@@ -21,14 +21,18 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import android.net.MacAddress;
 import android.net.wifi.ScanResult;
 import android.net.wifi.ScanResult.InformationElement;
+import android.util.SparseIntArray;
 
 import androidx.test.filters.SmallTest;
 
 import com.android.server.wifi.MboOceConstants;
 import com.android.server.wifi.WifiBaseTest;
 import com.android.server.wifi.hotspot2.NetworkDetail;
+import com.android.server.wifi.util.InformationElementUtil.ApType6GHz;
+import com.android.server.wifi.util.InformationElementUtil.EhtOperation;
 import com.android.server.wifi.util.InformationElementUtil.HeOperation;
 import com.android.server.wifi.util.InformationElementUtil.HtOperation;
 import com.android.server.wifi.util.InformationElementUtil.VhtOperation;
@@ -295,34 +299,202 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 testByteArray[3], results[0].bytes[0]);
     }
 
+    /** Verify subelement fragmentation within a fragmented element. */
+    @Test
+    public void parseInformationElementWithTwoLevelFragmentation() throws IOException {
+
+        /**
+         *   Format of the Multi link element
+         *
+         *   Ext Tag: Multi-Link
+         *     Ext Tag length: 578 (Tag len: 579)   [fragmented]
+         *     Ext Tag Number: Multi-Link
+         *      Multi-Link Control: 0x01b0
+         *      Common Info
+         *      Subelement ID: Per-STA Profile
+         *      Subelement Length: 309              [fragmented]
+         *      Per-STA Profile 1
+         *        Per-STA Profile, Link-ID = 0
+         *      Subelement ID: Per-STA Profile
+         *      Subelement Length: 248
+         *      Per-STA Profile 2
+         *        Per-STA Profile, Link-ID = 1
+         *
+         *      Basic STA Profile Count: 2
+         *      STA Profiles LinkIds: 0_1
+         */
+        byte[] testByteArray =
+                new byte[] {
+                    (byte) 0xff, (byte) 0xff, (byte) 0x6b, (byte) 0xb0, (byte) 0x01, (byte) 0x0d,
+                    (byte) 0x40, (byte) 0xed, (byte) 0x00, (byte) 0x14, (byte) 0xf9, (byte) 0xf1,
+                    (byte) 0x02, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x42, (byte) 0x00,
+                    (byte) 0x00, (byte) 0xff, (byte) 0xf0, (byte) 0x01, (byte) 0x13, (byte) 0x00,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x64,
+                    (byte) 0x00, (byte) 0x22, (byte) 0xa8, (byte) 0x31, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x31,
+                    (byte) 0x04, (byte) 0x01, (byte) 0x08, (byte) 0x82, (byte) 0x84, (byte) 0x8b,
+                    (byte) 0x96, (byte) 0x0c, (byte) 0x12, (byte) 0x18, (byte) 0x24, (byte) 0x03,
+                    (byte) 0x01, (byte) 0x06, (byte) 0x07, (byte) 0x06, (byte) 0x55, (byte) 0x53,
+                    (byte) 0x20, (byte) 0x01, (byte) 0x0b, (byte) 0x1e, (byte) 0x2a, (byte) 0x01,
+                    (byte) 0x00, (byte) 0x32, (byte) 0x04, (byte) 0x30, (byte) 0x48, (byte) 0x60,
+                    (byte) 0x6c, (byte) 0x2d, (byte) 0x1a, (byte) 0x8d, (byte) 0x09, (byte) 0x03,
+                    (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x01, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x3d,
+                    (byte) 0x16, (byte) 0x06, (byte) 0x04, (byte) 0x04, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x4a,
+                    (byte) 0x0e, (byte) 0x14, (byte) 0x00, (byte) 0x0a, (byte) 0x00, (byte) 0x2c,
+                    (byte) 0x01, (byte) 0xc8, (byte) 0x00, (byte) 0x14, (byte) 0x00, (byte) 0x05,
+                    (byte) 0x00, (byte) 0x19, (byte) 0x00, (byte) 0x7f, (byte) 0x08, (byte) 0x05,
+                    (byte) 0x00, (byte) 0x0f, (byte) 0x02, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x40, (byte) 0xbf, (byte) 0x0c, (byte) 0x92, (byte) 0x79, (byte) 0x83,
+                    (byte) 0x33, (byte) 0xaa, (byte) 0xff, (byte) 0x00, (byte) 0x00, (byte) 0xaa,
+                    (byte) 0xff, (byte) 0x00, (byte) 0x20, (byte) 0xc0, (byte) 0x05, (byte) 0x00,
+                    (byte) 0x06, (byte) 0x00, (byte) 0xfc, (byte) 0xff, (byte) 0xff, (byte) 0x1d,
+                    (byte) 0x23, (byte) 0x09, (byte) 0x01, (byte) 0x08, (byte) 0x1a, (byte) 0x40,
+                    (byte) 0x10, (byte) 0x00, (byte) 0x60, (byte) 0x40, (byte) 0x88, (byte) 0x0f,
+                    (byte) 0x43, (byte) 0x81, (byte) 0x1c, (byte) 0x11, (byte) 0x08, (byte) 0x00,
+                    (byte) 0xaa, (byte) 0xff, (byte) 0xaa, (byte) 0xff, (byte) 0x1b, (byte) 0x1c,
+                    (byte) 0xc7, (byte) 0x71, (byte) 0x1c, (byte) 0xc7, (byte) 0x71, (byte) 0xff,
+                    (byte) 0x07, (byte) 0x24, (byte) 0xf4, (byte) 0x3f, (byte) 0x00, (byte) 0x2e,
+                    (byte) 0xfc, (byte) 0xff, (byte) 0xff, (byte) 0x0f, (byte) 0x6c, (byte) 0x80,
+                    (byte) 0x00, (byte) 0xe0, (byte) 0x01, (byte) 0x03, (byte) 0x00, (byte) 0x18,
+                    (byte) 0x36, (byte) 0x08, (byte) 0x12, (byte) 0x00, (byte) 0x44, (byte) 0x44,
+                    (byte) 0x44, (byte) 0xff, (byte) 0x06, (byte) 0x6a, (byte) 0x04, (byte) 0x11,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0xdd, (byte) 0x17, (byte) 0x8c,
+                    (byte) 0xfd, (byte) 0xf0, (byte) 0x01, (byte) 0x01, (byte) 0x02, (byte) 0x01,
+                    (byte) 0x00, (byte) 0x02, (byte) 0x01, (byte) 0x01, (byte) 0x03, (byte) 0x03,
+                    (byte) 0x01, (byte) 0x01, (byte) 0x00, (byte) 0x04, (byte) 0x01, (byte) 0xf2,
+                    (byte) 0xff, (byte) 0x01, (byte) 0x09, (byte) 0x02, (byte) 0x0f, (byte) 0x00,
+                    (byte) 0xdd, (byte) 0x18, (byte) 0x00, (byte) 0x50, (byte) 0xf2, (byte) 0x02,
+                    (byte) 0x01, (byte) 0x01, (byte) 0x80, (byte) 0x00, (byte) 0x03, (byte) 0xa4,
+                    (byte) 0x00, (byte) 0xfe, (byte) 0x36, (byte) 0x00, (byte) 0x27, (byte) 0xa4,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x42, (byte) 0x43, (byte) 0x5e, (byte) 0x00,
+                    (byte) 0x62, (byte) 0x32, (byte) 0x2f, (byte) 0x00, (byte) 0xdd, (byte) 0x16,
+                    (byte) 0x8c, (byte) 0xfd, (byte) 0xf0, (byte) 0x04, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x49, (byte) 0x4c, (byte) 0x51, (byte) 0x03, (byte) 0x02, (byte) 0x09,
+                    (byte) 0x72, (byte) 0x01, (byte) 0xcb, (byte) 0x17, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x09, (byte) 0x11, (byte) 0x00, (byte) 0x00, (byte) 0xdd, (byte) 0x07,
+                    (byte) 0x8c, (byte) 0xfd, (byte) 0xf0, (byte) 0x04, (byte) 0x01, (byte) 0x01,
+                    (byte) 0x00, (byte) 0xff, (byte) 0x06, (byte) 0x38, (byte) 0x03, (byte) 0x20,
+                    (byte) 0x23, (byte) 0xc3, (byte) 0x00, (byte) 0x00, (byte) 0xf8, (byte) 0xf1,
+                    (byte) 0x01, (byte) 0x13, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x00, (byte) 0x02, (byte) 0x64, (byte) 0x00, (byte) 0x0c, (byte) 0x74,
+                    (byte) 0x19, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x00, (byte) 0x03, (byte) 0x11, (byte) 0x05, (byte) 0x07, (byte) 0x0a,
+                    (byte) 0x55, (byte) 0x53, (byte) 0x04, (byte) 0xc9, (byte) 0x83, (byte) 0x00,
+                    (byte) 0x21, (byte) 0x33, (byte) 0x00, (byte) 0x00, (byte) 0x23, (byte) 0x02,
+                    (byte) 0x13, (byte) 0x00, (byte) 0x7f, (byte) 0x0b, (byte) 0x04, (byte) 0x00,
+                    (byte) 0x4f, (byte) 0x02, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x40,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x09, (byte) 0xc3, (byte) 0x05, (byte) 0x53,
+                    (byte) 0x3c, (byte) 0x3c, (byte) 0x3c, (byte) 0x3c, (byte) 0xc3, (byte) 0x05,
+                    (byte) 0x13, (byte) 0x30, (byte) 0x30, (byte) 0x30, (byte) 0x30, (byte) 0xff,
+                    (byte) 0x27, (byte) 0x23, (byte) 0x09, (byte) 0x01, (byte) 0x08, (byte) 0x1a,
+                    (byte) 0x40, (byte) 0x10, (byte) 0x0c, (byte) 0x63, (byte) 0x40, (byte) 0x88,
+                    (byte) 0xfd, (byte) 0x5b, (byte) 0x81, (byte) 0x1c, (byte) 0x11, (byte) 0x08,
+                    (byte) 0x00, (byte) 0xaa, (byte) 0xff, (byte) 0xaa, (byte) 0xff, (byte) 0xaa,
+                    (byte) 0xff, (byte) 0xaa, (byte) 0xff, (byte) 0x7b, (byte) 0x1c, (byte) 0xc7,
+                    (byte) 0x71, (byte) 0x1c, (byte) 0xc7, (byte) 0x71, (byte) 0x1c, (byte) 0xc7,
+                    (byte) 0x71, (byte) 0x1c, (byte) 0xc7, (byte) 0x71, (byte) 0xff, (byte) 0x0c,
+                    (byte) 0x24, (byte) 0xf4, (byte) 0x3f, (byte) 0x02, (byte) 0x13, (byte) 0xfc,
+                    (byte) 0xff, (byte) 0x45, (byte) 0x03, (byte) 0x47, (byte) 0x4f, (byte) 0x01,
+                    (byte) 0xff, (byte) 0x03, (byte) 0x3b, (byte) 0xb8, (byte) 0x36, (byte) 0xff,
+                    (byte) 0x12, (byte) 0x6c, (byte) 0x00, (byte) 0x00, (byte) 0xe0, (byte) 0x1f,
+                    (byte) 0x1b, (byte) 0x00, (byte) 0x18, (byte) 0x36, (byte) 0xd8, (byte) 0x36,
+                    (byte) 0x00, (byte) 0x44, (byte) 0x44, (byte) 0x44, (byte) 0x44, (byte) 0x44,
+                    (byte) 0x44, (byte) 0xff, (byte) 0x06, (byte) 0x6a, (byte) 0x04, (byte) 0x11,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0xdd, (byte) 0x17, (byte) 0x8c,
+                    (byte) 0xfd, (byte) 0xf0, (byte) 0x01, (byte) 0x01, (byte) 0x02, (byte) 0x01,
+                    (byte) 0x00, (byte) 0x02, (byte) 0x01, (byte) 0x01, (byte) 0x03, (byte) 0x03,
+                    (byte) 0x01, (byte) 0x01, (byte) 0x00, (byte) 0x04, (byte) 0x01, (byte) 0x01,
+                    (byte) 0x09, (byte) 0x02, (byte) 0x0f, (byte) 0x0f, (byte) 0xf2, (byte) 0x45,
+                    (byte) 0xdd, (byte) 0x18, (byte) 0x00, (byte) 0x50, (byte) 0xf2, (byte) 0x02,
+                    (byte) 0x01, (byte) 0x01, (byte) 0x80, (byte) 0x00, (byte) 0x03, (byte) 0xa4,
+                    (byte) 0x00, (byte) 0x00, (byte) 0x27, (byte) 0xa4, (byte) 0x00, (byte) 0x00,
+                    (byte) 0x42, (byte) 0x43, (byte) 0x5e, (byte) 0x00, (byte) 0x62, (byte) 0x32,
+                    (byte) 0x2f, (byte) 0x00, (byte) 0xdd, (byte) 0x16, (byte) 0x8c, (byte) 0xfd,
+                    (byte) 0xf0, (byte) 0x04, (byte) 0x00, (byte) 0x00, (byte) 0x49, (byte) 0x4c,
+                    (byte) 0x51, (byte) 0x03, (byte) 0x02, (byte) 0x09, (byte) 0x72, (byte) 0x01,
+                    (byte) 0xcb, (byte) 0x17, (byte) 0x00, (byte) 0x00, (byte) 0x09, (byte) 0x11,
+                    (byte) 0x00, (byte) 0x00, (byte) 0xdd, (byte) 0x07, (byte) 0x8c, (byte) 0xfd,
+                    (byte) 0xf0, (byte) 0x04, (byte) 0x01, (byte) 0x01, (byte) 0x00, (byte) 0xff,
+                    (byte) 0x08, (byte) 0x38, (byte) 0x05, (byte) 0x2d, (byte) 0x3d, (byte) 0xbf,
+                    (byte) 0xc0, (byte) 0xc9, (byte) 0x00
+                };
+
+        final int MAX_NUM_IES = 3;
+        // Generate multiple IE's concatenated
+        ByteArrayOutputStream multiLinkIes = new ByteArrayOutputStream();
+        for (int i = 0; i < MAX_NUM_IES; ++i) {
+            multiLinkIes.write(testByteArray);
+        }
+
+        /* Multi link element fragmentation verification */
+        InformationElement[] results =
+                InformationElementUtil.parseInformationElements(multiLinkIes.toByteArray());
+        assertEquals("Parsed results should have 1 element", MAX_NUM_IES, results.length);
+        assertEquals(
+                "First result should have id = EID_EXTENSION_PRESENT",
+                InformationElement.EID_EXTENSION_PRESENT,
+                results[0].id);
+        assertEquals(
+                "First result should have idExt = " + InformationElement.EID_EXT_MULTI_LINK,
+                InformationElement.EID_EXT_MULTI_LINK,
+                results[0].idExt);
+        assertEquals("First result should have data of 578 bytes", 578, results[0].bytes.length);
+
+        /* Per STA profile sub-element fragmentation verification */
+        InformationElementUtil.MultiLink multiLink = new InformationElementUtil.MultiLink();
+        multiLink.from(results[0]);
+        assertTrue(multiLink.isPresent());
+        assertEquals(2, multiLink.getLinkId());
+        assertEquals(2, multiLink.getAffiliatedLinks().size());
+        assertEquals(0, multiLink.getAffiliatedLinks().get(0).getLinkId());
+        assertEquals(
+                MacAddress.fromString("00:00:00:00:00:01"),
+                multiLink.getAffiliatedLinks().get(0).getApMacAddress());
+        assertEquals(1, multiLink.getAffiliatedLinks().get(1).getLinkId());
+        assertEquals(
+                MacAddress.fromString("00:00:00:00:00:02"),
+                multiLink.getAffiliatedLinks().get(1).getApMacAddress());
+    }
+
     private void verifyCapabilityStringFromIes(
-            InformationElement[] ies, int beaconCap, boolean isOweSupported,
-            String capsStr) {
+            InformationElement[] ies,
+            int beaconCap,
+            boolean isOweSupported,
+            String capsStr,
+            SparseIntArray unknownAkmMap) {
         InformationElementUtil.Capabilities capabilities =
                 new InformationElementUtil.Capabilities();
-        capabilities.from(ies, beaconCap, isOweSupported, 2400);
+        capabilities.from(ies, beaconCap, isOweSupported, 2400, unknownAkmMap);
         String result = capabilities.generateCapabilitiesString();
 
         assertEquals(capsStr, result);
     }
 
     private void verifyCapabilityStringFromIe(
-            InformationElement ie, int beaconCap, boolean isOweSupported,
-            String capsStr) {
+            InformationElement ie,
+            int beaconCap,
+            boolean isOweSupported,
+            String capsStr,
+            SparseIntArray unknownAkmMap) {
         InformationElement[] ies = new InformationElement[] { ie };
-        verifyCapabilityStringFromIes(new InformationElement[] { ie },
-                beaconCap, isOweSupported, capsStr);
-
+        verifyCapabilityStringFromIes(
+                new InformationElement[] {ie}, beaconCap, isOweSupported, capsStr, unknownAkmMap);
     }
 
     private void verifyCapabilityStringFromIeWithoutOweSupported(
             InformationElement ie, String capsStr) {
-        verifyCapabilityStringFromIe(ie, 0x1 << 4, false, capsStr);
+        verifyCapabilityStringFromIe(ie, 0x1 << 4, false, capsStr, null);
     }
 
     private void verifyCapabilityStringFromIeWithOweSupported(
-            InformationElement ie, String capsStr) {
-        verifyCapabilityStringFromIe(ie, 0x1 << 4, true, capsStr);
+            InformationElement ie, String capsStr, SparseIntArray unknownAkmMap) {
+        verifyCapabilityStringFromIe(ie, 0x1 << 4, true, capsStr, unknownAkmMap);
     }
 
     /**
@@ -625,10 +797,12 @@ public class InformationElementUtilTest extends WifiBaseTest {
                                    (byte) 0xF2, (byte) 0x02, (byte) 0x00, (byte) 0x00 };
 
         InformationElement[] ies = new InformationElement[] { ieWpa, ieRsn };
-        verifyCapabilityStringFromIes(ies,
+        verifyCapabilityStringFromIes(
+                ies,
                 0x1 << 4,
                 false,
-                "[WPA-PSK-CCMP+TKIP][WPA2-PSK-CCMP+TKIP][RSN-PSK-CCMP+TKIP]");
+                "[WPA-PSK-CCMP+TKIP][WPA2-PSK-CCMP+TKIP][RSN-PSK-CCMP+TKIP]",
+                null);
     }
 
     /**
@@ -656,8 +830,8 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 (byte) 0x00, (byte) 0x0F, (byte) 0xAC, (byte) 0x08,
                 // Padding
                 (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIeWithOweSupported(ieRsn,
-                "[WPA2-PSK-CCMP][RSN-PSK+SAE-CCMP]");
+        verifyCapabilityStringFromIeWithOweSupported(
+                ieRsn, "[WPA2-PSK-CCMP][RSN-PSK+SAE-CCMP]", null);
     }
 
     /**
@@ -685,8 +859,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 (byte) 0x00, (byte) 0x0F, (byte) 0xAC, (byte) 0x09,
                 // Padding
                 (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIeWithOweSupported(ieRsn,
-                "[RSN-SAE+FT/SAE-CCMP]");
+        verifyCapabilityStringFromIeWithOweSupported(ieRsn, "[RSN-SAE+FT/SAE-CCMP]", null);
     }
 
     /**
@@ -714,8 +887,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 (byte) 0x00, (byte) 0x0F, (byte) 0xAC, (byte) 0x18,
                 // Padding
                 (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIeWithOweSupported(ieRsn,
-                "[RSN-SAE+SAE_EXT_KEY-CCMP]");
+        verifyCapabilityStringFromIeWithOweSupported(ieRsn, "[RSN-SAE+SAE_EXT_KEY-CCMP]", null);
     }
 
     /**
@@ -744,8 +916,8 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 (byte) 0x00, (byte) 0x0F, (byte) 0xAC, (byte) 0x19,
                 // Padding
                 (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIeWithOweSupported(ieRsn,
-                "[RSN-SAE_EXT_KEY+FT/SAE_EXT_KEY-CCMP]");
+        verifyCapabilityStringFromIeWithOweSupported(
+                ieRsn, "[RSN-SAE_EXT_KEY+FT/SAE_EXT_KEY-CCMP]", null);
     }
 
     /**
@@ -771,8 +943,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 (byte) 0x00, (byte) 0x0F, (byte) 0xAC, (byte) 0x12,
                 // Padding
                 (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIeWithOweSupported(ieRsn,
-                "[RSN-OWE-CCMP]");
+        verifyCapabilityStringFromIeWithOweSupported(ieRsn, "[RSN-OWE-CCMP]", null);
     }
 
     /**
@@ -788,8 +959,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 (byte) 0x50, (byte) 0x6F, (byte) 0x9A, (byte) 0x1C,
                 // OWE IE contains BSSID, SSID and channel of other BSS, but we don't parse it.
                 (byte) 0x00, (byte) 0x000, (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIe(ieOwe, 0x1 << 0, true,
-                "[RSN-OWE_TRANSITION-CCMP][ESS]");
+        verifyCapabilityStringFromIe(ieOwe, 0x1 << 0, true, "[RSN-OWE_TRANSITION-CCMP][ESS]", null);
     }
 
     /**
@@ -805,8 +975,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 (byte) 0x50, (byte) 0x6F, (byte) 0x9A, (byte) 0x1C,
                 // OWE IE contains BSSID, SSID and channel of other BSS, but we don't parse it.
                 (byte) 0x00, (byte) 0x000, (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIe(ieOwe, 0x1 << 0, false,
-                "[ESS]");
+        verifyCapabilityStringFromIe(ieOwe, 0x1 << 0, false, "[ESS]", null);
     }
 
     /**
@@ -869,9 +1038,11 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 (byte) 0x00, (byte) 0x0F, (byte) 0xAC, (byte) 0x0E,
                 // RSN capabilities
                 (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIeWithOweSupported(ieRsn,
+        verifyCapabilityStringFromIeWithOweSupported(
+                ieRsn,
                 "[WPA2-EAP/SHA1+EAP/SHA256+EAP-FILS-SHA256-CCMP]"
-                        + "[RSN-EAP/SHA1+EAP/SHA256+EAP-FILS-SHA256-CCMP]");
+                        + "[RSN-EAP/SHA1+EAP/SHA256+EAP-FILS-SHA256-CCMP]",
+                null);
     }
 
     /**
@@ -902,9 +1073,60 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 (byte) 0x00, (byte) 0x0F, (byte) 0xAC, (byte) 0x0F,
                 // RSN capabilities
                 (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIeWithOweSupported(ieRsn,
+        verifyCapabilityStringFromIeWithOweSupported(
+                ieRsn,
                 "[WPA2-EAP/SHA1+EAP/SHA256+EAP-FILS-SHA384-CCMP]"
-                    + "[RSN-EAP/SHA1+EAP/SHA256+EAP-FILS-SHA384-CCMP]");
+                        + "[RSN-EAP/SHA1+EAP/SHA256+EAP-FILS-SHA384-CCMP]",
+                null);
+    }
+
+    /**
+     * Test Capabilities.generateCapabilitiesString() with RSN IE, CCMP and unknown AKM suite
+     * selector. Expect the function to return a capability string with the mapped AKM scheme.
+     */
+    @Test
+    public void buildCapabilities_rsnIeUnknownAkmMapping() {
+        // unknown AKM (0x00, 0x40, 0x96, 0x00) -> known AKM (0x00, 0x0F, 0xAC, 0x18) - SAE_EXT_KEY
+        SparseIntArray unknownAkmMap =
+                new SparseIntArray() {
+                    {
+                        put(0x00964000, 0x12);
+                    }
+                };
+        InformationElement ieRsn = new InformationElement();
+        ieRsn.id = InformationElement.EID_RSN;
+        ieRsn.bytes =
+                new byte[] {
+                    // RSNE Version (0x0001)
+                    (byte) 0x01,
+                    (byte) 0x00,
+                    // Group cipher suite: CCMP
+                    (byte) 0x00,
+                    (byte) 0x0F,
+                    (byte) 0xAC,
+                    (byte) 0x04,
+                    // Number of cipher suites (1)
+                    (byte) 0x01,
+                    (byte) 0x00,
+                    // Cipher suite: CCMP
+                    (byte) 0x00,
+                    (byte) 0x0F,
+                    (byte) 0xAC,
+                    (byte) 0x04,
+                    // Number of AKMs (1)
+                    (byte) 0x01,
+                    (byte) 0x00,
+                    // unknown AKM (0x00, 0x40, 0x96, 0x00)
+                    (byte) 0x00,
+                    (byte) 0x40,
+                    (byte) 0x96,
+                    (byte) 0x00,
+                    // RSN capabilities
+                    (byte) 0x00,
+                    (byte) 0x00
+                };
+        verifyCapabilityStringFromIeWithOweSupported(
+                ieRsn, "[RSN-SAE_EXT_KEY-CCMP]", unknownAkmMap);
     }
 
     /**
@@ -926,10 +1148,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
                 (byte) 0xF2, (byte) 0x02, (byte) 0x02, (byte) 0x00,
                 (byte) 0x00, (byte) 0x50 };
         InformationElement[] ies = new InformationElement[] { ieWpa, ieRsn };
-        verifyCapabilityStringFromIes(ies,
-                0x1 << 4,
-                false,
-                "[WPA][RSN]");
+        verifyCapabilityStringFromIes(ies, 0x1 << 4, false, "[WPA][RSN]", null);
     }
 
     /**
@@ -953,10 +1172,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
         ieWps.bytes = new byte[] { (byte) 0x00, (byte) 0x50, (byte) 0xF2, (byte) 0x04 };
 
         InformationElement[] ies = new InformationElement[] { ieWpa, ieWps };
-        verifyCapabilityStringFromIes(ies,
-                0x1 << 4,
-                false,
-                "[WPA-PSK-CCMP+TKIP][WPS]");
+        verifyCapabilityStringFromIes(ies, 0x1 << 4, false, "[WPA-PSK-CCMP+TKIP][WPS]", null);
     }
 
     /**
@@ -990,7 +1206,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
         ie.bytes = new byte[] { (byte) 0x00, (byte) 0x04, (byte) 0x0E, (byte) 0x01,
                                 (byte) 0x01, (byte) 0x02, (byte) 0x01, (byte) 0x00,
                                 (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIe(ie, 0, false, "");
+        verifyCapabilityStringFromIe(ie, 0, false, "", null);
     }
 
     /**
@@ -1006,7 +1222,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
         ie.bytes = new byte[] { (byte) 0x00, (byte) 0x04, (byte) 0x0E, (byte) 0x01,
                                 (byte) 0x01, (byte) 0x02, (byte) 0x01, (byte) 0x00,
                                 (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIe(ie, 0x1 << 0, false, "[ESS]");
+        verifyCapabilityStringFromIe(ie, 0x1 << 0, false, "[ESS]", null);
     }
 
     /**
@@ -1023,7 +1239,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
         ie.bytes = new byte[] { (byte) 0x00, (byte) 0x04, (byte) 0x0E, (byte) 0x01,
                                 (byte) 0x01, (byte) 0x02, (byte) 0x01, (byte) 0x00,
                                 (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00 };
-        verifyCapabilityStringFromIe(ie, 0, false, "");
+        verifyCapabilityStringFromIe(ie, 0, false, "", null);
     }
 
     /**
@@ -1037,7 +1253,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
 
         InformationElementUtil.Capabilities capabilities =
                 new InformationElementUtil.Capabilities();
-        capabilities.from(new InformationElement[0], beaconCap, false, 2400);
+        capabilities.from(new InformationElement[0], beaconCap, false, 2400, null);
         String result = capabilities.generateCapabilitiesString();
 
         assertEquals("[IBSS]", result);
@@ -1054,7 +1270,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
 
         InformationElementUtil.Capabilities capabilities =
                 new InformationElementUtil.Capabilities();
-        capabilities.from(new InformationElement[0], beaconCap, false, 58320);
+        capabilities.from(new InformationElement[0], beaconCap, false, 58320, null);
         String result = capabilities.generateCapabilitiesString();
 
         assertEquals("[IBSS]", result);
@@ -1071,7 +1287,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
 
         InformationElementUtil.Capabilities capabilities =
                 new InformationElementUtil.Capabilities();
-        capabilities.from(new InformationElement[0], beaconCap, false, 58320);
+        capabilities.from(new InformationElement[0], beaconCap, false, 58320, null);
         String result = capabilities.generateCapabilitiesString();
 
         assertEquals("[ESS]", result);
@@ -1093,6 +1309,11 @@ public class InformationElementUtilTest extends WifiBaseTest {
         extendedCap.from(ie);
         assertFalse(extendedCap.isStrictUtf8());
         assertFalse(extendedCap.is80211McRTTResponder());
+        assertFalse(extendedCap.isTriggerBasedRangingRespSupported());
+        assertFalse(extendedCap.isNonTriggerBasedRangingRespSupported());
+        assertFalse(extendedCap.isTwtRequesterSupported());
+        assertFalse(extendedCap.isTwtResponderSupported());
+        assertFalse(extendedCap.isFilsCapable());
     }
 
     /**
@@ -1130,6 +1351,28 @@ public class InformationElementUtilTest extends WifiBaseTest {
         extendedCap.from(ie);
         assertFalse(extendedCap.isStrictUtf8());
         assertTrue(extendedCap.is80211McRTTResponder());
+    }
+
+    /**
+     * Verify Extended Capabilities: trigger and non-trigger based ranging support, TWT requester
+     * and responder support and FILS support.
+     */
+    @Test
+    public void testExtendedCapabilitiesMisc() {
+        InformationElement ie = new InformationElement();
+        ie.id = InformationElement.EID_EXTENDED_CAPS;
+        ie.bytes = new byte[] { (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+            (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+            (byte) 0x00, (byte) 0x61, (byte) 0x00, (byte) 0x0c };
+
+        InformationElementUtil.ExtendedCapabilities extendedCap =
+                new InformationElementUtil.ExtendedCapabilities();
+        extendedCap.from(ie);
+        assertTrue(extendedCap.isTriggerBasedRangingRespSupported());
+        assertTrue(extendedCap.isNonTriggerBasedRangingRespSupported());
+        assertTrue(extendedCap.isTwtRequesterSupported());
+        assertTrue(extendedCap.isTwtResponderSupported());
+        assertTrue(extendedCap.isFilsCapable());
     }
 
     /**
@@ -1546,7 +1789,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
          *          3                1            2           0/3           0/1         0/5
          *
          * HE Operation Info:
-         *    |  Misc | VHT Operatoin Info | Misc | 6 GHz Operation Info Present | reserved |
+         *    |  Misc | VHT Operation Info | Misc | 6 GHz Operation Info Present | reserved |
          * bits:  14           1              2                   1                   6
          *
          * 6GHz Info Format:
@@ -1591,7 +1834,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
          *          3                1            2           0/3           0/1         0/5
          *
          * HE Operation Info:
-         *    |  Misc | VHT Operatoin Info | Misc | 6 GHz Operation Info Present | reserved |
+         *    |  Misc | VHT Operation Info | Misc | 6 GHz Operation Info Present | reserved |
          * bits:  14           1              2                   1                   6
          *
          * 6GHz Info Format:
@@ -1636,7 +1879,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
          *          3                1            2           0/3           0/1         0/5
          *
          * HE Operation Info:
-         *    |  Misc | VHT Operatoin Info | Misc | 6 GHz Operation Info Present | reserved |
+         *    |  Misc | VHT Operation Info | Misc | 6 GHz Operation Info Present | reserved |
          * bits:  14           1              2                   1                   6
          *
          */
@@ -1675,7 +1918,7 @@ public class InformationElementUtilTest extends WifiBaseTest {
          *          3                1            2           0/3           0/1         0/5
          *
          * HE Operation Info:
-         *    |  Misc | VHT Operatoin Info | Misc | 6 GHz Operation Info Present | reserved |
+         *    |  Misc | VHT Operation Info | Misc | 6 GHz Operation Info Present | reserved |
          * bits:  14           1              2                   1                   6
          *
          * VHT Operation Info Format:
@@ -1702,6 +1945,45 @@ public class InformationElementUtilTest extends WifiBaseTest {
         assertEquals(5200, vhtOperation.getCenterFreq0());
         assertEquals(0, vhtOperation.getCenterFreq1());
     }
+
+    /**
+     * Verify TWT Info, 6 Ghz Access Point Type
+     */
+    @Test
+    public void testHeOperationMisc() throws Exception {
+        InformationElement ie = new InformationElement();
+        ie.id = InformationElement.EID_EXTENSION_PRESENT;
+        ie.idExt = InformationElement.EID_EXT_HE_OPERATION;
+        /**
+         * HE Operation Format:
+         * | HE Operation Info | BSS Color | Basic HE-MCS | VHT Info  | Cohosted BSS| 6GH Info |
+         *          3                1            2           0/3           0/1         0/5
+         *
+         * HE Operation Info:
+         *    |  Misc | VHT Operation Info | Misc | 6 GHz Operation Info Present | reserved |
+         * bits:  14           1              2                   1                   6
+         *
+         * 6GHz Info Format:
+         * | Primary Channel | Control | Center Freq Seg 0 | Center Freq Seg 1 | Min Rate |
+         *         1             1               1                  1               1
+         *
+         * Control Field:
+         *       | Channel Width | Duplicate Beacon | Reg Info | Reserved |
+         * bits:        2             1                  3          2
+         *
+         */
+        ie.bytes = new byte[]{(byte) 0x08, (byte) 0x00, (byte) 0x02,  //HE Operation Info
+            (byte) 0x00, (byte) 0x00, (byte) 0x00,  // BSS Color and HE-MCS
+            (byte) 0x10, (byte) 0x0B, (byte) 0x14, (byte) 0x1C, (byte) 0x00};
+
+        HeOperation heOperation = new HeOperation();
+        heOperation.from(ie);
+        assertTrue(heOperation.isPresent());
+        assertTrue(heOperation.is6GhzInfoPresent());
+        assertTrue(heOperation.isTwtRequired());
+        assertEquals(ApType6GHz.AP_TYPE_6GHZ_STANDARD_POWER, heOperation.getApType6GHz());
+    }
+
     /**
      * Verify that the expected max number of spatial stream is parsed correctly from
      * HT capabilities IE
@@ -1791,6 +2073,34 @@ public class InformationElementUtilTest extends WifiBaseTest {
         heCapabilities.from(ie);
         assertEquals(8, heCapabilities.getMaxNumberSpatialStreams());
         assertEquals(true, heCapabilities.isPresent());
+    }
+
+    @Test
+    public void testTwtHeCapabilities() throws Exception {
+        InformationElement ie = new InformationElement();
+        ie.id = InformationElement.EID_EXTENSION_PRESENT;
+        ie.idExt = InformationElement.EID_EXT_HE_CAPABILITIES;
+        /**
+         * HE Capabilities IE Format:
+         * | HE MAC Capabilities Info | HE PHY Capabilities Info | Supported HE-MCS and NSS Set |
+         *           6                              11                     4
+         *
+         * HE MAC Capabilities Info format:
+         *      B1 : TWT Requester Support
+         *      B2 : TWT Responder Support
+         *      B20: Broadcast TWT Support
+         */
+        ie.bytes = new byte[]{(byte) 0x06, (byte) 0x00, (byte) 0x10, (byte) 0x02, (byte) 0x40,
+            (byte) 0x04, (byte) 0x70, (byte) 0x0c, (byte) 0x80, (byte) 0x00, (byte) 0x07,
+            (byte) 0x80, (byte) 0x04, (byte) 0x00, (byte) 0xaa, (byte) 0xaa, (byte) 0xaa,
+            (byte) 0xaa, (byte) 0x7f, (byte) 0x1c, (byte) 0xc7, (byte) 0x71, (byte) 0x1c,
+            (byte) 0xc7, (byte) 0x71};
+        InformationElementUtil.HeCapabilities heCapabilities =
+                new InformationElementUtil.HeCapabilities();
+        heCapabilities.from(ie);
+        assertEquals(true, heCapabilities.isTwtRequesterSupported());
+        assertEquals(true, heCapabilities.isTwtResponderSupported());
+        assertEquals(true, heCapabilities.isBroadcastTwtSupported());
     }
 
     /**
@@ -2040,6 +2350,135 @@ public class InformationElementUtilTest extends WifiBaseTest {
     }
 
     /**
+     * Verify that the expected Multi-Link information element with fragmented link info to be
+     * parsed correctly.
+     */
+    @Test
+    public void parseMultiLinkIeWithFragmentedLinkInfo() throws Exception {
+        InformationElement ie = new InformationElement();
+        ie.id = InformationElement.EID_EXTENSION_PRESENT;
+        ie.idExt = InformationElement.EID_EXT_MULTI_LINK;
+
+        ie.bytes = new byte[] {
+                /* Multi-link Control */
+                (byte) 0xb0, (byte) 0x01,
+                /* Common Info */
+                (byte) 0x0d, (byte) 0x40, (byte) 0xed, (byte) 0x00, (byte) 0x14, (byte) 0xf9,
+                (byte) 0xf1, (byte) 0x02, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x42,
+                (byte) 0x00,
+                /* Per STA Profile 1: Fragmented */
+                (byte) 0x00, (byte) 0xff, (byte) 0xf0, (byte) 0x01, (byte) 0x13, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x64,
+                (byte) 0x00, (byte) 0x22, (byte) 0xa8, (byte) 0x31, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x31,
+                (byte) 0x04, (byte) 0x01, (byte) 0x08, (byte) 0x82, (byte) 0x84, (byte) 0x8b,
+                (byte) 0x96, (byte) 0x0c, (byte) 0x12, (byte) 0x18, (byte) 0x24, (byte) 0x03,
+                (byte) 0x01, (byte) 0x06, (byte) 0x07, (byte) 0x06, (byte) 0x55, (byte) 0x53,
+                (byte) 0x20, (byte) 0x01, (byte) 0x0b, (byte) 0x1e, (byte) 0x2a, (byte) 0x01,
+                (byte) 0x00, (byte) 0x32, (byte) 0x04, (byte) 0x30, (byte) 0x48, (byte) 0x60,
+                (byte) 0x6c, (byte) 0x2d, (byte) 0x1a, (byte) 0x8d, (byte) 0x09, (byte) 0x03,
+                (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x01, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x3d,
+                (byte) 0x16, (byte) 0x06, (byte) 0x04, (byte) 0x04, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x4a,
+                (byte) 0x0e, (byte) 0x14, (byte) 0x00, (byte) 0x0a, (byte) 0x00, (byte) 0x2c,
+                (byte) 0x01, (byte) 0xc8, (byte) 0x00, (byte) 0x14, (byte) 0x00, (byte) 0x05,
+                (byte) 0x00, (byte) 0x19, (byte) 0x00, (byte) 0x7f, (byte) 0x08, (byte) 0x05,
+                (byte) 0x00, (byte) 0x0f, (byte) 0x02, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0x40, (byte) 0xbf, (byte) 0x0c, (byte) 0x92, (byte) 0x79, (byte) 0x83,
+                (byte) 0x33, (byte) 0xaa, (byte) 0xff, (byte) 0x00, (byte) 0x00, (byte) 0xaa,
+                (byte) 0xff, (byte) 0x00, (byte) 0x20, (byte) 0xc0, (byte) 0x05, (byte) 0x00,
+                (byte) 0x06, (byte) 0x00, (byte) 0xfc, (byte) 0xff, (byte) 0xff, (byte) 0x1d,
+                (byte) 0x23, (byte) 0x09, (byte) 0x01, (byte) 0x08, (byte) 0x1a, (byte) 0x40,
+                (byte) 0x10, (byte) 0x00, (byte) 0x60, (byte) 0x40, (byte) 0x88, (byte) 0x0f,
+                (byte) 0x43, (byte) 0x81, (byte) 0x1c, (byte) 0x11, (byte) 0x08, (byte) 0x00,
+                (byte) 0xaa, (byte) 0xff, (byte) 0xaa, (byte) 0xff, (byte) 0x1b, (byte) 0x1c,
+                (byte) 0xc7, (byte) 0x71, (byte) 0x1c, (byte) 0xc7, (byte) 0x71, (byte) 0xff,
+                (byte) 0x07, (byte) 0x24, (byte) 0xf4, (byte) 0x3f, (byte) 0x00, (byte) 0x2e,
+                (byte) 0xfc, (byte) 0xff, (byte) 0xff, (byte) 0x0f, (byte) 0x6c, (byte) 0x80,
+                (byte) 0x00, (byte) 0xe0, (byte) 0x01, (byte) 0x03, (byte) 0x00, (byte) 0x18,
+                (byte) 0x36, (byte) 0x08, (byte) 0x12, (byte) 0x00, (byte) 0x44, (byte) 0x44,
+                (byte) 0x44, (byte) 0xff, (byte) 0x06, (byte) 0x6a, (byte) 0x04, (byte) 0x11,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0xdd, (byte) 0x17, (byte) 0x8c,
+                (byte) 0xfd, (byte) 0xf0, (byte) 0x01, (byte) 0x01, (byte) 0x02, (byte) 0x01,
+                (byte) 0x00, (byte) 0x02, (byte) 0x01, (byte) 0x01, (byte) 0x03, (byte) 0x03,
+                (byte) 0x01, (byte) 0x01, (byte) 0x00, (byte) 0x04, (byte) 0x01, (byte) 0x01,
+                (byte) 0x09, (byte) 0x02, (byte) 0x0f, (byte) 0x00, (byte) 0xdd, (byte) 0x18,
+                (byte) 0x00, (byte) 0x50, (byte) 0xf2, (byte) 0x02, (byte) 0x01, (byte) 0x01,
+                (byte) 0x80, (byte) 0x00, (byte) 0x03, (byte) 0xa4, (byte) 0x00, (byte) 0xfe,
+                (byte) 0x36, (byte) 0x00, (byte) 0x27, (byte) 0xa4, (byte) 0x00, (byte) 0x00,
+                (byte) 0x42, (byte) 0x43, (byte) 0x5e, (byte) 0x00, (byte) 0x62, (byte) 0x32,
+                (byte) 0x2f, (byte) 0x00, (byte) 0xdd, (byte) 0x16, (byte) 0x8c, (byte) 0xfd,
+                (byte) 0xf0, (byte) 0x04, (byte) 0x00, (byte) 0x00, (byte) 0x49, (byte) 0x4c,
+                (byte) 0x51, (byte) 0x03, (byte) 0x02, (byte) 0x09, (byte) 0x72, (byte) 0x01,
+                (byte) 0xcb, (byte) 0x17, (byte) 0x00, (byte) 0x00, (byte) 0x09, (byte) 0x11,
+                (byte) 0x00, (byte) 0x00, (byte) 0xdd, (byte) 0x07, (byte) 0x8c, (byte) 0xfd,
+                (byte) 0xf0, (byte) 0x04, (byte) 0x01, (byte) 0x01, (byte) 0x00, (byte) 0xff,
+                (byte) 0x06, (byte) 0x38, (byte) 0x03, (byte) 0x20, (byte) 0x23, (byte) 0xc3,
+                (byte) 0x00,
+                /* Per STA Profile 1: Non Fragmented */
+                (byte) 0x00, (byte) 0xf8, (byte) 0xf1, (byte) 0x01, (byte) 0x13, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x02, (byte) 0x64,
+                (byte) 0x00, (byte) 0x0c, (byte) 0x74, (byte) 0x19, (byte) 0x00, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x03, (byte) 0x11,
+                (byte) 0x05, (byte) 0x07, (byte) 0x0a, (byte) 0x55, (byte) 0x53, (byte) 0x04,
+                (byte) 0xc9, (byte) 0x83, (byte) 0x00, (byte) 0x21, (byte) 0x33, (byte) 0x00,
+                (byte) 0x00, (byte) 0x23, (byte) 0x02, (byte) 0x13, (byte) 0x00, (byte) 0x7f,
+                (byte) 0x0b, (byte) 0x04, (byte) 0x00, (byte) 0x4f, (byte) 0x02, (byte) 0x00,
+                (byte) 0x00, (byte) 0x00, (byte) 0x40, (byte) 0x00, (byte) 0x00, (byte) 0x09,
+                (byte) 0xc3, (byte) 0x05, (byte) 0x53, (byte) 0x3c, (byte) 0x3c, (byte) 0x3c,
+                (byte) 0x3c, (byte) 0xc3, (byte) 0x05, (byte) 0x13, (byte) 0x30, (byte) 0x30,
+                (byte) 0x30, (byte) 0x30, (byte) 0xff, (byte) 0x27, (byte) 0x23, (byte) 0x09,
+                (byte) 0x01, (byte) 0x08, (byte) 0x1a, (byte) 0x40, (byte) 0x10, (byte) 0x0c,
+                (byte) 0x63, (byte) 0x40, (byte) 0x88, (byte) 0xfd, (byte) 0x5b, (byte) 0x81,
+                (byte) 0x1c, (byte) 0x11, (byte) 0x08, (byte) 0x00, (byte) 0xaa, (byte) 0xff,
+                (byte) 0xaa, (byte) 0xff, (byte) 0xaa, (byte) 0xff, (byte) 0xaa, (byte) 0xff,
+                (byte) 0x7b, (byte) 0x1c, (byte) 0xc7, (byte) 0x71, (byte) 0x1c, (byte) 0xc7,
+                (byte) 0x71, (byte) 0x1c, (byte) 0xc7, (byte) 0x71, (byte) 0x1c, (byte) 0xc7,
+                (byte) 0x71, (byte) 0xff, (byte) 0x0c, (byte) 0x24, (byte) 0xf4, (byte) 0x3f,
+                (byte) 0x02, (byte) 0x13, (byte) 0xfc, (byte) 0xff, (byte) 0x45, (byte) 0x03,
+                (byte) 0x47, (byte) 0x4f, (byte) 0x01, (byte) 0xff, (byte) 0x03, (byte) 0x3b,
+                (byte) 0xb8, (byte) 0x36, (byte) 0xff, (byte) 0x12, (byte) 0x6c, (byte) 0x00,
+                (byte) 0x00, (byte) 0xe0, (byte) 0x1f, (byte) 0x1b, (byte) 0x00, (byte) 0x18,
+                (byte) 0x36, (byte) 0xd8, (byte) 0x36, (byte) 0x00, (byte) 0x44, (byte) 0x44,
+                (byte) 0x44, (byte) 0x44, (byte) 0x44, (byte) 0x44, (byte) 0xff, (byte) 0x06,
+                (byte) 0x6a, (byte) 0x04, (byte) 0x11, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+                (byte) 0xdd, (byte) 0x17, (byte) 0x8c, (byte) 0xfd, (byte) 0xf0, (byte) 0x01,
+                (byte) 0x01, (byte) 0x02, (byte) 0x01, (byte) 0x00, (byte) 0x02, (byte) 0x01,
+                (byte) 0x01, (byte) 0x03, (byte) 0x03, (byte) 0x01, (byte) 0x01, (byte) 0x00,
+                (byte) 0x04, (byte) 0x01, (byte) 0x01, (byte) 0x09, (byte) 0x02, (byte) 0x0f,
+                (byte) 0x0f, (byte) 0xdd, (byte) 0x18, (byte) 0x00, (byte) 0x50, (byte) 0xf2,
+                (byte) 0x02, (byte) 0x01, (byte) 0x01, (byte) 0x80, (byte) 0x00, (byte) 0x03,
+                (byte) 0xa4, (byte) 0x00, (byte) 0x00, (byte) 0x27, (byte) 0xa4, (byte) 0x00,
+                (byte) 0x00, (byte) 0x42, (byte) 0x43, (byte) 0x5e, (byte) 0x00, (byte) 0x62,
+                (byte) 0x32, (byte) 0x2f, (byte) 0x00, (byte) 0xdd, (byte) 0x16, (byte) 0x8c,
+                (byte) 0xfd, (byte) 0xf0, (byte) 0x04, (byte) 0x00, (byte) 0x00, (byte) 0x49,
+                (byte) 0x4c, (byte) 0x51, (byte) 0x03, (byte) 0x02, (byte) 0x09, (byte) 0x72,
+                (byte) 0x01, (byte) 0xcb, (byte) 0x17, (byte) 0x00, (byte) 0x00, (byte) 0x09,
+                (byte) 0x11, (byte) 0x00, (byte) 0x00, (byte) 0xdd, (byte) 0x07, (byte) 0x8c,
+                (byte) 0xfd, (byte) 0xf0, (byte) 0x04, (byte) 0x01, (byte) 0x01, (byte) 0x00,
+                (byte) 0xff, (byte) 0x08, (byte) 0x38, (byte) 0x05, (byte) 0x2d, (byte) 0x3d,
+                (byte) 0xbf, (byte) 0xc0, (byte) 0xc9, (byte) 0x00
+        };
+        InformationElementUtil.MultiLink multiLink = new InformationElementUtil.MultiLink();
+        multiLink.from(ie);
+        assertTrue(multiLink.isPresent());
+        assertEquals(2, multiLink.getLinkId());
+        assertEquals(2, multiLink.getAffiliatedLinks().size());
+        assertEquals(0, multiLink.getAffiliatedLinks().get(0).getLinkId());
+        assertEquals(
+                MacAddress.fromString("00:00:00:00:00:01"),
+                multiLink.getAffiliatedLinks().get(0).getApMacAddress());
+        assertEquals(1, multiLink.getAffiliatedLinks().get(1).getLinkId());
+        assertEquals(
+                MacAddress.fromString("00:00:00:00:00:02"),
+                multiLink.getAffiliatedLinks().get(1).getApMacAddress());
+    }
+    /**
      * verify determineMode for various combinations.
      */
     @Test
@@ -2094,4 +2533,93 @@ public class InformationElementUtilTest extends WifiBaseTest {
         assertEquals("US", country.getCountryCode());
     }
     // TODO: SAE, OWN, SUITE_B
+
+    /**
+     * Verify EHT capabilities default values.
+     */
+    @Test
+    public void testEhtCapabilitiesNotSet() {
+        InformationElement ie = new InformationElement();
+        ie.id = InformationElement.EID_EXTENSION_PRESENT;
+        ie.idExt = InformationElement.EID_EXT_EHT_CAPABILITIES;
+        ie.bytes = new byte[2];
+
+        InformationElementUtil.EhtCapabilities ehtCapabilities =
+                new InformationElementUtil.EhtCapabilities();
+        ehtCapabilities.from(ie);
+        assertFalse(ehtCapabilities.isRestrictedTwtSupported());
+        assertFalse(ehtCapabilities.isEpcsPriorityAccessSupported());
+    }
+
+    /**
+     * Verify EHT Capabilities, R-TWT support and EPCS priority support.
+     */
+    @Test
+    public void testEhtCapabilities() {
+        InformationElement ie = new InformationElement();
+        ie.id = InformationElement.EID_EXTENSION_PRESENT;
+        ie.idExt = InformationElement.EID_EXT_EHT_CAPABILITIES;
+        ie.bytes = new byte[]{(byte) 0x11, (byte) 0x00};
+
+        InformationElementUtil.EhtCapabilities ehtCapabilities =
+                new InformationElementUtil.EhtCapabilities();
+        ehtCapabilities.from(ie);
+        assertTrue(ehtCapabilities.isRestrictedTwtSupported());
+        assertTrue(ehtCapabilities.isEpcsPriorityAccessSupported());
+    }
+
+    /**
+     * Verify that the expected EHT Operation information element is parsed correctly.
+     */
+    @Test
+    public void testEhtOperationElement() throws Exception {
+        InformationElement ie = new InformationElement();
+        ie.id = InformationElement.EID_EXTENSION_PRESENT;
+        ie.idExt = InformationElement.EID_EXT_EHT_OPERATION;
+        /**
+         * EHT Operation Format:
+         * | EHT Operation Param | Basic EHT-MCS | EHT Operation Info |
+         *          1                   1                0/3/5
+         *
+         * EHT Operation Param:
+         * |  EHT Operation Info Present | Disabled Subchannel Bitmap present |
+         * bits:       1                                  1                        ...
+         *
+         * EHT Operation Info:
+         * | Control | CCFS0 | CCFS 1 | Disabled Subchannel Bitmap |
+         *     1         1       1             0/2
+         */
+        ie.bytes = new byte[]{(byte) 0x03, //EHT Operation Param
+                (byte) 0xfc, (byte) 0xff, (byte) 0xfc, (byte) 0xff, //EHT-MCS
+                (byte) 0x03, (byte) 0x32, (byte) 0x32, //EHT Operation Info: Control, CCFS0, CCFS1
+                (byte) 0x03, (byte) 0x00}; //EHT Operation Info: Disabled Subchannel Bitmap
+
+        EhtOperation ehtOperation = new EhtOperation();
+        ehtOperation.from(ie);
+
+        assertTrue(ehtOperation.isPresent());
+        assertTrue(ehtOperation.isEhtOperationInfoPresent());
+        assertTrue(ehtOperation.isDisabledSubchannelBitmapPresent());
+        assertArrayEquals(new byte[]{(byte) 0x3, (byte) 0x0},
+                ehtOperation.getDisabledSubchannelBitmap());
+        assertEquals(ScanResult.CHANNEL_WIDTH_160MHZ, ehtOperation.getChannelWidth());
+        assertEquals(5250, ehtOperation.getCenterFreq0(ScanResult.WIFI_BAND_5_GHZ));
+        assertEquals(5250, ehtOperation.getCenterFreq0(ScanResult.WIFI_BAND_5_GHZ));
+
+        ie.bytes = new byte[]{(byte) 0x01, //EHT Operation Param
+                (byte) 0x44, (byte) 0x44, (byte) 0x44, (byte) 0x44, //EHT-MCS
+                (byte) 0x04, (byte) 0x2f, (byte) 0x1f}; //EHT Operation Info: Control, CCFS0, CCFS1
+
+        ehtOperation.from(ie);
+
+        assertTrue(ehtOperation.isPresent());
+        assertTrue(ehtOperation.isEhtOperationInfoPresent());
+        assertFalse(ehtOperation.isDisabledSubchannelBitmapPresent());
+        assertEquals(ScanResult.CHANNEL_WIDTH_320MHZ, ehtOperation.getChannelWidth());
+        // Center frequency of channel index 47 (0x2F), 160 Mhz
+        assertEquals(6185, ehtOperation.getCenterFreq0(ScanResult.WIFI_BAND_6_GHZ));
+        // Center frequency of channel index 31 (0x1F), 320 Mhz
+        assertEquals(6105, ehtOperation.getCenterFreq1(ScanResult.WIFI_BAND_6_GHZ));
+
+    }
 }

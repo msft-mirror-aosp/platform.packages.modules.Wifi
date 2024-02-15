@@ -15,13 +15,14 @@
 // Make test APK
 // ============================================================
 package {
+    default_team: "trendy_team_fwk_wifi_hal",
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
 android_test {
     name: "FrameworksWifiTests",
 
-    srcs: [ "**/*.java" ],
+    srcs: ["**/*.java"],
 
     dxflags: ["--multi-dex"],
 
@@ -33,7 +34,7 @@ android_test {
         "hamcrest-library",
         "mockito-target-extended-minus-junit4",
         "frameworks-base-testutils",
-        "truth-prebuilt",
+        "truth",
 
         // Statically link wifi-service-pre-jarjar since we want to test the working copy of
         // service-wifi, not the on-device copy.

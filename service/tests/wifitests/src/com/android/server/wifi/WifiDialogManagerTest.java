@@ -42,7 +42,6 @@ import android.content.res.Resources;
 import android.net.wifi.WifiContext;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.os.UserHandle;
 import android.view.Display;
 import android.view.Window;
@@ -61,6 +60,7 @@ import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
@@ -82,23 +82,27 @@ public class WifiDialogManagerTest extends WifiBaseTest {
     @Mock WifiThreadRunner mWifiThreadRunner;
     @Mock FrameworkFacade mFrameworkFacade;
     @Mock Resources mResources;
-    @Mock PowerManager mPowerManager;
     @Mock ActivityManager mActivityManager;
+    @Mock WifiInjector mWifiInjector;
+    @Mock WifiDeviceStateChangeManager mWifiDeviceStateChangeManager;
+    @Captor ArgumentCaptor<BroadcastReceiver> mBroadcastReceiverArgumentCaptor;
     private WifiDialogManager mDialogManager;
 
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
         when(mWifiContext.getWifiDialogApkPkgName()).thenReturn(WIFI_DIALOG_APK_PKG_NAME);
-        when(mWifiContext.getSystemService(PowerManager.class)).thenReturn(mPowerManager);
         when(mWifiContext.getSystemService(ActivityManager.class)).thenReturn(mActivityManager);
         when(mWifiContext.getResources()).thenReturn(mResources);
-        when(mPowerManager.isInteractive()).thenReturn(true);
+        when(mWifiInjector.getWifiDeviceStateChangeManager())
+                .thenReturn(mWifiDeviceStateChangeManager);
         doThrow(SecurityException.class).when(mWifiContext).startActivityAsUser(any(), any(),
                 any());
-        mDialogManager =
-                new WifiDialogManager(mWifiContext, mWifiThreadRunner, mFrameworkFacade);
+        mDialogManager = new WifiDialogManager(mWifiContext, mWifiThreadRunner, mFrameworkFacade,
+                mWifiInjector);
         mDialogManager.enableVerboseLogging(true);
+        verify(mWifiContext).registerReceiver(mBroadcastReceiverArgumentCaptor.capture(), any(),
+                eq(SdkLevel.isAtLeastT() ? Context.RECEIVER_EXPORTED : 0));
     }
 
     private void dispatchMockWifiThreadRunner(WifiThreadRunner wifiThreadRunner) {
@@ -754,29 +758,17 @@ public class WifiDialogManagerTest extends WifiBaseTest {
 
         // ACTION_CLOSE_SYSTEM_DIALOGS with EXTRA_CLOSE_SYSTEM_DIALOGS_EXCEPT_WIFI should be
         // ignored.
-        ArgumentCaptor<BroadcastReceiver> broadcastReceiverCaptor = ArgumentCaptor.forClass(
-                BroadcastReceiver.class);
-        verify(mWifiContext).registerReceiver(broadcastReceiverCaptor.capture(), any(),
-                eq(SdkLevel.isAtLeastT() ? Context.RECEIVER_EXPORTED : 0));
-        broadcastReceiverCaptor.getValue().onReceive(mWifiContext,
+        mBroadcastReceiverArgumentCaptor.getValue().onReceive(mWifiContext,
                 new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
                         .putExtra(WifiManager.EXTRA_CLOSE_SYSTEM_DIALOGS_EXCEPT_WIFI, true));
         dispatchMockWifiThreadRunner(mWifiThreadRunner);
 
         verify(dialog, never()).cancel();
 
-        // ACTION_CLOSE_SYSTEM_DIALOGS due to screen off should be ignored.
-        when(mPowerManager.isInteractive()).thenReturn(false);
-        broadcastReceiverCaptor.getValue().onReceive(mWifiContext,
-                new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
-        dispatchMockWifiThreadRunner(mWifiThreadRunner);
-
-        verify(dialog, never()).cancel();
-
-        // ACTION_CLOSE_SYSTEM_DIALOGS while screen on should cancel the dialog.
-        when(mPowerManager.isInteractive()).thenReturn(true);
-        broadcastReceiverCaptor.getValue().onReceive(mWifiContext,
-                new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+        // ACTION_CLOSE_SYSTEM_DIALOGS without the extra should cancel the dialog.
+        mBroadcastReceiverArgumentCaptor
+                .getValue()
+                .onReceive(mWifiContext, new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
         dispatchMockWifiThreadRunner(mWifiThreadRunner);
 
         verify(dialog).cancel();
@@ -811,15 +803,13 @@ public class WifiDialogManagerTest extends WifiBaseTest {
         launchDialogSynchronous(dialogHandle, TIMEOUT_MILLIS, mWifiThreadRunner);
         verify(window).setType(WindowManager.LayoutParams.TYPE_KEYGUARD_DIALOG);
 
-        // Receive ACTION_SCREEN_OFF.
+        // Receive screen off event.
         when(dialog.isShowing()).thenReturn(true);
-        ArgumentCaptor<BroadcastReceiver> broadcastReceiverCaptor = ArgumentCaptor.forClass(
-                BroadcastReceiver.class);
-        verify(mWifiContext).registerReceiver(broadcastReceiverCaptor.capture(), any(),
-                eq(SdkLevel.isAtLeastT() ? Context.RECEIVER_EXPORTED : 0));
-        broadcastReceiverCaptor.getValue().onReceive(mWifiContext,
-                new Intent(Intent.ACTION_SCREEN_OFF));
-        dispatchMockWifiThreadRunner(mWifiThreadRunner);
+        ArgumentCaptor<WifiDeviceStateChangeManager.StateChangeCallback> callbackArgumentCaptor =
+                ArgumentCaptor.forClass(WifiDeviceStateChangeManager.StateChangeCallback.class);
+        verify(mWifiDeviceStateChangeManager).registerStateChangeCallback(
+                callbackArgumentCaptor.capture());
+        callbackArgumentCaptor.getValue().onScreenStateChanged(false);
 
         // Verify dialog was dismissed and relaunched with window type TYPE_APPLICATION_OVERLAY.
         verify(dialog, never()).cancel();

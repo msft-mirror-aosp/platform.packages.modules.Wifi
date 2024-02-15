@@ -22,13 +22,27 @@ import static com.android.server.wifi.WifiConfigurationTestUtil.SECURITY_EAP;
 import static com.android.server.wifi.WifiConfigurationTestUtil.SECURITY_PSK;
 import static com.android.server.wifi.WifiConfigurationTestUtil.generateWifiConfig;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiEnterpriseConfig;
 import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiSsid;
+import android.os.Process;
 import android.telephony.SubscriptionManager;
 import android.util.LocalLog;
 import android.util.Pair;
@@ -39,7 +53,6 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.WifiNetworkSuggestionsManager.ExtendedWifiNetworkSuggestion;
 import com.android.server.wifi.WifiNetworkSuggestionsManager.PerAppInfo;
 import com.android.server.wifi.entitlement.PseudonymInfo;
-import com.android.server.wifi.hotspot2.PasspointNetworkNominateHelper;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -74,19 +87,20 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
     private @Mock WifiConfigManager mWifiConfigManager;
     private @Mock WifiNetworkSuggestionsManager mWifiNetworkSuggestionsManager;
-    private @Mock PasspointNetworkNominateHelper mPasspointNetworkNominateHelper;
     private @Mock Clock mClock;
     private @Mock WifiCarrierInfoManager mWifiCarrierInfoManager;
     private @Mock WifiPseudonymManager mWifiPseudonymManager;
     private @Mock WifiMetrics mWifiMetrics;
     private NetworkSuggestionNominator mNetworkSuggestionNominator;
+    private List<Pair<ScanDetail, WifiConfiguration>> mPasspointCandidates =
+            Collections.emptyList();
 
     /** Sets up test. */
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
         mNetworkSuggestionNominator = new NetworkSuggestionNominator(
-                mWifiNetworkSuggestionsManager, mWifiConfigManager, mPasspointNetworkNominateHelper,
+                mWifiNetworkSuggestionsManager, mWifiConfigManager,
                 new LocalLog(100), mWifiCarrierInfoManager, mWifiPseudonymManager,
                 mWifiMetrics);
         when(mWifiCarrierInfoManager.getBestMatchSubscriptionId(any())).thenReturn(
@@ -126,7 +140,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -169,7 +184,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -211,7 +227,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -256,7 +273,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -301,7 +319,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -350,7 +369,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -396,7 +416,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -451,7 +472,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -495,7 +517,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -553,7 +576,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -618,7 +642,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) ->
                         connectableNetworks.add(Pair.create(scanDetail, configuration)));
 
@@ -675,7 +700,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -744,7 +770,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -804,14 +831,12 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         passpointCandidates.add(Pair.create(scanDetails[0],
                 suggestions[0].createInternalWifiConfiguration(mWifiCarrierInfoManager)));
-        when(mPasspointNetworkNominateHelper
-                .getPasspointNetworkCandidates(Arrays.asList(scanDetails), true))
-                .thenReturn(passpointCandidates);
         when(mWifiNetworkSuggestionsManager.getNetworkSuggestionsForFqdn(TEST_FQDN))
                 .thenReturn(matchedExtSuggestions);
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), passpointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -857,15 +882,13 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         passpointCandidates.add(Pair.create(scanDetails[0],
                 suggestions[0].createInternalWifiConfiguration(mWifiCarrierInfoManager)));
-        when(mPasspointNetworkNominateHelper
-                .getPasspointNetworkCandidates(Arrays.asList(scanDetails), true))
-                .thenReturn(passpointCandidates);
         // As user haven't approved this suggestion, return null
         when(mWifiNetworkSuggestionsManager.getNetworkSuggestionsForFqdn(TEST_FQDN))
                 .thenReturn(Set.of());
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), passpointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -909,7 +932,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -955,7 +979,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1005,7 +1030,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1060,7 +1086,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1111,7 +1138,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1157,7 +1185,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1203,7 +1232,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), true, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, true, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1247,7 +1277,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1294,7 +1325,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, true, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, true, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1338,7 +1370,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1385,7 +1418,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, true, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, true,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1435,7 +1469,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, true, true, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, true, true,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1484,7 +1519,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1534,7 +1570,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, true, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, true, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1584,7 +1621,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, true, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, true,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1632,7 +1670,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1679,7 +1718,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1723,7 +1763,8 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), false, false, false, Collections.emptySet(),
+                Arrays.asList(scanDetails), mPasspointCandidates, false, false, false,
+                Collections.emptySet(),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
@@ -1769,11 +1810,58 @@ public class NetworkSuggestionNominatorTest extends WifiBaseTest {
 
         List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
         mNetworkSuggestionNominator.nominateNetworks(
-                Arrays.asList(scanDetails), true, false, false,
+                Arrays.asList(scanDetails), mPasspointCandidates, true, false, false,
                 Set.of(suggestions[0].wns.wifiConfiguration.creatorUid),
                 (ScanDetail scanDetail, WifiConfiguration configuration) -> {
                     connectableNetworks.add(Pair.create(scanDetail, configuration));
                 });
+
+        validateConnectableNetworks(connectableNetworks, scanSsids[0]);
+        verify(mWifiMetrics, never())
+                .incrementNetworkSuggestionMoreThanOneSuggestionForSingleScanResult();
+    }
+
+    /**
+     * Ensure that we nominate the one matching network suggestion.
+     * Because the only matched suggestion is restricted and suggested by the SYSTEM_SERVER
+     * Expected connectable Networks: {suggestionSsids[0]}
+     */
+    @Test
+    public void testSelectNetworkSuggestionForOneMatchRestrictedAllowBySystemServer() {
+        String[] scanSsids = {"test1", "test2"};
+        String[] bssids = {"6c:f3:7f:ae:8c:f3", "6c:f3:7f:ae:8c:f4"};
+        int[] freqs = {2470, 2437};
+        String[] caps = {"[WPA2-EAP/SHA1-CCMP][ESS]", "[WPA2-EAP/SHA1-CCMP][ESS]"};
+        int[] levels = {-67, -76};
+        String[] suggestionSsids = {"\"" + scanSsids[0] + "\""};
+        int[] securities = {SECURITY_PSK};
+        boolean[] appInteractions = {true};
+        boolean[] meteredness = {true};
+        int[] priorities = {-1};
+        int[] uids = {Process.SYSTEM_UID};
+        String[] packageNames = {TEST_PACKAGE};
+        boolean[] autojoin = {true};
+        boolean[] shareWithUser = {true};
+        int[] priorityGroup = {0};
+
+        ScanDetail[] scanDetails =
+            buildScanDetails(scanSsids, bssids, freqs, caps, levels, mClock);
+        ExtendedWifiNetworkSuggestion[] suggestions = buildNetworkSuggestions(suggestionSsids,
+            securities, appInteractions, meteredness, priorities, uids,
+            packageNames, autojoin, shareWithUser, priorityGroup);
+        suggestions[0].wns.wifiConfiguration.restricted = true;
+        // Link the scan result with suggestions.
+        linkScanDetailsWithNetworkSuggestions(scanDetails, suggestions);
+
+        setupAddToWifiConfigManager(suggestions[0]);
+
+        List<Pair<ScanDetail, WifiConfiguration>> connectableNetworks = new ArrayList<>();
+        mNetworkSuggestionNominator.nominateNetworks(
+                Arrays.asList(scanDetails), mPasspointCandidates, true, false, false,
+                Collections.emptySet(), // restrictedNetworkAllowedUids is empty
+                (ScanDetail scanDetail, WifiConfiguration configuration) -> {
+                connectableNetworks.add(Pair.create(scanDetail, configuration));
+            });
 
         validateConnectableNetworks(connectableNetworks, scanSsids[0]);
         verify(mWifiMetrics, never())

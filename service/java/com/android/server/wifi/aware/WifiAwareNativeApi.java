@@ -44,7 +44,7 @@ import java.util.Map;
  */
 public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellCommand {
     private static final String TAG = "WifiAwareNativeApi";
-    private static final boolean VDBG = false; // STOPSHIP if true
+    private boolean mVdbg = false; // STOPSHIP if true
     private boolean mVerboseLoggingEnabled = false;
 
     private final WifiAwareNativeManager mHal;
@@ -53,26 +53,27 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
     public WifiAwareNativeApi(WifiAwareNativeManager wifiAwareNativeManager) {
         mHal = wifiAwareNativeManager;
         onReset();
-        if (VDBG) {
-            mTransactionIds = new SparseIntArray();
-        }
     }
 
     /**
      * Enable/Disable verbose logging.
      *
      */
-    public void enableVerboseLogging(boolean verboseEnabled, boolean halVerboseEnabled) {
+    public void enableVerboseLogging(boolean verboseEnabled, boolean vDbg) {
         mVerboseLoggingEnabled = verboseEnabled;
+        mVdbg = vDbg;
     }
 
     private void recordTransactionId(int transactionId) {
-        if (!VDBG) return;
+        if (!mVdbg) return;
 
         if (transactionId == 0) {
             return; // tid == 0 is used as a placeholder transaction ID in several commands
         }
 
+        if (mTransactionIds == null) {
+            mTransactionIds = new SparseIntArray();
+        }
         int count = mTransactionIds.get(transactionId);
         if (count != 0) {
             Log.wtf(TAG, "Repeated transaction ID == " + transactionId);
@@ -176,18 +177,18 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
         final PrintWriter pw = parentShell.getErrPrintWriter();
 
         String subCmd = parentShell.getNextArgRequired();
-        if (VDBG) Log.v(TAG, "onCommand: subCmd='" + subCmd + "'");
+        if (mVdbg) Log.v(TAG, "onCommand: subCmd='" + subCmd + "'");
         switch (subCmd) {
             case "set": {
                 String name = parentShell.getNextArgRequired();
-                if (VDBG) Log.v(TAG, "onCommand: name='" + name + "'");
+                if (mVdbg) Log.v(TAG, "onCommand: name='" + name + "'");
                 if (!mSettableParameters.containsKey(name)) {
                     pw.println("Unknown parameter name -- '" + name + "'");
                     return -1;
                 }
 
                 String valueStr = parentShell.getNextArgRequired();
-                if (VDBG) Log.v(TAG, "onCommand: valueStr='" + valueStr + "'");
+                if (mVdbg) Log.v(TAG, "onCommand: valueStr='" + valueStr + "'");
                 int value;
                 try {
                     value = Integer.valueOf(valueStr);
@@ -203,7 +204,7 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
                 String name = parentShell.getNextArgRequired();
                 String valueStr = parentShell.getNextArgRequired();
 
-                if (VDBG) {
+                if (mVdbg) {
                     Log.v(TAG, "onCommand: mode='" + mode + "', name='" + name + "'" + ", value='"
                             + valueStr + "'");
                 }
@@ -229,7 +230,7 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
             }
             case "get": {
                 String name = parentShell.getNextArgRequired();
-                if (VDBG) Log.v(TAG, "onCommand: name='" + name + "'");
+                if (mVdbg) Log.v(TAG, "onCommand: name='" + name + "'");
                 if (!mSettableParameters.containsKey(name)) {
                     pw.println("Unknown parameter name -- '" + name + "'");
                     return -1;
@@ -241,7 +242,7 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
             case "get-power": {
                 String mode = parentShell.getNextArgRequired();
                 String name = parentShell.getNextArgRequired();
-                if (VDBG) Log.v(TAG, "onCommand: mode='" + mode + "', name='" + name + "'");
+                if (mVdbg) Log.v(TAG, "onCommand: mode='" + mode + "', name='" + name + "'");
                 if (!mSettablePowerParameters.containsKey(mode)) {
                     pw.println("Unknown mode -- '" + mode + "'");
                     return -1;
@@ -764,16 +765,24 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
             byte[] pairingIdentityKey, boolean enablePairingCache, int requestType, byte[] pmk,
             String password, int akm, int cipherSuite) {
         if (mVerboseLoggingEnabled) {
-            Log.v(TAG, "respondToDataPathRequest: transactionId=" + transactionId + ", accept="
-                    + accept + ", int pairingId=" + pairingId
-                    + ", enablePairingCache=" + enablePairingCache
-                    + ", requestType" + requestType);
+            Log.v(
+                    TAG,
+                    "respondToPairingRequest: transactionId="
+                            + transactionId
+                            + ", accept="
+                            + accept
+                            + ", int pairingId="
+                            + pairingId
+                            + ", enablePairingCache="
+                            + enablePairingCache
+                            + ", requestType"
+                            + requestType);
         }
         recordTransactionId(transactionId);
 
         WifiNanIface iface = mHal.getWifiNanIface();
         if (iface == null) {
-            Log.e(TAG, "respondToDataPathRequest: null interface");
+            Log.e(TAG, "respondToPairingRequest: null interface");
             return false;
         }
         return iface.respondToPairingRequest(transactionId, pairingId, accept, pairingIdentityKey,
@@ -789,10 +798,12 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
      *                      indication).
      * @param peer          The MAC address of the peer to create a connection with.
      * @param method        proposed bootstrapping method
+     * @param pubSubId      ID of the publish/subscribe session - obtained when creating a session.
+     * @param isComeBack    If the request is for a previous comeback response
      * @return True if the request send success
      */
     public boolean initiateBootstrapping(short transactionId, int peerId, byte[] peer, int method,
-            byte[] cookie) {
+            byte[] cookie, byte pubSubId, boolean isComeBack) {
         if (mVerboseLoggingEnabled) {
             Log.v(TAG, "initiateBootstrapping: transactionId=" + transactionId
                     + ", peerId=" + peerId + ", method=" + method
@@ -808,7 +819,8 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
 
         try {
             MacAddress peerMac = MacAddress.fromBytes(peer);
-            return iface.initiateBootstrapping(transactionId, peerId, peerMac, method, cookie);
+            return iface.initiateBootstrapping(transactionId, peerId, peerMac, method, cookie,
+                    pubSubId, isComeBack);
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "Invalid peer mac received: " + Arrays.toString(peer));
             return false;
@@ -817,14 +829,17 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
 
     /**
      * Response to a bootstrapping request for this from this session
-     * @param transactionId Transaction ID for the transaction - used in the
-     *                      async callback to match with the original request.
+     *
+     * @param transactionId   Transaction ID for the transaction - used in the
+     *                        async callback to match with the original request.
      * @param bootstrappingId The id of the current boostraping session
-     * @param accept True is proposed method is accepted
+     * @param accept          True is proposed method is accepte
+     * @param pubSubId        ID of the publish/subscribe session - obtained when creating a
+     *                        session.
      * @return True if the request send success
      */
     public boolean respondToBootstrappingRequest(short transactionId, int bootstrappingId,
-            boolean accept) {
+            boolean accept, byte pubSubId) {
         if (mVerboseLoggingEnabled) {
             Log.v(TAG, "respondToBootstrappingRequest: transactionId=" + transactionId);
         }
@@ -836,7 +851,8 @@ public class WifiAwareNativeApi implements WifiAwareShellCommand.DelegatedShellC
             return false;
         }
 
-        return iface.respondToBootstrappingRequest(transactionId, bootstrappingId, accept);
+        return iface.respondToBootstrappingRequest(transactionId, bootstrappingId, accept,
+                pubSubId);
     }
 
     /**

@@ -16,6 +16,8 @@
 
 package com.android.server.wifi.aware;
 
+import android.annotation.Nullable;
+import android.net.wifi.OuiKeyedData;
 import android.net.wifi.aware.AwarePairingConfig;
 import android.net.wifi.aware.IdentityChangedListener;
 import android.net.wifi.aware.WifiAwareChannelInfo;
@@ -43,7 +45,7 @@ import java.util.List;
 public class WifiAwareNativeCallback implements WifiNanIface.Callback,
         WifiAwareShellCommand.DelegatedShellCommand {
     private static final String TAG = "WifiAwareNativeCallback";
-    private boolean mVerboseHalLoggingEnabled = false;
+    private boolean mVerboseLoggingEnabled = false;
 
     private final WifiAwareStateManager mWifiAwareStateManager;
 
@@ -55,8 +57,8 @@ public class WifiAwareNativeCallback implements WifiNanIface.Callback,
      * Enable/Disable verbose logging.
      *
      */
-    public void enableVerboseLogging(boolean verboseEnabled, boolean halVerboseEnabled) {
-        mVerboseHalLoggingEnabled = halVerboseEnabled;
+    public void enableVerboseLogging(boolean verboseEnabled) {
+        mVerboseLoggingEnabled = verboseEnabled;
     }
 
     /*
@@ -337,11 +339,12 @@ public class WifiAwareNativeCallback implements WifiNanIface.Callback,
     public void eventMatch(byte discoverySessionId, int peerId, byte[] addr,
             byte[] serviceSpecificInfo, byte[] matchFilter, int rangingIndicationType,
             int rangingMeasurementInMm, byte[] scid, int peerCipherType, byte[] nonce, byte[] tag,
-            AwarePairingConfig pairingConfig) {
+            AwarePairingConfig pairingConfig, @Nullable List<OuiKeyedData> vendorData) {
         incrementCbCount(CB_EV_MATCH);
         mWifiAwareStateManager.onMatchNotification(discoverySessionId, peerId,
                 addr, serviceSpecificInfo, matchFilter, rangingIndicationType,
-                rangingMeasurementInMm, scid, peerCipherType, nonce, tag, pairingConfig);
+                rangingMeasurementInMm, scid, peerCipherType, nonce, tag, pairingConfig,
+                vendorData);
     }
 
     @Override

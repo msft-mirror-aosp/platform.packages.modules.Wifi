@@ -17,6 +17,7 @@
 package android.net.wifi.p2p;
 
 import android.annotation.CallbackExecutor;
+import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -57,6 +58,7 @@ import androidx.annotation.RequiresApi;
 import com.android.internal.util.AsyncChannel;
 import com.android.internal.util.Protocol;
 import com.android.modules.utils.build.SdkLevel;
+import com.android.wifi.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -224,6 +226,20 @@ public class WifiP2pManager {
      */
     public static final String EXTRA_PARAM_KEY_INFORMATION_ELEMENT_LIST =
             "android.net.wifi.p2p.EXTRA_PARAM_KEY_INFORMATION_ELEMENT_LIST";
+
+    /**
+     * Extra for transporting discovery config with vendor-specific data
+     * @hide
+     */
+    public static final String EXTRA_PARAM_KEY_DISCOVERY_CONFIG =
+            "android.net.wifi.p2p.EXTRA_PARAM_KEY_DISCOVERY_CONFIG";
+
+    /**
+     * Extra for transporting extended listening parameters
+     * @hide
+     */
+    public static final String EXTRA_PARAM_KEY_EXT_LISTEN_PARAMS =
+            "android.net.wifi.p2p.EXTRA_PARAM_KEY_EXT_LISTEN_PARAMS";
 
     /**
      * Key for transporting a bundle of extra information.
@@ -522,21 +538,27 @@ public class WifiP2pManager {
 
     /**
      * Run P2P scan on all channels.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
     public static final int WIFI_P2P_SCAN_FULL = 0;
 
     /**
      * Run P2P scan only on social channels.
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
     public static final int WIFI_P2P_SCAN_SOCIAL = 1;
 
     /**
      * Run P2P scan only on a specific channel.
+     */
+    @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
+    public static final int WIFI_P2P_SCAN_SINGLE_FREQ = 2;
+
+    /**
+     * Run P2P scan with config Params.
      * @hide
      */
-    public static final int WIFI_P2P_SCAN_SINGLE_FREQ = 2;
+    public static final int WIFI_P2P_SCAN_WITH_CONFIG_PARAMS = 3;
 
     /** @hide */
     @IntDef(prefix = {"WIFI_P2P_SCAN_"}, value = {
@@ -546,6 +568,12 @@ public class WifiP2pManager {
     @Retention(RetentionPolicy.SOURCE)
     public @interface WifiP2pScanType {
     }
+
+    /**
+     * Enter the P2P listen state with additional parameters.
+     * @hide
+     */
+    public static final int WIFI_P2P_EXT_LISTEN_WITH_PARAMS = 1;
 
     /**
      * No channel specified for discover Peers APIs. Let lower layer decide the frequencies to scan
@@ -1822,6 +1850,38 @@ public class WifiP2pManager {
     }
 
     /**
+     * Initiate peer discovery. A discovery process involves scanning for available Wi-Fi peers
+     * for the purpose of establishing a connection. See {@link #discoverPeers} for more details.
+     *
+     * This method accepts a {@link WifiP2pDiscoveryConfig} object specifying the desired
+     * parameters for the peer discovery. The configuration object allows the specification of the
+     * scan type (ex. FULL, SOCIAL) and the inclusion of vendor-specific configuration data.
+     *
+     * @param channel is the channel created at {@link #initialize}
+     * @param config is the configuration for this peer discovery
+     * @param listener for callbacks on success or failure.
+     */
+    @RequiresPermission(allOf = {
+            android.Manifest.permission.NEARBY_WIFI_DEVICES,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+            }, conditional = true)
+    @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
+    public void discoverPeers(
+            @NonNull Channel channel,
+            @Nullable WifiP2pDiscoveryConfig config,
+            @Nullable ActionListener listener) {
+        if (!isChannelConstrainedDiscoverySupported()) {
+            throw new UnsupportedOperationException();
+        }
+        checkChannel(channel);
+        Bundle extras = prepareExtrasBundle(channel);
+        extras.putParcelable(EXTRA_PARAM_KEY_DISCOVERY_CONFIG, config);
+        channel.mAsyncChannel.sendMessage(prepareMessage(DISCOVER_PEERS,
+                WIFI_P2P_SCAN_WITH_CONFIG_PARAMS,
+                channel.putListener(listener), extras, channel.mContext));
+    }
+
+    /**
      * Stop an ongoing peer discovery
      *
      * <p> The function call immediately returns after sending a stop request
@@ -2040,6 +2100,38 @@ public class WifiP2pManager {
         Bundle extras = prepareExtrasBundle(channel);
         channel.mAsyncChannel.sendMessage(prepareMessage(START_LISTEN, 0,
                 channel.putListener(listener), extras, channel.mContext));
+    }
+
+    /**
+     * Force P2P to enter the listen state. See {@link #startListening(Channel, ActionListener)}
+     * for more details.
+     *
+     * This method accepts a {@link WifiP2pExtListenParams} object containing additional
+     * parameters.
+     *
+     * @param channel is the channel created at @link #initialize(Context, Looper, ChannelListener)}
+     * @param params are the parameters for this listen request.
+     * @param listener for callbacks on success or failure.
+     * @hide
+     */
+    @SystemApi
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    @RequiresPermission(allOf = {
+            android.Manifest.permission.NEARBY_WIFI_DEVICES,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+            }, conditional = true)
+    @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
+    public void startListening(
+            @NonNull Channel channel,
+            @NonNull WifiP2pExtListenParams params,
+            @Nullable ActionListener listener) {
+        checkChannel(channel);
+        Bundle extras = prepareExtrasBundle(channel);
+        Objects.requireNonNull(params);
+        extras.putParcelable(EXTRA_PARAM_KEY_EXT_LISTEN_PARAMS, params);
+        channel.mAsyncChannel.sendMessage(prepareMessage(START_LISTEN,
+                WIFI_P2P_EXT_LISTEN_WITH_PARAMS, channel.putListener(listener), extras,
+                channel.mContext));
     }
 
     /**

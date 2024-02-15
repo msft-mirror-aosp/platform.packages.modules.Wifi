@@ -163,6 +163,13 @@ public class WifiConfigurationUtil {
     }
 
     /**
+     * Helper method to check if the provided |config| corresponds to a DPP network or not.
+     */
+    public static boolean isConfigForDppNetwork(WifiConfiguration config) {
+        return config.isSecurityType(WifiConfiguration.SECURITY_TYPE_DPP);
+    }
+
+    /**
      * Helper method to check if the provided |config| corresponds to a WEP network or not.
      */
     public static boolean isConfigForWepNetwork(WifiConfiguration config) {
@@ -252,7 +259,7 @@ public class WifiConfigurationUtil {
      * MAC randomization setting has changed or not.
      * @param existingConfig Existing WifiConfiguration object corresponding to the network.
      * @param newConfig      New WifiConfiguration object corresponding to the network.
-     * @return true if MAC randomization setting setting changed or the existing confiuration is
+     * @return true if MAC randomization setting changed or the existing configuration is
      * null and the newConfig is setting macRandomizationSetting to the default value.
      */
     public static boolean hasMacRandomizationSettingsChanged(WifiConfiguration existingConfig,
@@ -261,6 +268,22 @@ public class WifiConfigurationUtil {
             return newConfig.macRandomizationSetting != WifiConfiguration.RANDOMIZATION_AUTO;
         }
         return newConfig.macRandomizationSetting != existingConfig.macRandomizationSetting;
+    }
+
+    /**
+     * Compare existing and new WifiConfiguration objects after a network update and return if
+     * DHCP hostname setting has changed or not.
+     * @param existingConfig Existing WifiConfiguration object corresponding to the network.
+     * @param newConfig      New WifiConfiguration object corresponding to the network.
+     * @return true if DHCP hostname setting changed or the existing configuration is
+     * null and the newConfig is setting the DHCP hostname setting to the default value.
+     */
+    public static boolean hasSendDhcpHostnameEnabledChanged(WifiConfiguration existingConfig,
+            WifiConfiguration newConfig) {
+        if (existingConfig == null) {
+            return !newConfig.isSendDhcpHostnameEnabled();
+        }
+        return newConfig.isSendDhcpHostnameEnabled() != existingConfig.isSendDhcpHostnameEnabled();
     }
 
     /**
@@ -334,6 +357,10 @@ public class WifiConfigurationUtil {
             }
             if (!TextUtils.equals(newEnterpriseConfig.getDomainSuffixMatch(),
                     existingEnterpriseConfig.getDomainSuffixMatch())) {
+                return true;
+            }
+            if (newEnterpriseConfig.getMinimumTlsVersion()
+                    != existingEnterpriseConfig.getMinimumTlsVersion()) {
                 return true;
             }
         } else {
@@ -475,7 +502,8 @@ public class WifiConfigurationUtil {
         return true;
     }
 
-    private static boolean validatePassword(String password, boolean isAdd, boolean isSae) {
+    private static boolean validatePassword(String password, boolean isAdd, boolean isSae,
+            boolean isWapi) {
         if (isAdd) {
             if (password == null) {
                 Log.e(TAG, "validatePassword: null string");
@@ -517,7 +545,14 @@ public class WifiConfigurationUtil {
             }
         } else {
             // HEX PSK string
-            if (password.length() != PSK_SAE_HEX_LEN) {
+            if (isWapi) {
+                // Protect system against malicious actors injecting arbitrarily large passwords.
+                if (password.length() > 100) {
+                    Log.e(TAG, "validatePassword failed: WAPI hex string too long: "
+                            + password.length());
+                    return false;
+                }
+            } else if (password.length() != PSK_SAE_HEX_LEN) {
                 Log.e(TAG, "validatePassword failed: hex string size mismatch: "
                         + password.length());
                 return false;
@@ -725,15 +760,15 @@ public class WifiConfigurationUtil {
             return false;
         }
         if (config.isSecurityType(WifiConfiguration.SECURITY_TYPE_PSK)
-                && !validatePassword(config.preSharedKey, isAdd, false)) {
+                && !validatePassword(config.preSharedKey, isAdd, false, false)) {
             return false;
         }
         if (config.isSecurityType(WifiConfiguration.SECURITY_TYPE_SAE)
-                && !validatePassword(config.preSharedKey, isAdd, true)) {
+                && !validatePassword(config.preSharedKey, isAdd, true, false)) {
             return false;
         }
         if (config.isSecurityType(WifiConfiguration.SECURITY_TYPE_WAPI_PSK)
-                && !validatePassword(config.preSharedKey, isAdd, false)) {
+                && !validatePassword(config.preSharedKey, isAdd, false, true)) {
             return false;
         }
         if (config.isSecurityType(WifiConfiguration.SECURITY_TYPE_DPP)
@@ -897,11 +932,11 @@ public class WifiConfigurationUtil {
             return false;
         }
         if (config.isSecurityType(WifiConfiguration.SECURITY_TYPE_PSK)
-                && !validatePassword(config.preSharedKey, true, false)) {
+                && !validatePassword(config.preSharedKey, true, false, false)) {
             return false;
         }
         if (config.isSecurityType(WifiConfiguration.SECURITY_TYPE_SAE)
-                && !validatePassword(config.preSharedKey, true, true)) {
+                && !validatePassword(config.preSharedKey, true, true, false)) {
             return false;
         }
         // TBD: Validate some enterprise params as well in the future here.
@@ -936,6 +971,9 @@ public class WifiConfigurationUtil {
             return false;
         }
         if (WifiConfigurationUtil.hasCredentialChanged(config, config1)) {
+            return false;
+        }
+        if (config.isWifi7Enabled() != config1.isWifi7Enabled()) {
             return false;
         }
         return true;

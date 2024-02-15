@@ -16,10 +16,13 @@
 
 package android.net.wifi;
 
+import static android.Manifest.permission.ACCESS_FINE_LOCATION;
+import static android.Manifest.permission.LOCATION_HARDWARE;
 import static android.Manifest.permission.NEARBY_WIFI_DEVICES;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
+import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -54,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 
 /**
  * This class provides a way to scan the Wifi universe around the device
@@ -75,6 +79,18 @@ public class WifiScanner {
     public static final int WIFI_BAND_INDEX_60_GHZ = 4;
     /** @hide */
     public static final int WIFI_BAND_COUNT = 5;
+
+    /**
+     * Reserved bit for Multi-internet connection only, not for scanning.
+     * @hide
+     */
+    public static final int WIFI_BAND_INDEX_5_GHZ_LOW = 29;
+
+    /**
+     * Reserved bit for Multi-internet connection only, not for scanning.
+     * @hide
+     */
+    public static final int WIFI_BAND_INDEX_5_GHZ_HIGH = 30;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -98,6 +114,17 @@ public class WifiScanner {
     public static final int WIFI_BAND_6_GHZ = 1 << WIFI_BAND_INDEX_6_GHZ;
     /** 60 GHz band */
     public static final int WIFI_BAND_60_GHZ = 1 << WIFI_BAND_INDEX_60_GHZ;
+
+    /**
+     * Reserved for Multi-internet connection only, not for scanning.
+     * @hide
+     */
+    public static final int WIFI_BAND_5_GHZ_LOW = 1 << WIFI_BAND_INDEX_5_GHZ_LOW;
+    /**
+     * Reserved for Multi-internet connection only, not for scanning.
+     * @hide
+     */
+    public static final int WIFI_BAND_5_GHZ_HIGH = 1 << WIFI_BAND_INDEX_5_GHZ_HIGH;
 
     /**
      * Combination of bands
@@ -812,7 +839,8 @@ public class WifiScanner {
         /** all scan results discovered in this scan, sorted by timestamp in ascending order */
         private final List<ScanResult> mResults;
 
-        ScanData() {
+        /** {@hide} */
+        public ScanData() {
             mResults = new ArrayList<>();
         }
 
@@ -1537,6 +1565,41 @@ public class WifiScanner {
         }
     }
 
+    /**
+     * Retrieve the scan data cached by the hardware.
+     *
+     * @param executor The executor on which callback will be invoked.
+     * @param resultsCallback An asynchronous callback that will return the cached scan data.
+     *
+     * @throws UnsupportedOperationException if the API is not supported on this SDK version.
+     * @throws SecurityException if the caller does not have permission.
+     * @throws NullPointerException if the caller provided invalid inputs.
+     */
+    @FlaggedApi("com.android.wifi.flags.cached_scan_data")
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    @RequiresPermission(allOf = {ACCESS_FINE_LOCATION, LOCATION_HARDWARE})
+    public void getCachedScanData(@NonNull @CallbackExecutor Executor executor,
+            @NonNull Consumer<ScanData> resultsCallback) {
+        Objects.requireNonNull(executor, "executor cannot be null");
+        Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+        try {
+            mService.getCachedScanData(mContext.getPackageName(),
+                    mContext.getAttributionTag(),
+                    new IScanDataListener.Stub() {
+                        @Override
+                        public void onResult(@NonNull ScanData scanData) {
+                            Binder.clearCallingIdentity();
+                            executor.execute(() -> {
+                                resultsCallback.accept(scanData);
+                            });
+                        }
+                    });
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+
     private void startPnoScan(PnoScanListener listener, Executor executor,
             ScanSettings scanSettings, PnoSettings pnoSettings) {
         // Set the PNO scan flag.
@@ -1830,6 +1893,8 @@ public class WifiScanner {
     public static final int CMD_GET_SCAN_RESULTS            = BASE + 4;
     /** @hide */
     public static final int CMD_SCAN_RESULT                 = BASE + 5;
+    /** @hide */
+    public static final int CMD_CACHED_SCAN_DATA            = BASE + 6;
     /** @hide */
     public static final int CMD_OP_SUCCEEDED                = BASE + 17;
     /** @hide */

@@ -26,10 +26,12 @@ import android.content.pm.PackageManager;
 import android.hardware.wifi.WifiStatusCode;
 import android.net.MacAddress;
 import android.net.apf.ApfCapabilities;
+import android.net.wifi.OuiKeyedData;
 import android.net.wifi.ScanResult;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiAvailableChannel;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WifiManager.RoamingMode;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiSsid;
 import android.os.Handler;
@@ -390,18 +392,20 @@ public class WifiVendorHal {
      * @param band The requesting band for this AP interface.
      * @param isBridged Whether or not AP interface is a bridge interface.
      * @param softApManager SoftApManager of the request.
+     * @param vendorData List of {@link OuiKeyedData} containing vendor-provided
+     *                   configuration data. Empty list indicates no vendor data.
      * @return iface name on success, null otherwise.
      */
     public String createApIface(@Nullable InterfaceDestroyedListener destroyedListener,
             @NonNull WorkSource requestorWs,
             @SoftApConfiguration.BandType int band,
             boolean isBridged,
-            @NonNull SoftApManager softApManager) {
+            @NonNull SoftApManager softApManager, @NonNull List<OuiKeyedData> vendorData) {
         synchronized (sLock) {
             WifiApIface iface = mHalDeviceManager.createApIface(
                     getNecessaryCapabilitiesForSoftApMode(band),
                     new ApInterfaceDestroyedListenerInternal(destroyedListener), mHalEventHandler,
-                    requestorWs, isBridged, softApManager);
+                    requestorWs, isBridged, softApManager, vendorData);
             if (iface == null) {
                 mLog.err("Failed to create AP iface").flush();
                 return null;
@@ -709,6 +713,20 @@ public class WifiVendorHal {
             if (iface == null) return null;
             if (mScan == null) return null;
             return mScan.latestScanResults;
+        }
+    }
+
+    /**
+     * Gets the cached scan data.
+     *
+     * @param ifaceName Name of the interface.
+     */
+    @Nullable
+    public WifiScanner.ScanData getCachedScanData(@NonNull String ifaceName) {
+        synchronized (sLock) {
+            WifiStaIface iface = getStaIface(ifaceName);
+            if (iface == null) return null;
+            return iface.getCachedScanData();
         }
     }
 
@@ -1993,6 +2011,26 @@ public class WifiVendorHal {
             WifiStaIface iface = getStaIface(ifaceName);
             if (iface == null) return null;
             return mHalDeviceManager.getSupportedBandCombinations(iface);
+        }
+    }
+
+    /**
+     * See {@link WifiNative#setAfcChannelAllowance(WifiChip.AfcChannelAllowance)}
+     */
+    public boolean setAfcChannelAllowance(WifiChip.AfcChannelAllowance afcChannelAllowance) {
+        if (mWifiChip == null) return false;
+        return mWifiChip.setAfcChannelAllowance(afcChannelAllowance);
+    }
+
+    /**
+     * See {@link WifiNative#setRoamingMode(String, int)}.
+     */
+    public @WifiStatusCode int setRoamingMode(@NonNull String ifaceName,
+                                              @RoamingMode int roamingMode) {
+        synchronized (sLock) {
+            WifiStaIface iface = getStaIface(ifaceName);
+            if (iface == null) return WifiStatusCode.ERROR_WIFI_IFACE_INVALID;
+            return iface.setRoamingMode(roamingMode);
         }
     }
 }

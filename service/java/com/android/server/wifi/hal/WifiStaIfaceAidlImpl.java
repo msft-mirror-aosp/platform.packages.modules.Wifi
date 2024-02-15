@@ -19,6 +19,8 @@ package com.android.server.wifi.hal;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
+import android.hardware.wifi.CachedScanData;
+import android.hardware.wifi.CachedScanResult;
 import android.hardware.wifi.IWifiStaIfaceEventCallback;
 import android.hardware.wifi.Ssid;
 import android.hardware.wifi.StaApfPacketFilterCapabilities;
@@ -38,6 +40,8 @@ import android.hardware.wifi.StaRoamingState;
 import android.hardware.wifi.StaScanData;
 import android.hardware.wifi.StaScanDataFlagMask;
 import android.hardware.wifi.StaScanResult;
+import android.hardware.wifi.TwtSession;
+import android.hardware.wifi.TwtSessionStats;
 import android.hardware.wifi.WifiBand;
 import android.hardware.wifi.WifiChannelStats;
 import android.hardware.wifi.WifiDebugPacketFateFrameType;
@@ -45,11 +49,14 @@ import android.hardware.wifi.WifiDebugRxPacketFate;
 import android.hardware.wifi.WifiDebugRxPacketFateReport;
 import android.hardware.wifi.WifiDebugTxPacketFate;
 import android.hardware.wifi.WifiDebugTxPacketFateReport;
+import android.hardware.wifi.WifiRatePreamble;
 import android.hardware.wifi.WifiStatusCode;
 import android.net.MacAddress;
 import android.net.apf.ApfCapabilities;
 import android.net.wifi.ScanResult;
+import android.net.wifi.WifiAnnotations;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WifiManager.RoamingMode;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiSsid;
 import android.net.wifi.WifiUsabilityStatsEntry;
@@ -63,6 +70,7 @@ import com.android.server.wifi.WifiLinkLayerStats;
 import com.android.server.wifi.WifiLoggerHal;
 import com.android.server.wifi.WifiNative;
 import com.android.server.wifi.util.BitMask;
+import com.android.server.wifi.util.HalAidlUtil;
 import com.android.server.wifi.util.NativeUtil;
 import com.android.wifi.resources.R;
 
@@ -238,6 +246,9 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
     public WifiNative.ScanCapabilities getBackgroundScanCapabilities() {
         final String methodStr = "getBackgroundScanCapabilities";
         synchronized (mLock) {
+            if (!checkIfaceAndLogFailure(methodStr)) {
+                return null;
+            }
             try {
                 StaBackgroundScanCapabilities halCaps =
                         mWifiStaIface.getBackgroundScanCapabilities();
@@ -362,6 +373,28 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
             return null;
         }
     }
+
+    /**
+     * See comments for {@link IWifiStaIface#getCachedScanData()}
+     */
+    @Override
+    @Nullable
+    public WifiScanner.ScanData getCachedScanData() {
+        final String methodStr = "getCachedScanData";
+        synchronized (mLock) {
+            try {
+                if (!checkIfaceAndLogFailure(methodStr)) return null;
+                CachedScanData scanData = mWifiStaIface.getCachedScanData();
+                return halToFrameworkCachedScanData(scanData);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+            }
+            return null;
+        }
+    }
+
 
     /**
      * See comments for {@link IWifiStaIface#getLinkLayerStats()}
@@ -683,6 +716,47 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
         }
     }
 
+    /**
+     * See comments for {@link IWifiStaIface#setRoamingMode(int)}
+     */
+    public @WifiStatusCode int setRoamingMode(@RoamingMode int roamingMode) {
+        final String methodStr = "setRoamingMode";
+        @WifiStatusCode int errorCode = WifiStatusCode.ERROR_UNKNOWN;
+        synchronized (mLock) {
+            try {
+                if (checkIfaceAndLogFailure(methodStr)) {
+                    mWifiStaIface.setRoamingState(frameworkToHalRoamingMode(roamingMode));
+                    errorCode = WifiStatusCode.SUCCESS;
+                }
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+                errorCode = WifiStatusCode.ERROR_NOT_STARTED;
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+                errorCode = e.errorCode;
+            } catch (IllegalArgumentException e) {
+                handleIllegalArgumentException(e, methodStr);
+                errorCode = WifiStatusCode.ERROR_INVALID_ARGS;
+            }
+            return errorCode;
+        }
+    }
+
+    private static byte frameworkToHalRoamingMode(
+            @WifiManager.RoamingMode int mode) {
+        switch (mode) {
+            case WifiManager.ROAMING_MODE_NONE:
+                return StaRoamingState.DISABLED;
+            case WifiManager.ROAMING_MODE_NORMAL:
+                return StaRoamingState.ENABLED;
+            case WifiManager.ROAMING_MODE_AGGRESSIVE:
+                return StaRoamingState.AGGRESSIVE;
+            default:
+                throw new IllegalArgumentException("frameworkToHalRoamingMode Invalid mode: "
+                        + mode);
+        }
+    }
+
     private class StaIfaceEventCallback extends IWifiStaIfaceEventCallback.Stub {
         @Override
         public void onBackgroundScanFailure(int cmdId) {
@@ -724,6 +798,42 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
         @Override
         public int getInterfaceVersion() {
             return IWifiStaIfaceEventCallback.VERSION;
+        }
+
+        @Override
+        public void onTwtFailure(int cmdId, byte twtErrorCode) {
+            //TODO: Implementation
+        }
+
+        @Override
+        public void onTwtSessionCreate(int cmdId, TwtSession twtSession) {
+            //TODO: Implementation
+        }
+
+        @Override
+        public void onTwtSessionUpdate(int cmdId, TwtSession twtSession) {
+            //TODO: Implementation
+        }
+
+        @Override
+        public void onTwtSessionResume(int cmdId, int sessionId) {
+            //TODO: Implementation
+        }
+
+        @Override
+        public void onTwtSessionSuspend(int cmdId, int sessionId) {
+            //TODO: Implementation
+        }
+
+        @Override
+        public void onTwtSessionTeardown(int cmdId, int twtSessionId, byte twtReasonCode) {
+            //TODO: Implementation
+        }
+
+        @Override
+        public void onTwtSessionStats(int cmdId, int twtSessionId,
+                TwtSessionStats twtSessionStats) {
+            //TODO: Implementation
         }
     }
 
@@ -787,6 +897,76 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
                             WifiScanner.WIFI_BAND_UNSPECIFIED, frameworkScanResults);
         }
         return frameworkScanDatas;
+    }
+
+    @WifiAnnotations.WifiStandard
+    private static int wifiRatePreambleToWifiStandard(int wifiRatePreamble) {
+        switch (wifiRatePreamble) {
+            case WifiRatePreamble.CCK:
+            case WifiRatePreamble.OFDM:
+                return ScanResult.WIFI_STANDARD_LEGACY;
+            case WifiRatePreamble.HT:
+                return ScanResult.WIFI_STANDARD_11N;
+            case WifiRatePreamble.VHT:
+                return ScanResult.WIFI_STANDARD_11AC;
+            case WifiRatePreamble.HE:
+                return ScanResult.WIFI_STANDARD_11AX;
+            case WifiRatePreamble.EHT:
+                return ScanResult.WIFI_STANDARD_11BE;
+            default:
+                return ScanResult.WIFI_STANDARD_UNKNOWN;
+        }
+    }
+
+    private ScanResult halToFrameworkCachedScanResult(CachedScanResult scanResult) {
+        if (scanResult == null) return null;
+        WifiSsid originalSsid = WifiSsid.fromBytes(scanResult.ssid);
+        MacAddress bssid;
+        try {
+            bssid = MacAddress.fromString(NativeUtil.macAddressFromByteArray(scanResult.bssid));
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Failed to get BSSID of scan result: " + e);
+            return null;
+        }
+        ScanResult frameworkScanResult = new ScanResult();
+        frameworkScanResult.setWifiSsid(mSsidTranslator.getTranslatedSsidAndRecordBssidCharset(
+                originalSsid, bssid));
+        frameworkScanResult.BSSID = bssid.toString();
+        frameworkScanResult.level = scanResult.rssiDbm;
+        frameworkScanResult.frequency = scanResult.frequencyMhz;
+        frameworkScanResult.timestamp = scanResult.timeStampInUs;
+        frameworkScanResult.channelWidth = HalAidlUtil
+                .getChannelBandwidthFromHal(scanResult.channelWidthMhz);
+        frameworkScanResult.setWifiStandard(
+                wifiRatePreambleToWifiStandard(scanResult.preambleType));
+        return frameworkScanResult;
+    }
+
+    private ScanResult[] aidlToFrameworkCachedScanResults(CachedScanResult[] cachedScanResults) {
+        if (cachedScanResults == null) return new ScanResult[0];
+        List<ScanResult> frameworkScanResults = new ArrayList<>();
+        for (CachedScanResult cachedScanResult : cachedScanResults) {
+            ScanResult frameworkScanResult = halToFrameworkCachedScanResult(cachedScanResult);
+            if (frameworkScanResult == null) {
+                Log.e(TAG, "aidlToFrameworkCachedScanResults: unable to convert aidl to framework "
+                        + "scan result!");
+                continue;
+            }
+            frameworkScanResults.add(frameworkScanResult);
+        }
+        return frameworkScanResults.toArray(new ScanResult[0]);
+    }
+
+    private WifiScanner.ScanData halToFrameworkCachedScanData(CachedScanData cachedScanData) {
+        if (cachedScanData == null) return null;
+        ScanResult[] scanResults = aidlToFrameworkCachedScanResults(
+                cachedScanData.cachedScanResults);
+
+        // Todo b/319658055: map cachedScanData.scannedFrequenciesMhz to WifiScanner.WifiBand
+        WifiScanner.ScanData frameworkScanData = new WifiScanner.ScanData(0, 0,
+                0, WifiScanner.WIFI_BAND_UNSPECIFIED, scanResults);
+
+        return frameworkScanData;
     }
 
     private static StaRoamingConfig frameworkToHalStaRoamingConfig(List<MacAddress> bssidBlocklist,
@@ -930,6 +1110,10 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.SCAN_RAND)) {
             features |= WifiManager.WIFI_FEATURE_SCAN_RAND;
+        }
+        if (hasCapability(halFeatureSet,
+                android.hardware.wifi.IWifiStaIface.FeatureSetMask.ROAMING_MODE_CONTROL)) {
+            features |= WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT;
         }
         return features;
     }
