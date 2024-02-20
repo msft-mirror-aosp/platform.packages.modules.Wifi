@@ -10241,6 +10241,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
     @Test
     public void testSetExternalPnoScanRequest_Success() throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
+        when(mWifiGlobals.isBackgroundScanSupported()).thenReturn(true);
         when(mActiveModeWarden.getSupportedFeatureSet())
                 .thenReturn(WifiManager.WIFI_FEATURE_PNO);
         when(mWifiPermissionsUtil.checkRequestCompanionProfileAutomotiveProjectionPermission(
@@ -11507,6 +11508,11 @@ public class WifiServiceImplTest extends WifiBaseTest {
         assumeTrue(SdkLevel.isAtLeastU());
         enableQosPolicyFeature();
 
+        ConcreteClientModeManager primaryCmm = mock(ConcreteClientModeManager.class);
+        when(primaryCmm.isWifiStandardSupported(anyInt())).thenReturn(true);
+        when(mActiveModeWarden.getPrimaryClientModeManager()).thenReturn(primaryCmm);
+        mLooper.startAutoDispatch(); // handles call to isWifiStandardSupported
+
         List<QosPolicyParams> paramsList = createDownlinkQosPolicyParamsList(5, true);
         IBinder binder = mock(IBinder.class);
         IListListener listener = mock(IListListener.class);
@@ -11523,6 +11529,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mApplicationQosPolicyRequestHandler, times(expectedNumCalls)).queueAddRequest(
                 anyList(), any(), any(), anyInt());
+        mLooper.stopAutoDispatchAndIgnoreExceptions();
     }
 
     /**
@@ -12224,20 +12231,33 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 == nonAdminRoamingPolicies.size());
     }
 
+    private void verifyIsPnoSupported(boolean isBackgroundScanSupported, boolean isSwPnoEnabled,
+            boolean isPnoFeatureSet) {
+        when(mWifiGlobals.isBackgroundScanSupported()).thenReturn(isBackgroundScanSupported);
+        when(mWifiGlobals.isSwPnoEnabled()).thenReturn(isSwPnoEnabled);
+        if (isPnoFeatureSet) {
+            when(mActiveModeWarden.getSupportedFeatureSet())
+                    .thenReturn(WifiManager.WIFI_FEATURE_PNO);
+        } else {
+            when(mActiveModeWarden.getSupportedFeatureSet()).thenReturn(0L);
+        }
+        assertEquals(mWifiServiceImpl.isPnoSupported(),
+                (isBackgroundScanSupported && isPnoFeatureSet) || isSwPnoEnabled);
+    }
+
     /*
      * Verify that Pno is supported.
      */
     @Test
-    public void testIsPnoSupported() {
-        when(mWifiGlobals.isBackgroundScanSupported()).thenReturn(false);
-        assertFalse(mWifiServiceImpl.isPnoSupported());
-        when(mActiveModeWarden.getSupportedFeatureSet()).thenReturn(0L);
-        assertFalse(mWifiServiceImpl.isPnoSupported());
-
-        when(mActiveModeWarden.getSupportedFeatureSet()).thenReturn(WifiManager.WIFI_FEATURE_PNO);
-        assertTrue(mWifiServiceImpl.isPnoSupported());
-        when(mWifiGlobals.isBackgroundScanSupported()).thenReturn(true);
-        assertTrue(mWifiServiceImpl.isPnoSupported());
+    public void testIsPnoSupported() throws Exception {
+        verifyIsPnoSupported(false, false, false);
+        verifyIsPnoSupported(true, false, false);
+        verifyIsPnoSupported(false, true, false);
+        verifyIsPnoSupported(false, false, true);
+        verifyIsPnoSupported(true, true, false);
+        verifyIsPnoSupported(false, true, true);
+        verifyIsPnoSupported(true, false, true);
+        verifyIsPnoSupported(true, true, true);
     }
 
     @Test
