@@ -2219,10 +2219,10 @@ public class WifiMetrics {
                             currentConnectionEvent.mConfigSsid,
                             mClock.getElapsedSinceBootMillis(),
                             band, currentConnectionEvent.mAuthType);
-
-                    // TODO(b/166309727) need to add ifaceName to WifiStatsLog
-                    WifiStatsLog.write(WifiStatsLog.WIFI_CONNECTION_STATE_CHANGED,
-                            true, band, currentConnectionEvent.mAuthType);
+                    if (currentConnectionEvent.mRole == WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
+                        WifiStatsLog.write(WifiStatsLog.WIFI_CONNECTION_STATE_CHANGED,
+                                true, band, currentConnectionEvent.mAuthType);
+                    }
                 }
 
                 currentConnectionEvent.mConnectionEvent.connectionResult =
@@ -2682,12 +2682,13 @@ public class WifiMetrics {
             if (!isPrimary(ifaceName)) {
                 return;
             }
-            WifiStatsLog.write(WifiStatsLog.WIFI_CONNECTION_STATE_CHANGED,
-                    false,
-                    mCurrentSession != null ? mCurrentSession.mBand : 0,
-                    mCurrentSession != null ? mCurrentSession.mAuthType : 0);
-
             if (mCurrentSession != null) {
+                if (mCurrentSession.mConnectionEvent.mRole == WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
+                    WifiStatsLog.write(WifiStatsLog.WIFI_CONNECTION_STATE_CHANGED,
+                            false,
+                            mCurrentSession.mBand,
+                            mCurrentSession.mAuthType);
+                }
                 mCurrentSession.mSessionEndTimeMillis = mClock.getElapsedSinceBootMillis();
                 int durationSeconds = (int) (mCurrentSession.mSessionEndTimeMillis
                         - mCurrentSession.mSessionStartTimeMillis) / 1000;
@@ -4869,9 +4870,6 @@ public class WifiMetrics {
                         + mContext.getResources().getBoolean(
                                 R.bool.config_wifi_connected_mac_randomization_supported));
                 pw.println("mWifiLogProto.scoreExperimentId=" + mWifiLogProto.scoreExperimentId);
-                pw.println("mExperimentValues.wifiIsUnusableLoggingEnabled="
-                        + mContext.getResources().getBoolean(
-                                R.bool.config_wifiIsUnusableEventMetricsEnabled));
                 pw.println("mExperimentValues.wifiDataStallMinTxBad="
                         + mContext.getResources().getInteger(
                                 R.integer.config_wifiDataStallMinTxBad));
@@ -5574,8 +5572,6 @@ public class WifiMetrics {
             mWifiLogProto.wifiWakeStats = mWifiWakeMetrics.buildProto();
             mWifiLogProto.isMacRandomizationOn = mContext.getResources().getBoolean(
                     R.bool.config_wifi_connected_mac_randomization_supported);
-            mExperimentValues.wifiIsUnusableLoggingEnabled = mContext.getResources().getBoolean(
-                    R.bool.config_wifiIsUnusableEventMetricsEnabled);
             mExperimentValues.linkSpeedCountsLoggingEnabled = mContext.getResources().getBoolean(
                     R.bool.config_wifiLinkSpeedMetricsEnabled);
             mExperimentValues.wifiDataStallMinTxBad = mContext.getResources().getInteger(
@@ -6885,9 +6881,6 @@ public class WifiMetrics {
             return;
         }
         mScoreBreachLowTimeMillis = -1;
-        if (!mContext.getResources().getBoolean(R.bool.config_wifiIsUnusableEventMetricsEnabled)) {
-            return;
-        }
 
         long currentBootTime = mClock.getElapsedSinceBootMillis();
         switch (triggerType) {
@@ -7777,7 +7770,7 @@ public class WifiMetrics {
     /**
      * Add a new listener for Wi-Fi usability stats handling.
      */
-    public void addOnWifiUsabilityListener(IOnWifiUsabilityStatsListener listener) {
+    public void addOnWifiUsabilityListener(@NonNull IOnWifiUsabilityStatsListener listener) {
         if (!mOnWifiUsabilityListeners.register(listener)) {
             Log.e(TAG, "Failed to add listener");
             return;
@@ -7791,7 +7784,7 @@ public class WifiMetrics {
     /**
      * Remove an existing listener for Wi-Fi usability stats handling.
      */
-    public void removeOnWifiUsabilityListener(IOnWifiUsabilityStatsListener listener) {
+    public void removeOnWifiUsabilityListener(@NonNull IOnWifiUsabilityStatsListener listener) {
         mOnWifiUsabilityListeners.unregister(listener);
         if (DBG) {
             Log.v(TAG, "Removing listener. Num listeners: "
@@ -9443,6 +9436,10 @@ public class WifiMetrics {
                 getSoftApStartedStaApConcurrency(isStaApSupported, isStaDbsSupported),
                 getSoftApStartedStaStatus(staFreqMhz),
                 getSoftApStartedAuthType(securityType));
+        if (startResult == SoftApManager.START_RESULT_SUCCESS) {
+            WifiStatsLog.write(WifiStatsLog.SOFT_AP_STATE_CHANGED,
+                    WifiStatsLog.SOFT_AP_STATE_CHANGED__HOTSPOT_ON__STATE_ON);
+        }
     }
 
     private static int getSoftApStoppedStopEvent(@SoftApManager.StopEvent int stopEvent) {
@@ -9627,5 +9624,7 @@ public class WifiMetrics {
                 dbsFailureBand,
                 dbsTimeoutBand,
                 getSoftApStoppedUpstreamType(upstreamCaps));
+        WifiStatsLog.write(WifiStatsLog.SOFT_AP_STATE_CHANGED,
+                WifiStatsLog.SOFT_AP_STATE_CHANGED__HOTSPOT_ON__STATE_OFF);
     }
 }

@@ -1786,7 +1786,8 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         NetworkUpdateResult result = verifyAddNetworkToWifiConfigManager(openNetwork);
 
         mWifiConfigManager
-                .updateBeforeConnect(result.getNetworkId(), TEST_CREATOR_UID, TEST_PACKAGE_NAME);
+                .updateBeforeConnect(result.getNetworkId(), TEST_CREATOR_UID, TEST_PACKAGE_NAME,
+                        true);
 
         WifiConfiguration retrievedNetwork =
                 mWifiConfigManager.getConfiguredNetwork(result.getNetworkId());
@@ -1921,6 +1922,101 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         verifyUpdateNetworkToWifiConfigManagerWithoutIpChange(network);
         WifiConfigurationTestUtil.assertConfigurationEqualForConfigManagerAddOrUpdate(
                 network, mWifiConfigManager.getConfiguredNetworkWithPassword(network.networkId));
+    }
+
+    /**
+     * Verify that the protected WifiEnterpriseConfig fields are set correctly.
+     */
+    @Test
+    public void testWifiEnterpriseConfigProtectedFields() {
+        // Add an external config. Expect the internal config to have the default values.
+        WifiConfiguration externalConfig = WifiConfigurationTestUtil.createEapNetwork();
+        externalConfig.enterpriseConfig.setUserApproveNoCaCert(true);
+        externalConfig.enterpriseConfig.setTofuDialogState(
+                WifiEnterpriseConfig.TOFU_DIALOG_STATE_ACCEPTED);
+
+        NetworkUpdateResult result = verifyAddNetworkToWifiConfigManager(externalConfig);
+        WifiConfiguration internalConfig = mWifiConfigManager.getConfiguredNetwork(
+                result.getNetworkId());
+        assertFalse(internalConfig.enterpriseConfig.isUserApproveNoCaCert());
+        assertEquals(
+                WifiEnterpriseConfig.TOFU_DIALOG_STATE_UNSPECIFIED,
+                internalConfig.enterpriseConfig.getTofuDialogState());
+
+        // Update using an external config. Expect internal config to retain the default values.
+        result = verifyUpdateNetworkToWifiConfigManager(externalConfig);
+        internalConfig = mWifiConfigManager.getConfiguredNetwork(
+                result.getNetworkId());
+        assertFalse(internalConfig.enterpriseConfig.isUserApproveNoCaCert());
+        assertEquals(
+                WifiEnterpriseConfig.TOFU_DIALOG_STATE_UNSPECIFIED,
+                internalConfig.enterpriseConfig.getTofuDialogState());
+
+        // If the internal config's values are updated by the framework, merging
+        // with an external config should not overwrite the internal values.
+        mWifiConfigManager.setUserApproveNoCaCert(externalConfig.networkId, true);
+        mWifiConfigManager.setTofuDialogApproved(externalConfig.networkId, true);
+        externalConfig.enterpriseConfig.setUserApproveNoCaCert(false);
+        externalConfig.enterpriseConfig.setTofuDialogApproved(false);
+
+        result = verifyUpdateNetworkToWifiConfigManager(externalConfig);
+        internalConfig = mWifiConfigManager.getConfiguredNetwork(
+                result.getNetworkId());
+        assertTrue(internalConfig.enterpriseConfig.isUserApproveNoCaCert());
+        assertEquals(
+                WifiEnterpriseConfig.TOFU_DIALOG_STATE_ACCEPTED,
+                internalConfig.enterpriseConfig.getTofuDialogState());
+    }
+
+    /**
+     * Verify that the TOFU connection state is set correctly when an Enterprise config is added or
+     * updated.
+     */
+    @Test
+    public void testEnterpriseConfigTofuStateMerge() {
+        long featureSet = WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
+        when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(featureSet);
+
+        // If the configuration has never connected, the merged TOFU connection state
+        // should be set based on the latest external configuration.
+        WifiConfiguration config =
+                prepareTofuEapConfig(
+                        WifiEnterpriseConfig.Eap.SIM, WifiEnterpriseConfig.Phase2.NONE);
+        config.enterpriseConfig.enableTrustOnFirstUse(false);
+        NetworkUpdateResult result = addNetworkToWifiConfigManager(config);
+        WifiConfiguration internalConfig =
+                mWifiConfigManager.getConfiguredNetwork(result.getNetworkId());
+        assertEquals(
+                WifiEnterpriseConfig.TOFU_STATE_NOT_ENABLED,
+                internalConfig.enterpriseConfig.getTofuConnectionState());
+
+        // Enabling TOFU in the external config should lead to the Enabled Pre-Connection state.
+        config.enterpriseConfig.enableTrustOnFirstUse(true);
+        config.enterpriseConfig.setEapMethod(WifiEnterpriseConfig.Eap.PEAP);
+        result = updateNetworkToWifiConfigManager(config);
+        internalConfig = mWifiConfigManager.getConfiguredNetwork(result.getNetworkId());
+        assertEquals(
+                WifiEnterpriseConfig.TOFU_STATE_ENABLED_PRE_CONNECTION,
+                internalConfig.enterpriseConfig.getTofuConnectionState());
+
+        // Invalid post-connection values in the external config should be ignored,
+        // since external configs should not be setting their own TOFU connection state.
+        config.enterpriseConfig.setTofuConnectionState(
+                WifiEnterpriseConfig.TOFU_STATE_CERT_PINNING);
+        result = updateNetworkToWifiConfigManager(config);
+        internalConfig = mWifiConfigManager.getConfiguredNetwork(result.getNetworkId());
+        assertEquals(
+                WifiEnterpriseConfig.TOFU_STATE_ENABLED_PRE_CONNECTION,
+                internalConfig.enterpriseConfig.getTofuConnectionState());
+
+        // Post-connection states in the internal config should always persist.
+        mWifiConfigManager.setTofuPostConnectionState(
+                result.getNetworkId(), WifiEnterpriseConfig.TOFU_STATE_CERT_PINNING);
+        result = updateNetworkToWifiConfigManager(config);
+        internalConfig = mWifiConfigManager.getConfiguredNetwork(result.getNetworkId());
+        assertEquals(
+                WifiEnterpriseConfig.TOFU_STATE_CERT_PINNING,
+                internalConfig.enterpriseConfig.getTofuConnectionState());
     }
 
     /**
@@ -6499,7 +6595,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
                 .thenReturn(true);
 
         mWifiConfigManager.updateBeforeConnect(config.networkId, TEST_CREATOR_UID,
-                TEST_PACKAGE_NAME);
+                TEST_PACKAGE_NAME, true);
 
         config = mWifiConfigManager.getConfiguredNetwork(config.networkId);
         // network became enabled
@@ -6537,7 +6633,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
                 .thenReturn(false);
 
         mWifiConfigManager.updateBeforeConnect(config.networkId, TEST_CREATOR_UID,
-                TEST_PACKAGE_NAME);
+                TEST_PACKAGE_NAME, true);
 
         config = mWifiConfigManager.getConfiguredNetwork(config.networkId);
         // network became enabled
@@ -6572,7 +6668,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         when(mUserManager.isSameProfileGroup(any(), any())).thenReturn(false);
 
         mWifiConfigManager.updateBeforeConnect(config.networkId, TEST_OTHER_USER_UID,
-                TEST_PACKAGE_NAME);
+                TEST_PACKAGE_NAME, true);
 
         // network still disabled
         assertFalse(config.getNetworkSelectionStatus().isNetworkEnabled());
@@ -7267,6 +7363,36 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         // Verify that we can add a new network.
         verifyAddNetworkToWifiConfigManager(WifiConfigurationTestUtil.createOpenNetwork());
         assertEquals(2, mWifiConfigManager.getConfiguredNetworks().size());
+    }
+
+    /**
+     * Verify that the protected WifiEnterpriseConfig fields are loaded correctly
+     * from the XML store.
+     */
+    @Test
+    public void testLoadEnterpriseConfigProtectedFields() throws Exception {
+        WifiConfiguration config = WifiConfigurationTestUtil.createEapNetwork();
+        config.enterpriseConfig.setUserApproveNoCaCert(true);
+        config.enterpriseConfig.setTofuDialogState(WifiEnterpriseConfig.TOFU_DIALOG_STATE_ACCEPTED);
+        config.enterpriseConfig.setTofuConnectionState(
+                WifiEnterpriseConfig.TOFU_STATE_CERT_PINNING);
+        List<WifiConfiguration> storedConfigs = Arrays.asList(config);
+
+        // Setup xml storage
+        setupStoreDataForRead(storedConfigs, Arrays.asList());
+        assertTrue(mWifiConfigManager.loadFromStore());
+        verify(mWifiConfigStore).read();
+
+        List<WifiConfiguration> retrievedNetworks =
+                mWifiConfigManager.getConfiguredNetworksWithPasswords();
+        assertEquals(1, retrievedNetworks.size());
+        assertTrue(retrievedNetworks.get(0).enterpriseConfig.isUserApproveNoCaCert());
+        assertEquals(
+                WifiEnterpriseConfig.TOFU_DIALOG_STATE_ACCEPTED,
+                retrievedNetworks.get(0).enterpriseConfig.getTofuDialogState());
+        assertEquals(
+                WifiEnterpriseConfig.TOFU_STATE_CERT_PINNING,
+                retrievedNetworks.get(0).enterpriseConfig.getTofuConnectionState());
     }
 
     /**
@@ -8032,7 +8158,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         WifiConfiguration config = mWifiConfigManager.getConfiguredNetwork(eapPeapNetId);
         assertFalse(config.enterpriseConfig.isTrustOnFirstUseEnabled());
         assertFalse(config.enterpriseConfig.isUserApproveNoCaCert());
-        assertEquals("", config.enterpriseConfig.getDomainSuffixMatch());
+        assertEquals("mockServerCert", config.enterpriseConfig.getDomainSuffixMatch());
         assertEquals("DNS:wifi.android;EMAIL:test@wifi.com;DNS:network.android;"
                 + "URI:http://test.android.com",
                 config.enterpriseConfig.getAltSubjectMatch());
