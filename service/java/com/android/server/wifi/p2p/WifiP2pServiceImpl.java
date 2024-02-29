@@ -4640,10 +4640,15 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                 mSavedPeerConfig.getGroupClientIpProvisioningMode(),
                                 mGroup.p2pClientEapolIpInfo);
                         WifiP2pDevice groupOwner = mGroup.getOwner();
-                        WifiP2pDevice peer = mPeers.get(groupOwner.deviceAddress);
-                        if (peer != null) {
-                            // update group owner details with peer details found at discovery
-                            groupOwner.updateSupplicantDetails(peer);
+                        if (!EMPTY_DEVICE_ADDRESS.equals(groupOwner.deviceAddress)) {
+                            WifiP2pDevice peer = mPeers.get(groupOwner.deviceAddress);
+                            if (peer != null) {
+                                // update group owner details with peer details found at discovery
+                                groupOwner.updateSupplicantDetails(peer);
+                            } else {
+                                logd("Add group owner into mPeers: " + groupOwner);
+                                mPeers.updateSupplicantDetails(groupOwner);
+                            }
                             mPeers.updateStatus(groupOwner.deviceAddress,
                                     WifiP2pDevice.CONNECTED);
                             sendPeersChangedBroadcast();
@@ -5522,7 +5527,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         break;
                     case PEER_CONNECTION_USER_ACCEPT:
                         // Stop discovery to avoid failure due to channel switch
-                        mWifiNative.p2pStopFind();
+                        if (mDiscoveryStarted) {
+                            mWifiNative.p2pStopFind();
+                        }
                         if (mSavedPeerConfig.wps.setup == WpsInfo.PBC) {
                             mWifiNative.startWpsPbc(mGroup.getInterface(), null);
                         } else {

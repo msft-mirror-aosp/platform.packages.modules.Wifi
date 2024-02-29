@@ -116,7 +116,7 @@ public final class RangingRequest implements Parcelable {
             @NonNull List<OuiKeyedData> vendorData) {
         mRttPeers = rttPeers;
         mRttBurstSize = rttBurstSize;
-        mVendorData = vendorData;
+        mVendorData = new ArrayList<>(vendorData);
     }
 
     /**
@@ -149,7 +149,7 @@ public final class RangingRequest implements Parcelable {
      * @hide
      */
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-    @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     @NonNull
     @SystemApi
     public List<OuiKeyedData> getVendorData() {
@@ -232,7 +232,13 @@ public final class RangingRequest implements Parcelable {
          * {@link #getMaxRttBurstSize()} inclusively, or a
          * {@link java.lang.IllegalArgumentException} will be thrown.
          *
-         * Note: RTT burst size is only applicable for IEEE 802.11mc based ranging request.
+         * Note: RTT burst size is applicable to IEEE 802.11mc, and for one special case it is
+         * also applicable to IEEE 802.11az to generate multiple NTB ranging requests per
+         * measurement. It is applicable for IEEE 802.11az based ranging requests when MIMO is
+         * not available, with the transmit and receive spatial streams between the initiator and
+         * responder station is equal to 1. See
+         * {@link RangingResult#get80211azNumberOfRxSpatialStreams()} and
+         * {@link RangingResult#get80211azNumberOfTxSpatialStreams()}.
          *
          * @param rttBurstSize The number of FTM packets used to estimate a range.
          * @return The builder to facilitate chaining
@@ -503,7 +509,7 @@ public final class RangingRequest implements Parcelable {
          * @hide
          */
         @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-        @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         @SystemApi
         public Builder setVendorData(@NonNull List<OuiKeyedData> vendorData) {

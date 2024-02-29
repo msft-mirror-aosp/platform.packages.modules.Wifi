@@ -21,6 +21,7 @@ import android.annotation.Nullable;
 import android.net.DhcpInfo;
 import android.net.DhcpOption;
 import android.net.Network;
+import android.net.TetheringManager;
 import android.net.wifi.hotspot2.IProvisioningCallback;
 import android.net.wifi.hotspot2.OsuProvider;
 import android.net.wifi.hotspot2.PasspointConfiguration;
@@ -471,8 +472,20 @@ public class BaseWifiService extends IWifiManager.Stub {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Following method is deprecated with
+     * {@link #startTetheredHotspotRequest(TetheringManager.TetheringRequest, String)}
+     * @deprecated This is no longer supported.
+     */
+    @Deprecated
     @Override
     public boolean startTetheredHotspot(SoftApConfiguration softApConfig, String packageName) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean startTetheredHotspotRequest(
+            TetheringManager.TetheringRequest request, String packageName) {
         throw new UnsupportedOperationException();
     }
 
@@ -785,9 +798,14 @@ public class BaseWifiService extends IWifiManager.Stub {
         throw new UnsupportedOperationException();
     }
 
-    @Override
+    /** TO BE REMOVED */
     public void connect(WifiConfiguration config, int netId, IActionListener callback,
             @NonNull String packageName) {
+        throw new UnsupportedOperationException();
+    }
+    @Override
+    public void connect(WifiConfiguration config, int netId, IActionListener callback,
+            @NonNull String packageName, Bundle extras) {
         throw new UnsupportedOperationException();
     }
 
@@ -1181,6 +1199,11 @@ public class BaseWifiService extends IWifiManager.Stub {
 
     @Override
     public void queryD2dAllowedWhenInfraStaDisabled(@NonNull IBooleanListener listener) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean isPnoSupported() {
         throw new UnsupportedOperationException();
     }
 }

@@ -391,7 +391,7 @@ public class WifiP2pGroup implements Parcelable {
      * @hide
      */
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-    @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     @NonNull
     @SystemApi
     public List<OuiKeyedData> getVendorData() {
@@ -409,7 +409,7 @@ public class WifiP2pGroup implements Parcelable {
      * @hide
      */
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-    @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     @SystemApi
     public void setVendorData(@NonNull List<OuiKeyedData> vendorData) {
         if (!SdkLevel.isAtLeastV()) {
@@ -418,7 +418,7 @@ public class WifiP2pGroup implements Parcelable {
         if (vendorData == null) {
             throw new IllegalArgumentException("setVendorData received a null value");
         }
-        mVendorData = vendorData;
+        mVendorData = new ArrayList<>(vendorData);
     }
 
     public String toString() {

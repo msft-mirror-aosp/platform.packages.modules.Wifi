@@ -45,10 +45,10 @@ public final class TwtRequest implements Parcelable {
     private final int mLinkId;
 
     private TwtRequest(TwtRequest.Builder builder) {
-        mMinWakeDurationMicros = builder.mMaxWakeDurationMicros;
-        mMaxWakeDurationMicros = builder.mMinWakeDurationMicros;
-        mMinWakeIntervalMicros = builder.mMaxWakeIntervalMicros;
-        mMaxWakeIntervalMicros = builder.mMinWakeIntervalMicros;
+        mMinWakeDurationMicros = builder.mMinWakeDurationMicros;
+        mMaxWakeDurationMicros = builder.mMaxWakeDurationMicros;
+        mMinWakeIntervalMicros = builder.mMinWakeIntervalMicros;
+        mMaxWakeIntervalMicros = builder.mMaxWakeIntervalMicros;
         mLinkId = builder.mLinkId;
     }
 
@@ -173,10 +173,10 @@ public final class TwtRequest implements Parcelable {
          * @return The builder to facilitate chaining
          * @throws IllegalArgumentException if argument is invalid
          */
-        @IntRange(from = MIN_MLO_LINK_ID, to = MAX_MLO_LINK_ID)
         @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
-        public TwtRequest.Builder setLinkId(int linkId) {
+        public TwtRequest.Builder setLinkId(
+                @IntRange(from = MIN_MLO_LINK_ID, to = MAX_MLO_LINK_ID) int linkId) {
             if (linkId < MIN_MLO_LINK_ID || linkId > MAX_MLO_LINK_ID) {
                 throw new IllegalArgumentException("linkId is out of range");
             }

@@ -23,6 +23,7 @@ import android.net.wifi.hotspot2.IProvisioningCallback;
 import android.net.DhcpInfo;
 import android.net.DhcpOption;
 import android.net.Network;
+import android.net.TetheringManager.TetheringRequest;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -234,6 +235,8 @@ interface IWifiManager
 
     boolean startTetheredHotspot(in SoftApConfiguration softApConfig, String packageName);
 
+    boolean startTetheredHotspotRequest(in TetheringRequest request, String packageName);
+
     boolean stopSoftAp();
 
     boolean validateSoftApConfiguration(in SoftApConfiguration config);
@@ -350,7 +353,7 @@ interface IWifiManager
 
     void updateWifiUsabilityScore(int seqNum, int score, int predictionHorizonSec);
 
-    oneway void connect(in WifiConfiguration config, int netId, in IActionListener listener, in String packageName);
+    oneway void connect(in WifiConfiguration config, int netId, in IActionListener listener, in String packageName, in Bundle extras);
 
     oneway void save(in WifiConfiguration config, in IActionListener listener, in String packageName);
 
@@ -510,4 +513,6 @@ interface IWifiManager
     void retrieveWifiBackupData(in IByteArrayListener listener);
 
     void restoreWifiBackupData(in byte[] data);
+
+    boolean isPnoSupported();
 }

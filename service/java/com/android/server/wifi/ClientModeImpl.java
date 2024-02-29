@@ -195,6 +195,11 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     @VisibleForTesting public static final short NUM_LOG_RECS_VERBOSE = 3000;
 
     private static final String TAG = "WifiClientModeImpl";
+    // Hardcoded constant used for caller to avoid triggering connect choice that force framework
+    // to stick to the selected network. Do not change this value to maintain backward
+    // compatibility.
+    public static final String ATTRIBUTION_TAG_DISALLOW_CONNECT_CHOICE =
+            "ATTRIBUTION_TAG_DISALLOW_CONNECT_CHOICE";
 
     private static final int IPCLIENT_STARTUP_TIMEOUT_MS = 2_000;
     private static final int IPCLIENT_SHUTDOWN_TIMEOUT_MS = 60_000; // 60 seconds
@@ -1457,14 +1462,14 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      * @param packageName package name of the app requesting the connection.
      */
     private void connectToUserSelectNetwork(int netId, int uid, boolean forceReconnect,
-            @NonNull String packageName) {
+            @NonNull String packageName, @Nullable String attributionTag) {
         if (mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)
                 || mWifiPermissionsUtil.checkNetworkSetupWizardPermission(uid)) {
             mIsUserSelected = true;
         }
         logd("connectToUserSelectNetwork netId " + netId + ", uid " + uid + ", package "
                 + packageName + ", forceReconnect = " + forceReconnect + ", isUserSelected = "
-                + mIsUserSelected);
+                + mIsUserSelected + ", attributionTag = " + attributionTag);
         updateSaeAutoUpgradeFlagForUserSelectNetwork(netId);
         if (!forceReconnect && (mLastNetworkId == netId || mTargetNetworkId == netId)) {
             // We're already connecting/connected to the user specified network, don't trigger a
@@ -1501,6 +1506,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         }
                     }, mWifiThreadRunner).launchDialog();
         } else {
+            if (mIsUserSelected && ATTRIBUTION_TAG_DISALLOW_CONNECT_CHOICE.equals(attributionTag)) {
+                mIsUserSelected = false;
+                logd("connectToUserSelectNetwork attributionTag override to disable user selected");
+            }
             mWifiConnectivityManager.prepareForForcedConnection(netId);
             if (UserHandle.getAppId(uid) == Process.SYSTEM_UID) {
                 mWifiMetrics.setNominatorForNetwork(netId,
@@ -1669,6 +1678,15 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      */
     public boolean isWifiStandardSupported(@WifiStandard int standard) {
         return mWifiNative.isWifiStandardSupported(mInterfaceName, standard);
+    }
+
+    /**
+     * Check whether 11ax is supported by the most recent connection.
+     */
+    public boolean mostRecentConnectionSupports11ax() {
+        return mLastConnectionCapabilities != null
+                && (mLastConnectionCapabilities.wifiStandard == ScanResult.WIFI_STANDARD_11AX
+                || mLastConnectionCapabilities.wifiStandard == ScanResult.WIFI_STANDARD_11BE);
     }
 
     private byte[] getDstMacForKeepalive(KeepalivePacketData packetData)
@@ -4428,10 +4446,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         if (mLastNetworkId != WifiConfiguration.INVALID_NETWORK_ID) {
             WifiConfiguration config = getConnectedWifiConfigurationInternal();
             boolean shouldSetUserConnectChoice = config != null
+                    && mIsUserSelected
                     && isRecentlySelectedByTheUser(config)
                     && (config.getNetworkSelectionStatus().hasEverConnected()
-                    || config.isEphemeral())
-                    && mWifiPermissionsUtil.checkNetworkSettingsPermission(config.lastConnectUid);
+                    || config.isEphemeral());
             mWifiConfigManager.updateNetworkAfterConnect(mLastNetworkId,
                     mIsUserSelected, shouldSetUserConnectChoice, mWifiInfo.getRssi());
             // Notify PasspointManager of Passpoint network connected event.
@@ -4839,7 +4857,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     int netId = result.getNetworkId();
                     connectToUserSelectNetwork(
                             netId, message.sendingUid, result.hasCredentialChanged(),
-                            cnm.packageName);
+                            cnm.packageName, cnm.attributionTag);
                     mWifiMetrics.logStaEvent(mInterfaceName, StaEvent.TYPE_CONNECT_NETWORK,
                             mWifiConfigManager.getConfiguredNetwork(netId));
                     cnm.listener.sendSuccess();
@@ -5810,7 +5828,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     mWifiInfo.setNetworkKey(config.getNetworkKeyFromSecurityType(
                             mWifiInfo.getCurrentSecurityType()));
                     if (mApplicationQosPolicyRequestHandler.isFeatureEnabled()) {
-                        mApplicationQosPolicyRequestHandler.queueAllPoliciesOnIface(mInterfaceName);
+                        mApplicationQosPolicyRequestHandler.queueAllPoliciesOnIface(
+                                mInterfaceName, mostRecentConnectionSupports11ax());
                     }
                     updateLayer2Information();
                     updateCurrentConnectionInfo();
@@ -6605,7 +6624,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     }
                     checkIfNeedDisconnectSecondaryWifi();
                     if (mApplicationQosPolicyRequestHandler.isFeatureEnabled()) {
-                        mApplicationQosPolicyRequestHandler.queueAllPoliciesOnIface(mInterfaceName);
+                        mApplicationQosPolicyRequestHandler.queueAllPoliciesOnIface(
+                                mInterfaceName, mostRecentConnectionSupports11ax());
                     }
                     break;
                 }
@@ -7895,21 +7915,23 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         public final NetworkUpdateResult result;
         public final ActionListenerWrapper listener;
         public final String packageName;
+        public final String attributionTag;
 
         ConnectNetworkMessage(NetworkUpdateResult result, ActionListenerWrapper listener,
-                String packageName) {
+                String packageName, @Nullable String attributionTag) {
             this.result = result;
             this.listener = listener;
             this.packageName = packageName;
+            this.attributionTag = attributionTag;
         }
     }
 
     /** Trigger network connection and provide status via the provided callback. */
     public void connectNetwork(NetworkUpdateResult result, ActionListenerWrapper wrapper,
-            int callingUid, @NonNull String packageName) {
+            int callingUid, @NonNull String packageName, @Nullable String attributionTag) {
         Message message =
                 obtainMessage(CMD_CONNECT_NETWORK,
-                new ConnectNetworkMessage(result, wrapper, packageName));
+                        new ConnectNetworkMessage(result, wrapper, packageName, attributionTag));
         message.sendingUid = callingUid;
         sendMessage(message);
     }
@@ -7919,7 +7941,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             int callingUid, @NonNull String packageName) {
         Message message =
                 obtainMessage(CMD_SAVE_NETWORK,
-                new ConnectNetworkMessage(result, wrapper, packageName));
+                        new ConnectNetworkMessage(result, wrapper, packageName, null));
         message.sendingUid = callingUid;
         sendMessage(message);
     }
@@ -8189,9 +8211,43 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 ? mLastL2KeyAndGroupHint.second : null;
         final Layer2Information layer2Info = new Layer2Information(l2Key, groupHint,
                 currentBssid);
-        final boolean mRemainConnectedAfterIpProvisionTimeout = mContext.getResources().getBoolean(
-                R.bool.config_wifiRemainConnectedAfterIpProvisionTimeout);
 
+        final ProvisioningConfiguration.Builder prov =
+                new ProvisioningConfiguration.Builder()
+                        .withDisplayName(config.SSID)
+                        .withCreatorUid(config.creatorUid)
+                        .withLayer2Information(layer2Info)
+                        .withDhcpOptions(convertToInternalDhcpOptions(options));
+        if (isUsingMacRandomization) {
+            // Use EUI64 address generation for link-local IPv6 addresses.
+            prov.withRandomMacAddress();
+        }
+        if (mContext.getResources().getBoolean(R.bool.config_wifiEnableApfOnNonPrimarySta)
+                || isPrimary()) {
+            // unclear if the native layer will return the correct non-capabilities if APF is
+            // not supported on secondary interfaces.
+            prov.withApfCapabilities(mWifiNative.getApfCapabilities(mInterfaceName));
+        }
+        if (SdkLevel.isAtLeastV()) {
+            // Set the user dhcp hostname setting.
+            int hostnameSetting = config.isSendDhcpHostnameEnabled()
+                    ? IIpClient.HOSTNAME_SETTING_SEND
+                    : IIpClient.HOSTNAME_SETTING_DO_NOT_SEND;
+            int restrictions = mWifiGlobals.getSendDhcpHostnameRestriction();
+            // Override the user setting the dhcp hostname restrictions.
+            if (config.isOpenNetwork()) {
+                if ((restrictions
+                        & WifiManager.FLAG_SEND_DHCP_HOSTNAME_RESTRICTION_OPEN) != 0) {
+                    hostnameSetting = IIpClient.HOSTNAME_SETTING_DO_NOT_SEND;
+                }
+            } else {
+                if ((restrictions
+                        & WifiManager.FLAG_SEND_DHCP_HOSTNAME_RESTRICTION_SECURE) != 0) {
+                    hostnameSetting = IIpClient.HOSTNAME_SETTING_DO_NOT_SEND;
+                }
+            }
+            prov.withHostnameSetting(hostnameSetting);
+        }
         if (isFilsConnection) {
             stopIpClient();
             if (isUsingStaticIp) {
@@ -8199,27 +8255,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 return false;
             }
             setConfigurationsPriorToIpClientProvisioning(config);
-            final ProvisioningConfiguration.Builder prov =
-                    new ProvisioningConfiguration.Builder()
-                            .withPreDhcpAction()
-                            .withPreconnection()
-                            .withDisplayName(config.SSID)
-                            .withCreatorUid(config.creatorUid)
-                            .withLayer2Information(layer2Info)
-                            .withProvisioningTimeoutMs(mRemainConnectedAfterIpProvisionTimeout ? 0 :
-                                    PROVISIONING_TIMEOUT_FILS_CONNECTION_MS);
-            if (mContext.getResources().getBoolean(R.bool.config_wifiEnableApfOnNonPrimarySta)
-                    || isPrimary()) {
-                // unclear if the native layer will return the correct non-capabilities if APF is
-                // not supported on secondary interfaces.
-                prov.withApfCapabilities(mWifiNative.getApfCapabilities(mInterfaceName));
-            }
-            if (isUsingMacRandomization) {
-                // Use EUI64 address generation for link-local IPv6 addresses.
-                prov.withRandomMacAddress();
-            }
-            prov.withDhcpOptions(convertToInternalDhcpOptions(options));
-            mIpClient.startProvisioning(prov.build());
+            prov.withPreconnection()
+                    .withPreDhcpAction()
+                    .withProvisioningTimeoutMs(PROVISIONING_TIMEOUT_FILS_CONNECTION_MS);
         } else {
             sendNetworkChangeBroadcast(DetailedState.OBTAINING_IPADDR);
             // We must clear the config BSSID, as the wifi chipset may decide to roam
@@ -8237,57 +8275,36 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             // CONNECTED.
             stopDhcpSetup();
             setConfigurationsPriorToIpClientProvisioning(config);
-            ScanResult scanResult = getScanResultInternal(config);
 
-            final ProvisioningConfiguration.Builder prov;
-            ProvisioningConfiguration.ScanResultInfo scanResultInfo = null;
-            if (scanResult != null) {
-                final List<ScanResultInfo.InformationElement> ies =
-                        new ArrayList<ScanResultInfo.InformationElement>();
-                for (ScanResult.InformationElement ie : scanResult.getInformationElements()) {
-                    ScanResultInfo.InformationElement scanResultInfoIe =
-                            new ScanResultInfo.InformationElement(ie.getId(), ie.getBytes());
-                    ies.add(scanResultInfoIe);
-                }
-                scanResultInfo = new ProvisioningConfiguration.ScanResultInfo(scanResult.SSID,
-                        scanResult.BSSID, ies);
-            }
             final Network network = (mNetworkAgent != null) ? mNetworkAgent.getNetwork() : null;
+            prov.withNetwork(network);
             if (!isUsingStaticIp) {
-                prov = new ProvisioningConfiguration.Builder()
-                    .withPreDhcpAction()
-                    .withNetwork(network)
-                    .withDisplayName(config.SSID)
-                    .withScanResultInfo(scanResultInfo)
-                    .withCreatorUid(config.creatorUid)
-                    .withLayer2Information(layer2Info);
+                ProvisioningConfiguration.ScanResultInfo scanResultInfo = null;
+                ScanResult scanResult = getScanResultInternal(config);
+                if (scanResult != null) {
+                    final List<ScanResultInfo.InformationElement> ies =
+                            new ArrayList<ScanResultInfo.InformationElement>();
+                    for (ScanResult.InformationElement ie : scanResult.getInformationElements()) {
+                        ScanResultInfo.InformationElement scanResultInfoIe =
+                                new ScanResultInfo.InformationElement(ie.getId(), ie.getBytes());
+                        ies.add(scanResultInfoIe);
+                    }
+                    scanResultInfo = new ProvisioningConfiguration.ScanResultInfo(scanResult.SSID,
+                            scanResult.BSSID, ies);
+                }
+                prov.withScanResultInfo(scanResultInfo)
+                        .withPreDhcpAction();
             } else {
                 StaticIpConfiguration staticIpConfig = config.getStaticIpConfiguration();
-                prov = new ProvisioningConfiguration.Builder()
-                        .withStaticConfiguration(staticIpConfig)
-                        .withNetwork(network)
-                        .withDisplayName(config.SSID)
-                        .withCreatorUid(config.creatorUid)
-                        .withLayer2Information(layer2Info)
+                prov.withStaticConfiguration(staticIpConfig)
                         .withoutIpReachabilityMonitor();
             }
-            if (mContext.getResources().getBoolean(R.bool.config_wifiEnableApfOnNonPrimarySta)
-                    || isPrimary()) {
-                // unclear if the native layer will return the correct non-capabilities if APF is
-                // not supported on secondary interfaces.
-                prov.withApfCapabilities(mWifiNative.getApfCapabilities(mInterfaceName));
-            }
-            if (isUsingMacRandomization) {
-                // Use EUI64 address generation for link-local IPv6 addresses.
-                prov.withRandomMacAddress();
-            }
-            prov.withDhcpOptions(convertToInternalDhcpOptions(options));
-            if (mRemainConnectedAfterIpProvisionTimeout) {
-                prov.withProvisioningTimeoutMs(0);
-            }
-            mIpClient.startProvisioning(prov.build());
         }
-
+        if (mContext.getResources().getBoolean(
+                R.bool.config_wifiRemainConnectedAfterIpProvisionTimeout)) {
+            prov.withProvisioningTimeoutMs(0);
+        }
+        mIpClient.startProvisioning(prov.build());
         return true;
     }
 

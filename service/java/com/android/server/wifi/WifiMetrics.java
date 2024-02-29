@@ -2210,10 +2210,10 @@ public class WifiMetrics {
                             currentConnectionEvent.mConfigSsid,
                             mClock.getElapsedSinceBootMillis(),
                             band, currentConnectionEvent.mAuthType);
-
-                    // TODO(b/166309727) need to add ifaceName to WifiStatsLog
-                    WifiStatsLog.write(WifiStatsLog.WIFI_CONNECTION_STATE_CHANGED,
-                            true, band, currentConnectionEvent.mAuthType);
+                    if (currentConnectionEvent.mRole == WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
+                        WifiStatsLog.write(WifiStatsLog.WIFI_CONNECTION_STATE_CHANGED,
+                                true, band, currentConnectionEvent.mAuthType);
+                    }
                 }
 
                 currentConnectionEvent.mConnectionEvent.connectionResult =
@@ -2673,12 +2673,13 @@ public class WifiMetrics {
             if (!isPrimary(ifaceName)) {
                 return;
             }
-            WifiStatsLog.write(WifiStatsLog.WIFI_CONNECTION_STATE_CHANGED,
-                    false,
-                    mCurrentSession != null ? mCurrentSession.mBand : 0,
-                    mCurrentSession != null ? mCurrentSession.mAuthType : 0);
-
             if (mCurrentSession != null) {
+                if (mCurrentSession.mConnectionEvent.mRole == WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
+                    WifiStatsLog.write(WifiStatsLog.WIFI_CONNECTION_STATE_CHANGED,
+                            false,
+                            mCurrentSession.mBand,
+                            mCurrentSession.mAuthType);
+                }
                 mCurrentSession.mSessionEndTimeMillis = mClock.getElapsedSinceBootMillis();
                 int durationSeconds = (int) (mCurrentSession.mSessionEndTimeMillis
                         - mCurrentSession.mSessionStartTimeMillis) / 1000;
@@ -7760,7 +7761,7 @@ public class WifiMetrics {
     /**
      * Add a new listener for Wi-Fi usability stats handling.
      */
-    public void addOnWifiUsabilityListener(IOnWifiUsabilityStatsListener listener) {
+    public void addOnWifiUsabilityListener(@NonNull IOnWifiUsabilityStatsListener listener) {
         if (!mOnWifiUsabilityListeners.register(listener)) {
             Log.e(TAG, "Failed to add listener");
             return;
@@ -7774,7 +7775,7 @@ public class WifiMetrics {
     /**
      * Remove an existing listener for Wi-Fi usability stats handling.
      */
-    public void removeOnWifiUsabilityListener(IOnWifiUsabilityStatsListener listener) {
+    public void removeOnWifiUsabilityListener(@NonNull IOnWifiUsabilityStatsListener listener) {
         mOnWifiUsabilityListeners.unregister(listener);
         if (DBG) {
             Log.v(TAG, "Removing listener. Num listeners: "

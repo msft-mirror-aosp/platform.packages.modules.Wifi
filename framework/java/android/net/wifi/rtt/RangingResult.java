@@ -16,6 +16,7 @@
 
 package android.net.wifi.rtt;
 
+import android.annotation.ElapsedRealtimeLong;
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -117,14 +118,14 @@ public final class RangingResult implements Parcelable {
     /**
      * Builder class used to construct {@link RangingResult} objects.
      */
-    @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     public static final class Builder {
         private @RangeResultStatus int mStatus = STATUS_FAIL;
         private MacAddress mMac = null;
         private PeerHandle mPeerHandle = null;
         private int mDistanceMm = 0;
         private int mDistanceStdDevMm = 0;
-        private int mRssi = UNSPECIFIED;
+        private int mRssi = -127;
         private int mNumAttemptedMeasurements = 0;
         private int mNumSuccessfulMeasurements = 0;
         private byte[] mLci = null;
@@ -144,13 +145,13 @@ public final class RangingResult implements Parcelable {
         private List<OuiKeyedData> mVendorData = Collections.emptyList();
 
         /**
-         * Sets the Range result status from {@link RangeResultStatus}.
+         * Sets the Range result status.
          *
          * @param status Ranging result status, if not set defaults to
-         *               {@link RangeResultStatus#STATUS_FAIL}.
+         *               {@link #STATUS_FAIL}.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setStatus(@RangeResultStatus int status) {
             mStatus = status;
@@ -163,7 +164,7 @@ public final class RangingResult implements Parcelable {
          * @param macAddress Mac address, if not defaults to null.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setMacAddress(@Nullable MacAddress macAddress) {
             mMac = macAddress;
@@ -178,7 +179,7 @@ public final class RangingResult implements Parcelable {
          *                   defaults to null.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setPeerHandle(@Nullable PeerHandle peerHandle) {
             mPeerHandle = peerHandle;
@@ -191,7 +192,7 @@ public final class RangingResult implements Parcelable {
          * @param distanceMm distance. If not set, defaults to 0.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setDistanceMm(int distanceMm) {
             mDistanceMm = distanceMm;
@@ -205,7 +206,7 @@ public final class RangingResult implements Parcelable {
          *                         defaults to 0.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setDistanceStdDevMm(int distanceStdDevMm) {
             mDistanceStdDevMm = distanceStdDevMm;
@@ -215,10 +216,10 @@ public final class RangingResult implements Parcelable {
         /**
          * Sets the average RSSI.
          *
-         * @param rssi Average RSSI. If not set, defaults to 0.
+         * @param rssi Average RSSI. If not set, defaults to -127.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setRssi(int rssi) {
             mRssi = rssi;
@@ -232,7 +233,7 @@ public final class RangingResult implements Parcelable {
          *                                 to 0.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setNumAttemptedMeasurements(int numAttemptedMeasurements) {
             mNumAttemptedMeasurements = numAttemptedMeasurements;
@@ -246,7 +247,7 @@ public final class RangingResult implements Parcelable {
          *                                 to 0.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setNumSuccessfulMeasurements(int numSuccessfulMeasurements) {
             mNumSuccessfulMeasurements = numSuccessfulMeasurements;
@@ -263,7 +264,7 @@ public final class RangingResult implements Parcelable {
          * @param lci Location configuration information. If not set, defaults to null.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setLci(@Nullable byte[] lci) {
             mLci = lci;
@@ -283,7 +284,7 @@ public final class RangingResult implements Parcelable {
          * @param lcr Location civic report. If not set, defaults to null.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setLcr(@Nullable byte[] lcr) {
             mLcr = lcr;
@@ -300,7 +301,7 @@ public final class RangingResult implements Parcelable {
          * @param responderLocation Responder location. If not set, defaults to null.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setUnverifiedResponderLocation(
                 @Nullable ResponderLocation responderLocation) {
@@ -314,12 +315,12 @@ public final class RangingResult implements Parcelable {
          * The timestamp is in milliseconds since boot, including time spent in sleep,
          * corresponding to values provided by {@link android.os.SystemClock#elapsedRealtime()}.
          *
-         * @param timestamp time stamp in milliseconds
+         * @param timestamp time stamp in milliseconds. If not set, default to 0.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
-        public Builder setRangingTimestampMillis(long timestamp) {
+        public Builder setRangingTimestampMillis(@ElapsedRealtimeLong long timestamp) {
             mTimestamp = timestamp;
             return this;
         }
@@ -334,7 +335,7 @@ public final class RangingResult implements Parcelable {
          * @param is80211mcMeasurement true for IEEE 802.11mc measure, otherwise false.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder set80211mcMeasurement(boolean is80211mcMeasurement) {
             mIs80211mcMeasurement = is80211mcMeasurement;
@@ -349,7 +350,7 @@ public final class RangingResult implements Parcelable {
          * @param frequencyMHz Frequency.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setMeasurementChannelFrequencyMHz(int frequencyMHz) {
             mFrequencyMHz = frequencyMHz;
@@ -363,7 +364,7 @@ public final class RangingResult implements Parcelable {
          * @param measurementBandwidth Measurement bandwidth.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setMeasurementBandwidth(@ChannelWidth int measurementBandwidth) {
             mPacketBw = measurementBandwidth;
@@ -380,7 +381,7 @@ public final class RangingResult implements Parcelable {
          *                                otherwise false.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder set80211azNtbMeasurement(boolean is80211azNtbMeasurement) {
             mIs80211azNtbMeasurement = is80211azNtbMeasurement;
@@ -394,7 +395,7 @@ public final class RangingResult implements Parcelable {
          * @param ntbMinMeasurementTime non-trigger based ranging minimum measurement time.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setMinTimeBetweenNtbMeasurementsMicros(long ntbMinMeasurementTime) {
             mNtbMinMeasurementTime = ntbMinMeasurementTime;
@@ -408,7 +409,7 @@ public final class RangingResult implements Parcelable {
          * @param ntbMaxMeasurementTime non-trigger based ranging maximum measurement time.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder setMaxTimeBetweenNtbMeasurementsMicros(long ntbMaxMeasurementTime) {
             mNtbMaxMeasurementTime = ntbMaxMeasurementTime;
@@ -422,7 +423,7 @@ public final class RangingResult implements Parcelable {
          * @param i2rTxLtfRepetitions LFT repetition count.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder set80211azInitiatorTxLtfRepetitionsCount(int i2rTxLtfRepetitions) {
             mI2rTxLtfRepetitions = i2rTxLtfRepetitions;
@@ -436,7 +437,7 @@ public final class RangingResult implements Parcelable {
          * @param r2iTxLtfRepetitions LFT repetition count.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder set80211azResponderTxLtfRepetitionsCount(int r2iTxLtfRepetitions) {
             mR2iTxLtfRepetitions = r2iTxLtfRepetitions;
@@ -450,7 +451,7 @@ public final class RangingResult implements Parcelable {
          * @param numTxSpatialStreams Number of transmit spatial streams.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder set80211azNumberOfTxSpatialStreams(int numTxSpatialStreams) {
             mNumTxSpatialStreams = numTxSpatialStreams;
@@ -464,7 +465,7 @@ public final class RangingResult implements Parcelable {
          * @param numRxSpatialStreams Number of receive spatial streams.
          * @return The builder to facilitate chaining.
          */
-        @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public Builder set80211azNumberOfRxSpatialStreams(int numRxSpatialStreams) {
             mNumRxSpatialStreams = numRxSpatialStreams;
@@ -480,7 +481,7 @@ public final class RangingResult implements Parcelable {
          * @hide
          */
         @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-        @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @SystemApi
         @NonNull
         public Builder setVendorData(@NonNull List<OuiKeyedData> vendorData) {
@@ -498,7 +499,7 @@ public final class RangingResult implements Parcelable {
          * Build {@link RangingResult}
          * @return an instance of {@link RangingResult}
          */
-        @FlaggedApi("com.android.wifi.flags.ranging_result_builder")
+        @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
         @NonNull
         public RangingResult build() {
             if (mMac == null && mPeerHandle == null) {
@@ -761,7 +762,7 @@ public final class RangingResult implements Parcelable {
      * Only valid if {@link #getStatus()} returns {@link #STATUS_SUCCESS}, otherwise will throw an
      * exception.
      */
-    @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     public boolean is80211azNtbMeasurement() {
         if (mStatus != STATUS_SUCCESS) {
             throw new IllegalStateException(
@@ -779,7 +780,7 @@ public final class RangingResult implements Parcelable {
      * last measurement time {@link #getRangingTimestampMillis()} for the peer. Otherwise, cached
      * ranging result will be returned for the peer.
      */
-    @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     public long getMinTimeBetweenNtbMeasurementsMicros() {
         return mNtbMinMeasurementTime;
     }
@@ -793,7 +794,7 @@ public final class RangingResult implements Parcelable {
      * ranging session will be terminated and a new ranging negotiation will happen with
      * the responding station.
      */
-    @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     public long getMaxTimeBetweenNtbMeasurementsMicros() {
         return mNtbMaxMeasurementTime;
     }
@@ -807,7 +808,7 @@ public final class RangingResult implements Parcelable {
      *
      * @return LTF repetitions count
      */
-    @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     public int get80211azResponderTxLtfRepetitionsCount() {
         return mR2iTxLtfRepetitions;
     }
@@ -821,7 +822,7 @@ public final class RangingResult implements Parcelable {
      *
      * @return LTF repetitions count
      */
-    @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     public int get80211azInitiatorTxLtfRepetitionsCount() {
         return mI2rTxLtfRepetitions;
     }
@@ -832,7 +833,7 @@ public final class RangingResult implements Parcelable {
      *
      * @return Number of spatial streams
      */
-    @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     public int get80211azNumberOfTxSpatialStreams() {
         return mNumTxSpatialStreams;
     }
@@ -843,7 +844,7 @@ public final class RangingResult implements Parcelable {
      *
      * @return Number of spatial streams
      */
-    @FlaggedApi(Flags.FLAG_RTT_11AZ_NTB_RANGING_SUPPORT)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     public int get80211azNumberOfRxSpatialStreams() {
         return mNumRxSpatialStreams;
     }
@@ -893,7 +894,7 @@ public final class RangingResult implements Parcelable {
      * @hide
      */
     @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
-    @FlaggedApi(Flags.FLAG_VENDOR_PARCELABLE_PARAMETERS)
+    @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
     @SystemApi
     @NonNull
     public List<OuiKeyedData> getVendorData() {
