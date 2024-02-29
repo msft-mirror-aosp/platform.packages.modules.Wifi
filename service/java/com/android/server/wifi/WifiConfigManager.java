@@ -4012,9 +4012,10 @@ public class WifiConfigManager {
     }
 
     /** Update WifiConfigManager before connecting to a network. */
-    public void updateBeforeConnect(int networkId, int callingUid, @NonNull String packageName) {
+    public void updateBeforeConnect(int networkId, int callingUid, @NonNull String packageName,
+            boolean disableOthers) {
         userEnabledNetwork(networkId);
-        if (!enableNetwork(networkId, true, callingUid, null)
+        if (!enableNetwork(networkId, disableOthers, callingUid, null)
                 || !updateLastConnectUid(networkId, callingUid)) {
             Log.i(TAG, "connect Allowing uid " + callingUid + " packageName " + packageName
                     + " with insufficient permissions to connect=" + networkId);
@@ -4326,12 +4327,11 @@ public class WifiConfigManager {
                 Log.d(TAG, "Set altSubjectMatch to " + altSubjectNames);
             }
             newConfig.enterpriseConfig.setAltSubjectMatch(altSubjectNames);
-        } else {
-            if (mVerboseLoggingEnabled) {
-                Log.d(TAG, "Set domainSuffixMatch to " + serverCertInfo.commonName);
-            }
-            newConfig.enterpriseConfig.setDomainSuffixMatch(serverCertInfo.commonName);
         }
+        if (mVerboseLoggingEnabled) {
+            Log.d(TAG, "Set domainSuffixMatch to " + serverCertInfo.commonName);
+        }
+        newConfig.enterpriseConfig.setDomainSuffixMatch(serverCertInfo.commonName);
         newConfig.enterpriseConfig.setUserApproveNoCaCert(false);
         // Trigger an update to install CA certificate and the corresponding configuration.
         NetworkUpdateResult result = addOrUpdateNetwork(newConfig, internalConfig.creatorUid);
