@@ -1106,6 +1106,20 @@ public class WifiConfigManager {
         }
     }
 
+    private static @WifiEnterpriseConfig.TofuConnectionState int mergeTofuConnectionState(
+            WifiConfiguration internalConfig, WifiConfiguration externalConfig) {
+        // Prioritize the internal config if it has reached a post-connection state.
+        int internalTofuState = internalConfig.enterpriseConfig.getTofuConnectionState();
+        if (internalTofuState == WifiEnterpriseConfig.TOFU_STATE_CONFIGURE_ROOT_CA
+                || internalTofuState == WifiEnterpriseConfig.TOFU_STATE_CERT_PINNING) {
+            return internalTofuState;
+        }
+        // Else assign a pre-connection state based on the latest external config.
+        return externalConfig.enterpriseConfig.isTrustOnFirstUseEnabled()
+                ? WifiEnterpriseConfig.TOFU_STATE_ENABLED_PRE_CONNECTION
+                : WifiEnterpriseConfig.TOFU_STATE_NOT_ENABLED;
+    }
+
     /**
      * Copy over public elements from an external WifiConfiguration object to the internal
      * configuration object if element has been set in the provided external WifiConfiguration.
@@ -1199,10 +1213,18 @@ public class WifiConfigManager {
         }
 
         internalConfig.allowAutojoin = externalConfig.allowAutojoin;
-        // Copy over the |WifiEnterpriseConfig| parameters if set.
+        // Copy over the |WifiEnterpriseConfig| parameters if set. For fields which should
+        // only be set by the framework, cache the internal config's value and restore.
         if (externalConfig.enterpriseConfig != null) {
+            boolean userApproveNoCaCertInternal =
+                    internalConfig.enterpriseConfig.isUserApproveNoCaCert();
+            int tofuDialogStateInternal = internalConfig.enterpriseConfig.getTofuDialogState();
+            int tofuConnectionState = mergeTofuConnectionState(internalConfig, externalConfig);
             internalConfig.enterpriseConfig.copyFromExternal(
                     externalConfig.enterpriseConfig, PASSWORD_MASK);
+            internalConfig.enterpriseConfig.setUserApproveNoCaCert(userApproveNoCaCertInternal);
+            internalConfig.enterpriseConfig.setTofuDialogState(tofuDialogStateInternal);
+            internalConfig.enterpriseConfig.setTofuConnectionState(tofuConnectionState);
         }
 
         // Copy over any metered information.
@@ -3990,9 +4012,10 @@ public class WifiConfigManager {
     }
 
     /** Update WifiConfigManager before connecting to a network. */
-    public void updateBeforeConnect(int networkId, int callingUid, @NonNull String packageName) {
+    public void updateBeforeConnect(int networkId, int callingUid, @NonNull String packageName,
+            boolean disableOthers) {
         userEnabledNetwork(networkId);
-        if (!enableNetwork(networkId, true, callingUid, null)
+        if (!enableNetwork(networkId, disableOthers, callingUid, null)
                 || !updateLastConnectUid(networkId, callingUid)) {
             Log.i(TAG, "connect Allowing uid " + callingUid + " packageName " + packageName
                     + " with insufficient permissions to connect=" + networkId);
@@ -4304,12 +4327,11 @@ public class WifiConfigManager {
                 Log.d(TAG, "Set altSubjectMatch to " + altSubjectNames);
             }
             newConfig.enterpriseConfig.setAltSubjectMatch(altSubjectNames);
-        } else {
-            if (mVerboseLoggingEnabled) {
-                Log.d(TAG, "Set domainSuffixMatch to " + serverCertInfo.commonName);
-            }
-            newConfig.enterpriseConfig.setDomainSuffixMatch(serverCertInfo.commonName);
         }
+        if (mVerboseLoggingEnabled) {
+            Log.d(TAG, "Set domainSuffixMatch to " + serverCertInfo.commonName);
+        }
+        newConfig.enterpriseConfig.setDomainSuffixMatch(serverCertInfo.commonName);
         newConfig.enterpriseConfig.setUserApproveNoCaCert(false);
         // Trigger an update to install CA certificate and the corresponding configuration.
         NetworkUpdateResult result = addOrUpdateNetwork(newConfig, internalConfig.creatorUid);
