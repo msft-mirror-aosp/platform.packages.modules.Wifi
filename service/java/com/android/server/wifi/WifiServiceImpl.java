@@ -289,6 +289,8 @@ public class WifiServiceImpl extends BaseWifiService {
     /** Backup/Restore Module */
     private final WifiBackupRestore mWifiBackupRestore;
     private final SoftApBackupRestore mSoftApBackupRestore;
+    private final WifiSettingsBackupRestore mWifiSettingsBackupRestore;
+    private final BackupRestoreController mBackupRestoreController;
     private final CoexManager mCoexManager;
     private final WifiNetworkSuggestionsManager mWifiNetworkSuggestionsManager;
     private final WifiConfigManager mWifiConfigManager;
@@ -510,7 +512,6 @@ public class WifiServiceImpl extends BaseWifiService {
         }
     }
 
-
     public WifiServiceImpl(WifiContext context, WifiInjector wifiInjector) {
         mContext = context;
         mWifiInjector = wifiInjector;
@@ -531,6 +532,8 @@ public class WifiServiceImpl extends BaseWifiService {
         mWifiMulticastLockManager = mWifiInjector.getWifiMulticastLockManager();
         mWifiBackupRestore = mWifiInjector.getWifiBackupRestore();
         mSoftApBackupRestore = mWifiInjector.getSoftApBackupRestore();
+        mWifiSettingsBackupRestore = mWifiInjector.getWifiSettingsBackupRestore();
+        mBackupRestoreController = mWifiInjector.getBackupRestoreController();
         mWifiApConfigStore = mWifiInjector.getWifiApConfigStore();
         mWifiPermissionsUtil = mWifiInjector.getWifiPermissionsUtil();
         mLog = mWifiInjector.makeLog(TAG);
@@ -600,6 +603,15 @@ public class WifiServiceImpl extends BaseWifiService {
             mWifiInjector.getWifiScanAlwaysAvailableSettingsCompatibility().initialize();
             mWifiInjector.getWifiNotificationManager().createNotificationChannels();
             // Align the value between config stroe (i.e.WifiConfigStore.xml) and WifiGlobals.
+            mSettingsConfigStore.registerChangeListener(WIFI_WEP_ALLOWED,
+                    (key, value) -> {
+                        if (mWifiGlobals.isWepAllowed() != value) {
+                            // It should only happen when settings is restored from cloud.
+                            handleWepAllowedChanged(value);
+                            Log.i(TAG, "(Cloud Restoration) Wep allowed is changed to " + value);
+                        }
+                    },
+                    new Handler(mWifiHandlerThread.getLooper()));
             mWifiGlobals.setWepAllowed(mSettingsConfigStore.get(WIFI_WEP_ALLOWED));
             mContext.registerReceiver(
                     new BroadcastReceiver() {
@@ -2010,7 +2022,7 @@ public class WifiServiceImpl extends BaseWifiService {
          */
         private final Object mLock = new Object();
         @NonNull
-        private SoftApState mSoftApsoftApState =
+        private SoftApState mSoftApState =
                 new SoftApState(WIFI_AP_STATE_DISABLED, 0, null, null);
         private Map<String, List<WifiClient>> mSoftApConnectedClientsMap = new HashMap();
         private Map<String, SoftApInfo> mSoftApInfoMap = new HashMap();
@@ -2022,24 +2034,24 @@ public class WifiServiceImpl extends BaseWifiService {
 
         public SoftApState getState() {
             synchronized (mLock) {
-                return mSoftApsoftApState;
+                return mSoftApState;
             }
         }
 
         public void setState(SoftApState softApState) {
             synchronized (mLock) {
-                mSoftApsoftApState = softApState;
+                mSoftApState = softApState;
             }
         }
 
         public boolean setEnablingIfAllowed() {
             synchronized (mLock) {
-                int state = mSoftApsoftApState.getState();
+                int state = mSoftApState.getState();
                 if (state != WIFI_AP_STATE_DISABLED
                         && state != WIFI_AP_STATE_FAILED) {
                     return false;
                 }
-                mSoftApsoftApState = new SoftApState(
+                mSoftApState = new SoftApState(
                         WIFI_AP_STATE_ENABLING, 0, null, null);
                 return true;
             }
@@ -2047,9 +2059,9 @@ public class WifiServiceImpl extends BaseWifiService {
 
         public void setFailedWhileEnabling() {
             synchronized (mLock) {
-                int state = mSoftApsoftApState.getState();
+                int state = mSoftApState.getState();
                 if (state == WIFI_AP_STATE_ENABLING) {
-                    mSoftApsoftApState = new SoftApState(
+                    mSoftApState = new SoftApState(
                             WIFI_AP_STATE_FAILED, 0, null, null);
                 }
             }
@@ -5395,6 +5407,8 @@ public class WifiServiceImpl extends BaseWifiService {
                 pw.println();
                 mWifiBackupRestore.dump(fd, pw, args);
                 pw.println();
+                mBackupRestoreController.dump(fd, pw, args);
+                pw.println();
                 pw.println("ScoringParams: " + mWifiInjector.getScoringParams());
                 pw.println();
                 mSettingsConfigStore.dump(fd, pw, args);
@@ -5605,6 +5619,8 @@ public class WifiServiceImpl extends BaseWifiService {
         }
         ApConfigUtil.enableVerboseLogging(mVerboseLoggingEnabled);
         mApplicationQosPolicyRequestHandler.enableVerboseLogging(mVerboseLoggingEnabled);
+        mWifiSettingsBackupRestore.enableVerboseLogging(mVerboseLoggingEnabled);
+        mBackupRestoreController.enableVerboseLogging(mVerboseLoggingEnabled);
     }
 
     @Override
@@ -5757,8 +5773,7 @@ public class WifiServiceImpl extends BaseWifiService {
         }
         mWifiThreadRunner.post(() -> {
             try {
-                 // TODO: b/302250336 - implement it.
-                listener.onResult(new byte[0]);
+                listener.onResult(mBackupRestoreController.retrieveBackupData());
             } catch (RemoteException e) {
                 Log.e(TAG, e.getMessage(), e);
             }
@@ -5778,8 +5793,10 @@ public class WifiServiceImpl extends BaseWifiService {
             throw new UnsupportedOperationException("SDK level too old");
         }
         enforceNetworkSettingsPermission();
-        mLog.info("restoreWifiBackupData uid=%").c(Binder.getCallingUid()).flush();
-        // TODO: b/302250336 - implement it.
+        mWifiThreadRunner.post(() -> {
+            mLog.info("restoreWifiBackupData uid=%").c(Binder.getCallingUid()).flush();
+            mBackupRestoreController.parserBackupDataAndDispatch(data);
+        });
     }
 
     /**
@@ -8193,22 +8210,26 @@ public class WifiServiceImpl extends BaseWifiService {
         mLog.info("setWepAllowed=% uid=%").c(isAllowed).c(callingUid).flush();
         mWifiThreadRunner.post(() -> {
             mSettingsConfigStore.put(WIFI_WEP_ALLOWED, isAllowed);
-            mWifiGlobals.setWepAllowed(isAllowed);
-            if (!isAllowed) {
-                for (ClientModeManager clientModeManager
-                        : mActiveModeWarden.getClientModeManagers()) {
-                    if (!(clientModeManager instanceof ConcreteClientModeManager)) {
-                        continue;
-                    }
-                    ConcreteClientModeManager cmm = (ConcreteClientModeManager) clientModeManager;
-                    WifiInfo info = cmm.getConnectionInfo();
-                    if (info != null
-                            && info.getCurrentSecurityType() == WifiInfo.SECURITY_TYPE_WEP) {
-                        clientModeManager.disconnect();
-                    }
+            handleWepAllowedChanged(isAllowed);
+        });
+    }
+
+    private void handleWepAllowedChanged(boolean isAllowed) {
+        mWifiGlobals.setWepAllowed(isAllowed);
+        if (!isAllowed) {
+            for (ClientModeManager clientModeManager
+                    : mActiveModeWarden.getClientModeManagers()) {
+                if (!(clientModeManager instanceof ConcreteClientModeManager)) {
+                    continue;
+                }
+                ConcreteClientModeManager cmm = (ConcreteClientModeManager) clientModeManager;
+                WifiInfo info = cmm.getConnectionInfo();
+                if (info != null
+                        && info.getCurrentSecurityType() == WifiInfo.SECURITY_TYPE_WEP) {
+                    clientModeManager.disconnect();
                 }
             }
-        });
+        }
     }
 
     /**
