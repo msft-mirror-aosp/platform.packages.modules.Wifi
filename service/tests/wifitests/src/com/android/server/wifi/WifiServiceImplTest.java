@@ -12386,10 +12386,10 @@ public class WifiServiceImplTest extends WifiBaseTest {
         ArgumentCaptor<Map<String, Integer>> resultCaptor = ArgumentCaptor.forClass(Map.class);
         inOrder.verify(listener).onResult(resultCaptor.capture());
 
-        assertTrue(resultCaptor.getValue().get(TEST_SSID_WITH_QUOTES)
-                == deviceAdminRoamingPolicies.get(TEST_SSID_WITH_QUOTES));
-        assertTrue(resultCaptor.getValue().size()
-                == deviceAdminRoamingPolicies.size());
+        assertEquals(resultCaptor.getValue().get(TEST_SSID_WITH_QUOTES),
+                deviceAdminRoamingPolicies.get(TEST_SSID_WITH_QUOTES));
+        assertEquals(resultCaptor.getValue().size(),
+                deviceAdminRoamingPolicies.size());
     }
 
     @Test
@@ -12414,10 +12414,10 @@ public class WifiServiceImplTest extends WifiBaseTest {
         ArgumentCaptor<Map<String, Integer>> resultCaptor = ArgumentCaptor.forClass(Map.class);
         inOrder.verify(listener).onResult(resultCaptor.capture());
 
-        assertTrue(resultCaptor.getValue().get(TEST_SSID_WITH_QUOTES)
-                == nonAdminRoamingPolicies.get(TEST_SSID_WITH_QUOTES));
-        assertTrue(resultCaptor.getValue().size()
-                == nonAdminRoamingPolicies.size());
+        assertEquals(resultCaptor.getValue().get(TEST_SSID_WITH_QUOTES),
+                nonAdminRoamingPolicies.get(TEST_SSID_WITH_QUOTES));
+        assertEquals(resultCaptor.getValue().size(),
+                nonAdminRoamingPolicies.size());
     }
 
     private void verifyIsPnoSupported(boolean isBackgroundScanSupported, boolean isSwPnoEnabled,
@@ -12546,10 +12546,11 @@ public class WifiServiceImplTest extends WifiBaseTest {
         verify(iTwtCallback).onFailure(eq(TwtSessionCallback.TWT_ERROR_CODE_NOT_AVAILABLE));
         // Test setupTwtSession with station connected
         when(mClientModeManager.isConnected()).thenReturn(true);
+        when(mClientModeManager.getConnectedBssid()).thenReturn(TEST_BSSID);
         mWifiServiceImpl.setupTwtSession(twtRequest, iTwtCallback, mExtras);
         mLooper.dispatchAll();
         verify(mTwtManager).setupTwtSession(eq(WIFI_IFACE_NAME), eq(twtRequest), eq(iTwtCallback),
-                eq(Binder.getCallingUid()));
+                eq(Binder.getCallingUid()), eq(TEST_BSSID));
     }
 
     @Test
