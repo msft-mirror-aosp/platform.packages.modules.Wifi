@@ -196,6 +196,11 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     @VisibleForTesting public static final short NUM_LOG_RECS_VERBOSE = 3000;
 
     private static final String TAG = "WifiClientModeImpl";
+    // Hardcoded constant used for caller to avoid triggering connect choice that force framework
+    // to stick to the selected network. Do not change this value to maintain backward
+    // compatibility.
+    public static final String ATTRIBUTION_TAG_DISALLOW_CONNECT_CHOICE =
+            "ATTRIBUTION_TAG_DISALLOW_CONNECT_CHOICE";
 
     private static final int IPCLIENT_STARTUP_TIMEOUT_MS = 2_000;
     private static final int IPCLIENT_SHUTDOWN_TIMEOUT_MS = 60_000; // 60 seconds
@@ -215,15 +220,15 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      */
     @Override
     protected void loge(String s) {
-        Log.e(getTag(), s);
+        Log.e(getTag(), s, null);
     }
     @Override
     protected void logd(String s) {
-        Log.d(getTag(), s);
+        Log.d(getTag(), s, null);
     }
     @Override
     protected void log(String s) {
-        Log.d(getTag(), s);
+        Log.d(getTag(), s, null);
     }
     private final WifiContext mContext;
     private final WifiMetrics mWifiMetrics;
@@ -1435,14 +1440,14 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      * @param packageName package name of the app requesting the connection.
      */
     private void connectToUserSelectNetwork(int netId, int uid, boolean forceReconnect,
-            @NonNull String packageName) {
+            @NonNull String packageName, @Nullable String attributionTag) {
         if (mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)
                 || mWifiPermissionsUtil.checkNetworkSetupWizardPermission(uid)) {
             mIsUserSelected = true;
         }
         logd("connectToUserSelectNetwork netId " + netId + ", uid " + uid + ", package "
                 + packageName + ", forceReconnect = " + forceReconnect + ", isUserSelected = "
-                + mIsUserSelected);
+                + mIsUserSelected + ", attributionTag = " + attributionTag);
         updateSaeAutoUpgradeFlagForUserSelectNetwork(netId);
         if (!forceReconnect && (mLastNetworkId == netId || mTargetNetworkId == netId)) {
             // We're already connecting/connected to the user specified network, don't trigger a
@@ -1479,6 +1484,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         }
                     }, mWifiThreadRunner).launchDialog();
         } else {
+            if (mIsUserSelected && ATTRIBUTION_TAG_DISALLOW_CONNECT_CHOICE.equals(attributionTag)) {
+                mIsUserSelected = false;
+                logd("connectToUserSelectNetwork attributionTag override to disable user selected");
+            }
             mWifiConnectivityManager.prepareForForcedConnection(netId);
             if (UserHandle.getAppId(uid) == Process.SYSTEM_UID) {
                 mWifiMetrics.setNominatorForNetwork(netId,
@@ -2670,7 +2679,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             return stats;
         }
 
-        int newRssi = pollResults.getRssi();
+        int newRssi = RssiUtil.calculateAdjustedRssi(pollResults.getRssi());
         int newTxLinkSpeed = pollResults.getTxLinkSpeed();
         int newFrequency = pollResults.getFrequency();
         int newRxLinkSpeed = pollResults.getRxLinkSpeed();
@@ -2685,7 +2694,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         /* Set link specific signal poll results for associated links */
         for (MloLink link : mWifiInfo.getAssociatedMloLinks()) {
             int linkId = link.getLinkId();
-            link.setRssi(pollResults.getRssi(linkId));
+            int rssi = RssiUtil.calculateAdjustedRssi(pollResults.getRssi(linkId));
+            if (rssi > WifiInfo.INVALID_RSSI) {
+                link.setRssi(rssi);
+            }
             link.setTxLinkSpeedMbps(pollResults.getTxLinkSpeed(linkId));
             link.setRxLinkSpeedMbps(pollResults.getRxLinkSpeed(linkId));
             link.setChannel(ScanResult.convertFrequencyMhzToChannelIfSupported(
@@ -2719,18 +2731,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             }
             mWifiInfo.setFrequency(newFrequency);
         }
+
         // updateLinkBandwidth() requires the latest frequency information
-        if (newRssi > WifiInfo.INVALID_RSSI && newRssi < WifiInfo.MAX_RSSI) {
-            /*
-             * Positive RSSI is possible when devices are close(~0m apart) to each other.
-             * And there are some driver/firmware implementation, where they avoid
-             * reporting large negative rssi values by adding 256.
-             * so adjust the valid rssi reports for such implementations.
-             */
-            if (newRssi > (WifiInfo.INVALID_RSSI + 256)) {
-                Log.wtf(getTag(), "Error! +ve value RSSI: " + newRssi);
-                newRssi -= 256;
-            }
+        if (newRssi > WifiInfo.INVALID_RSSI) {
             int oldRssi = mWifiInfo.getRssi();
             mWifiInfo.setRssi(newRssi);
             /*
@@ -2757,10 +2760,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             updateLinkBandwidthAndCapabilities(stats, updateNetworkCapabilities, txBytes,
                     rxBytes);
             mLastSignalLevel = newSignalLevel;
-        } else {
-            mWifiInfo.setRssi(WifiInfo.INVALID_RSSI);
-            updateCapabilities();
-            mLastSignalLevel = -1;
         }
         mWifiConfigManager.updateScanDetailCacheFromWifiInfo(mWifiInfo);
         /*
@@ -3632,7 +3631,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      * Inform other components that a new connection attempt is starting.
      */
     private void reportConnectionAttemptStart(
-            WifiConfiguration config, String targetBSSID, int roamType) {
+            WifiConfiguration config, String targetBSSID, int roamType, int uid) {
         boolean isOobPseudonymEnabled = false;
         if (config.enterpriseConfig != null && config.enterpriseConfig.isAuthenticationSimBased()
                 && mWifiCarrierInfoManager.isOobPseudonymFeatureEnabled(config.carrierId)) {
@@ -3641,7 +3640,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         int overlapWithLastConnectionMs =
                 mWifiMetrics.startConnectionEvent(
                         mInterfaceName, config, targetBSSID, roamType, isOobPseudonymEnabled,
-                        getClientRoleForMetrics(config));
+                        getClientRoleForMetrics(config), uid);
         if (mDeviceConfigFacade.isOverlappingConnectionBugreportEnabled()
                 && overlapWithLastConnectionMs
                 > mDeviceConfigFacade.getOverlappingConnectionDurationThresholdMs()) {
@@ -3961,15 +3960,12 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             // roaming. The linked network roaming reset the mLastNetworkId which results in
             // the connected configuration to be null.
             config = getConnectingWifiConfigurationInternal();
-        }
-        if (config == null || (config.getIpAssignment() == IpConfiguration.IpAssignment.STATIC)) {
-            // config could be null if it had been removed from WifiConfigManager. In this case
-            // we should simply disconnect. And if IP reachability failures come from static IP
-            // case(e.g. a misconfigured default gateway IP address), refreshing L3 provisioning
-            // doesn't help improve the situation and also introduces a loop, it's better to
-            // disconnect and disable the auto-rejoin on that network.
-            handleIpReachabilityLost(lossReason);
-            return;
+            if (config == null) {
+                // config could be null if it had been removed from WifiConfigManager. In this case
+                // we should simply disconnect.
+                handleIpReachabilityLost(lossReason);
+                return;
+            }
         }
         final long curTime = mClock.getElapsedSinceBootMillis();
         if (curTime - mNudFailureCounter.first <= mWifiGlobals.getRepeatedNudFailuresWindowMs()) {
@@ -4337,10 +4333,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         if (mLastNetworkId != WifiConfiguration.INVALID_NETWORK_ID) {
             WifiConfiguration config = getConnectedWifiConfigurationInternal();
             boolean shouldSetUserConnectChoice = config != null
+                    && mIsUserSelected
                     && isRecentlySelectedByTheUser(config)
                     && (config.getNetworkSelectionStatus().hasEverConnected()
-                    || config.isEphemeral())
-                    && mWifiPermissionsUtil.checkNetworkSettingsPermission(config.lastConnectUid);
+                    || config.isEphemeral());
             mWifiConfigManager.updateNetworkAfterConnect(mLastNetworkId,
                     mIsUserSelected, shouldSetUserConnectChoice, mWifiInfo.getRssi());
             // Notify PasspointManager of Passpoint network connected event.
@@ -4689,7 +4685,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
 
                     updateWifiConfigOnStartConnection(config, bssid);
                     reportConnectionAttemptStart(config, mTargetBssid,
-                            WifiMetricsProto.ConnectionEvent.ROAM_UNRELATED);
+                            WifiMetricsProto.ConnectionEvent.ROAM_UNRELATED, uid);
 
                     String currentMacAddress = mWifiNative.getMacAddress(mInterfaceName);
                     mWifiInfo.setMacAddress(currentMacAddress);
@@ -4749,7 +4745,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     int netId = result.getNetworkId();
                     connectToUserSelectNetwork(
                             netId, message.sendingUid, result.hasCredentialChanged(),
-                            cnm.packageName);
+                            cnm.packageName, cnm.attributionTag);
                     mWifiMetrics.logStaEvent(mInterfaceName, StaEvent.TYPE_CONNECT_NETWORK,
                             mWifiConfigManager.getConfiguredNetwork(netId));
                     cnm.listener.sendSuccess();
@@ -5258,7 +5254,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     public boolean isAffiliatedLinkBssid(@NonNull MacAddress bssid) {
         List<MloLink> links = mWifiInfo.getAffiliatedMloLinks();
         for (MloLink link: links) {
-            if (link.getApMacAddress().equals(bssid)) {
+            if (bssid.equals(link.getApMacAddress())) {
                 return true;
             }
         }
@@ -6321,6 +6317,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     mLinkProbeManager.resetOnNewConnection();
                 }
                 sendMessage(CMD_RSSI_POLL, mRssiPollToken, 0);
+            } else {
+                updateLinkLayerStatsRssiAndScoreReport();
             }
             sendNetworkChangeBroadcast(DetailedState.CONNECTING);
             // If this network was explicitly selected by the user, evaluate whether to inform
@@ -6586,6 +6584,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     }
                     else {
                         mRssiMonitor.setShortPollRssiInterval();
+                        removeMessages(CMD_RSSI_POLL);
                     }
                     break;
                 }
@@ -6868,7 +6867,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     Log.e(getTag(), "Fail to create an IpClient instance within "
                             + IPCLIENT_STARTUP_TIMEOUT_MS + "ms");
                     handleNetworkDisconnect(false,
-                            WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__TIMEOUT);
+                            WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_CREATE_IP_CLIENT_TIMEOUT);
                     transitionTo(mDisconnectedState);
                     break;
                 }
@@ -7184,7 +7183,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             WifiConfiguration config = getConnectedWifiConfigurationInternal();
             mWifiScoreReport.startConnectedNetworkScorer(
                     mNetworkAgent.getNetwork().getNetId(), isRecentlySelectedByTheUser(config));
-            updateLinkLayerStatsRssiAndScoreReport();
             mWifiScoreCard.noteIpConfiguration(mWifiInfo);
             // too many places to record L3 failure with too many failure reasons.
             // So only record success here.
@@ -7230,6 +7228,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                                     config.networkId,
                                     DISABLED_UNWANTED_LOW_RSSI);
                         }
+                        mFrameworkDisconnectReasonOverride = WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_UNWANTED_BY_CONNECTIVITY;
                         mWifiNative.disconnect(mInterfaceName);
                     } else if (message.arg1 == NETWORK_STATUS_UNWANTED_DISABLE_AUTOJOIN
                             || message.arg1 == NETWORK_STATUS_UNWANTED_VALIDATION_FAILED) {
@@ -7401,7 +7400,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             + " targetRoamBSSID " + mTargetBssid);
 
                     reportConnectionAttemptStart(config, mTargetBssid,
-                            WifiMetricsProto.ConnectionEvent.ROAM_ENTERPRISE);
+                            WifiMetricsProto.ConnectionEvent.ROAM_ENTERPRISE, Process.WIFI_UID);
                     if (mWifiNative.roamToNetwork(mInterfaceName, config)) {
                         mTargetWifiConfiguration = config;
                         mIsAutoRoaming = true;
@@ -7765,21 +7764,23 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         public final NetworkUpdateResult result;
         public final ActionListenerWrapper listener;
         public final String packageName;
+        public final String attributionTag;
 
         ConnectNetworkMessage(NetworkUpdateResult result, ActionListenerWrapper listener,
-                String packageName) {
+                String packageName, @Nullable String attributionTag) {
             this.result = result;
             this.listener = listener;
             this.packageName = packageName;
+            this.attributionTag = attributionTag;
         }
     }
 
     /** Trigger network connection and provide status via the provided callback. */
     public void connectNetwork(NetworkUpdateResult result, ActionListenerWrapper wrapper,
-            int callingUid, @NonNull String packageName) {
+            int callingUid, @NonNull String packageName, @Nullable String attributionTag) {
         Message message =
                 obtainMessage(CMD_CONNECT_NETWORK,
-                new ConnectNetworkMessage(result, wrapper, packageName));
+                        new ConnectNetworkMessage(result, wrapper, packageName, attributionTag));
         message.sendingUid = callingUid;
         sendMessage(message);
     }
@@ -7789,7 +7790,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             int callingUid, @NonNull String packageName) {
         Message message =
                 obtainMessage(CMD_SAVE_NETWORK,
-                new ConnectNetworkMessage(result, wrapper, packageName));
+                        new ConnectNetworkMessage(result, wrapper, packageName, null));
         message.sendingUid = callingUid;
         sendMessage(message);
     }
@@ -8135,7 +8136,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         .withNetwork(network)
                         .withDisplayName(config.SSID)
                         .withCreatorUid(config.creatorUid)
-                        .withLayer2Information(layer2Info);
+                        .withLayer2Information(layer2Info)
+                        .withoutIpReachabilityMonitor();
             }
             if (mContext.getResources().getBoolean(R.bool.config_wifiEnableApfOnNonPrimarySta)
                     || isPrimary()) {

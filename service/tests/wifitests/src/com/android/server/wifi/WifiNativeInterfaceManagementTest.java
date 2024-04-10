@@ -267,6 +267,7 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
     @Test
     public void testSetupClientInterfaceWithQosPolicyFeatureEnabled() throws Exception {
         mResources.setBoolean(R.bool.config_wifiNetworkCentricQosPolicyFeatureEnabled, true);
+        when(mSupplicantStaIfaceHal.isAidlService()).thenReturn(true);
         when(mSupplicantStaIfaceHal
                 .setNetworkCentricQosPolicyFeatureEnabled(anyString(), anyBoolean()))
                 .thenReturn(true);
@@ -274,6 +275,7 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
                 false, false, IFACE_NAME_0, mIfaceCallback0, mIfaceDestroyedListenerCaptor0,
                 mNetworkObserverCaptor0);
         assertEquals(Set.of(IFACE_NAME_0), mWifiNative.getClientInterfaceNames());
+        verify(mSupplicantStaIfaceHal).isAidlService();
         verify(mSupplicantStaIfaceHal)
                 .setNetworkCentricQosPolicyFeatureEnabled(IFACE_NAME_0, true);
     }
@@ -871,12 +873,13 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
      * Verifies the setup of a client interface and wificond death handling.
      */
     @Test
-    public void testSetupClientInterfaceAndWicondDied() throws Exception {
+    public void testSetupClientInterfaceAndWificondDied() throws Exception {
         executeAndValidateSetupClientInterface(
                 false, false, IFACE_NAME_0, mIfaceCallback0, mIfaceDestroyedListenerCaptor0,
                 mNetworkObserverCaptor0);
         // Trigger wificond death
         mWificondDeathHandlerCaptor.getValue().run();
+        mLooper.dispatchAll();
 
         mInOrder.verify(mWifiMetrics).incrementNumWificondCrashes();
 

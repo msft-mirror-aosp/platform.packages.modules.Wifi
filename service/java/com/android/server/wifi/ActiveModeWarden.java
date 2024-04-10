@@ -174,6 +174,9 @@ public class ActiveModeWarden {
     @GuardedBy("mServiceApiLock")
     private WifiInfo mCurrentConnectionInfo = new WifiInfo();
 
+    @GuardedBy("mServiceApiLock")
+    private final ArraySet<WorkSource> mRequestWs = new ArraySet<>();
+
     /**
      * One of  {@link WifiManager#WIFI_STATE_DISABLED},
      * {@link WifiManager#WIFI_STATE_DISABLING},
@@ -206,6 +209,17 @@ public class ActiveModeWarden {
             default:
                 Log.d(TAG, "attempted to set an invalid state: " + newState);
                 break;
+        }
+    }
+
+    /**
+     * Get the request WorkSource for secondary CMM
+     *
+     * @return the WorkSources of the current secondary CMMs
+     */
+    public Set<WorkSource> getSecondaryRequestWs() {
+        synchronized (mServiceApiLock) {
+            return new ArraySet<>(mRequestWs);
         }
     }
 
@@ -1397,6 +1411,11 @@ public class ActiveModeWarden {
         ConcreteClientModeManager manager = mWifiInjector.makeClientModeManager(
                 listener, requestorWs, role, mVerboseLoggingEnabled);
         mClientModeManagers.add(manager);
+        if (ROLE_CLIENT_SECONDARY_LONG_LIVED.equals(role) || ROLE_CLIENT_LOCAL_ONLY.equals(role)) {
+            synchronized (mServiceApiLock) {
+                mRequestWs.add(new WorkSource(requestorWs));
+            }
+        }
         return true;
     }
 
@@ -1410,6 +1429,14 @@ public class ActiveModeWarden {
             @NonNull WorkSource requestorWs) {
         Log.d(TAG, "Switching role for additional ClientModeManager to role: " + role);
         ClientListener listener = new ClientListener(externalRequestListener);
+        synchronized (mServiceApiLock) {
+            mRequestWs.remove(manager.getRequestorWs());
+        }
+        if (ROLE_CLIENT_SECONDARY_LONG_LIVED.equals(role) || ROLE_CLIENT_LOCAL_ONLY.equals(role)) {
+            synchronized (mServiceApiLock) {
+                mRequestWs.add(new WorkSource(requestorWs));
+            }
+        }
         manager.setRole(role, requestorWs, listener);
         return true;
     }
@@ -1660,6 +1687,12 @@ public class ActiveModeWarden {
 
         private void onStoppedOrStartFailure(ConcreteClientModeManager clientModeManager) {
             mClientModeManagers.remove(clientModeManager);
+            if (ROLE_CLIENT_SECONDARY_LONG_LIVED.equals(clientModeManager.getPreviousRole())
+                    || ROLE_CLIENT_LOCAL_ONLY.equals(clientModeManager.getPreviousRole())) {
+                synchronized (mServiceApiLock) {
+                    mRequestWs.remove(clientModeManager.getRequestorWs());
+                }
+            }
             mGraveyard.inter(clientModeManager);
             updateClientScanMode();
             updateBatteryStats();
@@ -2117,7 +2150,7 @@ public class ActiveModeWarden {
             void exitImpl() {
             }
 
-            private void checkAndHandleAirplaneModeState() {
+            private void checkAndHandleAirplaneModeState(String loggingPackageName) {
                 if (mSettingsStore.isAirplaneModeOn()) {
                     log("Airplane mode toggled");
                     if (!mSettingsStore.shouldWifiRemainEnabledWhenApmEnabled()) {
@@ -2125,7 +2158,7 @@ public class ActiveModeWarden {
                         shutdownWifi();
                         // onStopped will move the state machine to "DisabledState".
                         mLastCallerInfoManager.put(WifiManager.API_WIFI_ENABLED, Process.myTid(),
-                                Process.WIFI_UID, -1, "android_apm", false);
+                                Process.WIFI_UID, -1, loggingPackageName, false);
                     }
                 } else {
                     log("Airplane mode disabled, determine next state");
@@ -2135,7 +2168,7 @@ public class ActiveModeWarden {
                                 mFacade.getSettingsWorkSource(mContext));
                         transitionTo(mEnabledState);
                         mLastCallerInfoManager.put(WifiManager.API_WIFI_ENABLED, Process.myTid(),
-                                Process.WIFI_UID, -1, "android_apm", true);
+                                Process.WIFI_UID, -1, loggingPackageName, true);
                     }
                     // wifi should remain disabled, do not need to transition
                 }
@@ -2171,7 +2204,7 @@ public class ActiveModeWarden {
                             log("Satellite mode is on - return");
                             break;
                         }
-                        checkAndHandleAirplaneModeState();
+                        checkAndHandleAirplaneModeState("android_apm");
                         break;
                     case CMD_UPDATE_AP_CAPABILITY:
                         updateCapabilityToSoftApModeManager((SoftApCapability) msg.obj, msg.arg1);
@@ -2183,9 +2216,12 @@ public class ActiveModeWarden {
                         if (mSettingsStore.isSatelliteModeOn()) {
                             log("Satellite mode is on, disable wifi");
                             shutdownWifi();
+                            mLastCallerInfoManager.put(WifiManager.API_WIFI_ENABLED,
+                                    Process.myTid(), Process.WIFI_UID, -1, "satellite_mode",
+                                    false);
                         } else {
                             log("Satellite mode is off, determine next stage");
-                            checkAndHandleAirplaneModeState();
+                            checkAndHandleAirplaneModeState("satellite_mode");
                         }
                         break;
                     default:
@@ -2202,7 +2238,8 @@ public class ActiveModeWarden {
         }
 
         private boolean shouldEnableSta() {
-            return mSettingsStore.isWifiToggleEnabled() || shouldEnableScanOnlyMode();
+            return (mSettingsStore.isWifiToggleEnabled() || shouldEnableScanOnlyMode())
+                    && !mSettingsStore.isSatelliteModeOn();
         }
 
         private void handleStaToggleChangeInDisabledState(WorkSource requestorWs) {
@@ -2386,7 +2423,8 @@ public class ActiveModeWarden {
                         if (mAllowRootToGetLocalOnlyCmm && curUid == 0) { // 0 is root UID.
                             continue;
                         }
-                        if (mWifiPermissionsUtil.checkEnterCarModePrioritized(curUid)) {
+                        if (curUid != Process.SYSTEM_UID
+                                && mWifiPermissionsUtil.checkEnterCarModePrioritized(curUid)) {
                             requestInfo.listener.onAnswer(primaryManager);
                             if (mVerboseLoggingEnabled) {
                                 Log.w(TAG, "Uid " + curUid
@@ -2474,8 +2512,7 @@ public class ActiveModeWarden {
 
                 // fallback decision
                 if (requestInfo.clientRole == ROLE_CLIENT_LOCAL_ONLY
-                        && mContext.getResources().getBoolean(
-                        R.bool.config_wifiMultiStaLocalOnlyConcurrencyEnabled)
+                        && isStaStaConcurrencySupportedForLocalOnlyConnections()
                         && !mWifiPermissionsUtil.isTargetSdkLessThan(
                         requestInfo.requestorWs.getPackageName(0), Build.VERSION_CODES.S,
                         requestInfo.requestorWs.getUid(0))) {
@@ -2547,6 +2584,26 @@ public class ActiveModeWarden {
                             }
                             return HANDLED;
                         }
+                    case CMD_SATELLITE_MODE_CHANGED:
+                        if (mSettingsStore.isSatelliteModeOn()) {
+                            log("Satellite mode is on, disable wifi");
+                            shutdownWifi();
+                            mLastCallerInfoManager.put(WifiManager.API_WIFI_ENABLED,
+                                    Process.myTid(), Process.WIFI_UID, -1, "satellite_mode",
+                                    false);
+                        } else {
+                            if (!hasPrimaryOrScanOnlyModeManager()) {
+                                // Enabling SoftAp while wifi is off could result in
+                                // ActiveModeWarden being in enabledState without a CMM.
+                                // Defer to the default state in this case to handle the satellite
+                                // mode state change which may result in enabling wifi if necessary.
+                                log("Satellite mode is off in enabled state - "
+                                        + "and no primary manager");
+                                return NOT_HANDLED;
+                            }
+                            log("Satellite mode is off in enabled state. Return handled");
+                        }
+                        break;
                     case CMD_AP_STOPPED:
                     case CMD_AP_START_FAILURE:
                         if (hasAnyModeManager()) {
@@ -2783,7 +2840,7 @@ public class ActiveModeWarden {
      */
     public @NonNull WifiInfo getConnectionInfo() {
         synchronized (mServiceApiLock) {
-            return mCurrentConnectionInfo;
+            return new WifiInfo(mCurrentConnectionInfo);
         }
     }
 
