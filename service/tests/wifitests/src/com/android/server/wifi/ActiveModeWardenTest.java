@@ -276,7 +276,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         mLooper.dispatchAll();
 
         verify(mWifiMetrics).noteWifiEnabledDuringBoot(false);
-
+        verify(mWifiGlobals).setD2dStaConcurrencySupported(false);
         verify(mWifiNative).registerStatusListener(mStatusListenerCaptor.capture());
         verify(mWifiNative).initialize();
         mWifiNativeStatusListener = mStatusListenerCaptor.getValue();
@@ -1156,6 +1156,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         verify(mWifiNative).isStaApConcurrencySupported();
         verify(mWifiNative).isStaStaConcurrencySupported();
         verify(mWifiNative).isP2pStaConcurrencySupported();
+        verify(mWifiNative).isNanStaConcurrencySupported();
         verifyZeroInteractions(mWifiNative);
     }
 
@@ -5061,10 +5062,29 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         mClientListener.onStopped(mClientModeManager);
         mLooper.dispatchAll();
         assertInDisabledState();
+        verify(mLastCallerInfoManager).put(eq(WifiManager.API_WIFI_ENABLED), anyInt(),
+                anyInt(), anyInt(), any(), eq(false));
     }
 
     @Test
-    public void testSatelliteModeOffEnableWifi() throws Exception {
+    public void testSatelliteModeOffNoOp() throws Exception {
+        // Wifi is enabled
+        enterClientModeActiveState();
+        assertInEnabledState();
+
+        // Satellite mode is off
+        when(mSettingsStore.isSatelliteModeOn()).thenReturn(false);
+        mActiveModeWarden.handleSatelliteModeChange();
+
+        mLooper.dispatchAll();
+        assertInEnabledState();
+        // Should not enable wifi again since wifi is already on
+        verify(mLastCallerInfoManager, never()).put(eq(WifiManager.API_WIFI_ENABLED), anyInt(),
+                anyInt(), anyInt(), any(), eq(true));
+    }
+
+    @Test
+    public void testSatelliteModeOnAndThenOffEnableWifi() throws Exception {
         // Wifi is enabled
         enterClientModeActiveState();
         assertInEnabledState();
@@ -5078,12 +5098,16 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         mClientListener.onStopped(mClientModeManager);
         mLooper.dispatchAll();
         assertInDisabledState();
+        verify(mLastCallerInfoManager).put(eq(WifiManager.API_WIFI_ENABLED), anyInt(),
+                anyInt(), anyInt(), any(), eq(false));
 
         // Satellite mode is off, enable Wifi
         when(mSettingsStore.isSatelliteModeOn()).thenReturn(false);
         mActiveModeWarden.handleSatelliteModeChange();
         mLooper.dispatchAll();
         assertInEnabledState();
+        verify(mLastCallerInfoManager).put(eq(WifiManager.API_WIFI_ENABLED), anyInt(),
+                anyInt(), anyInt(), any(), eq(true));
     }
 
 
@@ -5348,11 +5372,25 @@ public class ActiveModeWardenTest extends WifiBaseTest {
     }
 
     @Test
-    public void testD2dSupportedWhenInfraStaDisabled() throws Exception {
+    public void testD2dSupportedWhenInfraStaDisabledWhenP2pStaConcurrencySupported()
+            throws Exception {
         when(mWifiNative.isP2pStaConcurrencySupported()).thenReturn(true);
         when(mWifiGlobals.isD2dSupportedWhenInfraStaDisabled()).thenReturn(true);
         mActiveModeWarden = createActiveModeWarden();
         mActiveModeWarden.start();
+        mLooper.dispatchAll();
+        verify(mWifiGlobals).setD2dStaConcurrencySupported(true);
+        verify(mWifiGlobals, atLeastOnce()).isD2dSupportedWhenInfraStaDisabled();
+    }
+
+    @Test
+    public void testD2dSupportedWhenInfraStaDisabledWhenNanStaConcurrencySupported()
+            throws Exception {
+        when(mWifiNative.isNanStaConcurrencySupported()).thenReturn(true);
+        when(mWifiGlobals.isD2dSupportedWhenInfraStaDisabled()).thenReturn(true);
+        mActiveModeWarden = createActiveModeWarden();
+        mActiveModeWarden.start();
+        mLooper.dispatchAll();
         verify(mWifiGlobals).setD2dStaConcurrencySupported(true);
         verify(mWifiGlobals, atLeastOnce()).isD2dSupportedWhenInfraStaDisabled();
     }

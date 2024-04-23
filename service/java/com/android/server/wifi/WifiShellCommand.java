@@ -151,6 +151,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
     private static final String[] NON_PRIVILEGED_COMMANDS = {
             "add-suggestion",
             "forget-network",
+            "connect-network",
+            "add-network",
             "get-country-code",
             "help",
             "-h",
@@ -183,6 +185,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
             "get-mock-wifimodem-service",
             "set-mock-wifimodem-methods",
             "force-overlay-config-value",
+            "get-softap-supported-features",
     };
 
     private static final Map<String, Pair<NetworkRequest, ConnectivityManager.NetworkCallback>>
@@ -601,7 +604,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         final int carrierId = Integer.parseInt(arg1);
                         mWifiThreadRunner.post(() ->
                                 mWifiCarrierInfoManager.clearImsiPrivacyExemptionForCarrier(
-                                        carrierId));
+                                        carrierId), TAG + "#" + cmd);
                     } catch (NumberFormatException e) {
                         pw.println("Invalid argument to "
                                 + "'imsi-protection-exemption-clear-user-approved-for-carrier' "
@@ -612,7 +615,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 }
                 case "network-requests-remove-user-approved-access-points": {
                     String packageName = getNextArgRequired();
-                    mWifiThreadRunner.post(() -> mWifiNetworkFactory.removeApp(packageName));
+                    mWifiThreadRunner.post(() -> mWifiNetworkFactory.removeApp(packageName),
+                            TAG + "#" + cmd);
                     return 0;
                 }
                 case "clear-user-disabled-networks": {
@@ -961,7 +965,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     return 0;
                 case "list-scan-results":
                     List<ScanResult> scanResults =
-                            mWifiService.getScanResults(SHELL_PACKAGE_NAME, null);
+                            mScanRequestProxy.getScanResults();
                     if (scanResults.isEmpty()) {
                         pw.println("No scan results");
                     } else {
@@ -1009,9 +1013,6 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     WifiConfiguration config = buildWifiConfiguration(pw);
                     mWifiService.connect(config, -1, actionListener, SHELL_PACKAGE_NAME,
                             new Bundle());
-                    // wait for status.
-                    countDownLatch.await(500, TimeUnit.MILLISECONDS);
-                    setAutoJoin(pw, config.SSID, config.allowAutojoin);
                     return 0;
                 }
                 case "add-network": {
@@ -1031,9 +1032,6 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     };
                     WifiConfiguration config = buildWifiConfiguration(pw);
                     mWifiService.save(config, actionListener, SHELL_PACKAGE_NAME);
-                    // wait for status.
-                    countDownLatch.await(500, TimeUnit.MILLISECONDS);
-                    setAutoJoin(pw, config.SSID, config.allowAutojoin);
                     return 0;
                 }
                 case "forget-network": {
@@ -1925,7 +1923,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     location.setLongitude(longitude);
                     location.setLatitude(latitude);
                     location.setAltitude(height);
-                    mWifiThreadRunner.post(() -> mAfcManager.onLocationChange(location, true));
+                    mWifiThreadRunner.post(() -> mAfcManager.onLocationChange(location, true),
+                            TAG + "#" + cmd);
                     pw.println("The updated location with longitude of " + longitude + " degrees, "
                             + "latitude of " + latitude + " degrees, and height of " + height
                             + " meters was passed into the Afc Manager onLocationChange method.");
@@ -2048,7 +2047,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                             queue.offer("Setting the allowed AFC channels and frequencies "
                                     + "failed.");
                         }
-                    });
+                    }, TAG + "#" + cmd);
 
                     // block until msg is received, or timed out
                     String msg = queue.poll(3000, TimeUnit.MILLISECONDS);
@@ -2113,7 +2112,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
 
                     mWifiThreadRunner.post(() -> {
                         mAfcManager.setServerUrlAndRequestPropertyPairs(url, requestProperties);
-                    });
+                    }, TAG + "#" + cmd);
 
                     pw.println("The URL is set to " + url);
                     pw.println("The request properties are set to: ");
@@ -2536,7 +2535,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         // So, find scan result with the best rssi level to set in the request.
         if (bssid == null && !nullBssid && !noSsid) {
             ScanResult matchingScanResult =
-                    mWifiService.getScanResults(SHELL_PACKAGE_NAME, null)
+                    mScanRequestProxy.getScanResults()
                             .stream()
                             .filter(s -> s.SSID.equals(ssid))
                             .max(Comparator.comparingInt(s -> s.level))
@@ -2611,28 +2610,6 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         return cellChannels;
     }
 
-    private void setAutoJoin(PrintWriter pw, String ssid, boolean allowAutojoin) {
-        // For suggestions, this will work only if the config has already been added
-        // to WifiConfigManager.
-        Bundle extras = new Bundle();
-        if (SdkLevel.isAtLeastS()) {
-            extras.putParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE,
-                    mContext.getAttributionSource());
-        }
-        WifiConfiguration retrievedConfig =
-                mWifiService.getPrivilegedConfiguredNetworks(SHELL_PACKAGE_NAME, null, extras)
-                        .getList()
-                        .stream()
-                        .filter(n -> n.SSID.equals(ssid))
-                        .findAny()
-                        .orElse(null);
-        if (retrievedConfig == null) {
-            pw.println("Cannot retrieve config, autojoin setting skipped.");
-            return;
-        }
-        mWifiService.allowAutojoin(retrievedConfig.networkId, allowAutojoin);
-    }
-
     private int sendLinkProbe(PrintWriter pw) throws InterruptedException {
         // Note: should match WifiNl80211Manager#SEND_MGMT_FRAME_TIMEOUT_MS
         final int sendMgmtFrameTimeoutMs = 1000;
@@ -2650,7 +2627,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         queue.offer("Link probe failed with reason "
                                 + LinkProbeCallback.failureReasonToString(reason));
                     }
-                }, -1));
+                }, -1), TAG + "#sendLinkProbe");
 
         // block until msg is received, or timed out
         String msg = queue.poll(sendMgmtFrameTimeoutMs + 1000, TimeUnit.MILLISECONDS);
@@ -2775,6 +2752,48 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Enables/disables Wifi on this device.");
         pw.println("  set-scan-always-available enabled|disabled");
         pw.println("    Sets whether scanning should be available even when wifi is off.");
+        pw.println("  connect-network <ssid> open|owe|wpa2|wpa3|wep [<passphrase>] [-x] [-m] "
+                + "[-d] [-b <bssid>] [-r auto|none|persistent|non_persistent]");
+        pw.println("    Connect to a network with provided params and add to saved networks list");
+        pw.println("    <ssid> - SSID of the network");
+        pw.println("    open|owe|wpa2|wpa3|wep - Security type of the network.");
+        pw.println("        - Use 'open' or 'owe' for networks with no passphrase");
+        pw.println("           - 'open' - Open networks (Most prevalent)");
+        pw.println("           - 'owe' - Enhanced open networks");
+        pw.println("        - Use 'wpa2' or 'wpa3' or 'wep' for networks with passphrase");
+        pw.println("           - 'wpa2' - WPA-2 PSK networks (Most prevalent)");
+        pw.println("           - 'wpa3' - WPA-3 PSK networks");
+        pw.println("           - 'wep'  - WEP network. Passphrase should be bytes in hex or encoded"
+                + " into String using UTF-8");
+        pw.println("    -x - Specifies the SSID as hex digits instead of plain text");
+        pw.println("    -m - Mark the network metered.");
+        pw.println("    -d - Mark the network autojoin disabled.");
+        pw.println("    -h - Mark the network hidden.");
+        pw.println("    -p - Mark the network private (not shared).");
+        pw.println("    -b <bssid> - Set specific BSSID.");
+        pw.println("    -r auto|none|persistent|non_persistent - MAC randomization scheme for the"
+                + " network");
+        pw.println("  add-network <ssid> open|owe|wpa2|wpa3|wep [<passphrase>] [-x] [-m] [-d] "
+                + "[-b <bssid>] [-r auto|none|persistent|non_persistent]");
+        pw.println("    Add/update saved network with provided params");
+        pw.println("    <ssid> - SSID of the network");
+        pw.println("    open|owe|wpa2|wpa3|wep - Security type of the network.");
+        pw.println("        - Use 'open' or 'owe' for networks with no passphrase");
+        pw.println("           - 'open' - Open networks (Most prevalent)");
+        pw.println("           - 'owe' - Enhanced open networks");
+        pw.println("        - Use 'wpa2' or 'wpa3' for networks with passphrase");
+        pw.println("           - 'wpa2' - WPA-2 PSK networks (Most prevalent)");
+        pw.println("           - 'wpa3' - WPA-3 PSK networks");
+        pw.println("           - 'wep'  - WEP network. Passphrase should be bytes in hex or encoded"
+                + " into String using UTF-8");
+        pw.println("    -x - Specifies the SSID as hex digits instead of plain text");
+        pw.println("    -m - Mark the network metered.");
+        pw.println("    -d - Mark the network autojoin disabled.");
+        pw.println("    -h - Mark the network hidden.");
+        pw.println("    -p - Mark the network private (not shared).");
+        pw.println("    -b <bssid> - Set specific BSSID.");
+        pw.println("    -r auto|none|persistent|non_persistent - MAC randomization scheme for the"
+                + " network");
         pw.println("  list-scan-results");
         pw.println("    Lists the latest scan results");
         pw.println("  start-scan");
@@ -2988,51 +3007,15 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 + "values per overlay.");
         pw.println("    enabled|disabled: enable the override or disable it and revert to using "
                 + "the built-in value.");
+        pw.println("  get-softap-supported-features");
+        pw.println("    Gets softap supported features. Will print 'wifi_softap_acs_supported'");
+        pw.println("    and/or 'wifi_softap_wpa3_sae_supported',");
+        pw.println("    and/or 'wifi_softap_bridged_ap_supported',");
+        pw.println("    and/or 'wifi_softap_bridged_ap_with_sta_supported',");
+        pw.println("    each on a separate line.");
     }
 
     private void onHelpPrivileged(PrintWriter pw) {
-        pw.println("  connect-network <ssid> open|owe|wpa2|wpa3|wep [<passphrase>] [-x] [-m] "
-                + "[-d] [-b <bssid>] [-r auto|none|persistent|non_persistent]");
-        pw.println("    Connect to a network with provided params and add to saved networks list");
-        pw.println("    <ssid> - SSID of the network");
-        pw.println("    open|owe|wpa2|wpa3|wep - Security type of the network.");
-        pw.println("        - Use 'open' or 'owe' for networks with no passphrase");
-        pw.println("           - 'open' - Open networks (Most prevalent)");
-        pw.println("           - 'owe' - Enhanced open networks");
-        pw.println("        - Use 'wpa2' or 'wpa3' or 'wep' for networks with passphrase");
-        pw.println("           - 'wpa2' - WPA-2 PSK networks (Most prevalent)");
-        pw.println("           - 'wpa3' - WPA-3 PSK networks");
-        pw.println("           - 'wep'  - WEP network. Passphrase should be bytes in hex or encoded"
-                + " into String using UTF-8");
-        pw.println("    -x - Specifies the SSID as hex digits instead of plain text");
-        pw.println("    -m - Mark the network metered.");
-        pw.println("    -d - Mark the network autojoin disabled.");
-        pw.println("    -h - Mark the network hidden.");
-        pw.println("    -p - Mark the network private (not shared).");
-        pw.println("    -b <bssid> - Set specific BSSID.");
-        pw.println("    -r auto|none|persistent|non_persistent - MAC randomization scheme for the"
-                + " network");
-        pw.println("  add-network <ssid> open|owe|wpa2|wpa3|wep [<passphrase>] [-x] [-m] [-d] "
-                + "[-b <bssid>] [-r auto|none|persistent|non_persistent]");
-        pw.println("    Add/update saved network with provided params");
-        pw.println("    <ssid> - SSID of the network");
-        pw.println("    open|owe|wpa2|wpa3|wep - Security type of the network.");
-        pw.println("        - Use 'open' or 'owe' for networks with no passphrase");
-        pw.println("           - 'open' - Open networks (Most prevalent)");
-        pw.println("           - 'owe' - Enhanced open networks");
-        pw.println("        - Use 'wpa2' or 'wpa3' for networks with passphrase");
-        pw.println("           - 'wpa2' - WPA-2 PSK networks (Most prevalent)");
-        pw.println("           - 'wpa3' - WPA-3 PSK networks");
-        pw.println("           - 'wep'  - WEP network. Passphrase should be bytes in hex or encoded"
-                + " into String using UTF-8");
-        pw.println("    -x - Specifies the SSID as hex digits instead of plain text");
-        pw.println("    -m - Mark the network metered.");
-        pw.println("    -d - Mark the network autojoin disabled.");
-        pw.println("    -h - Mark the network hidden.");
-        pw.println("    -p - Mark the network private (not shared).");
-        pw.println("    -b <bssid> - Set specific BSSID.");
-        pw.println("    -r auto|none|persistent|non_persistent - MAC randomization scheme for the"
-                + " network");
         pw.println("  set-poll-rssi-interval-msecs <int>");
         pw.println("    Sets the interval between RSSI polls to <int> milliseconds.");
         pw.println("  get-poll-rssi-interval-msecs");
@@ -3072,12 +3055,6 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Sets whether wifi watchdog should trigger recovery");
         pw.println("  get-wifi-watchdog");
         pw.println("    Gets setting of wifi watchdog trigger recovery.");
-        pw.println("  get-softap-supported-features");
-        pw.println("    Gets softap supported features. Will print 'wifi_softap_acs_supported'");
-        pw.println("    and/or 'wifi_softap_wpa3_sae_supported',");
-        pw.println("    and/or 'wifi_softap_bridged_ap_supported',");
-        pw.println("    and/or 'wifi_softap_bridged_ap_with_sta_supported',");
-        pw.println("    each on a separate line.");
         pw.println("  settings-reset");
         pw.println("    Initiates wifi settings reset");
         pw.println("  allow-root-to-get-local-only-cmm enabled|disabled");

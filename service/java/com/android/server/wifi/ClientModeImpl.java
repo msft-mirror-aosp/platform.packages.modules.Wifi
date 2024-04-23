@@ -692,6 +692,12 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
 
     private final ApplicationQosPolicyRequestHandler mApplicationQosPolicyRequestHandler;
 
+    @VisibleForTesting
+    public static final String X509_CERTIFICATE_EXPIRED_ERROR_STRING = "certificate has expired";
+    @VisibleForTesting
+    public static final int EAP_FAILURE_CODE_CERTIFICATE_EXPIRED = 32768;
+    private boolean mCurrentConnectionReportedCertificateExpired = false;
+
 
     /** Note that this constructor will also start() the StateMachine. */
     public ClientModeImpl(
@@ -1893,7 +1899,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      */
     public boolean syncQueryPasspointIcon(long bssid, String fileName) {
         return mWifiThreadRunner.call(
-                () -> mPasspointManager.queryPasspointIcon(bssid, fileName), false);
+                () -> mPasspointManager.queryPasspointIcon(bssid, fileName), false,
+                TAG + "#syncQueryPasspointIcon");
     }
 
     @Override
@@ -1945,7 +1952,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             IProvisioningCallback callback) {
         return mWifiThreadRunner.call(
                 () -> mPasspointManager.startSubscriptionProvisioning(
-                        callingUid, provider, callback), false);
+                        callingUid, provider, callback), false,
+                TAG + "#syncStartSubscriptionProvisioning");
     }
 
     /**
@@ -3559,6 +3567,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         mLastNetworkId = WifiConfiguration.INVALID_NETWORK_ID;
         mLastSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         mCurrentConnectionDetectedCaptivePortal = false;
+        mCurrentConnectionReportedCertificateExpired = false;
         mLastSimBasedConnectionCarrierName = null;
         mNudFailureCounter = new Pair<>(0L, 0);
         checkAbnormalDisconnectionAndTakeBugReport();
@@ -4775,6 +4784,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         break;
                     }
                     mCurrentConnectionDetectedCaptivePortal = false;
+                    mCurrentConnectionReportedCertificateExpired = false;
                     mTargetNetworkId = netId;
                     // Update scorecard while there is still state from existing connection
                     mLastScanRssi = mWifiConfigManager.findScanRssi(netId,
@@ -5502,7 +5512,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 return;
             }
             mWifiThreadRunner.post(
-                    () -> mRssiMonitor.updateAppThresholdsAndStartMonitor(thresholds));
+                    () -> mRssiMonitor.updateAppThresholdsAndStartMonitor(thresholds),
+                    TAG + "#onSignalStrengthThresholdsUpdated");
         }
 
         @Override
@@ -5929,6 +5940,12 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     logEventIfManagedNetwork(getConnectingWifiConfigurationInternal(),
                             eventInfo.eventCode, eventInfo.bssid,
                             eventInfo.reasonString);
+                    if (!TextUtils.isEmpty(eventInfo.reasonString)
+                            && eventInfo.reasonString.contains(
+                                    X509_CERTIFICATE_EXPIRED_ERROR_STRING)) {
+                        mCurrentConnectionReportedCertificateExpired = true;
+                        Log.e(getTag(), "Current connection attempt detected expired certificate");
+                    }
                     break;
                 }
                 case CMD_DISCONNECT: {
@@ -6217,6 +6234,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         if (errorCode == WifiNative.EAP_SIM_NOT_SUBSCRIBED) {
                             disableReason = WifiConfiguration.NetworkSelectionStatus
                                     .DISABLED_AUTHENTICATION_NO_SUBSCRIPTION;
+                        }
+                        if (mCurrentConnectionReportedCertificateExpired && errorCode <= 0) {
+                            errorCode = EAP_FAILURE_CODE_CERTIFICATE_EXPIRED;
                         }
                     }
                     mWifiConfigManager.updateNetworkSelectionStatus(
@@ -8635,7 +8655,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             return false;
         }
 
-        return mWifiConfigManager.saveToStore(true);
+        return mWifiConfigManager.saveToStore();
     }
 
     /**

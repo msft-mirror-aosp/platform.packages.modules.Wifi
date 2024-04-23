@@ -792,10 +792,10 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
     private WifiServiceImpl makeWifiServiceImplWithMockRunnerWhichTimesOut() {
         WifiThreadRunner mockRunner = mock(WifiThreadRunner.class);
-        when(mockRunner.call(any(), any())).then(returnsSecondArg());
-        when(mockRunner.call(any(), any(int.class))).then(returnsSecondArg());
-        when(mockRunner.call(any(), any(boolean.class))).then(returnsSecondArg());
-        when(mockRunner.post(any())).thenReturn(false);
+        when(mockRunner.call(any(), any(), anyString())).then(returnsSecondArg());
+        when(mockRunner.call(any(), any(int.class), anyString())).then(returnsSecondArg());
+        when(mockRunner.call(any(), any(boolean.class), anyString())).then(returnsSecondArg());
+        when(mockRunner.post(any(), anyString())).thenReturn(false);
 
         when(mWifiInjector.getWifiThreadRunner()).thenReturn(mockRunner);
         // Reset mWifiCountryCode to avoid verify failure in makeWifiServiceImpl.
@@ -2248,7 +2248,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
     /**
      * Verify a SecurityException is thrown when a caller without the correct permission attempts to
-     * call startTetheredHotspotRequest().
+     * call startTetheredHotspot().
      */
     @Test(expected = SecurityException.class)
     public void testStartTetheredHotspotRequestWithoutPermissionThrowsException() throws Exception {
@@ -3344,7 +3344,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         String featureId = "test.com.featureId";
         mLooper.startAutoDispatch();
         List<ScanResult> retrievedScanResultList = mWifiServiceImpl.getScanResults(packageName,
-                featureId);
+                featureId).getList();
         mLooper.stopAutoDispatchAndIgnoreExceptions();
         verify(mScanRequestProxy).getScanResults();
 
@@ -3370,7 +3370,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         String featureId = "test.com.featureId";
         mLooper.startAutoDispatch();
         List<ScanResult> retrievedScanResultList = mWifiServiceImpl.getScanResults(packageName,
-                featureId);
+                featureId).getList();
         mLooper.stopAutoDispatchAndIgnoreExceptions();
         verify(mScanRequestProxy, never()).getScanResults();
 

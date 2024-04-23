@@ -9299,7 +9299,7 @@ public class ClientModeImplTest extends WifiBaseTest {
                 SecurityParams.createSecurityParamsBySecurityType(
                         WifiConfiguration.SECURITY_TYPE_PSK));
         when(mWifiConfigManager.setNetworkDefaultGwMacAddress(anyInt(), any())).thenReturn(true);
-        when(mWifiConfigManager.saveToStore(anyBoolean())).thenReturn(true);
+        when(mWifiConfigManager.saveToStore()).thenReturn(true);
         WifiConfiguration linkedConfig = WifiConfigurationTestUtil.createPskNetwork("\"ssid2\"");
         linkedConfig.networkId = connectedConfig.networkId + 1;
         Map<String, WifiConfiguration> linkedNetworks = new HashMap<>();
@@ -9368,7 +9368,7 @@ public class ClientModeImplTest extends WifiBaseTest {
                 SecurityParams.createSecurityParamsBySecurityType(
                         WifiConfiguration.SECURITY_TYPE_SAE));
         when(mWifiConfigManager.setNetworkDefaultGwMacAddress(anyInt(), any())).thenReturn(true);
-        when(mWifiConfigManager.saveToStore(anyBoolean())).thenReturn(true);
+        when(mWifiConfigManager.saveToStore()).thenReturn(true);
         mWifiNetworkAgentCallbackCaptor.getValue().onValidationStatus(
                 NetworkAgent.VALIDATION_STATUS_VALID, null /* captivePortalUrl */);
         mLooper.dispatchAll();
@@ -9421,7 +9421,7 @@ public class ClientModeImplTest extends WifiBaseTest {
                 SecurityParams.createSecurityParamsBySecurityType(
                         WifiConfiguration.SECURITY_TYPE_PSK));
         when(mWifiConfigManager.setNetworkDefaultGwMacAddress(anyInt(), any())).thenReturn(true);
-        when(mWifiConfigManager.saveToStore(anyBoolean())).thenReturn(true);
+        when(mWifiConfigManager.saveToStore()).thenReturn(true);
 
         // FT/PSK scan, do not update linked networks
         ScanResult ftPskScan = new ScanResult();
@@ -9501,7 +9501,7 @@ public class ClientModeImplTest extends WifiBaseTest {
                 SecurityParams.createSecurityParamsBySecurityType(
                         WifiConfiguration.SECURITY_TYPE_PSK));
         when(mWifiConfigManager.setNetworkDefaultGwMacAddress(anyInt(), any())).thenReturn(true);
-        when(mWifiConfigManager.saveToStore(anyBoolean())).thenReturn(true);
+        when(mWifiConfigManager.saveToStore()).thenReturn(true);
         WifiConfiguration linkedConfig = WifiConfigurationTestUtil.createPskNetwork("\"ssid2\"");
         linkedConfig.networkId = connectedConfig.networkId + 1;
         linkedConfig.allowAutojoin = false;
@@ -11105,5 +11105,32 @@ public class ClientModeImplTest extends WifiBaseTest {
     public void testSendDhcpHostnameEnabledWithSecureRestriction() throws Exception {
         testDhcpHostnameSetting(true, WifiManager.FLAG_SEND_DHCP_HOSTNAME_RESTRICTION_SECURE,
                 SECURITY_TYPE_PSK, IIpClient.HOSTNAME_SETTING_DO_NOT_SEND);
+    }
+
+    /**
+     * Verify that the connection failure due to expired certificate status code is captured in the
+     * connection result metrics failure specific status code.
+     */
+    @Test
+    public void testConnectionFailureDueToExpiredCertificateStatusCode() throws Exception {
+        initializeAndAddNetworkAndVerifySuccess();
+
+        startConnectSuccess();
+
+        mCmi.sendMessage(WifiMonitor.AUXILIARY_SUPPLICANT_EVENT,
+                new SupplicantEventInfo(7,  MacAddress.fromString(TEST_BSSID_STR),
+                        "TLS: Certificate verification failed"
+                                + ClientModeImpl.X509_CERTIFICATE_EXPIRED_ERROR_STRING));
+
+        mCmi.sendMessage(WifiMonitor.AUTHENTICATION_FAILURE_EVENT,
+                new AuthenticationFailureEventInfo(TEST_SSID, MacAddress.fromString(TEST_BSSID_STR),
+                        WifiManager.ERROR_AUTH_FAILURE_EAP_FAILURE, -1));
+        mLooper.dispatchAll();
+
+        verify(mWifiMetrics).endConnectionEvent(
+                any(), eq(WifiMetrics.ConnectionEvent.FAILURE_AUTHENTICATION_FAILURE),
+                eq(WifiMetricsProto.ConnectionEvent.HLF_NONE),
+                eq(WifiMetricsProto.ConnectionEvent.AUTH_FAILURE_EAP_FAILURE),
+                anyInt(), eq(ClientModeImpl.EAP_FAILURE_CODE_CERTIFICATE_EXPIRED));
     }
 }

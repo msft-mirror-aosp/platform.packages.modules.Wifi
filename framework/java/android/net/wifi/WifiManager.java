@@ -4518,12 +4518,26 @@ public class WifiManager {
      * {@link android.Manifest.permission#ACCESS_FINE_LOCATION ACCESS_FINE_LOCATION} permission
      * and {@link android.Manifest.permission#ACCESS_WIFI_STATE} permission
      * in order to get valid results.
+     *
+     * <p>
+     * When an Access Point’s beacon or probe response includes a Multi-BSSID Element, the
+     * returned scan results should include separate scan result for each BSSID within the
+     * Multi-BSSID Information Element. This includes both transmitted and non-transmitted BSSIDs.
+     * Original Multi-BSSID Element will be included in the Information Elements attached to
+     * each of the scan results.
+     * Note: This is the expected behavior for devices supporting 11ax (WiFi-6) and above, and an
+     * optional requirement for devices running with older WiFi generations.
+     * </p>
      */
     @RequiresPermission(allOf = {ACCESS_WIFI_STATE, ACCESS_FINE_LOCATION})
     public List<ScanResult> getScanResults() {
         try {
-            return mService.getScanResults(mContext.getOpPackageName(),
-                    mContext.getAttributionTag());
+            ParceledListSlice<ScanResult> parceledList = mService
+                    .getScanResults(mContext.getOpPackageName(), mContext.getAttributionTag());
+            if (parceledList == null) {
+                return Collections.emptyList();
+            }
+            return parceledList.getList();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -6631,7 +6645,8 @@ public class WifiManager {
          * <p>
          * This provides the same state and failure reason as {@link #onStateChanged(int, int)}, but
          * also provides extra information such as interface name and TetheringRequest in order to
-         * replace usage of the WIFI_AP_STATE_CHANGED_ACTION broadcast.
+         * replace usage of the WIFI_AP_STATE_CHANGED_ACTION broadcast. If this method is overridden
+         * then {@link #onStateChanged(int, int)} will no longer be called.
          *
          * @param state the new state.
          */
@@ -6783,7 +6798,6 @@ public class WifiManager {
             Binder.clearCallingIdentity();
             mExecutor.execute(() -> {
                 mCallback.onStateChanged(state);
-                mCallback.onStateChanged(state.getState(), state.getFailureReasonInternal());
             });
         }
 
@@ -7413,7 +7427,7 @@ public class WifiManager {
      * <li> This API will cause reconnect if the current active connection is marked metered.</li>
      *
      * @param networkId the ID of the network as returned by {@link #addNetwork} or {@link
-     *        getConfiguredNetworks}.
+     *        #getConfiguredNetworks()}.
      * @param listener for callbacks on success or failure. Can be null.
      * @throws IllegalStateException if the WifiManager instance needs to be
      * initialized again
