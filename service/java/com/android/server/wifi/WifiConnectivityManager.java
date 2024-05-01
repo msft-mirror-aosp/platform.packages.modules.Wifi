@@ -1492,6 +1492,11 @@ public class WifiConnectivityManager {
                 clientModeManager.getConnectedBssid());
         ScanResult scanResultCandidate =
                 candidate.getNetworkSelectionStatus().getCandidate();
+        if (scanResultCandidate == null) {
+            localLog("isClientModeManagerConnectedOrConnectingToCandidate(" + clientModeManager
+                    + "): bad candidate - " + candidate.SSID + " scanResult is null!");
+            return connectingOrConnectedToTarget;
+        }
         String targetBssid = scanResultCandidate.BSSID;
         return connectingOrConnectedToTarget
                 && Objects.equals(targetBssid, connectedOrConnectingBssid);
@@ -3433,6 +3438,24 @@ public class WifiConnectivityManager {
     }
 
     /**
+     * Reset states when Wi-Fi is getting disabled.
+     */
+    public void resetOnWifiDisable() {
+        mNetworkSelector.resetOnDisable();
+        mConfigManager.enableTemporaryDisabledNetworks();
+        mConfigManager.stopRestrictingAutoJoinToSubscriptionId();
+        mConfigManager.clearUserTemporarilyDisabledList();
+        mConfigManager.removeAllEphemeralOrPasspointConfiguredNetworks();
+        // Flush ANQP cache if configured to do so
+        if (mWifiGlobals.flushAnqpCacheOnWifiToggleOffEvent()) {
+            mPasspointManager.clearAnqpRequestsAndFlushCache();
+        }
+        if (mEnablePnoScanAfterWifiToggle) {
+            mPnoScanEnabledByFramework = true;
+        }
+    }
+
+    /**
      * Inform WiFi is enabled for connection or not
      */
     private void setWifiEnabled(boolean enable) {
@@ -3441,18 +3464,7 @@ public class WifiConnectivityManager {
         localLog("Set WiFi " + (enable ? "enabled" : "disabled"));
 
         if (!enable) {
-            mNetworkSelector.resetOnDisable();
-            mConfigManager.enableTemporaryDisabledNetworks();
-            mConfigManager.stopRestrictingAutoJoinToSubscriptionId();
-            mConfigManager.clearUserTemporarilyDisabledList();
-            mConfigManager.removeAllEphemeralOrPasspointConfiguredNetworks();
-            // Flush ANQP cache if configured to do so
-            if (mWifiGlobals.flushAnqpCacheOnWifiToggleOffEvent()) {
-                mPasspointManager.clearAnqpRequestsAndFlushCache();
-            }
-            if (mEnablePnoScanAfterWifiToggle) {
-                mPnoScanEnabledByFramework = true;
-            }
+            resetOnWifiDisable();
         }
         mWifiEnabled = enable;
         updateRunningState();
