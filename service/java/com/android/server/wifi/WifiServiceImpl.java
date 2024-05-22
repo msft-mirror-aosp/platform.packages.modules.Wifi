@@ -5541,11 +5541,13 @@ public class WifiServiceImpl extends BaseWifiService {
                 pw.println();
                 mLastCallerInfoManager.dump(pw);
                 pw.println();
-                mWifiInjector.getLinkProbeManager().dump(fd, pw, args);
-                pw.println();
                 mWifiNative.dump(pw);
                 pw.println();
                 mWifiInjector.getWifiRoamingModeManager().dump(fd, pw, args);
+                if (SdkLevel.isAtLeastV() && mWifiInjector.getWifiVoipDetector() != null) {
+                    pw.println();
+                    mWifiInjector.getWifiVoipDetector().dump(fd, pw, args);
+                }
             }
         }, TAG + "#dump");
     }
@@ -5723,6 +5725,9 @@ public class WifiServiceImpl extends BaseWifiService {
         mApplicationQosPolicyRequestHandler.enableVerboseLogging(mVerboseLoggingEnabled);
         mWifiSettingsBackupRestore.enableVerboseLogging(mVerboseLoggingEnabled);
         mBackupRestoreController.enableVerboseLogging(mVerboseLoggingEnabled);
+        if (SdkLevel.isAtLeastV() && mWifiInjector.getWifiVoipDetector() != null) {
+            mWifiInjector.getWifiVoipDetector().enableVerboseLogging(mVerboseLoggingEnabled);
+        }
     }
 
     @Override
@@ -6907,10 +6912,14 @@ public class WifiServiceImpl extends BaseWifiService {
      * See {@link WifiManager#registerScanResultsCallback(WifiManager.ScanResultsCallback)}
      */
     public void unregisterScanResultsCallback(@NonNull IScanResultsCallback callback) {
+        if (callback == null) {
+            throw new IllegalArgumentException("callback must not be null");
+        }
+        enforceAccessPermission();
+
         if (mVerboseLoggingEnabled) {
             mLog.info("unregisterScanResultCallback uid=%").c(Binder.getCallingUid()).flush();
         }
-        enforceAccessPermission();
         // post operation to handler thread
         mWifiThreadRunner.post(() -> mWifiInjector.getScanRequestProxy()
                         .unregisterScanResultsCallback(callback),
@@ -8453,13 +8462,14 @@ public class WifiServiceImpl extends BaseWifiService {
     /**
      * Force Overlay Config for testing
      */
-    public boolean forceOverlayConfigValue(String configString, String value, boolean isEnabled) {
+    public boolean forceOverlayConfigValue(String overlayName, String configValue,
+            boolean isEnabled) {
         int uid = Binder.getCallingUid();
         if (!mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)) {
             throw new SecurityException(TAG + " Uid " + uid
                     + " Missing NETWORK_SETTINGS permission");
         }
-        return mWifiGlobals.forceOverlayConfigValue(configString, value, isEnabled);
+        return mWifiGlobals.forceOverlayConfigValue(overlayName, configValue, isEnabled);
     }
 
     /**

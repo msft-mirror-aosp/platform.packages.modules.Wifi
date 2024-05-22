@@ -755,18 +755,14 @@ public class SoftApManagerTest extends WifiBaseTest {
 
         ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
         if (SdkLevel.isAtLeastSv2()) {
-            verify(mContext, times(2)).sendBroadcastAsUser(intentCaptor.capture(),
+            verify(mContext, times(1)).sendBroadcastAsUser(intentCaptor.capture(),
                     eq(UserHandle.ALL), eq(android.Manifest.permission.ACCESS_WIFI_STATE));
         } else {
-            verify(mContext, times(2)).sendStickyBroadcastAsUser(intentCaptor.capture(),
+            verify(mContext, times(1)).sendStickyBroadcastAsUser(intentCaptor.capture(),
                     eq(UserHandle.ALL));
         }
-        List<Intent> capturedIntents = intentCaptor.getAllValues();
-        checkApStateChangedBroadcast(capturedIntents.get(0), WIFI_AP_STATE_ENABLING,
-                WIFI_AP_STATE_DISABLED, HOTSPOT_NO_ERROR, TEST_INTERFACE_NAME,
-                softApConfig.getTargetMode());
-        checkApStateChangedBroadcast(capturedIntents.get(1), WIFI_AP_STATE_FAILED,
-                WIFI_AP_STATE_ENABLING, WifiManager.SAP_START_FAILURE_GENERAL, TEST_INTERFACE_NAME,
+        checkApStateChangedBroadcast(intentCaptor.getValue(), WIFI_AP_STATE_FAILED,
+                WIFI_AP_STATE_DISABLED, WifiManager.SAP_START_FAILURE_GENERAL, TEST_INTERFACE_NAME,
                 softApConfig.getTargetMode());
         verify(mWifiMetrics).writeSoftApStartedEvent(
                 eq(SoftApManager.START_RESULT_FAILURE_SET_COUNTRY_CODE),
@@ -794,19 +790,14 @@ public class SoftApManagerTest extends WifiBaseTest {
 
         ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
         if (SdkLevel.isAtLeastSv2()) {
-            verify(mContext, times(2)).sendBroadcastAsUser(intentCaptor.capture(),
+            verify(mContext, times(1)).sendBroadcastAsUser(intentCaptor.capture(),
                     eq(UserHandle.ALL), eq(android.Manifest.permission.ACCESS_WIFI_STATE));
         } else {
-            verify(mContext, times(2)).sendStickyBroadcastAsUser(intentCaptor.capture(),
+            verify(mContext, times(1)).sendStickyBroadcastAsUser(intentCaptor.capture(),
                     eq(UserHandle.ALL));
         }
-
-        List<Intent> capturedIntents = intentCaptor.getAllValues();
-        checkApStateChangedBroadcast(capturedIntents.get(0), WIFI_AP_STATE_ENABLING,
-                WIFI_AP_STATE_DISABLED, HOTSPOT_NO_ERROR, TEST_INTERFACE_NAME,
-                softApConfig.getTargetMode());
-        checkApStateChangedBroadcast(capturedIntents.get(1), WIFI_AP_STATE_FAILED,
-                WIFI_AP_STATE_ENABLING, WifiManager.SAP_START_FAILURE_GENERAL, TEST_INTERFACE_NAME,
+        checkApStateChangedBroadcast(intentCaptor.getValue(), WIFI_AP_STATE_FAILED,
+                WIFI_AP_STATE_DISABLED, WifiManager.SAP_START_FAILURE_GENERAL, TEST_INTERFACE_NAME,
                 softApConfig.getTargetMode());
     }
 
@@ -834,19 +825,14 @@ public class SoftApManagerTest extends WifiBaseTest {
 
         ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
         if (SdkLevel.isAtLeastSv2()) {
-            verify(mContext, times(2)).sendBroadcastAsUser(intentCaptor.capture(),
+            verify(mContext, times(1)).sendBroadcastAsUser(intentCaptor.capture(),
                     eq(UserHandle.ALL), eq(android.Manifest.permission.ACCESS_WIFI_STATE));
         } else {
-            verify(mContext, times(2)).sendStickyBroadcastAsUser(intentCaptor.capture(),
+            verify(mContext, times(1)).sendStickyBroadcastAsUser(intentCaptor.capture(),
                     eq(UserHandle.ALL));
         }
-
-        List<Intent> capturedIntents = intentCaptor.getAllValues();
-        checkApStateChangedBroadcast(capturedIntents.get(0), WIFI_AP_STATE_ENABLING,
-                WIFI_AP_STATE_DISABLED, HOTSPOT_NO_ERROR, TEST_INTERFACE_NAME,
-                softApConfig.getTargetMode());
-        checkApStateChangedBroadcast(capturedIntents.get(1), WIFI_AP_STATE_FAILED,
-                WIFI_AP_STATE_ENABLING, WifiManager.SAP_START_FAILURE_GENERAL, TEST_INTERFACE_NAME,
+        checkApStateChangedBroadcast(intentCaptor.getValue(), WIFI_AP_STATE_FAILED,
+                WIFI_AP_STATE_DISABLED, WifiManager.SAP_START_FAILURE_GENERAL, TEST_INTERFACE_NAME,
                 softApConfig.getTargetMode());
     }
 
@@ -875,19 +861,14 @@ public class SoftApManagerTest extends WifiBaseTest {
 
         ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
         if (SdkLevel.isAtLeastSv2()) {
-            verify(mContext, times(2)).sendBroadcastAsUser(intentCaptor.capture(),
+            verify(mContext, times(1)).sendBroadcastAsUser(intentCaptor.capture(),
                     eq(UserHandle.ALL), eq(android.Manifest.permission.ACCESS_WIFI_STATE));
         } else {
-            verify(mContext, times(2)).sendStickyBroadcastAsUser(intentCaptor.capture(),
+            verify(mContext, times(1)).sendStickyBroadcastAsUser(intentCaptor.capture(),
                     eq(UserHandle.ALL));
         }
-
-        List<Intent> capturedIntents = intentCaptor.getAllValues();
-        checkApStateChangedBroadcast(capturedIntents.get(0), WIFI_AP_STATE_ENABLING,
-                WIFI_AP_STATE_DISABLED, HOTSPOT_NO_ERROR, TEST_INTERFACE_NAME,
-                softApConfig.getTargetMode());
-        checkApStateChangedBroadcast(capturedIntents.get(1), WIFI_AP_STATE_FAILED,
-                WIFI_AP_STATE_ENABLING, WifiManager.SAP_START_FAILURE_GENERAL, TEST_INTERFACE_NAME,
+        checkApStateChangedBroadcast(intentCaptor.getValue(), WIFI_AP_STATE_FAILED,
+                WIFI_AP_STATE_DISABLED, WifiManager.SAP_START_FAILURE_GENERAL, TEST_INTERFACE_NAME,
                 softApConfig.getTargetMode());
     }
 
@@ -2542,9 +2523,6 @@ public class SoftApManagerTest extends WifiBaseTest {
                 eq(mSoftApManager), anyList());
         ArgumentCaptor<SoftApConfiguration> configCaptor =
                 ArgumentCaptor.forClass(SoftApConfiguration.class);
-        order.verify(mCallback).onStateChanged(eq(new SoftApState(
-                WifiManager.WIFI_AP_STATE_ENABLING, 0,
-                softApConfig.getTetheringRequest(), TEST_INTERFACE_NAME)));
         if (!TextUtils.isEmpty(softApConfig.getCountryCode())
                 && !TextUtils.equals(
                         softApConfig.getCountryCode(),
@@ -2584,6 +2562,9 @@ public class SoftApManagerTest extends WifiBaseTest {
             assertThat(mSoftApManager.getSoftApModeConfiguration().getCapability().getCountryCode())
                     .isEqualTo("some country");
         }
+        order.verify(mCallback).onStateChanged(eq(new SoftApState(
+                WifiManager.WIFI_AP_STATE_ENABLING, 0,
+                softApConfig.getTetheringRequest(), TEST_INTERFACE_NAME)));
         order.verify(mWifiNative).startSoftAp(eq(TEST_INTERFACE_NAME),
                 configCaptor.capture(),
                 eq(softApConfig.getTargetMode() ==  WifiManager.IFACE_IP_MODE_TETHERED),
@@ -4057,17 +4038,46 @@ public class SoftApManagerTest extends WifiBaseTest {
 
     /**
      * Tests that 11BE is set to disabled in the SoftApConfiguration if it isn't supported by
-     * SoftApCapability.
+     * device Capabilities.
      */
     @Test
-    public void testStartSoftApRemoves11BEIfNotSupported() throws Exception {
+    public void testStartSoftApRemoves11BEIfNotSupportedByDeviceCapabilities() throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
+        when(mResources.getBoolean(R.bool.config_wifiSoftapIeee80211beSupported))
+                .thenReturn(true);
         when(mDeviceWiphyCapabilities.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
                 .thenReturn(false);
         Builder configBuilder = new SoftApConfiguration.Builder();
-        configBuilder.setBand(SoftApConfiguration.BAND_2GHZ);
+        configBuilder.setBand(SoftApConfiguration.BAND_5GHZ);
         configBuilder.setSsid(TEST_SSID);
         configBuilder.setIeee80211beEnabled(true);
+        configBuilder.setPassphrase("somepassword",
+                SoftApConfiguration.SECURITY_TYPE_WPA3_SAE);
+        SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
+                WifiManager.IFACE_IP_MODE_TETHERED, configBuilder.build(),
+                mTestSoftApCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
+        SoftApConfiguration expectedConfig = configBuilder.setIeee80211beEnabled(false).build();
+        startSoftApAndVerifyEnabled(apConfig, expectedConfig, false);
+    }
+
+    /**
+     * Tests that 11BE is set to disabled in the SoftApConfiguration if it isn't supported by
+     * overlay configuration.
+     */
+    @Test
+    public void testStartSoftApRemoves11BEIfNotSupportedByOverlay() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastT());
+        when(mResources.getBoolean(R.bool.config_wifiSoftapIeee80211beSupported))
+                .thenReturn(false);
+        when(mDeviceWiphyCapabilities.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
+                .thenReturn(true);
+        mDeviceWiphyCapabilitiesSupports11Be = true;
+        Builder configBuilder = new SoftApConfiguration.Builder();
+        configBuilder.setBand(SoftApConfiguration.BAND_5GHZ);
+        configBuilder.setSsid(TEST_SSID);
+        configBuilder.setIeee80211beEnabled(true);
+        configBuilder.setPassphrase("somepassword",
+                SoftApConfiguration.SECURITY_TYPE_WPA3_SAE);
         SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
                 WifiManager.IFACE_IP_MODE_TETHERED, configBuilder.build(),
                 mTestSoftApCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
@@ -4081,6 +4091,8 @@ public class SoftApManagerTest extends WifiBaseTest {
     @Test
     public void testStartSoftApRemoves11BEInWpa2()throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
+        when(mResources.getBoolean(R.bool.config_wifiSoftapIeee80211beSupported))
+                .thenReturn(true);
         when(mDeviceWiphyCapabilities.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
                 .thenReturn(true);
         mDeviceWiphyCapabilitiesSupports11Be = true;
@@ -4105,6 +4117,8 @@ public class SoftApManagerTest extends WifiBaseTest {
     @Test
     public void testStartSoftApRemoves11BEInBridgedModeIfNotSupportedByOverlay()throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
+        when(mResources.getBoolean(R.bool.config_wifiSoftapIeee80211beSupported))
+                .thenReturn(true);
         when(mResources.getBoolean(R.bool.config_wifiSoftApSingleLinkMloInBridgedModeSupported))
                 .thenReturn(false);
         when(mDeviceWiphyCapabilities.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
@@ -4132,6 +4146,8 @@ public class SoftApManagerTest extends WifiBaseTest {
     @Test
     public void testStartSoftApInBridgedMode11BEConfiguration()throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
+        when(mResources.getBoolean(R.bool.config_wifiSoftapIeee80211beSupported))
+                .thenReturn(true);
         when(mResources.getBoolean(R.bool.config_wifiSoftApSingleLinkMloInBridgedModeSupported))
                 .thenReturn(true);
         when(mDeviceWiphyCapabilities.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
@@ -4157,6 +4173,8 @@ public class SoftApManagerTest extends WifiBaseTest {
     @Test
     public void testStartSoftApInSingleAp11BEConfiguration()throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
+        when(mResources.getBoolean(R.bool.config_wifiSoftapIeee80211beSupported))
+                .thenReturn(true);
         when(mDeviceWiphyCapabilities.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
                 .thenReturn(true);
         mDeviceWiphyCapabilitiesSupports11Be = true;
