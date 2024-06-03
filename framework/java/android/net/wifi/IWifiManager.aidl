@@ -156,7 +156,7 @@ interface IWifiManager
 
     boolean startScan(String packageName, String featureId);
 
-    List<ScanResult> getScanResults(String callingPackage, String callingFeatureId);
+    ParceledListSlice getScanResults(String callingPackage, String callingFeatureId);
 
     void getChannelData(in IListListener listener, String packageName, in Bundle extras);
 
@@ -235,7 +235,7 @@ interface IWifiManager
 
     boolean startTetheredHotspot(in SoftApConfiguration softApConfig, String packageName);
 
-    boolean startTetheredHotspotRequest(in TetheringRequest request, String packageName);
+    void startTetheredHotspotRequest(in TetheringRequest request, in ISoftApCallback callback, String packageName);
 
     boolean stopSoftAp();
 

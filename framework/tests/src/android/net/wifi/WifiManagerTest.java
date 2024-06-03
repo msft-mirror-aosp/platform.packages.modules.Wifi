@@ -1300,7 +1300,6 @@ public class WifiManagerTest {
                 TEST_TETHERING_REQUEST, TEST_INTERFACE_NAME);
         callbackCaptor.getValue().onStateChanged(state);
         mLooper.dispatchAll();
-        verify(mSoftApCallback).onStateChanged(WIFI_AP_STATE_ENABLED, 0);
         ArgumentCaptor<SoftApState> softApStateCaptor = ArgumentCaptor.forClass(SoftApState.class);
         verify(mSoftApCallback).onStateChanged(softApStateCaptor.capture());
         assertEquals(state, softApStateCaptor.getValue());
@@ -1833,8 +1832,6 @@ public class WifiManagerTest {
 
 
         mLooper.dispatchAll();
-        verify(mSoftApCallback).onStateChanged(WIFI_AP_STATE_ENABLING, 0);
-        verify(mSoftApCallback).onStateChanged(WIFI_AP_STATE_FAILED, SAP_START_FAILURE_GENERAL);
         verify(mSoftApCallback).onCapabilityChanged(testSoftApCapability);
         ArgumentCaptor<SoftApState> softApStateCaptor =
                 ArgumentCaptor.forClass(SoftApState.class);
@@ -1859,13 +1856,17 @@ public class WifiManagerTest {
                 TEST_TETHERING_REQUEST, TEST_INTERFACE_NAME);
         callbackCaptor.getValue().onStateChanged(state);
         altLooper.dispatchAll();
-        verify(mSoftApCallback).onStateChanged(WIFI_AP_STATE_ENABLED, 0);
         ArgumentCaptor<SoftApState> softApStateCaptor =
                 ArgumentCaptor.forClass(SoftApState.class);
         verify(mSoftApCallback).onStateChanged(softApStateCaptor.capture());
         SoftApState softApState = softApStateCaptor.getValue();
         assertEquals(WIFI_AP_STATE_ENABLED, softApState.getState());
-        assertEquals(0, softApState.getFailureReason());
+        try {
+            softApState.getFailureReason();
+            fail("getFailureReason should throw if not in failure state");
+        } catch (IllegalStateException e) {
+            // Pass.
+        }
         assertEquals(TEST_INTERFACE_NAME, softApState.getIface());
         assertEquals(TEST_TETHERING_REQUEST, softApState.getTetheringRequest());
     }
@@ -3903,7 +3904,6 @@ public class WifiManagerTest {
                 WifiManager.SAP_CLIENT_BLOCK_REASON_CODE_NO_MORE_STAS);
 
         mLooper.dispatchAll();
-        verify(mSoftApCallback).onStateChanged(WIFI_AP_STATE_ENABLED, 0);
         ArgumentCaptor<SoftApState> softApStateCaptor =
                 ArgumentCaptor.forClass(SoftApState.class);
         verify(mSoftApCallback).onStateChanged(softApStateCaptor.capture());

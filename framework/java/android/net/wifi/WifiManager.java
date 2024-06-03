@@ -4518,12 +4518,26 @@ public class WifiManager {
      * {@link android.Manifest.permission#ACCESS_FINE_LOCATION ACCESS_FINE_LOCATION} permission
      * and {@link android.Manifest.permission#ACCESS_WIFI_STATE} permission
      * in order to get valid results.
+     *
+     * <p>
+     * When an Access Point’s beacon or probe response includes a Multi-BSSID Element, the
+     * returned scan results should include separate scan result for each BSSID within the
+     * Multi-BSSID Information Element. This includes both transmitted and non-transmitted BSSIDs.
+     * Original Multi-BSSID Element will be included in the Information Elements attached to
+     * each of the scan results.
+     * Note: This is the expected behavior for devices supporting 11ax (WiFi-6) and above, and an
+     * optional requirement for devices running with older WiFi generations.
+     * </p>
      */
     @RequiresPermission(allOf = {ACCESS_WIFI_STATE, ACCESS_FINE_LOCATION})
     public List<ScanResult> getScanResults() {
         try {
-            return mService.getScanResults(mContext.getOpPackageName(),
-                    mContext.getAttributionTag());
+            ParceledListSlice<ScanResult> parceledList = mService
+                    .getScanResults(mContext.getOpPackageName(), mContext.getAttributionTag());
+            if (parceledList == null) {
+                return Collections.emptyList();
+            }
+            return parceledList.getList();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -5688,7 +5702,7 @@ public class WifiManager {
      *                     using {@link WifiManager#setSoftApConfiguration(SoftApConfiguration)}.
      * @return {@code true} if the operation succeeded, {@code false} otherwise
      *
-     * @deprecated Use {@link #startTetheredHotspotRequest(TetheringManager.TetheringRequest)}
+     * @deprecated Use {@link #startTetheredHotspot(TetheringManager.TetheringRequest)}
      *             instead.
      * @hide
      */
@@ -5710,21 +5724,10 @@ public class WifiManager {
      * Start Soft AP (hotspot) mode for tethering purposes with the specified TetheringRequest.
      * Note that starting Soft AP mode may disable station mode operation if the device does not
      * support concurrency.
-     * </p>
-     * This will fail and return {@code false} under the following circumstances:
-     * <ul>
-     *     <li>No interfaces are currently available for hotspot. See
-     *     {@link #reportCreateInterfaceImpact(int, boolean, Executor, BiConsumer)}. </li>
-     *     <li>TetheringRequest is misconfigured.</li>
-     *     <li>Wi-Fi tethering is disallowed for the current user.</li>
-     * </ul>
      *
-     * @param request A valid TetheringRequest specifying the configuration of the SAP.
-     *
-     * @return {@code true} if the start operation was successfully posted, {@code false} otherwise.
-     *         If {@code true} was returned, then the success/failure of the request will be
-     *         conveyed afterwards via SoftApCallback.
-     *
+     * @param request  A valid TetheringRequest specifying the configuration of the SAP.
+     * @param executor Executor to run the callback on.
+     * @param callback Callback to listen on state changes for this specific request.
      * @hide
      */
     @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
@@ -5733,9 +5736,15 @@ public class WifiManager {
             android.Manifest.permission.NETWORK_STACK,
             NetworkStack.PERMISSION_MAINLINE_NETWORK_STACK
     })
-    public boolean startTetheredHotspotRequest(@NonNull TetheringManager.TetheringRequest request) {
+    public void startTetheredHotspot(@NonNull TetheringManager.TetheringRequest request,
+            @NonNull @CallbackExecutor Executor executor, @NonNull SoftApCallback callback) {
+        if (executor == null) throw new IllegalArgumentException("executor cannot be null");
+        if (callback == null) throw new IllegalArgumentException("callback cannot be null");
+        ISoftApCallback.Stub binderCallback = new SoftApCallbackProxy(executor, callback,
+                IFACE_IP_MODE_TETHERED);
         try {
-            return mService.startTetheredHotspotRequest(request, mContext.getOpPackageName());
+            mService.startTetheredHotspotRequest(request, binderCallback,
+                    mContext.getOpPackageName());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -6628,17 +6637,23 @@ public class WifiManager {
          *                      {@link #SAP_START_FAILURE_NO_CHANNEL},
          *                      {@link #SAP_START_FAILURE_UNSUPPORTED_CONFIGURATION},
          *                      {@link #SAP_START_FAILURE_USER_REJECTED}
-         * @deprecated Use {@link #onStateChanged(StateInfo)}.
          */
         default void onStateChanged(@WifiApState int state, @SapStartFailure int failureReason) {}
 
         /**
          * Called when soft AP state changes.
+         * <p>
+         * This provides the same state and failure reason as {@link #onStateChanged(int, int)}, but
+         * also provides extra information such as interface name and TetheringRequest in order to
+         * replace usage of the WIFI_AP_STATE_CHANGED_ACTION broadcast. If this method is overridden
+         * then {@link #onStateChanged(int, int)} will no longer be called.
          *
          * @param state the new state.
          */
         @FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API)
-        default void onStateChanged(@NonNull SoftApState state) {}
+        default void onStateChanged(@NonNull SoftApState state) {
+            onStateChanged(state.mState, state.mFailureReason);
+        }
 
         /**
          * Called when the connected clients to soft AP changes.
@@ -6783,7 +6798,6 @@ public class WifiManager {
             Binder.clearCallingIdentity();
             mExecutor.execute(() -> {
                 mCallback.onStateChanged(state);
-                mCallback.onStateChanged(state.getState(), state.getFailureReason());
             });
         }
 
@@ -7413,7 +7427,7 @@ public class WifiManager {
      * <li> This API will cause reconnect if the current active connection is marked metered.</li>
      *
      * @param networkId the ID of the network as returned by {@link #addNetwork} or {@link
-     *        getConfiguredNetworks}.
+     *        #getConfiguredNetworks()}.
      * @param listener for callbacks on success or failure. Can be null.
      * @throws IllegalStateException if the WifiManager instance needs to be
      * initialized again
@@ -11581,10 +11595,6 @@ public class WifiManager {
     })
     public void addCustomDhcpOptions(@NonNull WifiSsid ssid, @NonNull byte[] oui,
             @NonNull List<DhcpOption> options) {
-        if (mVerboseLoggingEnabled) {
-            Log.v(TAG, "addCustomDhcpOptions: ssid="
-                    + ssid + ", oui=" + Arrays.toString(oui) + ", options=" + options);
-        }
         try {
             mService.addCustomDhcpOptions(ssid, oui, options);
         } catch (RemoteException e) {
@@ -11607,9 +11617,6 @@ public class WifiManager {
             android.Manifest.permission.OVERRIDE_WIFI_CONFIG
     })
     public void removeCustomDhcpOptions(@NonNull WifiSsid ssid, @NonNull byte[] oui) {
-        if (mVerboseLoggingEnabled) {
-            Log.v(TAG, "removeCustomDhcpOptions: ssid=" + ssid + ", oui=" + Arrays.toString(oui));
-        }
         try {
             mService.removeCustomDhcpOptions(ssid, oui);
         } catch (RemoteException e) {

@@ -480,7 +480,6 @@ public class WifiServiceImplTest extends WifiBaseTest {
     @Mock SelfRecovery mSelfRecovery;
     @Mock LastCallerInfoManager mLastCallerInfoManager;
     @Mock BuildProperties mBuildProperties;
-    @Mock LinkProbeManager mLinkProbeManager;
     @Mock IOnWifiDriverCountryCodeChangedListener mIOnWifiDriverCountryCodeChangedListener;
     @Mock WifiShellCommand mWifiShellCommand;
     @Mock AfcManager mAfcManager;
@@ -548,7 +547,6 @@ public class WifiServiceImplTest extends WifiBaseTest {
         when(mWifiInjector.getMakeBeforeBreakManager()).thenReturn(mMakeBeforeBreakManager);
         when(mWifiInjector.getWifiNotificationManager()).thenReturn(mWifiNotificationManager);
         when(mWifiInjector.getBuildProperties()).thenReturn(mBuildProperties);
-        when(mWifiInjector.getLinkProbeManager()).thenReturn(mLinkProbeManager);
         when(mWifiInjector.makeWifiShellCommand(any())).thenReturn(mWifiShellCommand);
         when(mWifiInjector.getAfcManager()).thenReturn(mAfcManager);
         when(mWifiInjector.getPasspointNetworkNominateHelper())
@@ -792,10 +790,10 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
     private WifiServiceImpl makeWifiServiceImplWithMockRunnerWhichTimesOut() {
         WifiThreadRunner mockRunner = mock(WifiThreadRunner.class);
-        when(mockRunner.call(any(), any())).then(returnsSecondArg());
-        when(mockRunner.call(any(), any(int.class))).then(returnsSecondArg());
-        when(mockRunner.call(any(), any(boolean.class))).then(returnsSecondArg());
-        when(mockRunner.post(any())).thenReturn(false);
+        when(mockRunner.call(any(), any(), anyString())).then(returnsSecondArg());
+        when(mockRunner.call(any(), any(int.class), anyString())).then(returnsSecondArg());
+        when(mockRunner.call(any(), any(boolean.class), anyString())).then(returnsSecondArg());
+        when(mockRunner.post(any(), anyString())).thenReturn(false);
 
         when(mWifiInjector.getWifiThreadRunner()).thenReturn(mockRunner);
         // Reset mWifiCountryCode to avoid verify failure in makeWifiServiceImpl.
@@ -2248,7 +2246,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
     /**
      * Verify a SecurityException is thrown when a caller without the correct permission attempts to
-     * call startTetheredHotspotRequest().
+     * call startTetheredHotspot().
      */
     @Test(expected = SecurityException.class)
     public void testStartTetheredHotspotRequestWithoutPermissionThrowsException() throws Exception {
@@ -2259,12 +2257,13 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mLooper.startAutoDispatch();
         TetheringManager.TetheringRequest request = new TetheringManager.TetheringRequest.Builder(
                 TetheringManager.TETHERING_WIFI).build();
-        mWifiServiceImpl.startTetheredHotspotRequest(request, TEST_PACKAGE_NAME);
+        mWifiServiceImpl.startTetheredHotspotRequest(request, mClientSoftApCallback,
+                TEST_PACKAGE_NAME);
         mLooper.stopAutoDispatchAndIgnoreExceptions();
     }
 
     /**
-     * Verify that startTetheredHotspotRequest() succeeds if the caller does not have the
+     * Verify that startTetheredHotspotRequest succeeds if the caller does not have the
      * NETWORK_STACK permission but does have the MAINLINE_NETWORK_STACK permission.
      */
     @Test
@@ -2274,9 +2273,9 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mLooper.startAutoDispatch();
         TetheringManager.TetheringRequest request = new TetheringManager.TetheringRequest.Builder(
                 TetheringManager.TETHERING_WIFI).build();
-        boolean result = mWifiServiceImpl.startTetheredHotspotRequest(request, TEST_PACKAGE_NAME);
+        mWifiServiceImpl.startTetheredHotspotRequest(request, mClientSoftApCallback,
+                TEST_PACKAGE_NAME);
         mLooper.stopAutoDispatchAndIgnoreExceptions();
-        assertTrue(result);
         verify(mActiveModeWarden).startSoftAp(mSoftApModeConfigCaptor.capture(),
                 eq(new WorkSource(Binder.getCallingUid(), TEST_PACKAGE_NAME)));
         assertThat(mSoftApModeConfigCaptor.getValue().getSoftApConfiguration()).isNull();
@@ -2286,12 +2285,13 @@ public class WifiServiceImplTest extends WifiBaseTest {
     }
 
     /**
-     * Verify startTetheredHotspot fails with a null request.
+     * Verify startTetheredHotspotRequest fails with a null request.
      */
     @Test(expected = IllegalArgumentException.class)
     public void testStartTetheredHotspotNullRequestFails() {
         mLooper.startAutoDispatch();
-        mWifiServiceImpl.startTetheredHotspotRequest(null, TEST_PACKAGE_NAME);
+        mWifiServiceImpl.startTetheredHotspotRequest(null, mClientSoftApCallback,
+                TEST_PACKAGE_NAME);
         mLooper.stopAutoDispatchAndIgnoreExceptions();
     }
 
@@ -2302,8 +2302,8 @@ public class WifiServiceImplTest extends WifiBaseTest {
     public void testStartTetheredHotspotRequestWithPermissions() {
         TetheringManager.TetheringRequest request = new TetheringManager.TetheringRequest.Builder(
                 TetheringManager.TETHERING_WIFI).build();
-        boolean result = mWifiServiceImpl.startTetheredHotspotRequest(request, TEST_PACKAGE_NAME);
-        assertTrue(result);
+        mWifiServiceImpl.startTetheredHotspotRequest(request,
+                mClientSoftApCallback, TEST_PACKAGE_NAME);
         verify(mActiveModeWarden).startSoftAp(mSoftApModeConfigCaptor.capture(),
                 eq(new WorkSource(Binder.getCallingUid(), TEST_PACKAGE_NAME)));
         assertNull(mSoftApModeConfigCaptor.getValue().getSoftApConfiguration());
@@ -2349,6 +2349,24 @@ public class WifiServiceImplTest extends WifiBaseTest {
         SoftApConfiguration config = createValidSoftApConfiguration();
         boolean result = mWifiServiceImpl.startTetheredHotspot(config, TEST_PACKAGE_NAME);
         assertFalse(result);
+        verify(mActiveModeWarden, never()).startSoftAp(any(), any());
+    }
+
+    /**
+     * Verify that while the DISALLOW_WIFI_TETHERING user restriction is set,
+     * startTetheredHotspotRequest fails and notifies the callback.
+     */
+    @Test
+    public void testStartTetheredHotspotRequestWithUserRestriction() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastT());
+        when(mBundle.getBoolean(UserManager.DISALLOW_WIFI_TETHERING)).thenReturn(true);
+        mWifiServiceImpl.checkAndStartWifi();
+        mLooper.dispatchAll();
+        SoftApConfiguration config = createValidSoftApConfiguration();
+        mWifiServiceImpl.startTetheredHotspotRequest(TEST_TETHERING_REQUEST, mClientSoftApCallback,
+                TEST_PACKAGE_NAME);
+        verify(mClientSoftApCallback).onStateChanged(eq(new SoftApState(WIFI_AP_STATE_FAILED,
+                SAP_START_FAILURE_GENERAL, TEST_TETHERING_REQUEST, null)));
         verify(mActiveModeWarden, never()).startSoftAp(any(), any());
     }
 
@@ -3324,7 +3342,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         String featureId = "test.com.featureId";
         mLooper.startAutoDispatch();
         List<ScanResult> retrievedScanResultList = mWifiServiceImpl.getScanResults(packageName,
-                featureId);
+                featureId).getList();
         mLooper.stopAutoDispatchAndIgnoreExceptions();
         verify(mScanRequestProxy).getScanResults();
 
@@ -3350,7 +3368,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         String featureId = "test.com.featureId";
         mLooper.startAutoDispatch();
         List<ScanResult> retrievedScanResultList = mWifiServiceImpl.getScanResults(packageName,
-                featureId);
+                featureId).getList();
         mLooper.stopAutoDispatchAndIgnoreExceptions();
         verify(mScanRequestProxy, never()).getScanResults();
 
@@ -3618,6 +3636,35 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
         // Start another session without a stop, that should fail.
         assertFalse(mWifiServiceImpl.startTetheredHotspot(config, TEST_PACKAGE_NAME));
+
+        verifyNoMoreInteractions(mActiveModeWarden);
+    }
+
+    /**
+     * Verify startTetheredHotspotRequest fails if we are already tethering.
+     */
+    @Test
+    public void testStartTetheredHotspotRequestDoesNotStartWhenAlreadyTetheringActive()
+            throws Exception {
+        SoftApConfiguration config = createValidSoftApConfiguration();
+        assertTrue(mWifiServiceImpl.startTetheredHotspot(config, TEST_PACKAGE_NAME));
+        verify(mActiveModeWarden).startSoftAp(mSoftApModeConfigCaptor.capture(),
+                eq(new WorkSource(Binder.getCallingUid(), TEST_PACKAGE_NAME)));
+        assertThat(config).isEqualTo(mSoftApModeConfigCaptor.getValue().getSoftApConfiguration());
+        assertNull(mSoftApModeConfigCaptor.getValue().getTetheringRequest());
+        mStateMachineSoftApCallback.onStateChanged(
+                new SoftApState(WIFI_AP_STATE_ENABLED, 0,
+                        TEST_TETHERING_REQUEST, TEST_IFACE_NAME));
+        mWifiServiceImpl.updateInterfaceIpState(WIFI_IFACE_NAME, IFACE_IP_MODE_TETHERED);
+        mLooper.dispatchAll();
+        assertEquals(WIFI_AP_STATE_ENABLED, mWifiServiceImpl.getWifiApEnabledState());
+        reset(mActiveModeWarden);
+
+        // Start another session without a stop, that should fail.
+        mWifiServiceImpl.startTetheredHotspotRequest(TEST_TETHERING_REQUEST, mClientSoftApCallback,
+                TEST_PACKAGE_NAME);
+        verify(mClientSoftApCallback).onStateChanged(eq(new SoftApState(WIFI_AP_STATE_FAILED,
+                SAP_START_FAILURE_GENERAL, TEST_TETHERING_REQUEST, null)));
 
         verifyNoMoreInteractions(mActiveModeWarden);
     }
@@ -9934,10 +9981,14 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mLooper.startAutoDispatch();
         assertThat(mWifiServiceImpl.getUsableChannels(WIFI_BAND_24_5_WITH_DFS_6_60_GHZ, OP_MODE_SAP,
                 FILTER_REGULATORY, TEST_PACKAGE_NAME, mExtras)).containsExactly(
-                new WifiAvailableChannel(2452, WifiAvailableChannel.OP_MODE_SAP),
-                new WifiAvailableChannel(5180, WifiAvailableChannel.OP_MODE_SAP),
-                new WifiAvailableChannel(5955, WifiAvailableChannel.OP_MODE_SAP),
-                new WifiAvailableChannel(58320, WifiAvailableChannel.OP_MODE_SAP));
+                        new WifiAvailableChannel(2452, WifiAvailableChannel.OP_MODE_SAP,
+                        ScanResult.CHANNEL_WIDTH_20MHZ),
+                        new WifiAvailableChannel(5180, WifiAvailableChannel.OP_MODE_SAP,
+                        ScanResult.CHANNEL_WIDTH_20MHZ),
+                        new WifiAvailableChannel(5955, WifiAvailableChannel.OP_MODE_SAP,
+                        ScanResult.CHANNEL_WIDTH_20MHZ),
+                        new WifiAvailableChannel(58320, WifiAvailableChannel.OP_MODE_SAP,
+                        ScanResult.CHANNEL_WIDTH_20MHZ));
         mLooper.stopAutoDispatchAndIgnoreExceptions();
     }
 
@@ -9959,13 +10010,16 @@ public class WifiServiceImplTest extends WifiBaseTest {
         when(mWifiNative.isHalStarted()).thenReturn(true);
         when(mWifiNative.getUsableChannels(eq(WIFI_BAND_24_GHZ), anyInt(), anyInt()))
                 .thenReturn(Arrays.asList(
-                        new WifiAvailableChannel(2452, WifiAvailableChannel.OP_MODE_SAP)));
+                        new WifiAvailableChannel(2452, WifiAvailableChannel.OP_MODE_SAP,
+                                ScanResult.CHANNEL_WIDTH_20MHZ)));
         when(mWifiNative.getUsableChannels(eq(WIFI_BAND_5_GHZ), anyInt(), anyInt()))
                 .thenReturn(Arrays.asList(
-                        new WifiAvailableChannel(5180, WifiAvailableChannel.OP_MODE_SAP)));
+                        new WifiAvailableChannel(5180, WifiAvailableChannel.OP_MODE_SAP,
+                                ScanResult.CHANNEL_WIDTH_20MHZ)));
         when(mWifiNative.getUsableChannels(eq(WIFI_BAND_6_GHZ), anyInt(), anyInt()))
                 .thenReturn(Arrays.asList(
-                        new WifiAvailableChannel(5955, WifiAvailableChannel.OP_MODE_SAP)));
+                        new WifiAvailableChannel(5955, WifiAvailableChannel.OP_MODE_SAP,
+                                ScanResult.CHANNEL_WIDTH_20MHZ)));
         when(mWifiNative.getUsableChannels(eq(WIFI_BAND_60_GHZ), anyInt(), anyInt()))
                 .thenReturn(null);
 
@@ -10605,7 +10659,13 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 ArgumentCaptor.forClass(SoftApState.class);
         verify(mClientSoftApCallback).onStateChanged(softApStateCaptor.capture());
         assertThat(softApStateCaptor.getValue().getState()).isEqualTo(WIFI_AP_STATE_DISABLED);
-        assertThat(softApStateCaptor.getValue().getFailureReason()).isEqualTo(0);
+        try {
+            softApStateCaptor.getValue().getFailureReason();
+            fail("getFailureReason should throw if not in failure state");
+        } catch (IllegalStateException e) {
+            // Pass.
+        }
+        assertThat(softApStateCaptor.getValue().getFailureReasonInternal()).isEqualTo(0);
         verify(mClientSoftApCallback).onConnectedClientsOrInfoChanged(
                 new HashMap<String, SoftApInfo>(),
                 new HashMap<String, List<WifiClient>>(), false, true);
@@ -11374,7 +11434,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         when(mWifiNative.isHalStarted()).thenReturn(true);
         // Channel 9 - 2452Mhz
         WifiAvailableChannel channels2g = new WifiAvailableChannel(2452,
-                WifiAvailableChannel.OP_MODE_SAP);
+                WifiAvailableChannel.OP_MODE_SAP, ScanResult.CHANNEL_WIDTH_20MHZ);
         when(mWifiNative.isHalSupported()).thenReturn(true);
         when(mWifiNative.isHalStarted()).thenReturn(true);
         when(mWifiNative.getUsableChannels(eq(WifiScanner.WIFI_BAND_24_GHZ), anyInt(), anyInt()))
@@ -12108,7 +12168,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
         verify(mActiveModeWarden).notifyShuttingDown();
         verify(mWifiScoreCard).resetAllConnectionStates();
-        verify(mWifiConfigManager).handleShutDown();
+        verify(mWifiConfigManager).writeDataToStorage();
     }
 
     @Test(expected = SecurityException.class)
