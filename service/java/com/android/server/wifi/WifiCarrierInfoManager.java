@@ -55,6 +55,7 @@ import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyCallback;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
+import android.util.ArraySet;
 import android.util.Base64;
 import android.util.Log;
 import android.util.Pair;
@@ -499,11 +500,33 @@ public class WifiCarrierInfoManager {
                 ACTION_USER_DISALLOWED_CARRIER, mIsLastUserApprovalUiDialog);
     }
 
+    private void updateSubIdsInNetworkFactoryFilters(List<SubscriptionInfo> activeSubInfos) {
+        if (activeSubInfos == null || activeSubInfos.isEmpty()) {
+            return;
+        }
+        Set<Integer> subIds = new ArraySet<>();
+        for (SubscriptionInfo subInfo : activeSubInfos) {
+            if (subInfo.getSubscriptionId() != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                subIds.add(subInfo.getSubscriptionId());
+            }
+        }
+        if (mWifiInjector.getWifiNetworkFactory() != null) {
+            mWifiInjector.getWifiNetworkFactory().updateSubIdsInCapabilitiesFilter(subIds);
+        }
+        if (mWifiInjector.getUntrustedWifiNetworkFactory() != null) {
+            mWifiInjector.getUntrustedWifiNetworkFactory().updateSubIdsInCapabilitiesFilter(subIds);
+        }
+        if (mWifiInjector.getRestrictedWifiNetworkFactory() != null) {
+            mWifiInjector.getRestrictedWifiNetworkFactory()
+                    .updateSubIdsInCapabilitiesFilter(subIds);
+        }
+    }
     private class SubscriptionChangeListener extends
             SubscriptionManager.OnSubscriptionsChangedListener {
         @Override
         public void onSubscriptionsChanged() {
             mActiveSubInfos = mSubscriptionManager.getCompleteActiveSubscriptionInfoList();
+            updateSubIdsInNetworkFactoryFilters(mActiveSubInfos);
             mSubIdToSimInfoSparseArray.clear();
             mSubscriptionGroupMap.clear();
             if (mVerboseLogEnabled) {
@@ -1522,22 +1545,26 @@ public class WifiCarrierInfoManager {
             Log.v(TAG, "Raw Response - " + tmResponse);
         }
 
-        boolean goodReponse = false;
+        boolean goodResponse = false;
         if (tmResponse != null && tmResponse.length() > 4) {
             byte[] result = Base64.decode(tmResponse, Base64.DEFAULT);
             Log.e(TAG, "Hex Response - " + makeHex(result));
             byte tag = result[0];
             if (tag == (byte) 0xdb) {
                 Log.v(TAG, "successful 3G authentication ");
-                int resLen = result[1];
-                String res = makeHex(result, 2, resLen);
-                int ckLen = result[resLen + 2];
-                String ck = makeHex(result, resLen + 3, ckLen);
-                int ikLen = result[resLen + ckLen + 3];
-                String ik = makeHex(result, resLen + ckLen + 4, ikLen);
-                sb.append(":" + ik + ":" + ck + ":" + res);
-                Log.v(TAG, "ik:" + ik + "ck:" + ck + " res:" + res);
-                goodReponse = true;
+                try {
+                    int resLen = result[1];
+                    String res = makeHex(result, 2, resLen);
+                    int ckLen = result[resLen + 2];
+                    String ck = makeHex(result, resLen + 3, ckLen);
+                    int ikLen = result[resLen + ckLen + 3];
+                    String ik = makeHex(result, resLen + ckLen + 4, ikLen);
+                    sb.append(":" + ik + ":" + ck + ":" + res);
+                    Log.v(TAG, "ik:" + ik + "ck:" + ck + " res:" + res);
+                    goodResponse = true;
+                } catch (ArrayIndexOutOfBoundsException e) {
+                    Log.e(TAG, "ArrayIndexOutOfBoundsException in get3GAuthResponse: " + e);
+                }
             } else if (tag == (byte) 0xdc) {
                 Log.e(TAG, "synchronisation failure");
                 int autsLen = result[1];
@@ -1545,7 +1572,7 @@ public class WifiCarrierInfoManager {
                 resType = WifiNative.SIM_AUTH_RESP_TYPE_UMTS_AUTS;
                 sb.append(":" + auts);
                 Log.v(TAG, "auts:" + auts);
-                goodReponse = true;
+                goodResponse = true;
             } else {
                 Log.e(TAG, "bad response - unknown tag = " + tag);
             }
@@ -1553,7 +1580,7 @@ public class WifiCarrierInfoManager {
             Log.e(TAG, "bad response - " + tmResponse);
         }
 
-        if (goodReponse) {
+        if (goodResponse) {
             String response = sb.toString();
             Log.v(TAG, "Supplicant Response -" + response);
             return new SimAuthResponseData(resType, response);
@@ -1768,7 +1795,7 @@ public class WifiCarrierInfoManager {
             return;
         }
 
-        Log.d(TAG, msg);
+        Log.d(TAG, msg, null);
     }
 
     /** Dump state. */

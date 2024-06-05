@@ -383,6 +383,18 @@ public class InsecureEapNetworkHandler {
                 Log.d(TAG, cert.getSubjectX500Principal().getName());
             }
 
+            if (null == mPendingServerCertSubjectInfo) {
+                handleError(mCurrentTofuConfig.SSID);
+                Log.d(TAG, "No valid subject info in Server cert for TLS-based connection.");
+                return false;
+            }
+
+            if (null == mPendingServerCertIssuerInfo) {
+                handleError(mCurrentTofuConfig.SSID);
+                Log.d(TAG, "No valid issuer info in Server cert for TLS-based connection.");
+                return false;
+            }
+
             if (!configureServerValidationMethod()) {
                 Log.e(TAG, "Server cert chain is invalid.");
                 String ssid = mCurrentTofuConfig.SSID;
@@ -987,7 +999,7 @@ public class InsecureEapNetworkHandler {
             }
         } catch (Exception e) {
             // Fall through
-            Log.e(TAG, e.getMessage());
+            Log.e(TAG, e.getMessage(), e);
         }
         // The certificate is not in the trust store.
         return false;
