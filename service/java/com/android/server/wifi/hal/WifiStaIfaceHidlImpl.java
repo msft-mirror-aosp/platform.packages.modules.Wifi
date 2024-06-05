@@ -78,6 +78,7 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
     private SsidTranslator mSsidTranslator;
     private static final int DEFAULT_LINK = 0;
     private static final int NUM_OF_LINKS = 1;
+    private final boolean mWifiLinkLayerAllRadiosStatsAggregationEnabled;
 
     public WifiStaIfaceHidlImpl(@NonNull android.hardware.wifi.V1_0.IWifiStaIface staIface,
             @NonNull Context context, @NonNull SsidTranslator ssidTranslator) {
@@ -85,6 +86,8 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
         mContext = context;
         mSsidTranslator = ssidTranslator;
         mHalCallback = new StaIfaceEventCallback();
+        mWifiLinkLayerAllRadiosStatsAggregationEnabled = mContext.getResources()
+                .getBoolean(R.bool.config_wifiLinkLayerAllRadiosStatsAggregationEnabled);
     }
 
     /**
@@ -188,6 +191,15 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
         final String methodStr = "getFactoryMacAddress";
         return validateAndCall(methodStr, null,
                 () -> getFactoryMacAddressInternal(methodStr));
+    }
+
+    /**
+     * See comments for {@link IWifiStaIface#getCachedScanData()}
+     */
+    @Nullable
+    public WifiScanner.ScanData getCachedScanData() {
+        Log.d(TAG, "getCachedScanData is not implemented by HIDL");
+        return null;
     }
 
     /**
@@ -331,6 +343,14 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
     public boolean setDtimMultiplier(int multiplier) {
         Log.d(TAG, "setDtimMultiplier is not implemented by HIDL");
         return false;
+    }
+
+    /**
+     * See comments for {@link IWifiStaIface#setRoamingMode(int)}
+     */
+    public int setRoamingMode(int roamingMode) {
+        Log.d(TAG, "setRoamingMode is not implemented by HIDL");
+        return 0;
     }
 
     // Internal Implementations
@@ -1268,9 +1288,7 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
     private void aggregateFrameworkRadioStatsFromHidl_1_3(int radioIndex,
             WifiLinkLayerStats stats,
             android.hardware.wifi.V1_3.StaLinkLayerRadioStats hidlRadioStats) {
-        if (!mContext.getResources()
-                .getBoolean(R.bool.config_wifiLinkLayerAllRadiosStatsAggregationEnabled)
-                && radioIndex > 0) {
+        if (!mWifiLinkLayerAllRadiosStatsAggregationEnabled && radioIndex > 0) {
             return;
         }
         // Aggregate the radio stats from all the radios
@@ -1317,9 +1335,7 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
     private void aggregateFrameworkRadioStatsFromHidl_1_6(int radioIndex,
             WifiLinkLayerStats stats,
             android.hardware.wifi.V1_6.StaLinkLayerRadioStats hidlRadioStats) {
-        if (!mContext.getResources()
-                .getBoolean(R.bool.config_wifiLinkLayerAllRadiosStatsAggregationEnabled)
-                && radioIndex > 0) {
+        if (!mWifiLinkLayerAllRadiosStatsAggregationEnabled && radioIndex > 0) {
             return;
         }
         // Aggregate the radio stats from all the radios

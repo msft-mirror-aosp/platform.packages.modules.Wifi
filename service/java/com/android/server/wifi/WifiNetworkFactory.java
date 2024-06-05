@@ -36,10 +36,7 @@ import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.AppOpsManager;
 import android.companion.CompanionDeviceManager;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.net.MacAddress;
@@ -64,7 +61,6 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PatternMatcher;
-import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
@@ -115,6 +111,8 @@ public class WifiNetworkFactory extends NetworkFactory {
     public static final int NETWORK_CONNECTION_TIMEOUT_MS = 30 * 1000; // 30 seconds
     @VisibleForTesting
     public static final int USER_SELECTED_NETWORK_CONNECT_RETRY_MAX = 3; // max of 3 retries.
+    @VisibleForTesting
+    public static final int USER_APPROVED_SCAN_RETRY_MAX = 3; // max of 3 retries.
     @VisibleForTesting
     public static final String UI_START_INTENT_ACTION =
             "com.android.settings.wifi.action.NETWORK_REQUEST";
@@ -178,6 +176,7 @@ public class WifiNetworkFactory extends NetworkFactory {
     private boolean mShouldHaveInternetCapabilities = false;
     private Set<Integer> mConnectedUids = new ArraySet<>();
     private int mUserSelectedNetworkConnectRetryCount;
+    private int mUserApprovedScanRetryCount;
     // Map of bssid to latest scan results for all scan results matching a request. Will be
     //  - null, if there are no active requests.
     //  - empty, if there are no matching scan results received for the active request.
@@ -607,28 +606,15 @@ public class WifiNetworkFactory extends NetworkFactory {
         activeModeWarden.registerModeChangeCallback(new ModeChangeCallback());
 
         setScoreFilter(SCORE_FILTER);
-    }
-
-    /**
-     * Finished the setup after boot completed
-     */
-    public void start() {
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_SCREEN_ON);
-        filter.addAction(Intent.ACTION_SCREEN_OFF);
-        mContext.registerReceiver(
-                new BroadcastReceiver() {
-                    @Override
-                    public void onReceive(Context context, Intent intent) {
-                        String action = intent.getAction();
-                        if (action.equals(Intent.ACTION_SCREEN_ON)) {
-                            handleScreenStateChanged(true);
-                        } else if (action.equals(Intent.ACTION_SCREEN_OFF)) {
-                            handleScreenStateChanged(false);
-                        }
-                    }
-                }, filter, null, mHandler);
-        handleScreenStateChanged(mContext.getSystemService(PowerManager.class).isInteractive());
+        mWifiInjector
+                .getWifiDeviceStateChangeManager()
+                .registerStateChangeCallback(
+                        new WifiDeviceStateChangeManager.StateChangeCallback() {
+                            @Override
+                            public void onScreenStateChanged(boolean screenOn) {
+                                handleScreenStateChanged(screenOn);
+                            }
+                        });
     }
 
     // package-private
@@ -646,7 +632,7 @@ public class WifiNetworkFactory extends NetworkFactory {
     private void saveToStore() {
         // Set the flag to let WifiConfigStore that we have new data to write.
         mHasNewDataToSerialize = true;
-        if (!mWifiConfigManager.saveToStore(true)) {
+        if (!mWifiConfigManager.saveToStore()) {
             Log.w(TAG, "Failed to save to store");
         }
     }
@@ -767,6 +753,11 @@ public class WifiNetworkFactory extends NetworkFactory {
         if (!WifiConfigurationUtil.validateNetworkSpecifier(wns, mContext.getResources()
                 .getInteger(R.integer.config_wifiNetworkSpecifierMaxPreferredChannels))) {
             Log.e(TAG, "Invalid wifi network specifier: " + wns + ". Rejecting ");
+            return false;
+        }
+        if (wns.wifiConfiguration.enterpriseConfig != null
+                && wns.wifiConfiguration.enterpriseConfig.isTrustOnFirstUseEnabled()) {
+            Log.e(TAG, "Invalid wifi network specifier with TOFU enabled: " + wns + ". Rejecting ");
             return false;
         }
         return true;
@@ -951,6 +942,7 @@ public class WifiNetworkFactory extends NetworkFactory {
                                 mActiveMatchedScanResults.values());
                     }
                 }
+                mUserApprovedScanRetryCount = 0;
                 startPeriodicScans();
             }
         }
@@ -1625,6 +1617,13 @@ public class WifiNetworkFactory extends NetworkFactory {
             Log.e(TAG, "Scan triggered when periodic scanning paused. Ignoring...");
             return;
         }
+        if (mVerboseLoggingEnabled) {
+            Log.v(TAG, "mUserSelectedScanRetryCount: " + mUserApprovedScanRetryCount);
+        }
+        if (mSkipUserDialogue && mUserApprovedScanRetryCount >= USER_APPROVED_SCAN_RETRY_MAX) {
+            cleanupActiveRequest();
+            return;
+        }
         mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                 mClock.getElapsedSinceBootMillis() + PERIODIC_SCAN_INTERVAL_MS,
                 TAG, mPeriodicScanTimerListener, mHandler);
@@ -1643,6 +1642,7 @@ public class WifiNetworkFactory extends NetworkFactory {
         if (mVerboseLoggingEnabled) {
             Log.v(TAG, "Starting the next scan for " + mActiveSpecificNetworkRequestSpecifier);
         }
+        mUserApprovedScanRetryCount++;
         // Create a worksource using the caller's UID.
         WorkSource workSource = new WorkSource(mActiveSpecificNetworkRequest.getRequestorUid());
         mWifiScanner.startScan(

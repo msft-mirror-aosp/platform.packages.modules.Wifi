@@ -1,6 +1,5 @@
 package com.android.server.wifi.hotspot2;
 
-import static com.android.server.wifi.hotspot2.anqp.Constants.BYTES_IN_EUI48;
 import static com.android.server.wifi.hotspot2.anqp.Constants.BYTE_MASK;
 import static com.android.server.wifi.hotspot2.anqp.Constants.NIBBLE_MASK;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__PASSPOINT_ROAMING_TYPE__ROAMING_NONE;
@@ -41,10 +40,6 @@ public abstract class Utils {
     private static final long RCOI_OPEN_ROAMING_SETTLED_PREFIX = 0xBAA2D0;
     private static final long RCOI_OPEN_ROAMING_FREE_PREFIX = 0x5A03BA;
 
-    public static String hs2LogTag(Class c) {
-        return "HS20";
-    }
-
     public static List<String> splitDomain(String domain) {
 
         if (domain.endsWith("."))
@@ -79,20 +74,6 @@ public abstract class Utils {
             throw new IllegalArgumentException("Bad MAC address: '" + s + "'");
         }
         return mac;
-    }
-
-    /**
-     * Convert from mac address as long to simple string in hex code, same as "%012x".
-     * @param mac The Mac address as long value.
-     * @return String value of mac address.
-     */
-    public static String macToSimpleString(long mac) {
-        StringBuilder sb = new StringBuilder();
-        for (int n = BYTES_IN_EUI48 - 1; n >= 0; n--) {
-            long b = (mac >>> (n * Byte.SIZE)) & BYTE_MASK;
-            sb.append(b > 0xf ? Long.toHexString(b) : "0" + Long.toHexString(b));
-        }
-        return sb.toString();
     }
 
     /**

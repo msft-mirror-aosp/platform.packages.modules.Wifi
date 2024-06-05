@@ -27,7 +27,6 @@ import android.net.MacAddress;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiMigration;
 import android.net.wifi.util.HexEncoding;
-import android.os.Handler;
 import android.os.UserHandle;
 import android.os.test.TestLooper;
 
@@ -106,6 +105,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
                     + "<int name=\"DeletionPriority\" value=\"0\" />\n"
                     + "<int name=\"NumRebootsSinceLastUse\" value=\"0\" />\n"
                     + "<boolean name=\"RepeaterEnabled\" value=\"false\" />\n"
+                    + "<boolean name=\"EnableWifi7\" value=\"true\" />\n"
                     + "<SecurityParamsList>\n"
                     + "<SecurityParams>\n"
                     + "<int name=\"SecurityType\" value=\"0\" />\n"
@@ -124,6 +124,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
                     + "<byte-array name=\"AllowedSuiteBCiphers\" num=\"0\"></byte-array>\n"
                     + "</SecurityParams>\n"
                     + "</SecurityParamsList>\n"
+                    + "<boolean name=\"SendDhcpHostname\" value=\"true\" />\n"
                     + "<boolean name=\"Trusted\" value=\"true\" />\n"
                     + "<boolean name=\"IsRestricted\" value=\"false\" />\n"
                     + "<boolean name=\"OemPaid\" value=\"false\" />\n"
@@ -278,7 +279,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
     public void setUp() throws Exception {
         setupMocks();
 
-        mWifiConfigStore = new WifiConfigStore(mContext, new Handler(mLooper.getLooper()), mClock,
+        mWifiConfigStore = new WifiConfigStore(mClock,
                 mWifiMetrics, Arrays.asList(mSharedStore, mSharedSoftApStore));
         // Enable verbose logging before tests.
         mWifiConfigStore.enableVerboseLogging(true);
@@ -305,7 +306,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
     public void testWriteWithNoStoreData() throws Exception {
         // Perform force write to both share and user store file.
         mWifiConfigStore.setUserStores(mUserStores);
-        mWifiConfigStore.write(true);
+        mWifiConfigStore.write();
 
         assertFalse(mSharedStore.isStoreWritten());
         assertFalse(mUserStore.isStoreWritten());
@@ -326,7 +327,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
         mWifiConfigStore.registerStoreData(mUserStoreData);
 
         mWifiConfigStore.switchUserStoresAndRead(mUserStores);
-        mWifiConfigStore.write(true);
+        mWifiConfigStore.write();
 
         assertFalse(mAlarmManager.isPending(WifiConfigStore.BUFFERED_WRITE_ALARM_TAG));
         assertTrue(mSharedStore.isStoreWritten());
@@ -335,110 +336,6 @@ public class WifiConfigStoreTest extends WifiBaseTest {
 
         verify(mWifiMetrics).noteWifiConfigStoreWriteDuration(anyInt());
     }
-
-    /**
-     * Tests the write API with the force flag set to false.
-     * Expected behavior: This should set an alarm to write to the store files.
-     */
-    @Test
-    public void testBufferedWrite() throws Exception {
-        // Register data container.
-        mWifiConfigStore.registerStoreData(mSharedStoreData);
-        mWifiConfigStore.registerStoreData(mUserStoreData);
-
-        mWifiConfigStore.switchUserStoresAndRead(mUserStores);
-        mWifiConfigStore.write(false);
-
-        assertTrue(mAlarmManager.isPending(WifiConfigStore.BUFFERED_WRITE_ALARM_TAG));
-        assertFalse(mSharedStore.isStoreWritten());
-        assertFalse(mUserStore.isStoreWritten());
-        assertFalse(mUserNetworkSuggestionsStore.isStoreWritten());
-
-        // Now send the alarm and ensure that the writes happen.
-        mAlarmManager.dispatch(WifiConfigStore.BUFFERED_WRITE_ALARM_TAG);
-        mLooper.dispatchAll();
-        assertTrue(mSharedStore.isStoreWritten());
-        assertTrue(mUserStore.isStoreWritten());
-        assertFalse(mUserNetworkSuggestionsStore.isStoreWritten());
-
-        verify(mWifiMetrics).noteWifiConfigStoreWriteDuration(anyInt());
-    }
-
-    /**
-     * Tests the force write after a buffered write.
-     * Expected behaviour: The force write should override the previous buffered write and stop the
-     * buffer write alarms.
-     */
-    @Test
-    public void testForceWriteAfterBufferedWrite() throws Exception {
-        // Register a test data container with bogus data.
-        mWifiConfigStore.registerStoreData(mSharedStoreData);
-        mWifiConfigStore.registerStoreData(mUserStoreData);
-
-        mSharedStoreData.setData("abcds");
-        mUserStoreData.setData("asdfa");
-
-        // Perform buffered write for both user and share store file.
-        mWifiConfigStore.switchUserStoresAndRead(mUserStores);
-        mWifiConfigStore.write(false);
-
-        assertTrue(mAlarmManager.isPending(WifiConfigStore.BUFFERED_WRITE_ALARM_TAG));
-        assertFalse(mSharedStore.isStoreWritten());
-        assertFalse(mUserStore.isStoreWritten());
-
-        // Update the container with new set of data. The send a force write and ensure that the
-        // writes have been performed and alarms have been stopped and updated data are written.
-        mUserStoreData.setData(TEST_USER_DATA);
-        mSharedStoreData.setData(TEST_SHARE_DATA);
-        mWifiConfigStore.write(true);
-
-        assertFalse(mAlarmManager.isPending(WifiConfigStore.BUFFERED_WRITE_ALARM_TAG));
-        assertTrue(mSharedStore.isStoreWritten());
-        assertTrue(mUserStore.isStoreWritten());
-
-        // Verify correct data are loaded to the data container after a read.
-        mWifiConfigStore.read();
-        assertEquals(TEST_USER_DATA, mUserStoreData.getData());
-        assertEquals(TEST_SHARE_DATA, mSharedStoreData.getData());
-    }
-
-    /**
-     * Tests the force write with no new data after a buffered write.
-     * Expected behaviour: The force write should flush the previous buffered write and stop the
-     * buffer write alarms.
-     */
-    @Test
-    public void testForceWriteWithNoNewDataAfterBufferedWrite() throws Exception {
-        // Register a test data container with bogus data.
-        mWifiConfigStore.registerStoreData(mSharedStoreData);
-        mWifiConfigStore.registerStoreData(mUserStoreData);
-
-        mSharedStoreData.setData("abcds");
-        mUserStoreData.setData("asdfa");
-
-        // Perform buffered write for both user and share store file.
-        mWifiConfigStore.switchUserStoresAndRead(mUserStores);
-        mWifiConfigStore.write(false);
-
-        assertTrue(mAlarmManager.isPending(WifiConfigStore.BUFFERED_WRITE_ALARM_TAG));
-        assertFalse(mSharedStore.isStoreWritten());
-        assertFalse(mUserStore.isStoreWritten());
-
-        // Containers have no new data.
-        mUserStoreData.setHasAnyNewData(false);
-        mSharedStoreData.setHasAnyNewData(false);
-        mWifiConfigStore.write(true);
-
-        assertFalse(mAlarmManager.isPending(WifiConfigStore.BUFFERED_WRITE_ALARM_TAG));
-        assertTrue(mSharedStore.isStoreWritten());
-        assertTrue(mUserStore.isStoreWritten());
-
-        // Verify correct data are loaded to the data container after a read.
-        mWifiConfigStore.read();
-        assertEquals("abcds", mSharedStoreData.getData());
-        assertEquals("asdfa", mUserStoreData.getData());
-    }
-
 
     /**
      * Tests the read API behaviour after a write to the store files.
@@ -460,7 +357,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
         // Write share and user data.
         mUserStoreData.setData(TEST_USER_DATA);
         mSharedStoreData.setData(TEST_SHARE_DATA);
-        mWifiConfigStore.write(true);
+        mWifiConfigStore.write();
 
         // Read and verify the data content in the data container.
         mWifiConfigStore.read();
@@ -540,7 +437,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
         mSharedStoreData.setData(TEST_SHARE_DATA);
 
         // Perform write for the share store file.
-        mWifiConfigStore.write(true);
+        mWifiConfigStore.write();
         mWifiConfigStore.read();
         // Verify data content for both user and share data.
         assertEquals(TEST_SHARE_DATA, mSharedStoreData.getData());
@@ -560,7 +457,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
 
         // Perform force write with empty data content to both user and share store file.
         mWifiConfigStore.switchUserStoresAndRead(mUserStores);
-        mWifiConfigStore.write(true);
+        mWifiConfigStore.write();
 
         // Setup data container with some value.
         mUserStoreData.setData(TEST_USER_DATA);
@@ -639,7 +536,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
                 openNetwork.shared, openNetwork.creatorUid, openNetwork.creatorName,
                 openNetwork.getRandomizedMacAddress(), openNetwork.subscriptionId);
 
-        mWifiConfigStore.write(true);
+        mWifiConfigStore.write();
         // Verify the user store content.
         assertEquals(xmlString, new String(mUserStore.getStoreBytes()));
     }
@@ -799,7 +696,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
         mWifiConfigStore.setUserStores(mUserStores);
 
         // Now trigger a write.
-        mWifiConfigStore.write(true);
+        mWifiConfigStore.write();
 
         verify(sharedStoreData).hasNewDataToSerialize();
         verify(userStoreData).hasNewDataToSerialize();
@@ -964,7 +861,7 @@ public class WifiConfigStoreTest extends WifiBaseTest {
         StoreFile userStoreFile2 = mock(StoreFile.class);
         when(userStoreFile2.getFileId())
                 .thenReturn(WifiConfigStore.STORE_FILE_USER_NETWORK_SUGGESTIONS);
-        mWifiConfigStore = new WifiConfigStore(mContext, new Handler(mLooper.getLooper()), mClock,
+        mWifiConfigStore = new WifiConfigStore(mClock,
                 mWifiMetrics, Arrays.asList(sharedStoreFile1, sharedStoreFile2));
         mWifiConfigStore.setUserStores(Arrays.asList(userStoreFile1, userStoreFile2));
 

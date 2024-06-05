@@ -28,6 +28,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.wifi.IScanDataListener;
 import android.net.wifi.IWifiScanner;
 import android.net.wifi.IWifiScannerListener;
 import android.net.wifi.ScanResult;
@@ -64,6 +65,7 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.ClientModeImpl;
 import com.android.server.wifi.Clock;
 import com.android.server.wifi.DeviceConfigFacade;
+import com.android.server.wifi.WifiGlobals;
 import com.android.server.wifi.WifiInjector;
 import com.android.server.wifi.WifiLocalServices;
 import com.android.server.wifi.WifiLog;
@@ -87,6 +89,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -155,7 +158,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             if (mChannelHelper == null) return new ChannelSpec[0][0];
             mChannelHelper.updateChannels();
             return mChannelHelper.getAvailableScanChannels(band);
-        }, new ChannelSpec[0][0]);
+        }, new ChannelSpec[0][0], TAG + "#getAvailableChannels");
         if (channelSpecs == null) {
             channelSpecs = new ChannelSpec[0][0];
         }
@@ -216,7 +219,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             mPnoScanStateMachine.sendMessage(Message.obtain(msg));
             mLastCallerInfoManager.put(WifiManager.API_SCANNING_ENABLED, tid,
                     Binder.getCallingUid(), Binder.getCallingPid(), packageName, enable);
-        });
+        }, TAG + "#setScanningEnabled");
         return true;
     }
 
@@ -247,7 +250,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             logScanRequest("registerScanListener", client, null, null, null);
             mSingleScanListeners.addRequest(client, null, null);
             client.replySucceeded();
-        });
+        }, TAG + "#registerScanListener");
     }
 
     @Override
@@ -274,7 +277,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             logScanRequest("deregisterScanListener", client, null, null, null);
             mSingleScanListeners.removeRequest(client);
             client.cleanup();
-        });
+        }, TAG + "#unregisterScanListener");
     }
 
     @Override
@@ -304,7 +307,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             msg.obj = new ScanParams(listener, settings, workSource);
             msg.sendingUid = uid;
             mBackgroundScanStateMachine.sendMessage(msg);
-        });
+        }, TAG + "#startBackgroundScan");
     }
 
     @Override
@@ -406,7 +409,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             msg.obj = new ScanParams(listener, settings, workSource);
             msg.sendingUid = uid;
             mSingleScanStateMachine.sendMessage(msg);
-        });
+        }, TAG + "#startScan");
     }
 
     @Override
@@ -434,7 +437,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             msg.obj = new ScanParams(listener, null, null);
             msg.sendingUid = uid;
             mSingleScanStateMachine.sendMessage(msg);
-        });
+        }, TAG + "#stopScan");
     }
 
     @Override
@@ -452,7 +455,29 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             return new ArrayList<>();
         }
         return mWifiThreadRunner.call(() -> mSingleScanStateMachine.filterCachedScanResultsByAge(),
-                new ArrayList<ScanResult>());
+                new ArrayList<ScanResult>(), TAG + "#getSingleScanResults");
+    }
+
+
+    /**
+     * See {@link WifiScanner#getCachedScanData(Executor, Consumer)}.
+     */
+    @Override
+    public void getCachedScanData(String packageName, String featureId,
+            IScanDataListener listener) {
+        localLog("get single scan result: package " + packageName
+                + " AttributionTag " + featureId);
+        final int uid = Binder.getCallingUid();
+        Objects.requireNonNull(listener, "listener cannot be null");
+        enforcePermission(uid, packageName, featureId, false, false, false);
+
+        mWifiThreadRunner.post(() -> {
+            try {
+                listener.onResult(mWifiNative.getCachedScanResultsFromAllClientIfaces());
+            } catch (RemoteException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }, TAG + "#getCachedScanData");
     }
 
     @Override
@@ -482,7 +507,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             msg.obj = new ScanParams(listener, scanSettings, pnoSettings, null, packageName, null);
             msg.sendingUid = uid;
             mPnoScanStateMachine.sendMessage(msg);
-        });
+        }, TAG + "#startPnoScan");
     }
 
     @Override
@@ -514,7 +539,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             msg.obj = new ScanParams(listener, null, null);
             msg.sendingUid = uid;
             mPnoScanStateMachine.sendMessage(msg);
-        });
+        }, TAG + "#stopPnoScan");
     }
 
     @Override
@@ -664,6 +689,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
     private final WifiManager mWifiManager;
     private final LastCallerInfoManager mLastCallerInfoManager;
     private final DeviceConfigFacade mDeviceConfigFacade;
+    private final WifiGlobals mWifiGlobals;
 
     private AtomicBoolean mVerboseLoggingEnabled = new AtomicBoolean(false);
 
@@ -684,6 +710,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
         mWifiPermissionsUtil = wifiInjector.getWifiPermissionsUtil();
         mWifiNative = wifiInjector.getWifiNative();
         mDeviceConfigFacade = wifiInjector.getDeviceConfigFacade();
+        mWifiGlobals = wifiInjector.getWifiGlobals();
         // Wifi service is always started before other wifi services. So, there is no problem
         // obtaining WifiManager in the constructor here.
         mWifiManager = mContext.getSystemService(WifiManager.class);
@@ -701,7 +728,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             mBackgroundScanStateMachine.start();
             mSingleScanStateMachine.start();
             mPnoScanStateMachine.start();
-        });
+        }, TAG + "#startService");
     }
 
     /**
@@ -2429,8 +2456,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
                                 scanParams.pnoSettings.isConnected)) {
                             deferMessage(msg);
                             transitionTo(mHwPnoScanState);
-                        } else if (mContext.getResources().getBoolean(
-                                R.bool.config_wifiSwPnoEnabled)
+                        } else if (mWifiGlobals.isSwPnoEnabled()
                                 && mDeviceConfigFacade.isSoftwarePnoEnabled()) {
                             deferMessage(msg);
                             transitionTo(mSwPnoScanState);
@@ -3057,7 +3083,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
                         Log.i(TAG, "binder died: client listener: " + mListener);
                     }
                     cleanup();
-                });
+                }, TAG + "#binderDied");
             }
         };
 

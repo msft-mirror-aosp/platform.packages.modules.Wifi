@@ -30,10 +30,6 @@ import static com.android.server.wifi.proto.nano.WifiMetricsProto.ConnectionEven
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.AlarmManager;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.net.IpConfiguration;
 import android.net.MacAddress;
 import android.net.wifi.IPnoScanResultsCallback;
@@ -188,6 +184,7 @@ public class WifiConnectivityManager {
     private final FrameworkFacade mFrameworkFacade;
     private final WifiPermissionsUtil mWifiPermissionsUtil;
     private final WifiDialogManager mWifiDialogManager;
+    private final WifiThreadRunner mWifiThreadRunner;
 
     private WifiScannerInternal mScanner;
     private final MultiInternetManager mMultiInternetManager;
@@ -338,7 +335,7 @@ public class WifiConnectivityManager {
                     SingleScanListener singleScanListener = new SingleScanListener(false);
                     mScanner.startScan(settings,
                             new WifiScannerInternal.ScanListener(singleScanListener,
-                                    mEventHandler));
+                                    mWifiThreadRunner));
                     mWifiMetrics.incrementConnectivityOneshotScanCount();
                 }
             };
@@ -1329,9 +1326,7 @@ public class WifiConnectivityManager {
         }
     }
 
-    /**
-     * WifiConnectivityManager constructor
-     */
+    /** WifiConnectivityManager constructor */
     WifiConnectivityManager(
             WifiContext context,
             ScoringParams scoringParams,
@@ -1359,7 +1354,8 @@ public class WifiConnectivityManager {
             WifiPermissionsUtil wifiPermissionsUtil,
             WifiCarrierInfoManager wifiCarrierInfoManager,
             WifiCountryCode wifiCountryCode,
-            @NonNull WifiDialogManager wifiDialogManager) {
+            @NonNull WifiDialogManager wifiDialogManager,
+            WifiDeviceStateChangeManager wifiDeviceStateChangeManager) {
         mContext = context;
         mScoringParams = scoringParams;
         mConfigManager = configManager;
@@ -1370,6 +1366,7 @@ public class WifiConnectivityManager {
         mOpenNetworkNotifier = openNetworkNotifier;
         mWifiMetrics = wifiMetrics;
         mEventHandler = handler;
+        mWifiThreadRunner = new WifiThreadRunner(mEventHandler);
         mClock = clock;
         mLocalLog = localLog;
         mWifiScoreCard = scoreCard;
@@ -1402,37 +1399,18 @@ public class WifiConnectivityManager {
                 new InternalMultiInternetConnectionStatusListener());
         mAllSingleScanListener = new AllSingleScanListener();
         mInternalAllSingleScanListener = new WifiScannerInternal.ScanListener(
-                mAllSingleScanListener, mEventHandler);
+                mAllSingleScanListener, mWifiThreadRunner);
         mPnoScanListener = new PnoScanListener();
         mInternalPnoScanListener = new WifiScannerInternal.ScanListener(mPnoScanListener,
-                mEventHandler);
+                mWifiThreadRunner);
         mPnoScanPasspointSsids = new ArraySet<>();
-    }
-
-    /**
-     * Register broadcast receiver
-     */
-    public void initialization() {
-        // Listen for screen state change events.
-        // TODO: We should probably add a shared broadcast receiver in the wifi stack which
-        // can used by various modules to listen to common system events. Creating multiple
-        // broadcast receivers in each class within the wifi stack is *somewhat* expensive.
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(Intent.ACTION_SCREEN_ON);
-        filter.addAction(Intent.ACTION_SCREEN_OFF);
-        mContext.registerReceiver(
-                new BroadcastReceiver() {
+        wifiDeviceStateChangeManager.registerStateChangeCallback(
+                new WifiDeviceStateChangeManager.StateChangeCallback() {
                     @Override
-                    public void onReceive(Context context, Intent intent) {
-                        String action = intent.getAction();
-                        if (action.equals(Intent.ACTION_SCREEN_ON)) {
-                            handleScreenStateChanged(true);
-                        } else if (action.equals(Intent.ACTION_SCREEN_OFF)) {
-                            handleScreenStateChanged(false);
-                        }
+                    public void onScreenStateChanged(boolean screenOn) {
+                        handleScreenStateChanged(screenOn);
                     }
-                }, filter, null, mEventHandler);
-        handleScreenStateChanged(mPowerManager.isInteractive());
+                });
     }
 
     @NonNull
@@ -1514,6 +1492,11 @@ public class WifiConnectivityManager {
                 clientModeManager.getConnectedBssid());
         ScanResult scanResultCandidate =
                 candidate.getNetworkSelectionStatus().getCandidate();
+        if (scanResultCandidate == null) {
+            localLog("isClientModeManagerConnectedOrConnectingToCandidate(" + clientModeManager
+                    + "): bad candidate - " + candidate.SSID + " scanResult is null!");
+            return connectingOrConnectedToTarget;
+        }
         String targetBssid = scanResultCandidate.BSSID;
         return connectingOrConnectedToTarget
                 && Objects.equals(targetBssid, connectedOrConnectingBssid);
@@ -1702,7 +1685,7 @@ public class WifiConnectivityManager {
                     primaryManager.onNetworkSwitchRejected(candidate.networkId,
                             candidate.getNetworkSelectionStatus().getNetworkSelectionBSSID());
                 }),
-                new WifiThreadRunner(mEventHandler));
+                mWifiThreadRunner);
         mNetworkSwitchDialog.launchDialog();
         mDialogCandidateNetId = candidate.networkId;
     }
@@ -2349,7 +2332,7 @@ public class WifiConnectivityManager {
         SingleScanListener singleScanListener =
                 new SingleScanListener(isFullBandScan);
         mScanner.startScan(settings,
-                new WifiScannerInternal.ScanListener(singleScanListener, mEventHandler));
+                new WifiScannerInternal.ScanListener(singleScanListener, mWifiThreadRunner));
         mWifiMetrics.incrementConnectivityOneshotScanCount();
     }
 
@@ -3455,6 +3438,24 @@ public class WifiConnectivityManager {
     }
 
     /**
+     * Reset states when Wi-Fi is getting disabled.
+     */
+    public void resetOnWifiDisable() {
+        mNetworkSelector.resetOnDisable();
+        mConfigManager.enableTemporaryDisabledNetworks();
+        mConfigManager.stopRestrictingAutoJoinToSubscriptionId();
+        mConfigManager.clearUserTemporarilyDisabledList();
+        mConfigManager.removeAllEphemeralOrPasspointConfiguredNetworks();
+        // Flush ANQP cache if configured to do so
+        if (mWifiGlobals.flushAnqpCacheOnWifiToggleOffEvent()) {
+            mPasspointManager.clearAnqpRequestsAndFlushCache();
+        }
+        if (mEnablePnoScanAfterWifiToggle) {
+            mPnoScanEnabledByFramework = true;
+        }
+    }
+
+    /**
      * Inform WiFi is enabled for connection or not
      */
     private void setWifiEnabled(boolean enable) {
@@ -3463,18 +3464,7 @@ public class WifiConnectivityManager {
         localLog("Set WiFi " + (enable ? "enabled" : "disabled"));
 
         if (!enable) {
-            mNetworkSelector.resetOnDisable();
-            mConfigManager.enableTemporaryDisabledNetworks();
-            mConfigManager.stopRestrictingAutoJoinToSubscriptionId();
-            mConfigManager.clearUserTemporarilyDisabledList();
-            mConfigManager.removeAllEphemeralOrPasspointConfiguredNetworks();
-            // Flush ANQP cache if configured to do so
-            if (mWifiGlobals.flushAnqpCacheOnWifiToggleOffEvent()) {
-                mPasspointManager.clearAnqpRequestsAndFlushCache();
-            }
-            if (mEnablePnoScanAfterWifiToggle) {
-                mPnoScanEnabledByFramework = true;
-            }
+            resetOnWifiDisable();
         }
         mWifiEnabled = enable;
         updateRunningState();

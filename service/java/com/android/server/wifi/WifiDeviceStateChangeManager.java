@@ -34,6 +34,7 @@ public class WifiDeviceStateChangeManager {
 
     private final PowerManager mPowerManager;
     private final Set<StateChangeCallback> mChangeCallbackList = new ArraySet<>();
+    private boolean mIsWifiServiceStarted = false;
 
     /**
      * Callback to receive the device state change event. Caller should implement the method to
@@ -65,17 +66,17 @@ public class WifiDeviceStateChangeManager {
                     @Override
                     public void onReceive(Context context, Intent intent) {
                         String action = intent.getAction();
-                        if (TextUtils.equals(action, Intent.ACTION_SCREEN_ON)) {
-                            handleScreenStateChanged(true);
-                        } else if (TextUtils.equals(action, Intent.ACTION_SCREEN_OFF)) {
-                            handleScreenStateChanged(false);
+                        if (TextUtils.equals(action, Intent.ACTION_SCREEN_ON)
+                                || TextUtils.equals(action, Intent.ACTION_SCREEN_OFF)) {
+                            mHandler.post(() ->
+                                    handleScreenStateChanged(TextUtils.equals(action,
+                                            Intent.ACTION_SCREEN_ON)));
                         }
                     }
                 },
-                filter,
-                null,
-                mHandler);
+                filter);
         handleScreenStateChanged(mPowerManager.isInteractive());
+        mIsWifiServiceStarted = true;
     }
 
     /**
@@ -84,6 +85,8 @@ public class WifiDeviceStateChangeManager {
      */
     public void registerStateChangeCallback(StateChangeCallback callback) {
         mChangeCallbackList.add(callback);
+        if (!mIsWifiServiceStarted) return;
+        callback.onScreenStateChanged(mPowerManager.isInteractive());
     }
 
     /**

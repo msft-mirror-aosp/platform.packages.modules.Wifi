@@ -25,6 +25,7 @@ import android.provider.Settings;
 import android.util.ArraySet;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.wifi.flags.FeatureFlags;
 
 import java.util.Collections;
 import java.util.Optional;
@@ -40,6 +41,7 @@ public class DeviceConfigFacade {
     private final WifiMetrics mWifiMetrics;
 
     private static final String NAMESPACE = "wifi";
+    private final FeatureFlags mFeatureFlags;
 
     // Default values of fields
     @VisibleForTesting
@@ -218,6 +220,7 @@ public class DeviceConfigFacade {
     private boolean mSoftwarePnoEnabled;
     private boolean mIncludePasspointSsidsInPnoScans;
     private boolean mHandleRssiOrganicKernelFailuresEnabled;
+    private Set<String> mDisabledAutoBugreports = Collections.EMPTY_SET;
 
     private final Handler mWifiHandler;
 
@@ -225,6 +228,7 @@ public class DeviceConfigFacade {
         mContext = context;
         mWifiMetrics = wifiMetrics;
         mWifiHandler = handler;
+        mFeatureFlags = new com.android.wifi.flags.FeatureFlagsImpl();
         updateDeviceConfigFlags();
         DeviceConfig.addOnPropertiesChangedListener(
                 NAMESPACE,
@@ -418,6 +422,24 @@ public class DeviceConfigFacade {
                 "include_passpoint_ssids_in_pno_scans", true);
         mHandleRssiOrganicKernelFailuresEnabled = DeviceConfig.getBoolean(NAMESPACE,
                 "handle_rssi_organic_kernel_failures_enabled", true);
+        mDisabledAutoBugreports = getDisabledAutoBugreports();
+    }
+
+    private Set<String> getDisabledAutoBugreports() {
+        String rawList = DeviceConfig.getString(NAMESPACE,
+                "disabled_auto_bugreport_title_and_description", null);
+        if (rawList == null || rawList.isEmpty()) {
+            return Collections.EMPTY_SET;
+        }
+        Set<String> result = new ArraySet<>();
+        String[] list = rawList.split(",");
+        for (String cur : list) {
+            if (cur.length() == 0) {
+                continue;
+            }
+            result.add(cur);
+        }
+        return Collections.unmodifiableSet(result);
     }
 
     private Set<String> getUnmodifiableSetQuoted(String key) {
@@ -913,5 +935,17 @@ public class DeviceConfigFacade {
     public void setOobPseudonymFeatureFlagChangedListener(
             Consumer<Boolean> listener) {
         mOobPseudonymFeatureFlagChangedListener = listener;
+    }
+
+    /**
+     * Get the set of bugreports that are explicitly disabled.
+     * @return A Set of String to indicate disabled auto-bugreports trigger points.
+     */
+    public Set<String> getDisabledAutoBugreportTitleAndDetails() {
+        return mDisabledAutoBugreports;
+    }
+
+    public FeatureFlags getFeatureFlags() {
+        return mFeatureFlags;
     }
 }

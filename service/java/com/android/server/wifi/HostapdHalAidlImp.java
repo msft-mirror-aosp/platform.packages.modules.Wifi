@@ -33,6 +33,7 @@ import android.hardware.wifi.hostapd.Ieee80211ReasonCode;
 import android.hardware.wifi.hostapd.IfaceParams;
 import android.hardware.wifi.hostapd.NetworkParams;
 import android.net.MacAddress;
+import android.net.wifi.OuiKeyedData;
 import android.net.wifi.ScanResult;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SoftApConfiguration.BandType;
@@ -52,6 +53,7 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.WifiNative.HostapdDeathEventHandler;
 import com.android.server.wifi.WifiNative.SoftApHalCallback;
 import com.android.server.wifi.util.ApConfigUtil;
+import com.android.server.wifi.util.HalAidlUtil;
 import com.android.server.wifi.util.NativeUtil;
 import com.android.wifi.resources.R;
 
@@ -92,6 +94,7 @@ public class HostapdHalAidlImp implements IHostapdHal {
     private Set<String> mActiveInstances = new HashSet<>();
     private HostapdDeathEventHandler mDeathEventHandler;
     private boolean mServiceDeclared = false;
+    private int mServiceVersion;
     private CountDownLatch mWaitForDeathLatch;
 
     /**
@@ -395,10 +398,13 @@ public class HostapdHalAidlImp implements IHostapdHal {
             try {
                 SoftApHalCallback callback = mSoftApHalCallbacks.get(info.ifaceName);
                 if (callback != null) {
+                    List<OuiKeyedData> vendorData = isServiceVersionAtLeast(2)
+                            ? HalAidlUtil.halToFrameworkOuiKeyedDataList(info.vendorData)
+                            : Collections.emptyList();
                     callback.onInfoChanged(info.apIfaceInstance, info.freqMhz,
                             mapHalChannelBandwidthToSoftApInfo(info.channelBandwidth),
                             mapHalGenerationToWifiStandard(info.generation),
-                            MacAddress.fromBytes(info.apIfaceInstanceMacAddress));
+                            MacAddress.fromBytes(info.apIfaceInstanceMacAddress), vendorData);
                 }
                 mActiveInstances.add(info.apIfaceInstance);
             } catch (IllegalArgumentException iae) {
@@ -466,6 +472,14 @@ public class HostapdHalAidlImp implements IHostapdHal {
     }
 
     /**
+     * Check that the service is running at least the expected version. Use to avoid the case where
+     * the framework is using a newer interface version than the service.
+     */
+    private boolean isServiceVersionAtLeast(int expectedVersion) {
+        return expectedVersion <= mServiceVersion;
+    }
+
+    /**
      * Wrapper functions created to be mockable in unit tests
      */
     @VisibleForTesting
@@ -505,7 +519,8 @@ public class HostapdHalAidlImp implements IHostapdHal {
             Log.i(TAG, "Local Version: " + IHostapd.VERSION);
 
             try {
-                Log.i(TAG, "Remote Version: " + mIHostapd.getInterfaceVersion());
+                mServiceVersion = mIHostapd.getInterfaceVersion();
+                Log.i(TAG, "Remote Version: " + mServiceVersion);
                 IBinder serviceBinder = getServiceBinderMockable();
                 if (serviceBinder == null) return false;
                 mWaitForDeathLatch = null;
@@ -874,6 +889,11 @@ public class HostapdHalAidlImp implements IHostapdHal {
         if (ifaceParams.name == null || ifaceParams.hwModeParams == null
                 || ifaceParams.channelParams == null) {
             return null;
+        }
+        if (isServiceVersionAtLeast(2) && SdkLevel.isAtLeastV()
+                && !config.getVendorData().isEmpty()) {
+            ifaceParams.vendorData =
+                    HalAidlUtil.frameworkToHalOuiKeyedDataList(config.getVendorData());
         }
         return ifaceParams;
     }

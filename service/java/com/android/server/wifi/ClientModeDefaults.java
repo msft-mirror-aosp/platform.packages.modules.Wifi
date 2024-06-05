@@ -208,6 +208,10 @@ public interface ClientModeDefaults extends ClientMode {
         return true;
     }
 
+    default boolean isIpProvisioningTimedOut() {
+        return false;
+    }
+
     default boolean isSupplicantTransientState() {
         return false;
     }

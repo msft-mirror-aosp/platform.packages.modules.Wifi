@@ -29,6 +29,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.net.NetworkInfo;
+import android.net.wifi.OuiKeyedData;
 import android.net.wifi.WifiContext;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.p2p.WifiP2pManager;
@@ -53,6 +54,7 @@ import com.android.server.wifi.hal.WifiP2pIface;
 import com.android.server.wifi.hal.WifiRttController;
 import com.android.server.wifi.hal.WifiStaIface;
 import com.android.server.wifi.util.WorkSourceHelper;
+import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
 import org.json.JSONArray;
@@ -77,6 +79,7 @@ import java.util.stream.Collectors;
 public class HalDeviceManager {
     private static final String TAG = "HalDevMgr";
     private static final boolean VDBG = false;
+    private final FeatureFlags mFeatureFlags;
     private boolean mDbg = false;
 
     public static final long CHIP_CAPABILITY_ANY = 0L;
@@ -151,6 +154,7 @@ public class HalDeviceManager {
         mContext = context;
         mClock = clock;
         mWifiInjector = wifiInjector;
+        mFeatureFlags = mWifiInjector.getDeviceConfigFacade().getFeatureFlags();
         mEventHandler = handler;
         mIWifiDeathRecipient = new WifiDeathRecipient();
         mWifiHal = getWifiHalMockable(context, wifiInjector);
@@ -174,6 +178,13 @@ public class HalDeviceManager {
     @VisibleForTesting
     protected WifiHal getWifiHalMockable(WifiContext context, WifiInjector wifiInjector) {
         return new WifiHal(context, wifiInjector.getSsidTranslator());
+    }
+
+    /**
+     * Returns whether or not the concurrency combo is loaded from the driver.
+     */
+    public boolean isConcurrencyComboLoadedFromDriver() {
+        return mIsConcurrencyComboLoadedFromDriver;
     }
 
     /**
@@ -320,7 +331,7 @@ public class HalDeviceManager {
             return null;
         }
         WifiStaIface staIface = (WifiStaIface) createIface(HDM_CREATE_IFACE_STA,
-                requiredChipCapabilities, destroyedListener, handler, requestorWs);
+                requiredChipCapabilities, destroyedListener, handler, requestorWs, null);
         if (staIface != null) {
             mClientModeManagers.put(getName(staIface), concreteClientModeManager);
         }
@@ -358,14 +369,14 @@ public class HalDeviceManager {
             long requiredChipCapabilities,
             @Nullable InterfaceDestroyedListener destroyedListener, @Nullable Handler handler,
             @NonNull WorkSource requestorWs, boolean isBridged,
-            @NonNull SoftApManager softApManager) {
+            @NonNull SoftApManager softApManager, @NonNull List<OuiKeyedData> vendorData) {
         if (softApManager == null) {
             Log.e(TAG, "Cannot create AP Iface with null SoftApManager");
             return null;
         }
         WifiApIface apIface = (WifiApIface) createIface(isBridged ? HDM_CREATE_IFACE_AP_BRIDGE
                 : HDM_CREATE_IFACE_AP, requiredChipCapabilities, destroyedListener,
-                handler, requestorWs);
+                handler, requestorWs, vendorData);
         if (apIface != null) {
             mSoftApManagers.put(getName(apIface), softApManager);
         }
@@ -380,7 +391,7 @@ public class HalDeviceManager {
             @Nullable InterfaceDestroyedListener destroyedListener,
             @Nullable Handler handler, @NonNull WorkSource requestorWs) {
         WifiP2pIface iface = (WifiP2pIface) createIface(HDM_CREATE_IFACE_P2P,
-                requiredChipCapabilities, destroyedListener, handler, requestorWs);
+                requiredChipCapabilities, destroyedListener, handler, requestorWs, null);
         if (iface == null) {
             return null;
         }
@@ -407,7 +418,7 @@ public class HalDeviceManager {
     public WifiNanIface createNanIface(@Nullable InterfaceDestroyedListener destroyedListener,
             @Nullable Handler handler, @NonNull WorkSource requestorWs) {
         return (WifiNanIface) createIface(HDM_CREATE_IFACE_NAN, CHIP_CAPABILITY_ANY,
-                destroyedListener, handler, requestorWs);
+                destroyedListener, handler, requestorWs, null);
     }
 
     /**
@@ -568,7 +579,7 @@ public class HalDeviceManager {
      * Replace the requestorWs info for the associated info.
      *
      * When a new iface is requested via
-     * {@link #createIface(int, long, InterfaceDestroyedListener, Handler, WorkSource, ConcreteClientModeManager)}, the clients
+     * {@link #createIface(int, long, InterfaceDestroyedListener, Handler, WorkSource, List)}, the clients
      * pass in a worksource which includes all the apps that triggered the iface creation. However,
      * this list of apps can change during the lifetime of the iface (as new apps request the same
      * iface or existing apps release their request for the iface). This API can be invoked multiple
@@ -1542,7 +1553,7 @@ public class HalDeviceManager {
     private void managerStatusListenerDispatch() {
         synchronized (mLock) {
             for (ManagerStatusListenerProxy cb : mManagerStatusListeners) {
-                cb.trigger(false);
+                cb.action();
             }
         }
     }
@@ -1597,7 +1608,7 @@ public class HalDeviceManager {
 
     private WifiHal.WifiInterface createIface(@HdmIfaceTypeForCreation int createIfaceType,
             long requiredChipCapabilities, InterfaceDestroyedListener destroyedListener,
-            Handler handler, WorkSource requestorWs) {
+            Handler handler, WorkSource requestorWs, @Nullable List<OuiKeyedData> vendorData) {
         if (mDbg) {
             Log.d(TAG, "createIface: createIfaceType=" + createIfaceType
                     + ", requiredChipCapabilities=" + requiredChipCapabilities
@@ -1629,7 +1640,7 @@ public class HalDeviceManager {
 
             return createIfaceIfPossible(
                     chipInfos, createIfaceType, requiredChipCapabilities,
-                    destroyedListener, handler, requestorWs);
+                    destroyedListener, handler, requestorWs, vendorData);
         }
     }
 
@@ -1730,7 +1741,7 @@ public class HalDeviceManager {
     private WifiHal.WifiInterface createIfaceIfPossible(
             WifiChipInfo[] chipInfos, @HdmIfaceTypeForCreation int createIfaceType,
             long requiredChipCapabilities, InterfaceDestroyedListener destroyedListener,
-            Handler handler, WorkSource requestorWs) {
+            Handler handler, WorkSource requestorWs, @Nullable List<OuiKeyedData> vendorData) {
         int targetHalIfaceType = HAL_IFACE_MAP.get(createIfaceType);
         if (VDBG) {
             Log.d(TAG, "createIfaceIfPossible: chipInfos=" + Arrays.deepToString(chipInfos)
@@ -1739,13 +1750,17 @@ public class HalDeviceManager {
                     + ", requiredChipCapabilities=" + requiredChipCapabilities
                     + ", requestorWs=" + requestorWs);
         }
+        if (vendorData != null && !vendorData.isEmpty()) {
+            Log.d(TAG, "Request includes vendor data. ifaceType=" + createIfaceType
+                    + ", vendorDataSize=" + vendorData.size());
+        }
         synchronized (mLock) {
             IfaceCreationData bestIfaceCreationProposal = getBestIfaceCreationProposal(chipInfos,
                     createIfaceType, requiredChipCapabilities, requestorWs);
 
             if (bestIfaceCreationProposal != null) {
                 WifiHal.WifiInterface iface = executeChipReconfiguration(bestIfaceCreationProposal,
-                        createIfaceType);
+                        createIfaceType, vendorData);
                 if (iface == null) {
                     // If the chip reconfiguration failed, we'll need to clean up internal state.
                     Log.e(TAG, "Teardown Wifi internal state");
@@ -2359,7 +2374,7 @@ public class HalDeviceManager {
      * Returns the newly created interface or a null on any error.
      */
     private WifiHal.WifiInterface executeChipReconfiguration(IfaceCreationData ifaceCreationData,
-            @HdmIfaceTypeForCreation int createIfaceType) {
+            @HdmIfaceTypeForCreation int createIfaceType, @Nullable List<OuiKeyedData> vendorData) {
         if (mDbg) {
             Log.d(TAG, "executeChipReconfiguration: ifaceCreationData=" + ifaceCreationData
                     + ", createIfaceType=" + createIfaceType);
@@ -2433,10 +2448,10 @@ public class HalDeviceManager {
                     iface = ifaceCreationData.chipInfo.chip.createStaIface();
                     break;
                 case HDM_CREATE_IFACE_AP_BRIDGE:
-                    iface = ifaceCreationData.chipInfo.chip.createBridgedApIface();
+                    iface = ifaceCreationData.chipInfo.chip.createBridgedApIface(vendorData);
                     break;
                 case HDM_CREATE_IFACE_AP:
-                    iface = ifaceCreationData.chipInfo.chip.createApIface();
+                    iface = ifaceCreationData.chipInfo.chip.createApIface(vendorData);
                     break;
                 case HDM_CREATE_IFACE_P2P:
                     iface = ifaceCreationData.chipInfo.chip.createP2pIface();
@@ -2489,11 +2504,6 @@ public class HalDeviceManager {
                 return false;
             }
 
-            // dispatch listeners on other threads to prevent race conditions in case the HAL is
-            // blocking and they get notification about destruction from HAL before cleaning up
-            // status.
-            dispatchDestroyedListeners(name, type, true);
-
             boolean success = false;
             switch (type) {
                 case WifiChip.IFACE_TYPE_STA:
@@ -2515,7 +2525,7 @@ public class HalDeviceManager {
             }
 
             // dispatch listeners no matter what status
-            dispatchDestroyedListeners(name, type, false);
+            dispatchDestroyedListeners(name, type);
             if (validateRttController) {
                 // Try to update the RttController
                 updateRttControllerWhenInterfaceChanges();
@@ -2534,12 +2544,10 @@ public class HalDeviceManager {
     // cache entries for the called listeners
     // onlyOnOtherThreads = true: only call listeners on other threads
     // onlyOnOtherThreads = false: call all listeners
-    private void dispatchDestroyedListeners(String name, int type, boolean onlyOnOtherThreads) {
+    private void dispatchDestroyedListeners(String name, int type) {
         if (VDBG) Log.d(TAG, "dispatchDestroyedListeners: iface(name)=" + name);
-
-        List<InterfaceDestroyedListenerProxy> triggerList = new ArrayList<>();
         synchronized (mLock) {
-            InterfaceCacheEntry entry = mInterfaceInfoCache.get(Pair.create(name, type));
+            InterfaceCacheEntry entry = mInterfaceInfoCache.remove(Pair.create(name, type));
             if (entry == null) {
                 Log.e(TAG, "dispatchDestroyedListeners: no cache entry for iface(name)=" + name);
                 return;
@@ -2549,18 +2557,9 @@ public class HalDeviceManager {
                     entry.destroyedListeners.iterator();
             while (iterator.hasNext()) {
                 InterfaceDestroyedListenerProxy listener = iterator.next();
-                if (!onlyOnOtherThreads || !listener.requestedToRunInCurrentThread()) {
-                    triggerList.add(listener);
-                    iterator.remove();
-                }
+                iterator.remove();
+                listener.action();
             }
-            if (!onlyOnOtherThreads) { // leave entry until final call to *all* callbacks
-                mInterfaceInfoCache.remove(Pair.create(name, type));
-            }
-        }
-
-        for (InterfaceDestroyedListenerProxy listener : triggerList) {
-            listener.trigger(isWaitForDestroyedListenersMockable());
         }
     }
 
@@ -2580,7 +2579,7 @@ public class HalDeviceManager {
         }
 
         for (InterfaceDestroyedListenerProxy listener : triggerList) {
-            listener.trigger(false);
+            listener.action();
         }
     }
 
@@ -2617,42 +2616,6 @@ public class HalDeviceManager {
         @Override
         public int hashCode() {
             return mListener.hashCode();
-        }
-
-        public boolean requestedToRunInCurrentThread() {
-            if (mHandler == null) return true;
-            long currentTid = mWifiInjector.getCurrentThreadId();
-            long handlerTid = mHandler.getLooper().getThread().getId();
-            return currentTid == handlerTid;
-        }
-
-        void trigger(boolean isRunAtFront) {
-            // TODO(b/199792691): The thread check is needed to preserve the existing
-            //  assumptions of synchronous execution of the "onDestroyed" callback as much as
-            //  possible. This is needed to prevent regressions caused by posting to the handler
-            //  thread changing the code execution order.
-            //  When all wifi services (ie. WifiAware, WifiP2p) get moved to the wifi handler
-            //  thread, remove this thread check and the Handler#post() and simply always
-            //  invoke the callback directly.
-            if (requestedToRunInCurrentThread()) {
-                // Already running on the same handler thread. Trigger listener synchronously.
-                action();
-            } else if (isRunAtFront) {
-                // Current thread is not the thread the listener should be invoked on.
-                // Post action to the intended thread and run synchronously.
-                new WifiThreadRunner(mHandler).runAtFront(() -> {
-                    action();
-                });
-            } else {
-                // Current thread is not the thread the listener should be invoked on.
-                // Post action to the intended thread.
-                if (mHandler instanceof RunnerHandler) {
-                    RunnerHandler rh = (RunnerHandler) mHandler;
-                    rh.postToFront(() -> action());
-                } else {
-                    mHandler.postAtFrontOfQueue(() -> action());
-                }
-            }
         }
 
         protected void action() {}
@@ -2902,8 +2865,10 @@ public class HalDeviceManager {
      */
     public void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         pw.println("Dump of HalDeviceManager:");
-        pw.println("  mManagerStatusListeners: " + mManagerStatusListeners);
-        pw.println("  mInterfaceInfoCache: " + mInterfaceInfoCache);
+        synchronized (mLock) {
+            pw.println("  mManagerStatusListeners: " + mManagerStatusListeners);
+            pw.println("  mInterfaceInfoCache: " + mInterfaceInfoCache);
+        }
         pw.println("  mDebugChipsInfo: " + Arrays.toString(getAllChipInfo(false)));
     }
 }

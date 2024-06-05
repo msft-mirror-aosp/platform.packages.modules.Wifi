@@ -15,6 +15,7 @@
  */
 package com.android.server.wifi.util;
 
+import android.hardware.wifi.WifiBand;
 import android.net.MacAddress;
 import android.net.wifi.MloLink;
 import android.net.wifi.ScanResult;
@@ -828,7 +829,27 @@ public class InformationElementUtil {
      * EhtOperation: represents the EHT Operation IE
      */
     public static class EhtOperation {
+        private static final int EHT_OPERATION_BASIC_LENGTH = 5;
+        private static final int EHT_OPERATION_INFO_PRESENT_MASK = 0x01;
+        private static final int DISABLED_SUBCHANNEL_BITMAP_PRESENT_MASK = 0x02;
+        private static final int EHT_OPERATION_INFO_START_INDEX = EHT_OPERATION_BASIC_LENGTH;
+        private static final int DISABLED_SUBCHANNEL_BITMAP_START_INDEX =
+                EHT_OPERATION_INFO_START_INDEX + 3;
+        private static final int CHANNEL_WIDTH_INDEX = EHT_OPERATION_INFO_START_INDEX + 0;
+        private static final int CHANNEL_WIDTH_MASK = 0xF;
+        private static final int CHANNEL_CENTER_FREQ_SEG0_INDEX =
+                EHT_OPERATION_INFO_START_INDEX + 1;
+        private static final int CHANNEL_CENTER_FREQ_SEG_MASK = 0xFF;
+        private static final int CHANNEL_CENTER_FREQ_SEG1_INDEX =
+                EHT_OPERATION_INFO_START_INDEX + 2;
+
         private boolean mPresent = false;
+        private boolean mEhtOperationInfoPresent = false;
+        private boolean mDisabledSubchannelBitmapPresent = false;
+        private byte[] mDisabledSubchannelBitmap;
+        private int mChannelWidth;
+        private int mCenterFreqSeg0;
+        private int mCenterFreqSeg1;
 
         /**
          * Returns whether the EHT Information Element is present.
@@ -837,14 +858,136 @@ public class InformationElementUtil {
             return mPresent;
         }
 
-        /** Parse EHT Operation IE */
+        /**
+         * Returns whether EHT Operation Information field is present.
+         * Reference 9.4.2.311 EHT Operation element (IEEEStd 802.11be™ Draft2.0).
+         */
+        public boolean isEhtOperationInfoPresent() {
+            return mEhtOperationInfoPresent;
+        }
+
+        /**
+         * Returns whether the Disabled Subchannel Bitmap field is present.
+         */
+        public boolean isDisabledSubchannelBitmapPresent() {
+            return mDisabledSubchannelBitmapPresent;
+        }
+
+        /**
+         * Returns the Disabled Subchannel Bitmap field if it exists. Otherwise, returns null.
+         */
+        public byte[] getDisabledSubchannelBitmap() {
+            return mDisabledSubchannelBitmap;
+        }
+
+        /**
+         * @return  Channel width if EHT Operation Information Present.
+         */
+        public int getChannelWidth() {
+            /*
+             * Channel width in EHT operation Info is set,
+             *      0 for 20 MHz EHT BSS bandwidth.
+             *      1 for 40 MHz EHT BSS bandwidth.
+             *      2 for 80 MHz EHT BSS bandwidth.
+             *      3 for 160 MHz EHT BSS bandwidth.
+             *      4 for 320 MHz EHT BSS bandwidth.
+             *      Values in the ranges 5 to 7 are reserved.
+             */
+            switch(mChannelWidth) {
+                case 0: return ScanResult.CHANNEL_WIDTH_20MHZ;
+                case 1: return ScanResult.CHANNEL_WIDTH_40MHZ;
+                case 2: return ScanResult.CHANNEL_WIDTH_80MHZ;
+                case 3: return ScanResult.CHANNEL_WIDTH_160MHZ;
+                case 4: return ScanResult.CHANNEL_WIDTH_320MHZ;
+                default:
+                    return  ScanResult.UNSPECIFIED;
+            }
+        }
+
+        /**
+         * Returns Channel Center Frequency Segment 0 (CCFS0).
+         *
+         * - For 20, 40 or 80 MHz BSS bandwidth, indicates the channel center frequency for the
+         *   20, 40 or 80 MHz channel on which the EHT BSS operates.
+         * - For 160 MHz BSS bandwidth, indicates the channel center frequency of the primary 80
+         *   MHz channel.
+         * - For 320 MHz BSS bandwidth, indicates the channel center frequency of the primary 160
+         *   MHz channel.
+         *
+         * @param band Operating band
+         * @return Center frequency.
+         */
+        public int getCenterFreq0(@ScanResult.WifiBand int band) {
+            if (mCenterFreqSeg0 == 0 || band == WifiBand.BAND_UNSPECIFIED) {
+                return ScanResult.UNSPECIFIED;
+            }
+            return ScanResult.convertChannelToFrequencyMhzIfSupported(mCenterFreqSeg0, band);
+        }
+
+        /**
+         * Returns Channel Center Frequency Segment 1 (CCFS1)
+         *
+         * - For a 20, 40 or 80 MHz BSS bandwidth, returns {@link ScanResult#UNSPECIFIED} .
+         * - For a 160 MHz BSS bandwidth, returns the channel center frequency of the 160 MHz
+         *   channel on which the EHT BSS operates.
+         * - For a 320 MHz BSS bandwidth, returns the channel center frequency of the 320 MHz
+         *   channel on which the EHT BSS operates
+         *
+         * @param band Operating band
+         * @return Center frequency.
+         */
+        public int getCenterFreq1(@ScanResult.WifiBand int band) {
+            if (mCenterFreqSeg1 == 0 || band == WifiBand.BAND_UNSPECIFIED) {
+                return ScanResult.UNSPECIFIED;
+            }
+            return ScanResult.convertChannelToFrequencyMhzIfSupported(mCenterFreqSeg1, band);
+        }
+
+        /**
+         * Parse EHT Operation IE
+         */
         public void from(InformationElement ie) {
             if (ie.id != InformationElement.EID_EXTENSION_PRESENT
                     || ie.idExt != InformationElement.EID_EXT_EHT_OPERATION) {
                 throw new IllegalArgumentException("Element id is not EHT_OPERATION");
             }
+            // Make sure the byte array length is at least the fixed size
+            if (ie.bytes.length < EHT_OPERATION_BASIC_LENGTH) {
+                if (DBG) {
+                    Log.w(TAG, "Invalid EHT_OPERATION IE len: " + ie.bytes.length);
+                }
+                // Skipping parsing of the IE
+                return;
+            }
 
+            mEhtOperationInfoPresent = (ie.bytes[0] & EHT_OPERATION_INFO_PRESENT_MASK) != 0;
+            mDisabledSubchannelBitmapPresent =
+                    (ie.bytes[0] & DISABLED_SUBCHANNEL_BITMAP_PRESENT_MASK) != 0;
+            int expectedLen = EHT_OPERATION_BASIC_LENGTH + (mEhtOperationInfoPresent ? (
+                    mDisabledSubchannelBitmapPresent ? 5 : 3) : 0);
+            // Make sure the byte array length is at least fitting the known parameters
+            if (ie.bytes.length < expectedLen) {
+                if (DBG) {
+                    Log.w(TAG, "Invalid EHT_OPERATION info len: " + ie.bytes.length);
+                }
+                // Skipping parsing of the IE
+                return;
+            }
             mPresent = true;
+
+            if (mEhtOperationInfoPresent) {
+                mChannelWidth = ie.bytes[CHANNEL_WIDTH_INDEX] & CHANNEL_WIDTH_MASK;
+                mCenterFreqSeg0 =
+                        ie.bytes[CHANNEL_CENTER_FREQ_SEG0_INDEX] & CHANNEL_CENTER_FREQ_SEG_MASK;
+                mCenterFreqSeg1 =
+                        ie.bytes[CHANNEL_CENTER_FREQ_SEG1_INDEX] & CHANNEL_CENTER_FREQ_SEG_MASK;
+            }
+
+            if (mDisabledSubchannelBitmapPresent) {
+                mDisabledSubchannelBitmap = new byte[2];
+                System.arraycopy(ie.bytes, DISABLED_SUBCHANNEL_BITMAP_START_INDEX,
+                        mDisabledSubchannelBitmap, 0, 2);
+            }
 
             //TODO put more functionality for parsing the IE
         }
@@ -1465,6 +1608,17 @@ public class InformationElementUtil {
                         ByteBufferReader.readInteger(data, ByteOrder.BIG_ENDIAN, oi3Length);
             }
         }
+
+        @Override
+        public String toString() {
+            StringBuilder stringBuilder = new StringBuilder();
+            stringBuilder.append("RoamingConsortium [");
+            stringBuilder.append("anqpOICount: " + anqpOICount);
+            stringBuilder.append(", roamingConsortiums: " + (roamingConsortiums == null ? "null"
+                    : Arrays.toString(roamingConsortiums)));
+            stringBuilder.append("]");
+            return stringBuilder.toString();
+        }
     }
 
     public static class Vsa {
@@ -1619,7 +1773,7 @@ public class InformationElementUtil {
         private static final int FILS_CAPABILITY_BIT = 72;
         private static final int TWT_REQUESTER_CAPABILITY_BIT = 77;
         private static final int TWT_RESPONDER_CAPABILITY_BIT = 78;
-        private static final int NO_TB_RANGING_RESPONDER = 90;
+        private static final int NON_TB_RANGING_RESPONDER = 90;
         private static final int TB_RANGING_RESPONDER = 91;
 
         public BitSet capabilitiesBitSet;
@@ -1628,7 +1782,7 @@ public class InformationElementUtil {
          * @return true if Trigger based ranging responder supported. Refer P802.11az/D7.0,
          * September 2022, section 9.4.2.26 Extended Capabilities element.
          */
-        public boolean isTriggerBasedRangingRespSupported() {
+        public boolean is80211azTbResponder() {
             return capabilitiesBitSet.get(TB_RANGING_RESPONDER);
         }
 
@@ -1636,8 +1790,8 @@ public class InformationElementUtil {
          * @return true if Non trigger based ranging responder supported. Refer P802.11az/D7.0,
          * September 2022, section 9.4.2.26 Extended Capabilities element.
          */
-        public boolean isNonTriggerBasedRangingRespSupported() {
-            return capabilitiesBitSet.get(NO_TB_RANGING_RESPONDER);
+        public boolean is80211azNtbResponder() {
+            return capabilitiesBitSet.get(NON_TB_RANGING_RESPONDER);
         }
 
         /**

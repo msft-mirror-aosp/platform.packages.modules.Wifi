@@ -15,8 +15,6 @@
  */
 package com.android.server.wifi;
 
-import static android.content.Intent.ACTION_SCREEN_OFF;
-import static android.content.Intent.ACTION_SCREEN_ON;
 import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_HIGH_MVMT;
 import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_LOW_MVMT;
 import static android.net.wifi.WifiManager.DEVICE_MOBILITY_STATE_STATIONARY;
@@ -66,9 +64,7 @@ import static org.mockito.Mockito.when;
 import static java.lang.StrictMath.toIntExact;
 
 import android.app.ActivityManager;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
 import android.net.MacAddress;
 import android.net.wifi.EAPConstants;
 import android.net.wifi.IOnWifiUsabilityStatsListener;
@@ -216,10 +212,12 @@ public class WifiMetricsTest extends WifiBaseTest {
     @Mock PowerManager mPowerManager;
     @Mock WifiMonitor mWifiMonitor;
     @Mock ActiveModeWarden mActiveModeWarden;
-
-    @Captor ArgumentCaptor<BroadcastReceiver> mBroadcastReceiverCaptor;
+    @Mock WifiDeviceStateChangeManager mWifiDeviceStateChangeManager;
     @Captor ArgumentCaptor<ActiveModeWarden.ModeChangeCallback> mModeChangeCallbackArgumentCaptor;
     @Captor ArgumentCaptor<Handler> mHandlerCaptor;
+    @Captor
+    ArgumentCaptor<WifiDeviceStateChangeManager.StateChangeCallback>
+            mStateChangeCallbackArgumentCaptor;
 
     @Before
     public void setUp() throws Exception {
@@ -229,12 +227,19 @@ public class WifiMetricsTest extends WifiBaseTest {
         mTestLooper = new TestLooper();
         mResources = new MockResources();
         when(mContext.getResources()).thenReturn(mResources);
-        when(mContext.getSystemService(PowerManager.class)).thenReturn(mPowerManager);
-        when(mPowerManager.isInteractive()).thenReturn(true);
-        mWifiMetrics = new WifiMetrics(mContext, mFacade, mClock, mTestLooper.getLooper(),
-                new WifiAwareMetrics(mClock), new RttMetrics(mClock), mWifiPowerMetrics,
-                mWifiP2pMetrics, mDppMetrics, mWifiMonitor);
-        mWifiMetrics.start();
+        mWifiMetrics =
+                new WifiMetrics(
+                        mContext,
+                        mFacade,
+                        mClock,
+                        mTestLooper.getLooper(),
+                        new WifiAwareMetrics(mClock),
+                        new RttMetrics(mClock),
+                        mWifiPowerMetrics,
+                        mWifiP2pMetrics,
+                        mDppMetrics,
+                        mWifiMonitor,
+                        mWifiDeviceStateChangeManager);
         mWifiMetrics.setWifiConfigManager(mWcm);
         mWifiMetrics.setWifiBlocklistMonitor(mWifiBlocklistMonitor);
         mWifiMetrics.setPasspointManager(mPpm);
@@ -248,8 +253,9 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(mOnWifiUsabilityStatsListener.asBinder()).thenReturn(mAppBinder);
         when(mWifiScoreCard.lookupNetwork(anyString())).thenReturn(mPerNetwork);
         when(mPerNetwork.getRecentStats()).thenReturn(mNetworkConnectionStats);
-        verify(mContext, atLeastOnce()).registerReceiver(
-                mBroadcastReceiverCaptor.capture(), any(), any(), any());
+        verify(mWifiDeviceStateChangeManager)
+                .registerStateChangeCallback(mStateChangeCallbackArgumentCaptor.capture());
+        setScreenState(true);
 
         mWifiMetrics.registerForWifiMonitorEvents("wlan0");
         verify(mWifiMonitor, atLeastOnce())
@@ -2229,6 +2235,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.setConnectionScanDetail("nonexistentIface", mock(ScanDetail.class));
         mWifiMetrics.setConnectionPmkCache("nonexistentIface", false);
         mWifiMetrics.setConnectionMaxSupportedLinkSpeedMbps("nonexistentIface", 100, 50);
+        mWifiMetrics.setConnectionChannelWidth("nonexistentIface", ScanResult.CHANNEL_WIDTH_160MHZ);
         mWifiMetrics.endConnectionEvent("nonexistentIface",
                 WifiMetrics.ConnectionEvent.FAILURE_ASSOCIATION_REJECTION,
                 WifiMetricsProto.ConnectionEvent.HLF_DHCP,
@@ -6605,7 +6612,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 eq((int) wifiDisconnectTimeMs / 1000),
                 eq((int) (wifiDisconnectTimeMs - connectionEndTimeMs) / 1000),
                 eq(WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY),
-                anyInt(), anyInt(), anyInt(), anyInt()));
+                anyInt(), anyInt(), anyInt(), anyInt(), anyInt()));
     }
 
     @Test
@@ -6633,7 +6640,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         ExtendedMockito.verify(() -> WifiStatsLog.write(
                 eq(WifiStatsLog.WIFI_DISCONNECT_REPORTED),
                 anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()),
+                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()),
                 times(0));
     }
 
@@ -6644,7 +6651,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         ExtendedMockito.verify(() -> WifiStatsLog.write(
                 eq(WifiStatsLog.WIFI_DISCONNECT_REPORTED),
                 anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(),
-                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()),
+                anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()),
                 times(0));
     }
 
@@ -6902,10 +6909,10 @@ public class WifiMetricsTest extends WifiBaseTest {
     }
 
     private void setScreenState(boolean screenOn) {
-        BroadcastReceiver broadcastReceiver = mBroadcastReceiverCaptor.getValue();
-        assertNotNull(broadcastReceiver);
-        Intent intent = new Intent(screenOn  ? ACTION_SCREEN_ON : ACTION_SCREEN_OFF);
-        broadcastReceiver.onReceive(mContext, intent);
+        WifiDeviceStateChangeManager.StateChangeCallback callback =
+                mStateChangeCallbackArgumentCaptor.getValue();
+        assertNotNull(callback);
+        callback.onScreenStateChanged(screenOn);
     }
 
     @Test
@@ -7250,7 +7257,8 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(networkDetail.isIndividualTwtSupported()).thenReturn(true);
         when(networkDetail.isTwtRequired()).thenReturn(true);
         when(networkDetail.isFilsCapable()).thenReturn(true);
-        when(networkDetail.is11azSupported()).thenReturn(true);
+        when(networkDetail.is80211azNtbResponder()).thenReturn(true);
+        when(networkDetail.is80211azTbResponder()).thenReturn(false);
         when(networkDetail.is80211McResponderSupport()).thenReturn(true);
         when(networkDetail.isEpcsPriorityAccessSupported()).thenReturn(true);
         when(networkDetail.getHSRelease()).thenReturn(NetworkDetail.HSRelease.Unknown);
@@ -7271,6 +7279,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.logBugReport();
         mWifiMetrics.logStaEvent(TEST_IFACE_NAME, StaEvent.TYPE_CMD_START_ROAM,
                 StaEvent.DISCONNECT_UNKNOWN, null);
+        mWifiMetrics.setConnectionChannelWidth(TEST_IFACE_NAME, ScanResult.CHANNEL_WIDTH_160MHZ);
         mWifiMetrics.endConnectionEvent(TEST_IFACE_NAME,
                 WifiMetrics.ConnectionEvent.FAILURE_NONE,
                 WifiMetricsProto.ConnectionEvent.HLF_NONE,
@@ -7304,6 +7313,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                         eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__PASSPOINT_RELEASE__PASSPOINT_RELEASE_UNKNOWN),
                         eq(false), // isPasspointHomeProvider
                         eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__AP_TYPE_6GHZ__AP_TYPE_6GHZ_STANDARD_POWER),
-                        eq(true))); // mIsEcpsPriorityAccessSupported
+                        eq(true), // mIsEcpsPriorityAccessSupported
+                        eq(WifiStatsLog.WIFI_AP_CAPABILITIES_REPORTED__CHANNEL_WIDTH_MHZ__CHANNEL_WIDTH_160MHZ))); // mChannelWidth
     }
 }

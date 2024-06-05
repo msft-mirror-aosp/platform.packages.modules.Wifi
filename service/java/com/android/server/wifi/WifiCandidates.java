@@ -208,6 +208,13 @@ public class WifiCandidates {
          * @return true or false.
          */
         boolean isMultiLinkCapable();
+
+        /**
+         * Returns true if the candidate is Local-Only due to Ip Provisioning Timeout.
+         *
+         * @return true or false.
+         */
+        boolean isIpProvisioningTimedOut();
     }
 
     /**
@@ -240,6 +247,7 @@ public class WifiCandidates {
         private final int mNumRebootsSinceLastUse;
         private final int mEstimatedPercentInternetAvailability;
         private final MacAddress mApMldMacAddress;
+        private final boolean mIpProvisioningTimedOut;
 
         CandidateImpl(Key key, WifiConfiguration config,
                 WifiScoreCard.PerBssid perBssid,
@@ -282,6 +290,7 @@ public class WifiCandidates {
             this.mRestricted = config.restricted;
             this.mPredictedMultiLinkThroughputMbps = 0;
             this.mApMldMacAddress = apMldMacAddress;
+            this.mIpProvisioningTimedOut = config.isIpProvisioningTimedOut();
         }
 
         @Override
@@ -422,6 +431,11 @@ public class WifiCandidates {
         @Override
         public MacAddress getApMldMacAddress() {
             return  mApMldMacAddress;
+        }
+
+        @Override
+        public boolean isIpProvisioningTimedOut() {
+            return mIpProvisioningTimedOut;
         }
 
         /**

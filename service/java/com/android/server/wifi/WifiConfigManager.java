@@ -27,6 +27,7 @@ import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityManager;
+import android.app.AlarmManager;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -45,6 +46,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiSsid;
+import android.os.Handler;
 import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
@@ -59,6 +61,7 @@ import android.util.Log;
 import android.util.Pair;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.MacAddressUtils;
 import com.android.server.wifi.hotspot2.PasspointManager;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.UserActionEvent;
@@ -66,6 +69,7 @@ import com.android.server.wifi.util.CertificateSubjectInfo;
 import com.android.server.wifi.util.LruConnectionTracker;
 import com.android.server.wifi.util.MissingCounterTimerLockList;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
 import org.xmlpull.v1.XmlPullParserException;
@@ -116,6 +120,23 @@ public class WifiConfigManager {
      */
     @VisibleForTesting
     public static final String PASSWORD_MASK = "*";
+
+    private final AlarmManager mAlarmManager;
+    private final FeatureFlags mFeatureFlags;
+    private boolean mBufferedWritePending;
+    /** Alarm tag to use for starting alarms for buffering file writes. */
+    @VisibleForTesting public static final String BUFFERED_WRITE_ALARM_TAG = "WriteBufferAlarm";
+    /** Time interval for buffering file writes for non-forced writes */
+    private static final int BUFFERED_WRITE_ALARM_INTERVAL_MS = 10 * 1000;
+    /** Alarm listener for flushing out any buffered writes. */
+    private final AlarmManager.OnAlarmListener mBufferedWriteListener =
+            new AlarmManager.OnAlarmListener() {
+                public void onAlarm() {
+                    if (mBufferedWritePending) {
+                        writeBufferedData();
+                    }
+                }
+            };
 
     /**
      * Interface for other modules to listen to the network updated events.
@@ -328,6 +349,7 @@ public class WifiConfigManager {
 
     private final FrameworkFacade mFrameworkFacade;
     private final DeviceConfigFacade mDeviceConfigFacade;
+    private final Handler mHandler;
 
     /**
      * Verbose logging flag. Toggled by developer options.
@@ -400,9 +422,7 @@ public class WifiConfigManager {
     }
     private final Map<NetworkIdentifier, List<DhcpOption>> mCustomDhcpOptions = new HashMap<>();
 
-    /**
-     * Create new instance of WifiConfigManager.
-     */
+    /** Create new instance of WifiConfigManager. */
     WifiConfigManager(
             Context context,
             WifiKeyStore wifiKeyStore,
@@ -411,8 +431,10 @@ public class WifiConfigManager {
             NetworkListUserStoreData networkListUserStoreData,
             RandomizedMacStoreData randomizedMacStoreData,
             LruConnectionTracker lruConnectionTracker,
-            WifiInjector wifiInjector) {
+            WifiInjector wifiInjector,
+            Handler handler) {
         mContext = context;
+        mHandler = handler;
         mWifiInjector = wifiInjector;
         mClock = wifiInjector.getClock();
         mUserManager = wifiInjector.getUserManager();
@@ -424,6 +446,7 @@ public class WifiConfigManager {
         mWifiPermissionsUtil = wifiInjector.getWifiPermissionsUtil();
         mFrameworkFacade = wifiInjector.getFrameworkFacade();
         mDeviceConfigFacade = wifiInjector.getDeviceConfigFacade();
+        mFeatureFlags = mDeviceConfigFacade.getFeatureFlags();
         mMacAddressUtil = wifiInjector.getMacAddressUtil();
         mBuildProperties = wifiInjector.getBuildProperties();
 
@@ -449,6 +472,7 @@ public class WifiConfigManager {
         mLocalLog = new LocalLog(
                 context.getSystemService(ActivityManager.class).isLowRamDevice() ? 128 : 256);
         mLruConnectionTracker = lruConnectionTracker;
+        mAlarmManager = context.getSystemService(AlarmManager.class);
     }
 
     /**
@@ -784,6 +808,20 @@ public class WifiConfigManager {
      */
     public List<WifiConfiguration> getSavedNetworks(int targetUid) {
         return getConfiguredNetworks(true, true, targetUid);
+    }
+
+    /**
+     * Check Wi-Fi 7 is enabled for this network.
+     *
+     * @param networkId networkId of the requested network.
+     * @return true if Wi-Fi 7 is enabled for this network, false otherwise.
+     */
+    public boolean isWifi7Enabled(int networkId) {
+        WifiConfiguration config = getInternalConfiguredNetwork(networkId);
+        if (config == null) {
+            return false;
+        }
+        return config.isWifi7Enabled();
     }
 
     /**
@@ -1249,6 +1287,8 @@ public class WifiConfigManager {
                 externalConfig.getNetworkSelectionStatus().getConnectChoiceRssi());
         internalConfig.setBssidAllowlist(externalConfig.getBssidAllowlistInternal());
         internalConfig.setRepeaterEnabled(externalConfig.isRepeaterEnabled());
+        internalConfig.setSendDhcpHostnameEnabled(externalConfig.isSendDhcpHostnameEnabled());
+        internalConfig.setWifi7Enabled(externalConfig.isWifi7Enabled());
     }
 
     /**
@@ -1491,6 +1531,17 @@ public class WifiConfigManager {
                     existingInternalConfig);
         }
 
+        if (WifiConfigurationUtil.hasSendDhcpHostnameEnabledChanged(existingInternalConfig,
+                newInternalConfig) && !mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)
+                && !mWifiPermissionsUtil.checkNetworkSetupWizardPermission(uid)) {
+            Log.e(TAG, "UID " + uid + " does not have permission to modify send DHCP hostname "
+                    + "setting " + config.getProfileKey() + ". Must have "
+                    + "NETWORK_SETTINGS or NETWORK_SETUP_WIZARD.");
+            return new Pair<>(
+                    new NetworkUpdateResult(WifiConfiguration.INVALID_NETWORK_ID),
+                    existingInternalConfig);
+        }
+
         if (config.isEnterprise()
                 && config.enterpriseConfig.isEapMethodServerCertUsed()
                 && !config.enterpriseConfig.isMandatoryParameterSetForServerCertValidation()
@@ -1639,6 +1690,12 @@ public class WifiConfigManager {
             Log.e(TAG, "Cannot add/update network with null config");
             return new NetworkUpdateResult(WifiConfiguration.INVALID_NETWORK_ID);
         }
+        if (SdkLevel.isAtLeastV() && config.getVendorData() != null
+                && !config.getVendorData().isEmpty()
+                && !mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            Log.e(TAG, "UID " + uid + " does not have permission to include vendor data");
+            return new NetworkUpdateResult(WifiConfiguration.INVALID_NETWORK_ID);
+        }
         if (mPendingStoreRead) {
             Log.e(TAG, "Cannot add/update network before store is read!");
             return new NetworkUpdateResult(WifiConfiguration.INVALID_NETWORK_ID);
@@ -1671,7 +1728,7 @@ public class WifiConfigManager {
                         : WifiManager.CHANGE_REASON_CONFIG_CHANGE, newConfig);
         // Unless the added network is ephemeral or Passpoint, persist the network update/addition.
         if (!config.ephemeral && !config.isPasspoint()) {
-            saveToStore(true);
+            saveToStore();
         }
 
         for (OnNetworkUpdateListener listener : mListeners) {
@@ -1722,7 +1779,7 @@ public class WifiConfigManager {
      */
     public void incrementNumRebootsSinceLastUse() {
         getInternalConfiguredNetworks().forEach(config -> config.numRebootsSinceLastUse++);
-        saveToStore(false);
+        saveToStore();
     }
 
     private boolean isDeviceOwnerProfileOwnerOrSystem(int uid, String packageName) {
@@ -1926,7 +1983,7 @@ public class WifiConfigManager {
         sendConfiguredNetworkChangedBroadcast(WifiManager.CHANGE_REASON_REMOVED, config);
         // Unless the removed network is ephemeral or Passpoint, persist the network removal.
         if (!config.ephemeral && !config.isPasspoint()) {
-            saveToStore(true);
+            saveToStore();
         }
         for (OnNetworkUpdateListener listener : mListeners) {
             listener.onNetworkRemoved(
@@ -2145,7 +2202,7 @@ public class WifiConfigManager {
             // may need to update the wrong password text.
             sendConfiguredNetworkChangedBroadcast(WifiManager.CHANGE_REASON_CONFIG_CHANGE, config);
         }
-        saveToStore(false);
+        saveToStore();
         return true;
     }
 
@@ -2252,7 +2309,7 @@ public class WifiConfigManager {
             return false;
         }
         mWifiBlocklistMonitor.clearBssidBlocklistForSsid(config.SSID);
-        saveToStore(true);
+        saveToStore();
         return true;
     }
 
@@ -2291,7 +2348,7 @@ public class WifiConfigManager {
                 networkId, NetworkSelectionStatus.DISABLED_BY_WIFI_MANAGER)) {
             return false;
         }
-        saveToStore(true);
+        saveToStore();
         return true;
     }
 
@@ -2321,7 +2378,7 @@ public class WifiConfigManager {
         }
         sendConfiguredNetworkChangedBroadcast(WifiManager.CHANGE_REASON_CONFIG_CHANGE, config);
         if (!config.ephemeral) {
-            saveToStore(true);
+            saveToStore();
         }
         return true;
     }
@@ -2392,7 +2449,7 @@ public class WifiConfigManager {
         setNetworkStatus(config, WifiConfiguration.Status.CURRENT);
         config.isCurrentlyConnected = true;
         config.setIsUserSelected(isUserSelected);
-        saveToStore(false);
+        saveToStore();
         return true;
     }
 
@@ -2436,7 +2493,7 @@ public class WifiConfigManager {
         }
         config.isCurrentlyConnected = false;
         config.setIsUserSelected(false);
-        saveToStore(false);
+        saveToStore();
         return true;
     }
 
@@ -2597,7 +2654,7 @@ public class WifiConfigManager {
             config.numNoInternetAccessReports = 0;
             config.getNetworkSelectionStatus().setHasEverValidatedInternetAccess(true);
         }
-        saveToStore(false);
+        saveToStore();
         return true;
     }
 
@@ -2616,6 +2673,23 @@ public class WifiConfigManager {
         config.noInternetAccessExpected = expected;
         return true;
     }
+
+    /**
+     * Sets whether the provided network is local only due to ip provisioning timeout
+     *
+     * @param networkId             network ID corresponding to the network.
+     * @param isIpProvisionTimedOut Whether the network is local-only or not.
+     * @return true if the network was found, false otherwise.
+     */
+    public boolean setIpProvisioningTimedOut(int networkId, boolean isIpProvisionTimedOut) {
+        WifiConfiguration config = getInternalConfiguredNetwork(networkId);
+        if (config == null) {
+            return false;
+        }
+        config.setIpProvisioningTimedOut(isIpProvisionTimedOut);
+        return true;
+    }
+
 
     /**
      * Helper method to clear out the {@link #mNextNetworkId} user/app network selection. This
@@ -3125,7 +3199,7 @@ public class WifiConfigManager {
                 + mUserTemporarilyDisabledList.size() + ", maxDisableDurationMinutes:"
                 + maxDisableDurationMinutes);
         removeUserChoiceFromDisabledNetwork(network, uid);
-        saveToStore(false);
+        saveToStore();
     }
 
     /**
@@ -3303,7 +3377,7 @@ public class WifiConfigManager {
         }
         // Switch out the user store file.
         if (loadFromUserStoreAfterUnlockOrSwitch(userId)) {
-            saveToStore(true);
+            writeBufferedData();
             mPendingUnlockStoreRead = false;
         }
     }
@@ -3341,7 +3415,7 @@ public class WifiConfigManager {
             return new HashSet<>();
         }
         if (mUserManager.isUserUnlockingOrUnlocked(UserHandle.of(mCurrentUserId))) {
-            saveToStore(true);
+            writeBufferedData();
         }
         // Remove any private networks of the old user before switching the userId.
         Set<Integer> removedNetworkIds = clearInternalDataForUser(mCurrentUserId);
@@ -3400,7 +3474,7 @@ public class WifiConfigManager {
         }
         if (userId == mCurrentUserId
                 && mUserManager.isUserUnlockingOrUnlocked(UserHandle.of(mCurrentUserId))) {
-            saveToStore(true);
+            writeBufferedData();
             clearInternalDataForUser(mCurrentUserId);
         }
     }
@@ -3701,14 +3775,41 @@ public class WifiConfigManager {
     /**
      * Save the current snapshot of the in-memory lists to the config store.
      *
-     * @param forceWrite Whether the write needs to be forced or not.
      * @return Whether the write was successful or not, this is applicable only for force writes.
      */
-    public synchronized boolean saveToStore(boolean forceWrite) {
+    public synchronized boolean saveToStore() {
         if (mPendingStoreRead) {
             Log.e(TAG, "Cannot save to store before store is read!");
             return false;
         }
+        // When feature enabled, always do a delay write
+        startBufferedWriteAlarm();
+        return true;
+    }
+
+    /** Helper method to start a buffered write alarm if one doesn't already exist. */
+    private void startBufferedWriteAlarm() {
+        if (!mBufferedWritePending) {
+            mAlarmManager.set(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    mClock.getElapsedSinceBootMillis() + BUFFERED_WRITE_ALARM_INTERVAL_MS,
+                    BUFFERED_WRITE_ALARM_TAG,
+                    mBufferedWriteListener,
+                    mHandler);
+            mBufferedWritePending = true;
+        }
+    }
+
+    /** Helper method to stop a buffered write alarm if one exists. */
+    private void stopBufferedWriteAlarm() {
+        if (mBufferedWritePending) {
+            mAlarmManager.cancel(mBufferedWriteListener);
+            mBufferedWritePending = false;
+        }
+    }
+
+    private boolean writeBufferedData() {
+        stopBufferedWriteAlarm();
         ArrayList<WifiConfiguration> sharedConfigurations = new ArrayList<>();
         ArrayList<WifiConfiguration> userConfigurations = new ArrayList<>();
         // List of network IDs for legacy Passpoint configuration to be removed.
@@ -3762,7 +3863,7 @@ public class WifiConfigManager {
 
         try {
             long start = mClock.getElapsedSinceBootMillis();
-            mWifiConfigStore.write(forceWrite);
+            mWifiConfigStore.write();
             mWifiMetrics.wifiConfigStored((int) (mClock.getElapsedSinceBootMillis() - start));
         } catch (IOException | IllegalStateException e) {
             Log.wtf(TAG, "Writing to store failed. Saved networks maybe lost!", e);
@@ -4208,7 +4309,7 @@ public class WifiConfigManager {
             return;
         }
         internalConfig.setSecurityParamsIsAddedByAutoUpgrade(securityType, isAddedByAutoUpgrade);
-        saveToStore(true);
+        saveToStore();
     }
 
     private static final int SUBJECT_ALTERNATIVE_NAMES_EMAIL = 1;
@@ -4327,11 +4428,12 @@ public class WifiConfigManager {
                 Log.d(TAG, "Set altSubjectMatch to " + altSubjectNames);
             }
             newConfig.enterpriseConfig.setAltSubjectMatch(altSubjectNames);
+        } else {
+            if (mVerboseLoggingEnabled) {
+                Log.d(TAG, "Set domainSuffixMatch to " + serverCertInfo.commonName);
+            }
+            newConfig.enterpriseConfig.setDomainSuffixMatch(serverCertInfo.commonName);
         }
-        if (mVerboseLoggingEnabled) {
-            Log.d(TAG, "Set domainSuffixMatch to " + serverCertInfo.commonName);
-        }
-        newConfig.enterpriseConfig.setDomainSuffixMatch(serverCertInfo.commonName);
         newConfig.enterpriseConfig.setUserApproveNoCaCert(false);
         // Trigger an update to install CA certificate and the corresponding configuration.
         NetworkUpdateResult result = addOrUpdateNetwork(newConfig, internalConfig.creatorUid);
@@ -4461,5 +4563,16 @@ public class WifiConfigManager {
             }
         }
         return new ArrayList<>(results);
+    }
+
+    /**
+     * Write all cached data to the storage
+     */
+    public void writeDataToStorage() {
+        if (mPendingStoreRead) {
+            Log.e(TAG, "Cannot save to store before store is read!");
+            return;
+        }
+        writeBufferedData();
     }
 }

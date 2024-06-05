@@ -33,6 +33,13 @@
     <!-- boolean indicating whether the WiFi chipset has 6GHz band support -->
     <bool translatable="false" name ="config_wifi6ghzSupport">false</bool>
 
+    <!-- Boolean indicating whether the device supports AFC.
+            Note that this flag should remain disabled unless the device is allowed to
+            use AFC by the regulatory rules.
+            Note that enabling AFC will result in the device's location being shared
+            with the AFC server. -->
+    <bool translatable="false" name ="config_wifiAfcSupported">false</bool>
+
     <!-- boolean indicating whether the WiFi chipset has 60GHz band support -->
     <bool translatable="false" name ="config_wifi60ghzSupport">false</bool>
 
@@ -588,6 +595,9 @@
     <integer translatable="false" name="config_wifiDisableReasonByWrongPasswordThreshold"> 1 </integer>
     <integer translatable="false" name="config_wifiDisableReasonAuthenticationNoSubscriptionThreshold"> 1 </integer>
     <integer translatable="false" name="config_wifiDisableReasonConsecutiveFailuresThreshold"> 1 </integer>
+
+    <!-- Integer for maximum value of temporarily disabled duration -->
+    <integer translatable="false" name="config_wifiDisableTemporaryMaximumDurationMs"> 64800000 </integer>
 
     <!-- Base duration to set a network disabled after validation failure happen-->
     <integer translatable="false" name="config_wifiDisableReasonAssociationRejectionDurationMs"> 300000 </integer>
@@ -1162,6 +1172,18 @@
         -->
     </string-array>
 
+    <!-- Lists available AFC servers for each country, based on country code. Each country may
+     have more than one server listed. If a country is not present in the list, then AFC is not
+     available in that country, and the device will behave as if AFC is disabled.
+     Entries should be in the format:
+     <item>countryCode,url1,url2,url3...</item> -->
+    <string-array translatable="false" name="config_wifiAfcServerUrlsForCountry">
+        <!-- Below is a sample configuration for this list:
+            <item>US,https://example.com/,https://google.com/</item>
+            <item>CA,https://example.com/</item>
+        -->
+    </string-array>
+
     <!-- ACTION_FILE_BUG_DEEPLINK intent name -->
     <string name="config_wifiBugreportDeepLink" translatable="false">com.google.android.apps.betterbug.intent.FILE_BUG_DEEPLINK</string>
 
@@ -1232,6 +1254,9 @@
          regulatory approval (for example, FCC pre-approval is required according to "594280 D01
          Software Configuration Control v02r01").-->
     <bool translatable="false" name ="config_wifiUpdateCountryCodeFromScanResultGeneric">false</bool>
+    <!-- Boolean indication whether enable VDBG for more detailed log when Wi-Fi aware verbose
+    logging is enabled -->
+    <bool translatable="false" name ="config_aware_vdbg_enable_on_verbose_logging">false</bool>
     <!-- Boolean indicating the Hal support for mapping WPA3 transition mode to WPA3 for Softap in
          6GHz band. WPA3 transition mode or SAE+WPA_PSK key management(AKM) is not allowed in 6GHz.
          By default, framework removes 6GHz band for WPA3_SAE_TRANSITION security type.
@@ -1240,9 +1265,11 @@
          implementation to convert WPA3 transition mode to WPA3 only. otherwise driver/firmware may
          fail to set up the AP.-->
     <bool translatable="false" name="config_wifiSofapHalMapWpa3TransitionModeToWpa3OnlyIn6GHzBand">false</bool>
-    <!-- Boolean indication whether enable VDBG for more detailed log when Wi-Fi aware verbose
-    logging is enabled -->
-    <bool translatable="false" name ="config_aware_vdbg_enable_on_verbose_logging">false</bool>
+    <!-- Boolean indicating whether the device should remain connected to a network without DHCP.
+        If true, the IpClient provisioning timeout will be set to infinite, which means that the
+        connection will not be torn down if the DHCP server does not respond. As a result the device
+        will be discoverable and reachable via the local-only IPv6 address. -->
+    <bool translatable="false" name ="config_wifiRemainConnectedAfterIpProvisionTimeout">false</bool>
     <!-- Boolean indicating whether to disable disconnects on NUD failures. Such a configuration
          is limited to WAPI and to a specific country code.
      true: do not disconnect IF the connection type is WAPI and in the specific country code
@@ -1273,4 +1300,43 @@
              <item>unknownAkm2,knownAkm</item>
         -->
     </string-array>
+    <!-- Integer for minimum time between IEEE 802.11az non-trigger based ranging measurements in
+         microseconds. Note that ranging request converts this to units of 100 microseconds. So the
+         value should be a multiple of 100 microseconds. Non-zero values in this setting take
+         precedence over individual responder settings, effectively enforcing a system-wide minimum
+         measurement interval for non-trigger based ranging operations.. -->
+    <integer translatable="false" name="config_wifi80211azMinTimeBetweenNtbMeasurementsMicros">250000</integer>
+    <!-- Integer for maximum time between IEEE 802.11az non-trigger based ranging measurements in
+         microseconds. Note that ranging request converts this to units of 10 milliseconds. So the
+         value should be a multiple of 10000 microseconds. Non-zero values in this setting take
+         precedence over individual responder settings, effectively enforcing a system-wide maximum
+         measurement interval for non-trigger based ranging operations. -->
+    <integer translatable="false" name="config_wifi80211azMaxTimeBetweenNtbMeasurementsMicros">15000000</integer>
+
+    <!-- Boolean indicating whether the device supports d2d allowed control when infra STA is disabled  -->
+    <bool translatable="false" name ="config_wifiD2dAllowedControlSupportedWhenInfraStaDisabled">false</bool>
+
+    <!-- Array describing MAC OUI list to block TWT session setup request. If the primary station is
+         connected to an AP with a MAC address OUI (https://standards-oui.ieee.org/oui/oui.txt)
+         matching with any of entries in this blocked list, WifiManager#setupTwtSession() will fail
+         with TwtSessionCallback#onFailure(errorCode = TWT_ERROR_CODE_AP_OUI_BLOCKLISTED).
+     -->
+    <integer-array translatable="false" name="config_wifiTwtBlockedOuiList">
+        <!-- Below is a sample configuration for this list:
+        <item>0x001122</item>
+        <item>0x334455</item>
+        -->
+    </integer-array>
+
+    <!-- Wi-Fi chip supports single link MLO SoftAp instances in the bridged mode -->
+    <bool translatable="false" name="config_wifiSoftApSingleLinkMloInBridgedModeSupported">false</bool>
+
+    <!-- Boolean indicating whether Target Wake Time (TWT) feature is supported or not. This flag
+         overrides the device's TWT capability if set to false. If the device supports TWT and this
+         overlay parameter is set to false, the application cannot set up a TWT session. Also, the
+         API WifiManager#getTwtCapabilities returns TWT unsupported even if the device is capable
+         of setting up TWT session.
+    -->
+    <bool translatable="false" name="config_wifiTwtSupported">true</bool>
+
 </resources>

@@ -30,6 +30,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.anyBoolean;
@@ -50,7 +51,9 @@ import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiAvailableChannel;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiContext;
+import android.net.wifi.WifiManager;
 import android.net.wifi.WifiScanner;
+import android.net.wifi.WifiScanner.ScanData;
 import android.net.wifi.WifiSsid;
 import android.net.wifi.nl80211.NativeScanResult;
 import android.net.wifi.nl80211.RadioChainInfo;
@@ -66,6 +69,7 @@ import androidx.test.filters.SmallTest;
 import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.coex.CoexManager;
+import com.android.server.wifi.hal.WifiChip;
 import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.util.NativeUtil;
 import com.android.server.wifi.util.NetdWrapper;
@@ -278,6 +282,7 @@ public class WifiNativeTest extends WifiBaseTest {
     @Mock private SsidTranslator mSsidTranslator;
     @Mock private WifiGlobals mWifiGlobals;
     @Mock DeviceConfigFacade mDeviceConfigFacade;
+    @Mock WifiChip.AfcChannelAllowance mAfcChannelAllowance;
 
     private MockitoSession mSession;
     ArgumentCaptor<WifiNl80211Manager.ScanEventCallback> mScanCallbackCaptor =
@@ -295,7 +300,7 @@ public class WifiNativeTest extends WifiBaseTest {
         when(mWifiVendorHal.startVendorHalSta(eq(mConcreteClientModeManager))).thenReturn(true);
         when(mWifiVendorHal.createStaIface(any(), any(), eq(mConcreteClientModeManager)))
                 .thenReturn(WIFI_IFACE_NAME);
-        when(mWifiVendorHal.createApIface(any(), any(), anyInt(), anyBoolean(), any()))
+        when(mWifiVendorHal.createApIface(any(), any(), anyInt(), anyBoolean(), any(), anyList()))
                 .thenReturn(WIFI_IFACE_NAME);
 
         when(mBuildProperties.isEngBuild()).thenReturn(false);
@@ -801,11 +806,11 @@ public class WifiNativeTest extends WifiBaseTest {
         when(mWifiVendorHal.getBridgedApInstances(WIFI_IFACE_NAME))
                 .thenReturn(Arrays.asList(instance1, instance2));
         mWifiNative.setupInterfaceForSoftApMode(null, TEST_WORKSOURCE, SoftApConfiguration.BAND_2GHZ
-                | SoftApConfiguration.BAND_5GHZ, true, mSoftApManager);
+                | SoftApConfiguration.BAND_5GHZ, true, mSoftApManager, new ArrayList<>());
         ArgumentCaptor<HalDeviceManager.InterfaceDestroyedListener> ifaceDestroyedListenerCaptor =
                 ArgumentCaptor.forClass(HalDeviceManager.InterfaceDestroyedListener.class);
         verify(mWifiVendorHal).createApIface(ifaceDestroyedListenerCaptor.capture(), any(),
-                anyInt(), anyBoolean(), any());
+                anyInt(), anyBoolean(), any(), anyList());
         verify(mWificondControl).setupInterfaceForSoftApMode(instance1);
 
         when(mWifiVendorHal.getBridgedApInstances(WIFI_IFACE_NAME)).thenReturn(null);
@@ -890,7 +895,7 @@ public class WifiNativeTest extends WifiBaseTest {
 
         mWifiNative.teardownAllInterfaces();
         mWifiNative.setupInterfaceForSoftApMode(null, TEST_WORKSOURCE, WIFI_BAND_24_GHZ, false,
-                mSoftApManager);
+                mSoftApManager, new ArrayList<>());
         verify(mWifiVendorHal, times(4)).setCoexUnsafeChannels(unsafeChannels, restrictions);
     }
 
@@ -1596,8 +1601,10 @@ public class WifiNativeTest extends WifiBaseTest {
     @Test
     public void testGetSupportedBandsFromHal() throws Exception {
         List<WifiAvailableChannel> usableChannelList = new ArrayList<>();
-        usableChannelList.add(new WifiAvailableChannel(2412, WifiAvailableChannel.OP_MODE_STA));
-        usableChannelList.add(new WifiAvailableChannel(5160, WifiAvailableChannel.OP_MODE_STA));
+        usableChannelList.add(new WifiAvailableChannel(2412, WifiAvailableChannel.OP_MODE_STA,
+                ScanResult.CHANNEL_WIDTH_20MHZ));
+        usableChannelList.add(new WifiAvailableChannel(5160, WifiAvailableChannel.OP_MODE_STA,
+                ScanResult.CHANNEL_WIDTH_40MHZ));
         when(mWifiVendorHal.getUsableChannels(WifiScanner.WIFI_BAND_24_5_WITH_DFS_6_60_GHZ,
                 WifiAvailableChannel.OP_MODE_STA,
                 WifiAvailableChannel.FILTER_REGULATORY)).thenReturn(usableChannelList);
@@ -1641,12 +1648,63 @@ public class WifiNativeTest extends WifiBaseTest {
     }
 
     @Test
+    public void testGetCachedScanResultsLocationDisabledOrInvalidTimestamp() throws Exception {
+        ScanResult[] scanResults = new ScanResult[2];
+        for (int i = 0; i < 2; i++) {
+            ScanResult scanResult = new ScanResult();
+            scanResult.timestamp = 0;
+            scanResults[i] = scanResult;
+        }
+        ScanData testScanData = new ScanData(0, 0,
+                0, WifiScanner.WIFI_BAND_UNSPECIFIED, scanResults);
+        when(mWifiVendorHal.getCachedScanData(any())).thenReturn(testScanData);
+
+        mWifiNative.setLocationModeEnabled(false);
+        ScanData scanData = mWifiNative.getCachedScanResults(WIFI_IFACE_NAME);
+        // Get no scan result because the location mode is disabled
+        assertEquals(0, scanData.getResults().length);
+
+        mWifiNative.setLocationModeEnabled(true);
+        scanData = mWifiNative.getCachedScanResults(WIFI_IFACE_NAME);
+        // Get no scan result because the scan timestamp is too new
+        assertEquals(0, scanData.getResults().length);
+    }
+
+    @Test
+    public void testGetCachedScanResultsLocationEnabledValidTimestamp() throws Exception {
+        ScanResult[] scanResults = new ScanResult[3];
+        for (int i = 0; i < 3; i++) {
+            ScanResult scanResult = new ScanResult();
+            // 1st ScanResult has invalid timestamp
+            scanResult.timestamp = (i > 0) ? Long.MAX_VALUE : 0;
+            scanResults[i] = scanResult;
+        }
+        ScanData testScanData = new ScanData(0, 0,
+                0, WifiScanner.WIFI_BAND_UNSPECIFIED, scanResults);
+        when(mWifiVendorHal.getCachedScanData(any())).thenReturn(testScanData);
+
+        mWifiNative.setLocationModeEnabled(true);
+        ScanData scanData = mWifiNative.getCachedScanResults(WIFI_IFACE_NAME);
+        // Get the last two scan results which has the valid timestamp
+        assertEquals(2, scanData.getResults().length);
+    }
+
+    @Test
     public void testEnableStaChannelForPeerNetworkWithOverride() throws Exception {
         mResources.setBoolean(R.bool.config_wifiEnableStaIndoorChannelForPeerNetwork, true);
         mResources.setBoolean(R.bool.config_wifiEnableStaDfsChannelForPeerNetwork, true);
         mWifiNative.setupInterfaceForClientInScanMode(null, TEST_WORKSOURCE,
                 mConcreteClientModeManager);
         verify(mWifiVendorHal).enableStaChannelForPeerNetwork(true, true);
+    }
+
+    /**
+     * Verifies that setAfcChannelAllowance() calls underlying WifiVendorHal.
+     */
+    @Test
+    public void testSetAfcChannelAllowance() {
+        mWifiNative.setAfcChannelAllowance(mAfcChannelAllowance);
+        verify(mWifiVendorHal).setAfcChannelAllowance(mAfcChannelAllowance);
     }
 
     /**
@@ -1752,5 +1810,14 @@ public class WifiNativeTest extends WifiBaseTest {
         assertEquals(2, wifiNativeInstance.mUnknownAkmMap.size());
         assertEquals(ScanResult.KEY_MGMT_EAP, wifiNativeInstance.mUnknownAkmMap.get(9846784));
         assertEquals(ScanResult.KEY_MGMT_SAE_EXT_KEY, wifiNativeInstance.mUnknownAkmMap.get(1234));
+    }
+
+    @Test
+    public void testSetRoamingMode() throws Exception {
+        int status = 0;
+        when(mWifiVendorHal.setRoamingMode(eq(WIFI_IFACE_NAME), anyInt())).thenReturn(status);
+        assertEquals(status, mWifiNative.setRoamingMode(WIFI_IFACE_NAME,
+                WifiManager.ROAMING_MODE_NORMAL));
+        verify(mWifiVendorHal).setRoamingMode(WIFI_IFACE_NAME, WifiManager.ROAMING_MODE_NORMAL);
     }
 }

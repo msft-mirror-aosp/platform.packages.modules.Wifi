@@ -161,13 +161,15 @@ public class NetworkDetail {
     // 6 GHz Access Point Type
     private final InformationElementUtil.ApType6GHz mApType6GHz;
 
-    // IEEE 802.11az
-    private final boolean mIs11azSupported;
+    // IEEE 802.11az non-trigger based & trigger based
+    private final boolean mIs11azNtbResponder;
+    private final boolean mIs11azTbResponder;
 
     // MLO Attributes
     private MacAddress mMldMacAddress = null;
     private int mMloLinkId = MloLink.INVALID_MLO_LINK_ID;
     private List<MloLink> mAffiliatedMloLinks = Collections.emptyList();
+    private byte[] mDisabledSubchannelBitmap;
 
     public NetworkDetail(String bssid, ScanResult.InformationElement[] infoElements,
             List<String> anqpLines, int freq) {
@@ -303,7 +305,7 @@ public class NetworkDetail {
             }
         }
         catch (IllegalArgumentException | BufferUnderflowException | ArrayIndexOutOfBoundsException e) {
-            Log.d(Utils.hs2LogTag(getClass()), "Caught " + e);
+            Log.d(TAG, "Caught " + e);
             if (ssidOctets == null) {
                 throw new IllegalArgumentException("Malformed IE string (no SSID)", e);
             }
@@ -371,30 +373,35 @@ public class NetworkDetail {
         mEpcsPriorityAccessSupported = ehtCapabilities.isEpcsPriorityAccessSupported();
         mFilsCapable = extendedCapabilities.isFilsCapable();
         mApType6GHz = heOperation.getApType6GHz();
-        mIs11azSupported = extendedCapabilities.isTriggerBasedRangingRespSupported()
-                || extendedCapabilities.isNonTriggerBasedRangingRespSupported();
+        mIs11azNtbResponder =  extendedCapabilities.is80211azNtbResponder();
+        mIs11azTbResponder = extendedCapabilities.is80211azTbResponder();
         int channelWidth = ScanResult.UNSPECIFIED;
         int centerFreq0 = mPrimaryFreq;
         int centerFreq1 = 0;
 
-        if (ehtOperation.isPresent()) {
-            //TODO: include parsing of EHT_Operation to collect BW and center freq.
+        // Check if EHT Operation Info is present in EHT operation IE.
+        if (ehtOperation.isEhtOperationInfoPresent()) {
+            int operatingBand = ScanResult.toBand(mPrimaryFreq);
+            channelWidth = ehtOperation.getChannelWidth();
+            centerFreq0 = ehtOperation.getCenterFreq0(operatingBand);
+            centerFreq1 = ehtOperation.getCenterFreq1(operatingBand);
+            mDisabledSubchannelBitmap = ehtOperation.getDisabledSubchannelBitmap();
         }
 
-        if (ehtOperation.isPresent()) {
-            //TODO Add impact for using info from EHT capabilities and EHT operation IEs
-        }
-
-        // Check if HE Operation IE is present
-        if (heOperation.isPresent()) {
-            // If 6GHz info is present, then parameters should be acquired from HE Operation IE
-            if (heOperation.is6GhzInfoPresent()) {
-                channelWidth = heOperation.getChannelWidth();
-                centerFreq0 = heOperation.getCenterFreq0();
-                centerFreq1 = heOperation.getCenterFreq1();
-            } else if (heOperation.isVhtInfoPresent()) {
-                // VHT Operation Info could be included inside the HE Operation IE
-                vhtOperation.from(heOperation.getVhtInfoElement());
+        // Proceed to HE Operation IE if channel width and center frequencies were not obtained
+        // from EHT Operation IE
+        if (channelWidth == ScanResult.UNSPECIFIED) {
+            // Check if HE Operation IE is present
+            if (heOperation.isPresent()) {
+                // If 6GHz info is present, then parameters should be acquired from HE Operation IE
+                if (heOperation.is6GhzInfoPresent()) {
+                    channelWidth = heOperation.getChannelWidth();
+                    centerFreq0 = heOperation.getCenterFreq0();
+                    centerFreq1 = heOperation.getCenterFreq1();
+                } else if (heOperation.isVhtInfoPresent()) {
+                    // VHT Operation Info could be included inside the HE Operation IE
+                    vhtOperation.from(heOperation.getVhtInfoElement());
+                }
             }
         }
 
@@ -558,7 +565,8 @@ public class NetworkDetail {
         mEpcsPriorityAccessSupported = base.mEpcsPriorityAccessSupported;
         mFilsCapable = base.mFilsCapable;
         mApType6GHz = base.mApType6GHz;
-        mIs11azSupported = base.mIs11azSupported;
+        mIs11azNtbResponder = base.mIs11azNtbResponder;
+        mIs11azTbResponder = base.mIs11azTbResponder;
     }
 
     public NetworkDetail complete(Map<Constants.ANQPElementType, ANQPElement> anqpElements) {
@@ -702,6 +710,10 @@ public class NetworkDetail {
         return mAffiliatedMloLinks;
     }
 
+    public byte[] getDisabledSubchannelBitmap() {
+        return mDisabledSubchannelBitmap;
+    }
+
     @Override
     public boolean equals(Object thatObject) {
         if (this == thatObject) {
@@ -724,8 +736,8 @@ public class NetworkDetail {
     @Override
     public String toString() {
         return "NetworkInfo{SSID='" + mSSID
-                + "', HESSID=" + Utils.macToSimpleString(mHESSID)
-                + ", BSSID=" + Utils.macToSimpleString(mBSSID)
+                + "', HESSID=" + Utils.macToString(mHESSID)
+                + ", BSSID=" + Utils.macToString(mBSSID)
                 + ", StationCount=" + mStationCount
                 + ", ChannelUtilization=" + mChannelUtilization
                 + ", Capacity=" + mCapacity
@@ -737,9 +749,9 @@ public class NetworkDetail {
 
     public String toKeyString() {
         return mHESSID != 0 ?
-                "'" + mSSID + "':" + Utils.macToSimpleString(mBSSID) + " ("
-                        + Utils.macToSimpleString(mHESSID) + ")"
-                : "'" + mSSID + "':" + Utils.macToSimpleString(mBSSID);
+                "'" + mSSID + "':" + Utils.macToString(mBSSID) + " ("
+                        + Utils.macToString(mHESSID) + ")"
+                : "'" + mSSID + "':" + Utils.macToString(mBSSID);
     }
 
     public String getBSSIDString() {
@@ -784,10 +796,16 @@ public class NetworkDetail {
         return mOceSupported;
     }
 
-    /** Return whether the AP supports IEEE 802.11az **/
-    public boolean is11azSupported() {
-        return mIs11azSupported;
+    /** Return whether the AP supports IEEE 802.11az non-trigger based ranging **/
+    public boolean is80211azNtbResponder() {
+        return mIs11azNtbResponder;
     }
+
+    /** Return whether the AP supports IEEE 802.11az trigger based ranging **/
+    public boolean is80211azTbResponder() {
+        return mIs11azTbResponder;
+    }
+
     /**
      * Return whether the AP requires HE stations to participate either in individual TWT
      * agreements or Broadcast TWT operation.

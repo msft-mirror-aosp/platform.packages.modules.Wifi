@@ -17,12 +17,9 @@
 package com.android.server.wifi;
 
 import static android.net.wifi.WifiManager.WIFI_FEATURE_OWE;
-import static android.net.wifi.WifiNetworkSelectionConfig
-        .ASSOCIATED_NETWORK_SELECTION_OVERRIDE_DISABLED;
-import static android.net.wifi.WifiNetworkSelectionConfig
-        .ASSOCIATED_NETWORK_SELECTION_OVERRIDE_ENABLED;
-import static android.net.wifi.WifiNetworkSelectionConfig
-        .ASSOCIATED_NETWORK_SELECTION_OVERRIDE_NONE;
+import static android.net.wifi.WifiNetworkSelectionConfig.ASSOCIATED_NETWORK_SELECTION_OVERRIDE_DISABLED;
+import static android.net.wifi.WifiNetworkSelectionConfig.ASSOCIATED_NETWORK_SELECTION_OVERRIDE_ENABLED;
+import static android.net.wifi.WifiNetworkSelectionConfig.ASSOCIATED_NETWORK_SELECTION_OVERRIDE_NONE;
 
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
 
@@ -139,6 +136,7 @@ public class WifiNetworkSelector {
             ASSOCIATED_NETWORK_SELECTION_OVERRIDE_NONE;
     private boolean mScreenOn = false;
     private final WifiNative mWifiNative;
+    private final DevicePolicyManager mDevicePolicyManager;
 
     /**
      * Interface for WiFi Network Nominator
@@ -185,17 +183,22 @@ public class WifiNetworkSelector {
 
         /**
          * Evaluate all the networks from the scan results.
-         * @param scanDetails              a list of scan details constructed from the scan results
-         * @param untrustedNetworkAllowed  a flag to indicate if untrusted networks are allowed
-         * @param oemPaidNetworkAllowed    a flag to indicate if oem paid networks are allowed
-         * @param oemPrivateNetworkAllowed a flag to indicate if oem private networks are allowed
+         *
+         * @param scanDetails                  a list of scan details constructed from the scan
+         *                                     results
+         * @param untrustedNetworkAllowed      a flag to indicate if untrusted networks are allowed
+         * @param oemPaidNetworkAllowed        a flag to indicate if oem paid networks are allowed
+         * @param oemPrivateNetworkAllowed     a flag to indicate if oem private networks are
+         *                                     allowed
          * @param restrictedNetworkAllowedUids a set of Uids are allowed for restricted network
-         * @param onConnectableListener    callback to record all of the connectable networks
+         * @param onConnectableListener        callback to record all of the connectable networks
          */
-        void nominateNetworks(List<ScanDetail> scanDetails,
+        void nominateNetworks(@NonNull List<ScanDetail> scanDetails,
+                @NonNull List<Pair<ScanDetail, WifiConfiguration>> passpointCandidates,
                 boolean untrustedNetworkAllowed, boolean oemPaidNetworkAllowed,
-                boolean oemPrivateNetworkAllowed, Set<Integer> restrictedNetworkAllowedUids,
-                OnConnectableListener onConnectableListener);
+                boolean oemPrivateNetworkAllowed,
+                @NonNull Set<Integer> restrictedNetworkAllowedUids,
+                @NonNull OnConnectableListener onConnectableListener);
 
         /**
          * Callback for recording connectable candidates
@@ -353,6 +356,11 @@ public class WifiNetworkSelector {
             return false;
         }
 
+        if (network.isIpProvisioningTimedOut()) {
+            localLog("Current network has no IPv4 provisioning and therefore insufficient");
+            return false;
+        }
+
         if (!hasSufficientLinkQuality(wifiInfo) && !hasActiveStream(wifiInfo)) {
             localLog("Current network link quality is not sufficient and has low ongoing traffic");
             return false;
@@ -408,7 +416,7 @@ public class WifiNetworkSelector {
                 localLog(cmmState.ifaceName + ": Current connected network is not sufficient.");
                 return true;
             }
-        } else if (cmmState.disconnected) {
+        } else if (cmmState.disconnected || cmmState.ipProvisioningTimedOut) {
             return true;
         } else {
             // No network selection if ClientModeImpl is in a state other than
@@ -420,12 +428,7 @@ public class WifiNetworkSelector {
 
     }
 
-    private boolean isNetworkSelectionNeeded(@NonNull List<ScanDetail> scanDetails,
-            @NonNull List<ClientModeManagerState> cmmStates) {
-        if (scanDetails.size() == 0) {
-            localLog("Empty connectivity scan results. Skip network selection.");
-            return false;
-        }
+    private boolean isNetworkSelectionNeeded(@NonNull List<ClientModeManagerState> cmmStates) {
         for (ClientModeManagerState cmmState : cmmStates) {
             // network selection needed by this CMM instance, perform network selection
             if (isNetworkSelectionNeededForCmm(cmmState)) {
@@ -484,13 +487,10 @@ public class WifiNetworkSelector {
 
         int numBssidFiltered = 0;
 
-        DevicePolicyManager devicePolicyManager =
-                WifiPermissionsUtil.retrieveDevicePolicyManagerFromContext(mContext);
-
-        if (devicePolicyManager != null && SdkLevel.isAtLeastT()) {
+        if (mDevicePolicyManager != null && SdkLevel.isAtLeastT()) {
             adminMinimumSecurityLevel =
-                    devicePolicyManager.getMinimumRequiredWifiSecurityLevel();
-            WifiSsidPolicy policy = devicePolicyManager.getWifiSsidPolicy();
+                    mDevicePolicyManager.getMinimumRequiredWifiSecurityLevel();
+            WifiSsidPolicy policy = mDevicePolicyManager.getWifiSsidPolicy();
             if (policy != null) {
                 adminSsidRestrictionSet = true;
                 if (policy.getPolicyType() == WifiSsidPolicy.WIFI_SSID_POLICY_TYPE_ALLOWLIST) {
@@ -811,8 +811,10 @@ public class WifiNetworkSelector {
                 if (seenNetworks.contains(tempConfig.getProfileKey())) {
                     Log.wtf(TAG, "user connected network is a loop, use candidate:"
                             + candidate);
-                    mWifiConfigManager.setLegacyUserConnectChoice(candidate,
-                            candidate.getNetworkSelectionStatus().getCandidate().level);
+                    if (candidate.getNetworkSelectionStatus().getCandidate() != null) {
+                        mWifiConfigManager.setLegacyUserConnectChoice(candidate,
+                                candidate.getNetworkSelectionStatus().getCandidate().level);
+                    }
                     break;
                 }
                 seenNetworks.add(tempConfig.getProfileKey());
@@ -920,6 +922,8 @@ public class WifiNetworkSelector {
         public final boolean connected;
         /** True if the device is disconnected */
         public final boolean disconnected;
+        /** True if the device is connected in local-only mode due to ip provisioning timeout**/
+        public final boolean ipProvisioningTimedOut;
          /** Currently connected network */
         public final WifiInfo wifiInfo;
         public final ActiveModeManager.ClientRole role;
@@ -928,6 +932,7 @@ public class WifiNetworkSelector {
             ifaceName = clientModeManager.getInterfaceName();
             connected = clientModeManager.isConnected();
             disconnected = clientModeManager.isDisconnected();
+            ipProvisioningTimedOut = clientModeManager.isIpProvisioningTimedOut();
             wifiInfo = clientModeManager.getConnectionInfo();
             role = clientModeManager.getRole();
         }
@@ -937,16 +942,19 @@ public class WifiNetworkSelector {
             connected = false;
             disconnected = true;
             wifiInfo = new WifiInfo();
+            ipProvisioningTimedOut = false;
             role = null;
         }
 
         @VisibleForTesting
         ClientModeManagerState(@NonNull String ifaceName, boolean connected, boolean disconnected,
-                @NonNull WifiInfo wifiInfo, ActiveModeManager.ClientRole role) {
+                @NonNull WifiInfo wifiInfo, boolean ipProvisioningTimedOut,
+                ActiveModeManager.ClientRole role) {
             this.ifaceName = ifaceName;
             this.connected = connected;
             this.disconnected = disconnected;
             this.wifiInfo = wifiInfo;
+            this.ipProvisioningTimedOut = ipProvisioningTimedOut;
             this.role = role;
         }
 
@@ -1083,10 +1091,24 @@ public class WifiNetworkSelector {
             registeredNominator.update(scanDetails);
         }
 
+        // Filter out unwanted networks.
+        mFilteredNetworks = filterScanResults(scanDetails, bssidBlocklist, cmmStates);
+        if (mFilteredNetworks.size() == 0) {
+            return null;
+        }
+        // Update the matching profiles into WifiConfigManager, help displaying Passpoint networks
+        // in Wifi Picker
+        mWifiInjector.getPasspointNetworkNominateHelper().updatePasspointConfig(mFilteredNetworks);
+
         boolean networkSelectionNeeded = skipSufficiencyCheck
-                || isNetworkSelectionNeeded(scanDetails, cmmStates);
+                || isNetworkSelectionNeeded(cmmStates);
         final String userConnectChoiceKey;
         if (!networkSelectionNeeded) {
+            if (!isAssociatedNetworkSelectionEnabled()) {
+                // Skip network selection based on connect choice because associated network
+                // selection is disabled.
+                return null;
+            }
             userConnectChoiceKey = getConnectChoiceKey(cmmStates);
             if (userConnectChoiceKey == null) {
                 return null;
@@ -1096,12 +1118,6 @@ public class WifiNetworkSelector {
                     + "considering user connect choice: " + userConnectChoiceKey);
         } else {
             userConnectChoiceKey = null;
-        }
-
-        // Filter out unwanted networks.
-        mFilteredNetworks = filterScanResults(scanDetails, bssidBlocklist, cmmStates);
-        if (mFilteredNetworks.size() == 0) {
-            return null;
         }
 
         WifiCandidates wifiCandidates = new WifiCandidates(mWifiScoreCard, mContext);
@@ -1152,10 +1168,13 @@ public class WifiNetworkSelector {
         // Update all configured networks before initiating network selection.
         updateConfiguredNetworks();
 
+        List<Pair<ScanDetail, WifiConfiguration>> passpointCandidates = mWifiInjector
+                .getPasspointNetworkNominateHelper()
+                .getPasspointNetworkCandidates(new ArrayList<>(mFilteredNetworks));
         for (NetworkNominator registeredNominator : mNominators) {
             localLog("About to run " + registeredNominator.getName() + " :");
             registeredNominator.nominateNetworks(
-                    new ArrayList<>(mFilteredNetworks),
+                    new ArrayList<>(mFilteredNetworks), passpointCandidates,
                     untrustedNetworkAllowed, oemPaidNetworkAllowed, oemPrivateNetworkAllowed,
                     restrictedNetworkAllowedUids, (scanDetail, config) -> {
                         WifiCandidates.Key key = wifiCandidates.keyFromScanDetailAndConfig(
@@ -1205,6 +1224,16 @@ public class WifiNetworkSelector {
     }
 
     /**
+     * Check Wi-Fi7 is enabled for all candidates.
+     */
+    private boolean isWifi7Enabled(List<WifiCandidates.Candidate> candidates) {
+        for (WifiCandidates.Candidate candidate : candidates) {
+            if (!mWifiConfigManager.isWifi7Enabled(candidate.getNetworkConfigId())) return false;
+        }
+        return true;
+    }
+
+    /**
      * Update multi link candidate's throughput which is used in network selection by
      * {@link ThroughputScorer}
      *
@@ -1245,6 +1274,7 @@ public class WifiNetworkSelector {
 
         for (List<WifiCandidates.Candidate> mlCandidates :
                 wifiCandidates.getMultiLinkCandidates()) {
+            if (!isWifi7Enabled(mlCandidates)) continue;
             for (List<Integer> bands : simultaneousBandCombinations) {
                 // Limit the radios/bands to maximum STR link supported in multi link operation.
                 if (bands.size() > maxMloStrLinkCount) break;
@@ -1412,6 +1442,7 @@ public class WifiNetworkSelector {
                 .getConfiguredNetworkWithPassword(config.networkId);
         if (configWithPassword.isSecurityType(WifiConfiguration.SECURITY_TYPE_PSK)
                 && configWithPassword.isSecurityType(WifiConfiguration.SECURITY_TYPE_SAE)
+                && configWithPassword.preSharedKey != null
                 && !configWithPassword.preSharedKey.startsWith("\"")
                 && configWithPassword.preSharedKey.length() == 64
                 && configWithPassword.preSharedKey.matches("[0-9A-Fa-f]{64}")) {
@@ -1428,9 +1459,11 @@ public class WifiNetworkSelector {
     private void updateSecurityParamsForTransitionModeIfNecessary(
             ScanResult scanResult, SecurityParams params) {
         if (params.isSecurityType(WifiConfiguration.SECURITY_TYPE_SAE)
+                && params.isAddedByAutoUpgrade()
                 && ScanResultUtil.isScanResultForPskSaeTransitionNetwork(scanResult)) {
             params.setRequirePmf(false);
         } else if (params.isSecurityType(WifiConfiguration.SECURITY_TYPE_EAP_WPA3_ENTERPRISE)
+                && params.isAddedByAutoUpgrade()
                 && ScanResultUtil.isScanResultForWpa3EnterpriseTransitionNetwork(scanResult)) {
             params.setRequirePmf(false);
         }
@@ -1680,7 +1713,8 @@ public class WifiNetworkSelector {
                 scanDetail.getNetworkDetail().getMaxNumberSpatialStreams(),
                 scanDetail.getNetworkDetail().getChannelUtilization(),
                 channelUtilizationLinkLayerStats,
-                mWifiGlobals.isBluetoothConnected());
+                mWifiGlobals.isBluetoothConnected(),
+                scanDetail.getNetworkDetail().getDisabledSubchannelBitmap());
     }
 
     /**
@@ -1776,5 +1810,6 @@ public class WifiNetworkSelector {
         mWifiGlobals = wifiGlobals;
         mScanRequestProxy = scanRequestProxy;
         mWifiNative = wifiNative;
+        mDevicePolicyManager = WifiPermissionsUtil.retrieveDevicePolicyManagerFromContext(mContext);
     }
 }

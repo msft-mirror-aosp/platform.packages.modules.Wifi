@@ -53,7 +53,6 @@ import android.hardware.wifi.supplicant.V1_4.LegacyMode;
 import android.hidl.manager.V1_0.IServiceManager;
 import android.hidl.manager.V1_0.IServiceNotification;
 import android.net.MacAddress;
-import android.net.wifi.QosPolicyParams;
 import android.net.wifi.ScanResult;
 import android.net.wifi.SecurityParams;
 import android.net.wifi.WifiAnnotations.WifiStandard;
@@ -74,7 +73,9 @@ import com.android.server.wifi.util.NativeUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -120,7 +121,8 @@ public class SupplicantStaIfaceHalHidlImpl implements ISupplicantStaIfaceHal {
     private Map<String, SupplicantStaNetworkHalHidlImpl> mCurrentNetworkRemoteHandles =
             new HashMap<>();
     private Map<String, WifiConfiguration> mCurrentNetworkLocalConfigs = new HashMap<>();
-    private Map<String, WifiSsid> mCurrentNetworkFallbackSsids = new HashMap<>();
+    private Map<String, Deque<WifiSsid>> mCurrentNetworkFallbackSsids = new HashMap<>();
+    private Map<String, WifiSsid> mCurrentNetworkFirstSsid = new HashMap<>();
     private Map<String, List<Pair<SupplicantStaNetworkHalHidlImpl, WifiConfiguration>>>
             mLinkedNetworkLocalAndRemoteConfigs = new HashMap<>();
     @VisibleForTesting
@@ -974,18 +976,24 @@ public class SupplicantStaIfaceHalHidlImpl implements ISupplicantStaIfaceHal {
     }
 
     /**
-     * Connects to the fallback SSID (if any) of the current network upon a network not found
-     * notification.
+     * Connects to the next fallback SSID (if any) of the current network upon a network not found
+     * notification. If all the fallback SSIDs have been tried, return to the first SSID and go
+     * through the fallbacks again.
+     *
+     * Returns false if there's no fallback SSID to connect to, or if we've wrapped back to the
+     * first SSID.
      */
     public boolean connectToFallbackSsid(@NonNull String ifaceName) {
         synchronized (mLock) {
-            WifiSsid fallbackSsid = mCurrentNetworkFallbackSsids.remove(ifaceName);
-            if (fallbackSsid == null) {
+            Deque<WifiSsid> fallbackSsids = mCurrentNetworkFallbackSsids.get(ifaceName);
+            if (fallbackSsids == null || fallbackSsids.isEmpty()) {
                 return false;
             }
-            Log.d(TAG, "connectToFallbackSsid " + fallbackSsid);
-            return connectToNetwork(
-                    ifaceName, getCurrentNetworkLocalConfig(ifaceName), fallbackSsid);
+            WifiSsid nextSsid = fallbackSsids.removeFirst();
+            fallbackSsids.addLast(nextSsid);
+            Log.d(TAG, "connectToFallbackSsid " + nextSsid);
+            connectToNetwork(ifaceName, getCurrentNetworkLocalConfig(ifaceName), nextSsid);
+            return !Objects.equals(nextSsid, mCurrentNetworkFirstSsid.get(ifaceName));
         }
     }
 
@@ -1032,7 +1040,6 @@ public class SupplicantStaIfaceHalHidlImpl implements ISupplicantStaIfaceHal {
                 mCurrentNetworkRemoteHandles.remove(ifaceName);
                 mCurrentNetworkLocalConfigs.remove(ifaceName);
                 mLinkedNetworkLocalAndRemoteConfigs.remove(ifaceName);
-                mCurrentNetworkFallbackSsids.remove(ifaceName);
                 if (!removeAllNetworks(ifaceName)) {
                     loge("Failed to remove existing networks");
                     return false;
@@ -1041,25 +1048,27 @@ public class SupplicantStaIfaceHalHidlImpl implements ISupplicantStaIfaceHal {
                 if (actualSsid != null) {
                     supplicantConfig.SSID = actualSsid.toString();
                 } else {
+                    mCurrentNetworkFallbackSsids.remove(ifaceName);
+                    mCurrentNetworkFirstSsid.remove(ifaceName);
                     if (config.SSID != null) {
                         // No actual SSID supplied, so select from the network selection BSSID
                         // or the latest candidate BSSID.
                         WifiSsid configSsid = WifiSsid.fromString(config.SSID);
                         WifiSsid supplicantSsid = mSsidTranslator.getOriginalSsid(config);
                         if (supplicantSsid != null) {
-                            supplicantConfig.SSID = supplicantSsid.toString();
-                            List<WifiSsid> allPossibleSsids = mSsidTranslator
-                                    .getAllPossibleOriginalSsids(configSsid);
-                            WifiSsid selectedSsid = mSsidTranslator.getOriginalSsid(config);
-                            allPossibleSsids.remove(selectedSsid);
-                            if (!allPossibleSsids.isEmpty()) {
-                                // Store the unused SSID to fallback on in
-                                // connectToFallbackSsid(String) if the chosen SSID isn't found.
-                                mCurrentNetworkFallbackSsids.put(
-                                        ifaceName, allPossibleSsids.get(0));
-                            }
                             Log.d(TAG, "Selecting supplicant SSID " + supplicantSsid);
                             supplicantConfig.SSID = supplicantSsid.toString();
+
+                            Deque<WifiSsid> fallbackSsids = new ArrayDeque<>(mSsidTranslator
+                                    .getAllPossibleOriginalSsids(configSsid));
+                            fallbackSsids.remove(supplicantSsid);
+                            if (!fallbackSsids.isEmpty()) {
+                                // Store the unused SSIDs to fallback on in
+                                // connectToFallbackSsid(String) if the chosen SSID isn't found.
+                                fallbackSsids.addLast(supplicantSsid);
+                                mCurrentNetworkFallbackSsids.put(ifaceName, fallbackSsids);
+                                mCurrentNetworkFirstSsid.put(ifaceName, supplicantSsid);
+                            }
                         }
                         // Set the actual translation of the original SSID in case the untranslated
                         // SSID has an ambiguous encoding.
@@ -3944,99 +3953,5 @@ public class SupplicantStaIfaceHalHidlImpl implements ISupplicantStaIfaceHal {
         }
 
         return currentConfig.getNetworkSelectionStatus().getCandidateSecurityParams();
-    }
-
-    /**
-     * Set whether the network-centric QoS policy feature is enabled or not for this interface.
-     *
-     * @param ifaceName name of the interface.
-     * @param isEnabled true if feature is enabled, false otherwise.
-     * @return true without action since this is not a supported feature.
-     */
-    public boolean setNetworkCentricQosPolicyFeatureEnabled(@NonNull String ifaceName,
-            boolean isEnabled) {
-        throw new UnsupportedOperationException(
-                "setNetworkCentricQosPolicyFeatureEnabled is not supported by the HIDL HAL");
-    }
-
-    /**
-     * Sends a QoS policy response.
-     *
-     * @param ifaceName Name of the interface.
-     * @param qosPolicyRequestId Dialog token to identify the request.
-     * @param morePolicies Flag to indicate more QoS policies can be accommodated.
-     * @param qosPolicyStatusList List of framework QosPolicyStatus objects.
-     * @return true if response is sent successfully, false otherwise.
-     */
-    public boolean sendQosPolicyResponse(String ifaceName, int qosPolicyRequestId,
-            boolean morePolicies,
-            @NonNull List<SupplicantStaIfaceHal.QosPolicyStatus> qosPolicyStatusList) {
-        throw new UnsupportedOperationException(
-                "sendQosPolicyResponse is not supported by the HIDL HAL");
-    }
-
-    /**
-     * Indicates the removal of all active QoS policies configured by the AP.
-     *
-     * @param ifaceName Name of the interface.
-     */
-    public boolean removeAllQosPolicies(String ifaceName) {
-        throw new UnsupportedOperationException(
-                "removeAllQosPolicies is not supported by the HIDL HAL");
-    }
-
-    /**
-     * See comments for {@link ISupplicantStaIfaceHal#addQosPolicyRequestForScs(String, List)}
-     */
-    public List<SupplicantStaIfaceHal.QosPolicyStatus> addQosPolicyRequestForScs(
-            @NonNull String ifaceName, @NonNull List<QosPolicyParams> policies) {
-        Log.e(TAG, "addQosPolicyRequestForScs is not supported by the HIDL HAL");
-        return null;
-    }
-
-    /**
-     * See comments for {@link ISupplicantStaIfaceHal#removeQosPolicyForScs(String, List)}
-     */
-    public List<SupplicantStaIfaceHal.QosPolicyStatus> removeQosPolicyForScs(
-            @NonNull String ifaceName, @NonNull List<Byte> policyIds) {
-        Log.e(TAG, "removeQosPolicyForScs is not supported by the HIDL HAL");
-        return null;
-    }
-
-    /**
-     * See comments for {@link ISupplicantStaIfaceHal#registerQosScsResponseCallback(
-     *                             SupplicantStaIfaceHal.QosScsResponseCallback)}
-     */
-    public void registerQosScsResponseCallback(
-            @NonNull SupplicantStaIfaceHal.QosScsResponseCallback callback) {
-        Log.e(TAG, "registerQosScsResponseCallback is not supported by the HIDL HAL");
-    }
-
-    /**
-     * Generate DPP credential for network access
-     *
-     * @param ifaceName Name of the interface.
-     * @param ssid ssid of the network
-     * @param privEcKey Private EC Key for DPP Configurator
-     * Returns false. Not Supported throuh HIDL
-     */
-    public boolean generateSelfDppConfiguration(@NonNull String ifaceName, @NonNull String ssid,
-            byte[] privEcKey) {
-        Log.d(TAG, "generateSelfDppConfiguration is not supported");
-        return false;
-    }
-
-    /**
-     * Set the currently configured network's anonymous identity.
-     *
-     * @param ifaceName Name of the interface.
-     * @param anonymousIdentity the anonymouns identity.
-     * @param updateToNativeService write the data to the native service.
-     * @return true if succeeds, false otherwise.
-     */
-    public boolean setEapAnonymousIdentity(@NonNull String ifaceName, String anonymousIdentity,
-            boolean updateToNativeService) {
-        Log.d(TAG, "setEapAnonymousIdentity is ignored for HIDL");
-        return false;
     }
 }

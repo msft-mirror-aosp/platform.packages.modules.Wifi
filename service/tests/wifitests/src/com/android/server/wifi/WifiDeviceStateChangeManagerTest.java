@@ -60,17 +60,23 @@ public class WifiDeviceStateChangeManagerTest extends WifiBaseTest {
     public void setUp() {
         MockitoAnnotations.initMocks(this);
         when(mContext.getSystemService(PowerManager.class)).thenReturn(mPowerManager);
+        when(mPowerManager.isInteractive()).thenReturn(true);
         mLooper = new TestLooper();
         mHandler = new Handler(mLooper.getLooper());
         mWifiDeviceStateChangeManager = new WifiDeviceStateChangeManager(mContext, mHandler);
-        mWifiDeviceStateChangeManager.handleBootCompleted();
-        verify(mContext, atLeastOnce())
-                .registerReceiver(mBroadcastReceiverCaptor.capture(), any(), any(), any());
+
     }
 
     @Test
-    public void testScreenChange() {
+    public void testRegisterBeforeBootCompleted() {
         mWifiDeviceStateChangeManager.registerStateChangeCallback(mStateChangeCallback);
+        // Should be no callback event before the boot completed
+        verify(mStateChangeCallback, never()).onScreenStateChanged(anyBoolean());
+        mWifiDeviceStateChangeManager.handleBootCompleted();
+        verify(mContext, atLeastOnce())
+                .registerReceiver(mBroadcastReceiverCaptor.capture(), any());
+        verify(mStateChangeCallback).onScreenStateChanged(true);
+        reset(mStateChangeCallback);
         setScreenState(true);
         verify(mStateChangeCallback).onScreenStateChanged(true);
         setScreenState(false);
@@ -81,10 +87,21 @@ public class WifiDeviceStateChangeManagerTest extends WifiBaseTest {
         verify(mStateChangeCallback, never()).onScreenStateChanged(anyBoolean());
     }
 
+    @Test
+    public void testRegisterAfterBootCompleted() {
+        mWifiDeviceStateChangeManager.handleBootCompleted();
+        verify(mContext, atLeastOnce())
+                .registerReceiver(mBroadcastReceiverCaptor.capture(), any());
+        mWifiDeviceStateChangeManager.registerStateChangeCallback(mStateChangeCallback);
+        // Register after boot completed should immediately get a callback
+        verify(mStateChangeCallback).onScreenStateChanged(true);
+    }
+
     private void setScreenState(boolean screenOn) {
         BroadcastReceiver broadcastReceiver = mBroadcastReceiverCaptor.getValue();
         assertNotNull(broadcastReceiver);
         Intent intent = new Intent(screenOn ? ACTION_SCREEN_ON : ACTION_SCREEN_OFF);
         broadcastReceiver.onReceive(mContext, intent);
+        mLooper.dispatchAll();
     }
 }

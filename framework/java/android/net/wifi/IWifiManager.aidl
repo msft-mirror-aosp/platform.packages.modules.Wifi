@@ -23,9 +23,11 @@ import android.net.wifi.hotspot2.IProvisioningCallback;
 import android.net.DhcpInfo;
 import android.net.DhcpOption;
 import android.net.Network;
+import android.net.TetheringManager.TetheringRequest;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
+import android.net.wifi.IByteArrayListener;
 import android.net.wifi.ICoexCallback;
 import android.net.wifi.IDppCallback;
 import android.net.wifi.IIntegerListener;
@@ -34,6 +36,7 @@ import android.net.wifi.ILastCallerListener;
 import android.net.wifi.IListListener;
 import android.net.wifi.ILocalOnlyHotspotCallback;
 import android.net.wifi.ILocalOnlyConnectionStatusListener;
+import android.net.wifi.IMapListener;
 import android.net.wifi.INetworkRequestMatchCallback;
 import android.net.wifi.IOnWifiActivityEnergyInfoListener;
 import android.net.wifi.IOnWifiDriverCountryCodeChangedListener;
@@ -47,11 +50,15 @@ import android.net.wifi.ISubsystemRestartCallback;
 import android.net.wifi.ISuggestionConnectionStatusListener;
 import android.net.wifi.ISuggestionUserApprovalStatusListener;
 import android.net.wifi.ITrafficStateCallback;
+import android.net.wifi.ITwtCallback;
+import android.net.wifi.ITwtCapabilitiesListener;
+import android.net.wifi.ITwtStatsListener;
 import android.net.wifi.IWifiBandsListener;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiLowLatencyLockListener;
 import android.net.wifi.IWifiNetworkSelectionConfigListener;
 import android.net.wifi.IWifiVerboseLoggingStatusChangedListener;
+import android.net.wifi.MscsParams;
 import android.net.wifi.QosPolicyParams;
 import android.net.wifi.ScanResult;
 import android.net.wifi.SoftApConfiguration;
@@ -62,6 +69,8 @@ import android.net.wifi.WifiManager;
 import android.net.wifi.WifiNetworkSelectionConfig;
 import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiSsid;
+
+import android.net.wifi.twt.TwtRequest;
 
 import android.os.Bundle;
 import android.os.Messenger;
@@ -147,7 +156,7 @@ interface IWifiManager
 
     boolean startScan(String packageName, String featureId);
 
-    List<ScanResult> getScanResults(String callingPackage, String callingFeatureId);
+    ParceledListSlice getScanResults(String callingPackage, String callingFeatureId);
 
     void getChannelData(in IListListener listener, String packageName, in Bundle extras);
 
@@ -225,6 +234,8 @@ interface IWifiManager
     boolean startSoftAp(in WifiConfiguration wifiConfig, String packageName);
 
     boolean startTetheredHotspot(in SoftApConfiguration softApConfig, String packageName);
+
+    void startTetheredHotspotRequest(in TetheringRequest request, in ISoftApCallback callback, String packageName);
 
     boolean stopSoftAp();
 
@@ -468,4 +479,40 @@ interface IWifiManager
     void getMaxMloStrLinkCount(in IIntegerListener listener, in Bundle extras);
 
     void getSupportedSimultaneousBandCombinations(in IWifiBandsListener listener, in Bundle extras);
+
+    void setWepAllowed(boolean isAllowed);
+
+    void queryWepAllowed(in IBooleanListener listener);
+
+    void enableMscs(in MscsParams mscsParams);
+
+    void disableMscs();
+
+    void setSendDhcpHostnameRestriction(String packageName, int restriction);
+
+    void querySendDhcpHostnameRestriction(String packageName, in IIntegerListener listener);
+
+    void setPerSsidRoamingMode(in WifiSsid ssid, int roamingMode, String packageName);
+
+    void removePerSsidRoamingMode(in WifiSsid ssid, String packageName);
+
+    void getPerSsidRoamingModes(String packageName,in IMapListener listener);
+
+    void getTwtCapabilities(in ITwtCapabilitiesListener listener, in Bundle extras);
+
+    void setupTwtSession(in TwtRequest twtRequest, in ITwtCallback callback, in Bundle extras);
+
+    void getStatsTwtSession(in int sessionId, in ITwtStatsListener listener, in Bundle extras);
+
+    void teardownTwtSession(in int sessionId, in Bundle extras);
+
+    void setD2dAllowedWhenInfraStaDisabled(boolean isAllowed);
+
+    void queryD2dAllowedWhenInfraStaDisabled(in IBooleanListener listener);
+
+    void retrieveWifiBackupData(in IByteArrayListener listener);
+
+    void restoreWifiBackupData(in byte[] data);
+
+    boolean isPnoSupported();
 }
