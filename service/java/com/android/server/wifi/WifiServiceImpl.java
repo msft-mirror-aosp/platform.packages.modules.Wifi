@@ -1033,7 +1033,7 @@ public class WifiServiceImpl extends BaseWifiService {
         // before memory store write triggered by mMemoryStoreImpl.stop().
         mWifiScoreCard.resetAllConnectionStates();
         mMemoryStoreImpl.stop();
-        mWifiConfigManager.handleShutDown();
+        mWifiConfigManager.writeDataToStorage();
     }
 
     private boolean checkNetworkSettingsPermission(int pid, int uid) {
@@ -6649,7 +6649,10 @@ public class WifiServiceImpl extends BaseWifiService {
     public void connect(WifiConfiguration config, int netId, @Nullable IActionListener callback,
             @NonNull String packageName, Bundle extras) {
         int uid = getMockableCallingUid();
-        if (!isPrivileged(Binder.getCallingPid(), uid)) {
+        if (!isPrivileged(Binder.getCallingPid(), uid)
+                // TODO(b/343881335): Longer term, we need a specific permission
+                // for NFC.
+                && UserHandle.getAppId(uid) != Process.NFC_UID) {
             throw new SecurityException(TAG + ": Permission denied");
         }
         if (packageName == null) {
