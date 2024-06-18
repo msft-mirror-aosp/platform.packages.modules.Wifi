@@ -1316,6 +1316,9 @@
     <!-- Boolean indicating whether the device supports d2d allowed control when infra STA is disabled  -->
     <bool translatable="false" name ="config_wifiD2dAllowedControlSupportedWhenInfraStaDisabled">false</bool>
 
+    <!-- Boolean indicating whether the device supports WEP allowed control or not  -->
+    <bool translatable="false" name ="config_wifiWepAllowedControlSupported">true</bool>
+
     <!-- Array describing MAC OUI list to block TWT session setup request. If the primary station is
          connected to an AP with a MAC address OUI (https://standards-oui.ieee.org/oui/oui.txt)
          matching with any of entries in this blocked list, WifiManager#setupTwtSession() will fail
@@ -1330,4 +1333,13 @@
 
     <!-- Wi-Fi chip supports single link MLO SoftAp instances in the bridged mode -->
     <bool translatable="false" name="config_wifiSoftApSingleLinkMloInBridgedModeSupported">false</bool>
+
+    <!-- Boolean indicating whether Target Wake Time (TWT) feature is supported or not. This flag
+         overrides the device's TWT capability if set to false. If the device supports TWT and this
+         overlay parameter is set to false, the application cannot set up a TWT session. Also, the
+         API WifiManager#getTwtCapabilities returns TWT unsupported even if the device is capable
+         of setting up TWT session.
+    -->
+    <bool translatable="false" name="config_wifiTwtSupported">true</bool>
+
 </resources>
