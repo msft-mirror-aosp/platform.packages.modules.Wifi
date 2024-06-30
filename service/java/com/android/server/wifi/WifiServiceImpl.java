@@ -1039,6 +1039,7 @@ public class WifiServiceImpl extends BaseWifiService {
         mWifiScoreCard.resetAllConnectionStates();
         mMemoryStoreImpl.stop();
         mWifiConfigManager.writeDataToStorage();
+        mWifiNetworkSuggestionsManager.handleShutDown();
     }
 
     private boolean checkNetworkSettingsPermission(int pid, int uid) {
@@ -2850,13 +2851,14 @@ public class WifiServiceImpl extends BaseWifiService {
                 false, TAG + " registerLocalOnlyHotspotSoftApCallback");
 
         if (mVerboseLoggingEnabled) {
-            mLog.info("registerSoftApCallback uid=%").c(Binder.getCallingUid()).flush();
+            mLog.info("registerLocalOnlyHotspotSoftApCallback uid=%")
+                    .c(Binder.getCallingUid()).flush();
         }
 
         // post operation to handler thread
         mWifiThreadRunner.post(() -> {
             if (!mLohsSoftApTracker.registerSoftApCallback(callback)) {
-                Log.e(TAG, "registerSoftApCallback: Failed to add callback");
+                Log.e(TAG, "registerLocalOnlyHotspotSoftApCallback: Failed to add callback");
                 return;
             }
         }, TAG + "#registerLocalOnlyHotspotSoftApCallback");
@@ -2876,7 +2878,8 @@ public class WifiServiceImpl extends BaseWifiService {
                 false, TAG + " registerLocalOnlyHotspotSoftApCallback");
 
         if (mVerboseLoggingEnabled) {
-            mLog.info("unregisterSoftApCallback uid=%").c(Binder.getCallingUid()).flush();
+            mLog.info("unregisterLocalOnlyHotspotSoftApCallback uid=%")
+                    .c(Binder.getCallingUid()).flush();
         }
 
         // post operation to handler thread
