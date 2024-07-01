@@ -1519,7 +1519,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         }
                         if (wifistate == WifiManager.WIFI_STATE_ENABLED
                                 || wifistate == WifiManager.WIFI_STATE_DISABLING) {
-                            checkAndSendP2pStateChangedBroadcast();
+                            getHandler().post(() -> checkAndSendP2pStateChangedBroadcast());
                         }
                     }
                 }, new IntentFilter(WifiManager.WIFI_STATE_CHANGED_ACTION));
@@ -6893,7 +6893,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
 
             mWifiNative.setDeviceName(mThisDevice.deviceName);
             // DIRECT-XY-DEVICENAME (XY is randomly generated)
-            mWifiNative.setP2pSsidPostfix("-" + mThisDevice.deviceName);
+            mWifiNative.setP2pSsidPostfix(generateP2pSsidPostfix(mThisDevice.deviceName));
             mWifiNative.setP2pDeviceType(mThisDevice.primaryDeviceType);
             // Supplicant defaults to using virtual display with display
             // which refers to a remote display. Use physical_display
