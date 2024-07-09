@@ -77,3 +77,23 @@ flag {
     bug: "295885471"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "get_bssid_blocklist_api"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add new API to get BSSID blocklist"
+    bug: "336109216"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "delayed_carrier_network_selection"
+    namespace: "wifi"
+    description: "Delay network selection for some carrier networks until a delay period has passed"
+    bug: "329142362"
+    is_fixed_read_only: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
