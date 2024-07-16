@@ -9,6 +9,14 @@ flag {
 }
 
 flag {
+    name: "p2p_ownership"
+    namespace: "wifi"
+    description: "Control the P2P group ownership feature"
+    bug: "215045910"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "delay_save_to_store"
     namespace: "wifi"
     description: "Control the feature delay the save to store in batch to reduce the blocking time"
@@ -71,9 +79,40 @@ flag {
 }
 
 flag {
-    name: "voip_detection"
+    name: "voip_detection_bugfix"
     namespace: "wifi"
     description: "Detect VoIP over Wifi and execute optimization"
     bug: "295885471"
+    is_fixed_read_only: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "get_bssid_blocklist_api"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add new API to get BSSID blocklist"
+    bug: "336109216"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "delayed_carrier_network_selection"
+    namespace: "wifi"
+    description: "Delay network selection for some carrier networks until a delay period has passed"
+    bug: "329142362"
+    is_fixed_read_only: true
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "local_only_connection_optimization"
+    namespace: "wifi"
+    description: "optimize local-only connection API"
+    bug: "347117408"
     is_fixed_read_only: true
 }

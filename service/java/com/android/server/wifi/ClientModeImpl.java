@@ -2794,6 +2794,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
          * set Tx link speed only if it is valid
          */
         if (newTxLinkSpeed > 0) {
+            if (newTxLinkSpeed != mWifiInfo.getTxLinkSpeedMbps() && SdkLevel.isAtLeastV()) {
+                updateNetworkCapabilities = true;
+            }
             mWifiInfo.setLinkSpeed(newTxLinkSpeed);
             mWifiInfo.setTxLinkSpeedMbps(newTxLinkSpeed);
         }
@@ -2801,6 +2804,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
          * set Rx link speed only if it is valid
          */
         if (newRxLinkSpeed > 0) {
+            if (newRxLinkSpeed != mWifiInfo.getRxLinkSpeedMbps() && SdkLevel.isAtLeastV()) {
+                updateNetworkCapabilities = true;
+            }
             mWifiInfo.setRxLinkSpeedMbps(newRxLinkSpeed);
         }
         if (newFrequency > 0) {
@@ -3243,6 +3249,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             mWifiInfo.setInformationElements(null);
             mWifiInfo.clearCurrentSecurityType();
             mWifiInfo.resetMultiLinkInfo();
+        }
+        if (state == SupplicantState.SCANNING) {
+            // Set networkId only for matching Wi-Fi entry in UI.
+            mWifiInfo.setNetworkId(stateChangeResult.networkId);
         }
 
         // SSID might have been updated, so call updateCapabilities

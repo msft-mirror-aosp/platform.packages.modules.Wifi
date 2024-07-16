@@ -380,7 +380,7 @@ public class WifiNetworkSuggestionsManager {
             config.allowAutojoin = isAutojoinEnabled;
             if (config.enterpriseConfig
                     != null && config.enterpriseConfig.isAuthenticationSimBased()
-                    && anonymousIdentity != null) {
+                    && !TextUtils.isEmpty(anonymousIdentity)) {
                 config.enterpriseConfig.setAnonymousIdentity(anonymousIdentity);
             }
             config.getNetworkSelectionStatus().setConnectChoice(connectChoice);
@@ -467,6 +467,7 @@ public class WifiNetworkSuggestionsManager {
     private boolean mIsLastUserApprovalUiDialog = false;
 
     private boolean mUserDataLoaded = false;
+    private boolean mIsDeviceShuttingDown = false;
 
     /**
      * Keep a set of packageNames which is treated as carrier provider.
@@ -901,8 +902,9 @@ public class WifiNetworkSuggestionsManager {
             Log.e(TAG, "UID " + uid + " not visible to the current user");
             return WifiManager.STATUS_NETWORK_SUGGESTIONS_ERROR_INTERNAL;
         }
-        if (!mUserDataLoaded) {
-            Log.e(TAG, "Add Network suggestion before boot complete is not allowed.");
+        if (!mUserDataLoaded || mIsDeviceShuttingDown) {
+            Log.e(TAG, "Add Network suggestion before boot complete or when device is "
+                    + "shutting down is not allowed.");
             return WifiManager.STATUS_NETWORK_SUGGESTIONS_ERROR_INTERNAL;
         }
         if (networkSuggestions == null || networkSuggestions.isEmpty()) {
@@ -1393,8 +1395,9 @@ public class WifiNetworkSuggestionsManager {
             Log.e(TAG, "UID " + uid + " not visible to the current user");
             return WifiManager.STATUS_NETWORK_SUGGESTIONS_ERROR_INTERNAL;
         }
-        if (!mUserDataLoaded) {
-            Log.e(TAG, "Remove Network suggestion before boot complete is not allowed.");
+        if (!mUserDataLoaded || mIsDeviceShuttingDown) {
+            Log.e(TAG, "Remove Network suggestion before boot complete or when device is "
+                    + "shutting down is not allowed.");
             return WifiManager.STATUS_NETWORK_SUGGESTIONS_ERROR_INTERNAL;
         }
         if (networkSuggestions == null) {
@@ -2744,6 +2747,11 @@ public class WifiNetworkSuggestionsManager {
         }
         for (ExtendedWifiNetworkSuggestion ewns : matchedSuggestionSet) {
             ewns.anonymousIdentity = config.enterpriseConfig.getAnonymousIdentity();
+            if (TextUtils.isEmpty(ewns.anonymousIdentity)) {
+                // Update WifiConfig with App set AnonymousIdentity
+                updateWifiConfigInWcmIfPresent(ewns.createInternalWifiConfiguration(
+                        mWifiCarrierInfoManager), ewns.perAppInfo.uid, ewns.perAppInfo.packageName);
+            }
         }
         saveToStore();
     }
@@ -2874,5 +2882,12 @@ public class WifiNetworkSuggestionsManager {
             addToScanResultMatchInfoMap(ewns);
         }
         saveToStore();
+    }
+
+    /**
+     * Handle device shut down
+     */
+    public void handleShutDown() {
+        mIsDeviceShuttingDown = true;
     }
 }
