@@ -60,9 +60,7 @@
     <string name="wifi_p2p_to_message" msgid="3809923305696994787">"Til:"</string>
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"Sláðu inn PIN-númerið sem er krafist:"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"PIN-númer:"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tablet" msgid="2875937871590955304">"Wi-Fi tengingu spjaldtölvunnar verður tímabundið slitið á meðan hún er tengd við <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tv" msgid="9133053225387001827">"Android TV mun tímabundið aftengjast Wi-Fi á meðan það er tengt við <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="default" msgid="2226863827636191980">"Síminn mun tímabundið aftengjast Wi-Fi á meðan hann er tengdur við <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
+    <string name="wifi_p2p_frequency_conflict_message" msgid="8535404941723941766">"Tækið þitt mun tímabundið aftengjast Wi-Fi á meðan það er tengt við <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
     <string name="dlg_ok" msgid="254496739491689405">"Í lagi"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_title" msgid="2344570489693915253">"Ekki hægt að tengjast <xliff:g id="SSID">%1$s</xliff:g>"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_message" msgid="4834133226521813352">"Ýttu til að breyta persónuverndarstillingum og reyna aftur"</string>
@@ -162,14 +160,14 @@
     <string name="wifi_enable_request_dialog_positive_button" msgid="6050832555821470466">"Leyfa"</string>
     <string name="wifi_enable_request_dialog_negative_button" msgid="4754219902374918882">"Ekki leyfa"</string>
     <string name="wifi_enabled_apm_first_time_title" msgid="4814302384637588804">"Kveikt á Wi‑Fi í flugstillingu"</string>
-    <string name="wifi_enabled_apm_first_time_message" msgid="5443101896157496353">"Ef þú hefur kveikt á Wi-Fi mun síminn muna að hafa kveikt á því næst þegar þú stillir á flugstillingu"</string>
+    <string name="wifi_enabled_apm_first_time_message" msgid="6416193199042203037">"Ef þú hefur kveikt á Wi-Fi mun tækið muna að hafa kveikt á því næst þegar þú stillir á flugstillingu"</string>
     <string name="apm_enabled_first_time_title" msgid="2534167413190488009">"Áfram kveikt á Wi‑Fi"</string>
-    <string name="apm_enabled_first_time_message" msgid="4753441005253327841">"Síminn man að hafa kveikt á Wi-Fi í flugstillingu. Slökktu á Wi-Fi ef þú vilt ekki hafa kveikt á því."</string>
+    <string name="apm_enabled_first_time_message" msgid="6093911536874954410">"Tækið man að hafa kveikt á Wi-Fi í flugstillingu. Slökktu á Wi-Fi ef þú vilt ekki hafa kveikt á því."</string>
     <string name="wifi_network_disabled_by_admin_title" msgid="9057697656855227293">"Netkerfi ekki tiltækt"</string>
     <string name="wifi_network_disabled_by_admin_message" msgid="7830360441333155462">"Stjórnandinn hefur slökkt á <xliff:g id="SSID">%1$s</xliff:g>."</string>
     <string name="wifi_network_disabled_by_admin_button" msgid="3350310756265122689">"Loka"</string>
-    <string name="wifi_network_switch_dialog_title" msgid="4387595800316985421">"Skipta um WiFi-net?"</string>
-    <string name="wifi_network_switch_dialog_message" msgid="1122837977780086429">"<xliff:g id="SSID_0">%1$s</xliff:g> virðist ekki vera tengt netinu. Skipta yfir í <xliff:g id="SSID_1">%2$s</xliff:g>?"</string>
+    <string name="wifi_network_switch_dialog_title_no_internet" msgid="4116969009784041242">"<xliff:g id="SSID_0">%1$s</xliff:g> virðist ekki vera með nettengingu. Skipta yfir í <xliff:g id="SSID_1">%2$s</xliff:g>?"</string>
+    <string name="wifi_network_switch_dialog_title_bad_internet" msgid="6013385270249705547">"<xliff:g id="SSID_0">%1$s</xliff:g> er í lélegum gæðum. Skipta yfir í <xliff:g id="SSID_1">%2$s</xliff:g>?"</string>
     <string name="wifi_network_switch_dialog_positive_button" msgid="7845507995422722454">"Skipta"</string>
     <string name="wifi_network_switch_dialog_negative_button" msgid="1496665895689498806">"Ekki skipta"</string>
 </resources>

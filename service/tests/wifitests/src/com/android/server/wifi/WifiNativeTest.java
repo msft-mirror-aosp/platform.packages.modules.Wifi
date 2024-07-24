@@ -30,6 +30,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.anyBoolean;
@@ -39,6 +40,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.validateMockitoUsage;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,7 +51,9 @@ import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiAvailableChannel;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiContext;
+import android.net.wifi.WifiManager;
 import android.net.wifi.WifiScanner;
+import android.net.wifi.WifiScanner.ScanData;
 import android.net.wifi.WifiSsid;
 import android.net.wifi.nl80211.NativeScanResult;
 import android.net.wifi.nl80211.RadioChainInfo;
@@ -62,12 +66,16 @@ import android.text.TextUtils;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.coex.CoexManager;
+import com.android.server.wifi.hal.WifiChip;
+import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.util.NativeUtil;
 import com.android.server.wifi.util.NetdWrapper;
 import com.android.wifi.resources.R;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.AdditionalMatchers;
@@ -75,6 +83,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.MockitoSession;
+import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
 
 import java.util.ArrayList;
@@ -272,7 +282,9 @@ public class WifiNativeTest extends WifiBaseTest {
     @Mock private SsidTranslator mSsidTranslator;
     @Mock private WifiGlobals mWifiGlobals;
     @Mock DeviceConfigFacade mDeviceConfigFacade;
+    @Mock WifiChip.AfcChannelAllowance mAfcChannelAllowance;
 
+    private MockitoSession mSession;
     ArgumentCaptor<WifiNl80211Manager.ScanEventCallback> mScanCallbackCaptor =
             ArgumentCaptor.forClass(WifiNl80211Manager.ScanEventCallback.class);
 
@@ -288,7 +300,7 @@ public class WifiNativeTest extends WifiBaseTest {
         when(mWifiVendorHal.startVendorHalSta(eq(mConcreteClientModeManager))).thenReturn(true);
         when(mWifiVendorHal.createStaIface(any(), any(), eq(mConcreteClientModeManager)))
                 .thenReturn(WIFI_IFACE_NAME);
-        when(mWifiVendorHal.createApIface(any(), any(), anyInt(), anyBoolean(), any()))
+        when(mWifiVendorHal.createApIface(any(), any(), anyInt(), anyBoolean(), any(), anyList()))
                 .thenReturn(WIFI_IFACE_NAME);
 
         when(mBuildProperties.isEngBuild()).thenReturn(false);
@@ -328,12 +340,27 @@ public class WifiNativeTest extends WifiBaseTest {
         when(mWifiInjector.getDeviceConfigFacade()).thenReturn(mDeviceConfigFacade);
         when(mDeviceConfigFacade.isInterfaceFailureBugreportEnabled()).thenReturn(false);
 
+        // Mock static methods from WifiStatsLog.
+        mSession = ExtendedMockito.mockitoSession()
+                .strictness(Strictness.LENIENT)
+                .mockStatic(WifiStatsLog.class)
+                .startMocking();
+
         mWifiNative = new WifiNative(
                 mWifiVendorHal, mStaIfaceHal, mHostapdHal, mWificondControl,
                 mWifiMonitor, mPropertyService, mWifiMetrics,
                 mHandler, mRandom, mBuildProperties, mWifiInjector);
         mWifiNative.enableVerboseLogging(true, true);
         mWifiNative.initialize();
+        assertNull(mWifiNative.mUnknownAkmMap);
+    }
+
+    @After
+    public void tearDown() {
+        validateMockitoUsage();
+        if (mSession != null) {
+            mSession.finishMocking();
+        }
     }
 
     /** Mock translating an SSID */
@@ -746,7 +773,10 @@ public class WifiNativeTest extends WifiBaseTest {
                 any(), mScanCallbackCaptor.capture());
 
         mScanCallbackCaptor.getValue().onScanFailed();
-        verify(mWifiMetrics).incrementPnoScanFailedCount();
+        ExtendedMockito.verify(() -> WifiStatsLog.write(WifiStatsLog.PNO_SCAN_STOPPED,
+                WifiStatsLog.PNO_SCAN_STOPPED__STOP_REASON__SCAN_FAILED,
+                0, false, false, false, false,
+                WifiStatsLog.PNO_SCAN_STOPPED__FAILURE_CODE__WIFICOND_SCAN_FAILURE));
     }
 
     /**
@@ -776,11 +806,11 @@ public class WifiNativeTest extends WifiBaseTest {
         when(mWifiVendorHal.getBridgedApInstances(WIFI_IFACE_NAME))
                 .thenReturn(Arrays.asList(instance1, instance2));
         mWifiNative.setupInterfaceForSoftApMode(null, TEST_WORKSOURCE, SoftApConfiguration.BAND_2GHZ
-                | SoftApConfiguration.BAND_5GHZ, true, mSoftApManager);
+                | SoftApConfiguration.BAND_5GHZ, true, mSoftApManager, new ArrayList<>());
         ArgumentCaptor<HalDeviceManager.InterfaceDestroyedListener> ifaceDestroyedListenerCaptor =
                 ArgumentCaptor.forClass(HalDeviceManager.InterfaceDestroyedListener.class);
         verify(mWifiVendorHal).createApIface(ifaceDestroyedListenerCaptor.capture(), any(),
-                anyInt(), anyBoolean(), any());
+                anyInt(), anyBoolean(), any(), anyList());
         verify(mWificondControl).setupInterfaceForSoftApMode(instance1);
 
         when(mWifiVendorHal.getBridgedApInstances(WIFI_IFACE_NAME)).thenReturn(null);
@@ -834,7 +864,10 @@ public class WifiNativeTest extends WifiBaseTest {
                 any(), mScanCallbackCaptor.capture());
 
         mScanCallbackCaptor.getValue().onScanFailed();
-        verify(mWifiMetrics).incrementPnoScanFailedCount();
+        ExtendedMockito.verify(() -> WifiStatsLog.write(WifiStatsLog.PNO_SCAN_STOPPED,
+                WifiStatsLog.PNO_SCAN_STOPPED__STOP_REASON__SCAN_FAILED,
+                0, false, false, false, false,
+                WifiStatsLog.PNO_SCAN_STOPPED__FAILURE_CODE__WIFICOND_SCAN_FAILURE));
     }
 
     /**
@@ -862,7 +895,7 @@ public class WifiNativeTest extends WifiBaseTest {
 
         mWifiNative.teardownAllInterfaces();
         mWifiNative.setupInterfaceForSoftApMode(null, TEST_WORKSOURCE, WIFI_BAND_24_GHZ, false,
-                mSoftApManager);
+                mSoftApManager, new ArrayList<>());
         verify(mWifiVendorHal, times(4)).setCoexUnsafeChannels(unsafeChannels, restrictions);
     }
 
@@ -960,8 +993,10 @@ public class WifiNativeTest extends WifiBaseTest {
         verify(mWificondControl).startPnoScan(eq(WIFI_IFACE_NAME),
                 eq(TEST_PNO_SETTINGS.toNativePnoSettings()), any(), captor.capture());
         captor.getValue().onPnoRequestFailed();
-        verify(mWifiMetrics).incrementPnoScanStartAttemptCount();
-        verify(mWifiMetrics).incrementPnoScanFailedCount();
+        ExtendedMockito.verify(() -> WifiStatsLog.write(WifiStatsLog.PNO_SCAN_STOPPED,
+                WifiStatsLog.PNO_SCAN_STOPPED__STOP_REASON__SCAN_FAILED,
+                0, false, false, false, false,
+                WifiStatsLog.PNO_SCAN_STOPPED__FAILURE_CODE__WIFICOND_REQUEST_FAILURE));
     }
 
     /**
@@ -1611,11 +1646,176 @@ public class WifiNativeTest extends WifiBaseTest {
     }
 
     @Test
+    public void testGetCachedScanResultsLocationDisabledOrInvalidTimestamp() throws Exception {
+        ScanResult[] scanResults = new ScanResult[2];
+        for (int i = 0; i < 2; i++) {
+            ScanResult scanResult = new ScanResult();
+            scanResult.timestamp = 0;
+            scanResults[i] = scanResult;
+        }
+        ScanData testScanData = new ScanData(0, 0,
+                0, WifiScanner.WIFI_BAND_UNSPECIFIED, scanResults);
+        when(mWifiVendorHal.getCachedScanData(any())).thenReturn(testScanData);
+
+        mWifiNative.setLocationModeEnabled(false);
+        ScanData scanData = mWifiNative.getCachedScanResults(WIFI_IFACE_NAME);
+        // Get no scan result because the location mode is disabled
+        assertEquals(0, scanData.getResults().length);
+
+        mWifiNative.setLocationModeEnabled(true);
+        scanData = mWifiNative.getCachedScanResults(WIFI_IFACE_NAME);
+        // Get no scan result because the scan timestamp is too new
+        assertEquals(0, scanData.getResults().length);
+    }
+
+    @Test
+    public void testGetCachedScanResultsLocationEnabledValidTimestamp() throws Exception {
+        ScanResult[] scanResults = new ScanResult[3];
+        for (int i = 0; i < 3; i++) {
+            ScanResult scanResult = new ScanResult();
+            // 1st ScanResult has invalid timestamp
+            scanResult.timestamp = (i > 0) ? Long.MAX_VALUE : 0;
+            scanResults[i] = scanResult;
+        }
+        ScanData testScanData = new ScanData(0, 0,
+                0, WifiScanner.WIFI_BAND_UNSPECIFIED, scanResults);
+        when(mWifiVendorHal.getCachedScanData(any())).thenReturn(testScanData);
+
+        mWifiNative.setLocationModeEnabled(true);
+        ScanData scanData = mWifiNative.getCachedScanResults(WIFI_IFACE_NAME);
+        // Get the last two scan results which has the valid timestamp
+        assertEquals(2, scanData.getResults().length);
+    }
+
+    @Test
     public void testEnableStaChannelForPeerNetworkWithOverride() throws Exception {
         mResources.setBoolean(R.bool.config_wifiEnableStaIndoorChannelForPeerNetwork, true);
         mResources.setBoolean(R.bool.config_wifiEnableStaDfsChannelForPeerNetwork, true);
         mWifiNative.setupInterfaceForClientInScanMode(null, TEST_WORKSOURCE,
                 mConcreteClientModeManager);
         verify(mWifiVendorHal).enableStaChannelForPeerNetwork(true, true);
+    }
+
+    /**
+     * Verifies that setAfcChannelAllowance() calls underlying WifiVendorHal.
+     */
+    @Test
+    public void testSetAfcChannelAllowance() {
+        mWifiNative.setAfcChannelAllowance(mAfcChannelAllowance);
+        verify(mWifiVendorHal).setAfcChannelAllowance(mAfcChannelAllowance);
+    }
+
+    /**
+     * Verifies that overlay config item config_wifiUnknownAkmToKnownAkmMapping is parsed correctly
+     * and an expected value is set in unknown AKM map.
+     */
+    @Test
+    public void testConfigWifiUnknownAkmToKnownAkmMapping() throws Exception {
+        // Test that UnknownAkmMap is not set if two values are not added in the config.
+        mResources.setStringArray(
+                R.array.config_wifiUnknownAkmToKnownAkmMapping, new String[] {"1234"});
+        WifiNative wifiNativeInstance =
+                new WifiNative(
+                        mWifiVendorHal,
+                        mStaIfaceHal,
+                        mHostapdHal,
+                        mWificondControl,
+                        mWifiMonitor,
+                        mPropertyService,
+                        mWifiMetrics,
+                        mHandler,
+                        mRandom,
+                        mBuildProperties,
+                        mWifiInjector);
+        assertNull(wifiNativeInstance.mUnknownAkmMap);
+
+        // Test that UnknownAkmMap is not set if non-integer values are added in the config.
+        mResources.setStringArray(
+                R.array.config_wifiUnknownAkmToKnownAkmMapping, new String[] {"1234, bad"});
+        wifiNativeInstance =
+                new WifiNative(
+                        mWifiVendorHal,
+                        mStaIfaceHal,
+                        mHostapdHal,
+                        mWificondControl,
+                        mWifiMonitor,
+                        mPropertyService,
+                        mWifiMetrics,
+                        mHandler,
+                        mRandom,
+                        mBuildProperties,
+                        mWifiInjector);
+        assertNull(wifiNativeInstance.mUnknownAkmMap);
+
+        // Test that UnknownAkmMap is not set when an invalid AKM is set in the known AKM field
+        // known AKM - 555 (which is not a valid AKM suite specifier)
+        mResources.setStringArray(
+                R.array.config_wifiUnknownAkmToKnownAkmMapping, new String[] {"9846784, 555"});
+        wifiNativeInstance =
+                new WifiNative(
+                        mWifiVendorHal,
+                        mStaIfaceHal,
+                        mHostapdHal,
+                        mWificondControl,
+                        mWifiMonitor,
+                        mPropertyService,
+                        mWifiMetrics,
+                        mHandler,
+                        mRandom,
+                        mBuildProperties,
+                        mWifiInjector);
+        assertNull(wifiNativeInstance.mUnknownAkmMap);
+
+        // Test that UnknownAkmMap is set for a valid configuration
+        // known AKM - 28053248 (which corresponds to ScanResult.KEY_MGMT_EAP)
+        mResources.setStringArray(
+                R.array.config_wifiUnknownAkmToKnownAkmMapping, new String[] {"9846784, 28053248"});
+        wifiNativeInstance =
+                new WifiNative(
+                        mWifiVendorHal,
+                        mStaIfaceHal,
+                        mHostapdHal,
+                        mWificondControl,
+                        mWifiMonitor,
+                        mPropertyService,
+                        mWifiMetrics,
+                        mHandler,
+                        mRandom,
+                        mBuildProperties,
+                        mWifiInjector);
+        assertEquals(1, wifiNativeInstance.mUnknownAkmMap.size());
+        assertEquals(ScanResult.KEY_MGMT_EAP, wifiNativeInstance.mUnknownAkmMap.get(9846784));
+
+        // Test that UnknownAkmMap is set for multiple valid configuration entries
+        // known AKM - 28053248 (which corresponds to ScanResult.KEY_MGMT_EAP)
+        // known AKM - 413929216 (which corresponds to ScanResult.KEY_MGMT_SAE_EXT_KEY)
+        mResources.setStringArray(
+                R.array.config_wifiUnknownAkmToKnownAkmMapping,
+                new String[] {"9846784, 28053248", "1234, 413929216"});
+        wifiNativeInstance =
+                new WifiNative(
+                        mWifiVendorHal,
+                        mStaIfaceHal,
+                        mHostapdHal,
+                        mWificondControl,
+                        mWifiMonitor,
+                        mPropertyService,
+                        mWifiMetrics,
+                        mHandler,
+                        mRandom,
+                        mBuildProperties,
+                        mWifiInjector);
+        assertEquals(2, wifiNativeInstance.mUnknownAkmMap.size());
+        assertEquals(ScanResult.KEY_MGMT_EAP, wifiNativeInstance.mUnknownAkmMap.get(9846784));
+        assertEquals(ScanResult.KEY_MGMT_SAE_EXT_KEY, wifiNativeInstance.mUnknownAkmMap.get(1234));
+    }
+
+    @Test
+    public void testSetRoamingMode() throws Exception {
+        int status = 0;
+        when(mWifiVendorHal.setRoamingMode(eq(WIFI_IFACE_NAME), anyInt())).thenReturn(status);
+        assertEquals(status, mWifiNative.setRoamingMode(WIFI_IFACE_NAME,
+                WifiManager.ROAMING_MODE_NORMAL));
+        verify(mWifiVendorHal).setRoamingMode(WIFI_IFACE_NAME, WifiManager.ROAMING_MODE_NORMAL);
     }
 }

@@ -60,9 +60,7 @@
     <string name="wifi_p2p_to_message" msgid="3809923305696994787">"प्रति:"</string>
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"आवश्यक पिन टाइप करा:"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"पिन:"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tablet" msgid="2875937871590955304">"टॅबलेट <xliff:g id="DEVICE_NAME">%1$s</xliff:g> ला कनेक्‍ट केलेले असताना तात्‍पुरते वाय-फाय वरून डिस्‍कनेक्‍ट होईल"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tv" msgid="9133053225387001827">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g>शी तुमचे Android TV डिव्हाइस कनेक्ट केलेले असताना ते वाय-फाय वरून तात्पुरते डिस्कनेक्ट केले जाईल"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="default" msgid="2226863827636191980">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> वर फोन कनेक्ट केलेला असताना तो वाय-फाय वरून तात्पुरता डिस्कनेक्ट केला जाईल"</string>
+    <string name="wifi_p2p_frequency_conflict_message" msgid="8535404941723941766">"तुमचे डिव्हाइस <xliff:g id="DEVICE_NAME">%1$s</xliff:g> शी कनेक्ट केलेले असताना वाय-फायवरून तात्पुरते डिस्कनेक्ट होईल"</string>
     <string name="dlg_ok" msgid="254496739491689405">"ठीक"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_title" msgid="2344570489693915253">"<xliff:g id="SSID">%1$s</xliff:g> शी कनेक्ट करता आले नाही"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_message" msgid="4834133226521813352">"गोपनीयता सेटिंग्ज बदलण्यासाठी टॅप करा आणि पुन्हा प्रयत्न करा"</string>
@@ -162,14 +160,14 @@
     <string name="wifi_enable_request_dialog_positive_button" msgid="6050832555821470466">"अनुमती द्या"</string>
     <string name="wifi_enable_request_dialog_negative_button" msgid="4754219902374918882">"अनुमती देऊ नका"</string>
     <string name="wifi_enabled_apm_first_time_title" msgid="4814302384637588804">"विमान मोडमध्ये वाय-फाय सुरू आहे"</string>
-    <string name="wifi_enabled_apm_first_time_message" msgid="5443101896157496353">"तुम्ही वाय-फाय सुरू ठेवल्यास, पुढील वेळी विमान मोडमध्ये असाल, तेव्हा तुमचा फोन ते सुरू ठेवण्याचे लक्षात ठेवेल"</string>
+    <string name="wifi_enabled_apm_first_time_message" msgid="6416193199042203037">"तुम्ही वाय-फाय सुरू ठेवल्यास, पुढील वेळी विमान मोडमध्ये असाल, तेव्हा तुमचे डिव्हाइस ते सुरू ठेवण्याचे लक्षात ठेवेल"</string>
     <string name="apm_enabled_first_time_title" msgid="2534167413190488009">"वाय-फाय सुरू राहते"</string>
-    <string name="apm_enabled_first_time_message" msgid="4753441005253327841">"तुमचा फोन विमान मोडमध्ये वाय-फाय सुरू ठेवण्याचे लक्षात ठेवतो. तुम्हाला सुरू ठेवायचे नसल्यास, वाय-फाय बंद करा."</string>
+    <string name="apm_enabled_first_time_message" msgid="6093911536874954410">"तुमचे डिव्हाइस विमान मोडमध्ये वाय-फाय सुरू ठेवण्याचे लक्षात ठेवते. तुम्हाला वाय-फाय सुरू ठेवायचा नसल्यास तो बंद करा."</string>
     <string name="wifi_network_disabled_by_admin_title" msgid="9057697656855227293">"उपलब्ध नसलेले नेटवर्क"</string>
     <string name="wifi_network_disabled_by_admin_message" msgid="7830360441333155462">"तुमच्या अ‍ॅडमिनिस्ट्रेटर ने <xliff:g id="SSID">%1$s</xliff:g> बंद केले आहे."</string>
     <string name="wifi_network_disabled_by_admin_button" msgid="3350310756265122689">"बंद करा"</string>
-    <string name="wifi_network_switch_dialog_title" msgid="4387595800316985421">"वाय-फाय नेटवर्क स्विच करायचे आहेत का?"</string>
-    <string name="wifi_network_switch_dialog_message" msgid="1122837977780086429">"<xliff:g id="SSID_0">%1$s</xliff:g> इंटरनेटशी कनेक्ट केलेले दिसत नाही. <xliff:g id="SSID_1">%2$s</xliff:g> वर स्विच करायचे आहे का?"</string>
+    <string name="wifi_network_switch_dialog_title_no_internet" msgid="4116969009784041242">"<xliff:g id="SSID_0">%1$s</xliff:g> इंटरनेटशी कनेक्ट केलेले दिसत नाही. <xliff:g id="SSID_1">%2$s</xliff:g> वर स्विच करायचे आहे का?"</string>
+    <string name="wifi_network_switch_dialog_title_bad_internet" msgid="6013385270249705547">"<xliff:g id="SSID_0">%1$s</xliff:g> ही गुणवत्ता कमी आहे. <xliff:g id="SSID_1">%2$s</xliff:g> वर स्विच करायचे आहे का?"</string>
     <string name="wifi_network_switch_dialog_positive_button" msgid="7845507995422722454">"स्विच करा"</string>
     <string name="wifi_network_switch_dialog_negative_button" msgid="1496665895689498806">"स्विच करू नका"</string>
 </resources>

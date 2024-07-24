@@ -79,7 +79,8 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.test.TestLooper;
-import android.test.suitebuilder.annotation.SmallTest;
+
+import androidx.test.filters.SmallTest;
 
 import com.android.internal.util.WakeupMessage;
 import com.android.modules.utils.build.SdkLevel;
@@ -105,11 +106,11 @@ public class DppManagerTest extends WifiBaseTest {
     private static final int TEST_PEER_ID = 1;
     private static final int TEST_BOOTSTRAP_ID = 1;
     private static final int TEST_LISTEN_CHANNEL = 6;
-    private static final String TEST_SSID = "\"Test_SSID\"";
+    private static final String TEST_SSID = "\"テストSSID\""; // Make sure we test with non-ASCII
     private static final String TEST_SSID_NO_QUOTE = TEST_SSID.replace("\"", "");
-    private static final String TEST_SSID_ENCODED = "546573745f53534944";
-    private static final String TEST_PASSWORD = "\"secretPassword\"";
-    private static final String TEST_PASSWORD_ENCODED = "73656372657450617373776f7264";
+    private static final String TEST_SSID_ENCODED = "e38386e382b9e3838853534944";
+    private static final String TEST_PASSWORD = "\"テストPassword\"";
+    private static final String TEST_PASSWORD_ENCODED = "e38386e382b9e3838850617373776f7264";
     private static final int TEST_NETWORK_ID = 1;
     private static final String TEST_BSSID = "01:02:03:04:05:06";
     private static final String TEST_PACKAGE_NAME = "TestPackage";
@@ -855,9 +856,18 @@ public class DppManagerTest extends WifiBaseTest {
      */
     private void addTestNetworkInScanResult(int frequency) {
         String caps = "[WPA2-FT/SAE+SAE][ESS][WPS]";
-        ScanResult scanResult = new ScanResult(WifiSsid.fromUtf8Text(TEST_SSID_NO_QUOTE),
-                TEST_SSID_NO_QUOTE, TEST_BSSID, 1245, 0, caps, -78, frequency,
-                1025, 22, 33, 20, 0, 0, true);
+        ScanResult scanResult = new ScanResult.Builder(
+                WifiSsid.fromUtf8Text(TEST_SSID_NO_QUOTE),
+                TEST_BSSID)
+                .setHessid(1245)
+                .setCaps(caps)
+                .setRssi(-78)
+                .setFrequency(frequency)
+                .setTsf(1025)
+                .setDistanceCm(22)
+                .setDistanceSdCm(33)
+                .setIs80211McRTTResponder(true)
+                .build();
         List<ScanResult> scanResults = new ArrayList<>();
         scanResults.add(scanResult);
         when(mScanRequestProxy.getScanResults()).thenReturn(scanResults);

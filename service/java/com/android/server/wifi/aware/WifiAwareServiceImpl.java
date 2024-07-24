@@ -19,7 +19,7 @@ package com.android.server.wifi.aware;
 import static android.net.wifi.aware.Characteristics.WIFI_AWARE_CIPHER_SUITE_NCS_PK_PASN_128;
 import static android.net.wifi.aware.Characteristics.WIFI_AWARE_CIPHER_SUITE_NCS_PK_PASN_256;
 
-import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_VERBOSE_LOGGING_ENABLED;
+import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_AWARE_VERBOSE_LOGGING_ENABLED;
 
 import android.Manifest;
 import android.annotation.NonNull;
@@ -58,6 +58,7 @@ import com.android.server.wifi.BuildProperties;
 import com.android.server.wifi.Clock;
 import com.android.server.wifi.FrameworkFacade;
 import com.android.server.wifi.InterfaceConflictManager;
+import com.android.server.wifi.RunnerHandler;
 import com.android.server.wifi.SystemBuildProperties;
 import com.android.server.wifi.WifiInjector;
 import com.android.server.wifi.WifiSettingsConfigStore;
@@ -129,7 +130,9 @@ public class WifiAwareServiceImpl extends IWifiAwareManager.Stub {
         mWifiPermissionsUtil = wifiPermissionsUtil;
         mStateManager = awareStateManager;
         mShellCommand = awareShellCommand;
-        mHandler = new Handler(handlerThread.getLooper());
+        mHandler = new RunnerHandler(handlerThread.getLooper(), mContext.getResources()
+                .getInteger(R.integer.config_wifiConfigurationWifiRunnerThresholdInMs),
+                WifiInjector.getInstance().getWifiHandlerLocalLog());
         mWifiAwareNativeManager = wifiAwareNativeManager;
         mWifiAwareNativeApi = wifiAwareNativeApi;
         mWifiAwareNativeCallback = wifiAwareNativeCallback;
@@ -140,22 +143,23 @@ public class WifiAwareServiceImpl extends IWifiAwareManager.Stub {
                     interfaceConflictManager);
 
             settingsConfigStore.registerChangeListener(
-                    WIFI_VERBOSE_LOGGING_ENABLED,
+                    WIFI_AWARE_VERBOSE_LOGGING_ENABLED,
                     (key, newValue) -> enableVerboseLogging(newValue),
                     mHandler);
-            enableVerboseLogging(settingsConfigStore.get(WIFI_VERBOSE_LOGGING_ENABLED));
+            enableVerboseLogging(settingsConfigStore.get(WIFI_AWARE_VERBOSE_LOGGING_ENABLED));
         });
     }
 
     private void enableVerboseLogging(boolean verboseEnabled) {
         mVerboseHalLoggingEnabled = verboseEnabled;
         updateVerboseLoggingEnabled();
-        mStateManager.enableVerboseLogging(mVerboseLoggingEnabled, mVerboseLoggingEnabled);
-        mWifiAwareNativeCallback.enableVerboseLogging(mVerboseLoggingEnabled,
-                mVerboseLoggingEnabled);
+        boolean vDbg = verboseEnabled || mContext.getResources()
+                .getBoolean(R.bool.config_aware_vdbg_enable_on_verbose_logging);
+        mStateManager.enableVerboseLogging(mVerboseLoggingEnabled, mVerboseLoggingEnabled, vDbg);
+        mWifiAwareNativeCallback.enableVerboseLogging(mVerboseLoggingEnabled);
         mWifiAwareNativeManager.enableVerboseLogging(mVerboseLoggingEnabled,
                 mVerboseLoggingEnabled);
-        mWifiAwareNativeApi.enableVerboseLogging(mVerboseLoggingEnabled, mVerboseLoggingEnabled);
+        mWifiAwareNativeApi.enableVerboseLogging(mVerboseLoggingEnabled, vDbg);
     }
 
     /**
@@ -246,6 +250,9 @@ public class WifiAwareServiceImpl extends IWifiAwareManager.Stub {
         int uid = getMockableCallingUid();
         mWifiPermissionsUtil.checkPackage(uid, callingPackage);
         enforceChangePermission();
+        if (mVerboseLoggingEnabled) {
+            Log.v(TAG, "resetPairedDevices: callingPackage=" + callingPackage);
+        }
         mStateManager.resetPairedDevices(callingPackage);
     }
 
@@ -254,6 +261,9 @@ public class WifiAwareServiceImpl extends IWifiAwareManager.Stub {
         int uid = getMockableCallingUid();
         mWifiPermissionsUtil.checkPackage(uid, callingPackage);
         enforceChangePermission();
+        if (mVerboseLoggingEnabled) {
+            Log.v(TAG, "removePairedDevice: callingPackage=" + callingPackage + ", alias=" + alias);
+        }
         mStateManager.removePairedDevice(callingPackage, alias);
     }
 
@@ -273,6 +283,14 @@ public class WifiAwareServiceImpl extends IWifiAwareManager.Stub {
         int uid = getMockableCallingUid();
         mWifiPermissionsUtil.checkPackage(uid, callingPackage);
         enforceChangePermission();
+        if (mVerboseLoggingEnabled) {
+            Log.v(
+                    TAG,
+                    "setOpportunisticModeEnabled: callingPackage="
+                            + callingPackage
+                            + ", enabled="
+                            + enabled);
+        }
         mStateManager.setOpportunisticPackage(callingPackage, enabled);
     }
 
@@ -319,7 +337,22 @@ public class WifiAwareServiceImpl extends IWifiAwareManager.Stub {
         }
 
         if (configRequest != null) {
-            enforceNetworkStackPermission();
+            boolean networkStackPermission = checkNetworkStackPermission();
+            boolean manageNetworkSelectionPermission =
+                    mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid);
+            if (!(networkStackPermission || manageNetworkSelectionPermission)) {
+                throw new SecurityException("Insufficient permission to include a ConfigRequest");
+            }
+
+            if (!networkStackPermission) {
+                // OEM apps with only the network selection permission can provide a config request,
+                // but they should only modify the vendor data field.
+                ConfigRequest.Builder builder = new ConfigRequest.Builder();
+                if (SdkLevel.isAtLeastV()) {
+                    builder.setVendorData(configRequest.getVendorData());
+                }
+                configRequest = builder.build();
+            }
         } else {
             configRequest = new ConfigRequest.Builder().build();
         }
@@ -334,7 +367,7 @@ public class WifiAwareServiceImpl extends IWifiAwareManager.Stub {
         }
 
         if (mVerboseLoggingEnabled) {
-            Log.v(TAG, "connect: uid=" + uid + ", clientId=" + clientId + ", configRequest"
+            Log.v(TAG, "connect: uid=" + uid + ", clientId=" + clientId + ", configRequest="
                     + configRequest + ", notifyOnIdentityChanged=" + notifyOnIdentityChanged);
         }
 
@@ -816,5 +849,10 @@ public class WifiAwareServiceImpl extends IWifiAwareManager.Stub {
 
     private void enforceNetworkStackPermission() {
         mContext.enforceCallingOrSelfPermission(Manifest.permission.NETWORK_STACK, TAG);
+    }
+
+    private boolean checkNetworkStackPermission() {
+        return mContext.checkCallingOrSelfPermission(Manifest.permission.NETWORK_STACK)
+                == PackageManager.PERMISSION_GRANTED;
     }
 }

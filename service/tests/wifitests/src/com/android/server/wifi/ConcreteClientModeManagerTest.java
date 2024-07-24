@@ -61,9 +61,10 @@ import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.ims.ImsMmTelManager;
 import android.telephony.ims.RegistrationManager;
-import android.test.suitebuilder.annotation.SmallTest;
 import android.util.LocalLog;
 import android.util.Log;
+
+import androidx.test.filters.SmallTest;
 
 import com.android.server.wifi.ClientModeManagerBroadcastQueue.QueuedBroadcast;
 import com.android.wifi.resources.R;
@@ -94,6 +95,7 @@ public class ConcreteClientModeManagerTest extends WifiBaseTest {
     private static final int TEST_ACTIVE_SUBSCRIPTION_ID = 1;
     private static final WorkSource TEST_WORKSOURCE = new WorkSource();
     private static final WorkSource TEST_WORKSOURCE2 = new WorkSource();
+    private static final int TEST_UID = 435546654;
 
     TestLooper mLooper;
 
@@ -487,6 +489,37 @@ public class ConcreteClientModeManagerTest extends WifiBaseTest {
                 WIFI_STATE_ENABLING);
     }
 
+    @Test
+    public void testSwitchFromConnectModeToScanOnlyModeFail() throws Exception {
+        startClientInConnectModeAndVerifyEnabled();
+
+        // mock wifi native role switch failure
+        when(mWifiNative.switchClientInterfaceToScanMode(any(), any()))
+                .thenReturn(false);
+        InOrder inOrder = inOrder(mContext);
+        mClientModeManager.setRole(ROLE_CLIENT_SCAN_ONLY, TEST_WORKSOURCE);
+        mLooper.dispatchAll();
+
+        // Verify callback received for failed transition
+        verify(mListener).onStartFailure(mClientModeManager);
+
+        // First check WIFI_STATE_DISABLING is broadcast as the CMM tries to switch to scan only
+        // mode
+        inOrder.verify(mContext, atLeastOnce()).sendStickyBroadcastAsUser(
+                argThat(intent ->
+                        intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, -1)
+                                == WifiManager.WIFI_STATE_DISABLING),
+                any());
+
+        // Then verify WIFI_STATE_DISABLED is broadcast due to WifiNative failing
+        // to switch CMM role.
+        inOrder.verify(mContext).sendStickyBroadcastAsUser(
+                argThat(intent ->
+                        intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE, -1)
+                                == WIFI_STATE_DISABLED),
+                any());
+    }
+
     /**
      * Switch ClientModeManager from Connect mode to ScanOnly mode.
      */
@@ -744,6 +777,33 @@ public class ConcreteClientModeManagerTest extends WifiBaseTest {
         when(mCarrierConfigBundle
                 .getInt(eq(CarrierConfigManager.Ims.KEY_WIFI_OFF_DEFERRING_TIME_MILLIS_INT)))
                 .thenReturn(wifiOffDeferringTimeMs);
+    }
+
+    /**
+     * Secondary CMM will stop without deferring.
+     */
+    @Test
+    public void clientModeStopWithWifiOffDeferringTimeWithWifiCallingOnSecondaryTransient()
+            throws Exception {
+        setUpVoWifiTest(true,
+                TEST_WIFI_OFF_DEFERRING_TIME_MS);
+        startClientInConnectModeAndVerifyEnabled();
+        reset(mContext, mListener);
+        setUpSystemServiceForContext();
+
+        // Make sure CMM is not primary
+        mClientModeManager.setRole(ROLE_CLIENT_SECONDARY_TRANSIENT, TEST_WORKSOURCE);
+        mLooper.dispatchAll();
+
+        // Stop CMM and verify the Defer stop code is skipped
+        mClientModeManager.stop();
+        mLooper.dispatchAll();
+        when(mClientModeImpl.hasQuit()).thenReturn(true);
+        mClientModeManager.onClientModeImplQuit();
+        verify(mListener).onStopped(mClientModeManager);
+        verify(mImsMmTelManager, never()).registerImsRegistrationCallback(any(), any());
+        verify(mImsMmTelManager, never()).unregisterImsRegistrationCallback(any());
+        verify(mWifiMetrics).noteWifiOff(eq(false), eq(false), anyInt());
     }
 
     /**
@@ -1534,6 +1594,12 @@ public class ConcreteClientModeManagerTest extends WifiBaseTest {
 
         mClientModeManager.setShouldReduceNetworkScore(false);
         verify(mClientModeImpl, times(2)).setShouldReduceNetworkScore(false);
+
+        mClientModeManager.onIdleModeChanged(true);
+        verify(mClientModeImpl).onIdleModeChanged(true);
+
+        mClientModeManager.onIdleModeChanged(false);
+        verify(mClientModeImpl).onIdleModeChanged(false);
     }
 
     @Test
@@ -1542,14 +1608,14 @@ public class ConcreteClientModeManagerTest extends WifiBaseTest {
 
         IBinder iBinder = mock(IBinder.class);
         IWifiConnectedNetworkScorer iScorer = mock(IWifiConnectedNetworkScorer.class);
-        mClientModeManager.setWifiConnectedNetworkScorer(iBinder, iScorer);
-        verify(mClientModeImpl).setWifiConnectedNetworkScorer(iBinder, iScorer);
+        mClientModeManager.setWifiConnectedNetworkScorer(iBinder, iScorer, TEST_UID);
+        verify(mClientModeImpl).setWifiConnectedNetworkScorer(iBinder, iScorer, TEST_UID);
 
         mClientModeManager.clearWifiConnectedNetworkScorer();
         verify(mClientModeImpl).clearWifiConnectedNetworkScorer();
 
-        mClientModeManager.setWifiConnectedNetworkScorer(iBinder, iScorer);
-        verify(mClientModeImpl, times(2)).setWifiConnectedNetworkScorer(iBinder, iScorer);
+        mClientModeManager.setWifiConnectedNetworkScorer(iBinder, iScorer, TEST_UID);
+        verify(mClientModeImpl, times(2)).setWifiConnectedNetworkScorer(iBinder, iScorer, TEST_UID);
 
         mClientModeManager.onNetworkSwitchAccepted(1, "macAddress");
         verify(mClientModeImpl).onNetworkSwitchAccepted(1, "macAddress");

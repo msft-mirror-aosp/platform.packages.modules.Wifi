@@ -60,9 +60,7 @@
     <string name="wifi_p2p_to_message" msgid="3809923305696994787">"பெறுநர்:"</string>
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"பின்வரும் அவசியமான பின்னை உள்ளிடவும்:"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"பின்:"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tablet" msgid="2875937871590955304">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> உடன் டேப்லெட் இணைக்கப்படும்போது, வைஃபையிலிருந்து தற்காலிகமாகத் துண்டிக்கப்படும்."</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tv" msgid="9133053225387001827">"உங்கள் Android TV <xliff:g id="DEVICE_NAME">%1$s</xliff:g> சாதனத்துடன் இணைக்கப்பட்டிருக்கும் போது வைஃபையிலிருந்து தற்காலிகமாகத் துண்டிக்கப்படும்"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="default" msgid="2226863827636191980">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> உடன் மொபைல் இணைக்கப்படும்போது, வைஃபையிலிருந்து தற்காலிகமாகத் துண்டிக்கப்படும்."</string>
+    <string name="wifi_p2p_frequency_conflict_message" msgid="8535404941723941766">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> உடன் இணைக்கப்பட்டிருக்கும்போது உங்கள் சாதனம் வைஃபை இணைப்பில் இருந்து தற்காலிகமாகத் துண்டிக்கப்படும்"</string>
     <string name="dlg_ok" msgid="254496739491689405">"சரி"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_title" msgid="2344570489693915253">"<xliff:g id="SSID">%1$s</xliff:g> உடன் இணைக்க முடியவில்லை"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_message" msgid="4834133226521813352">"தனியுரிமை அமைப்புகளை மாற்ற தட்டி மீண்டும் முயலவும்"</string>
@@ -162,14 +160,14 @@
     <string name="wifi_enable_request_dialog_positive_button" msgid="6050832555821470466">"அனுமதி"</string>
     <string name="wifi_enable_request_dialog_negative_button" msgid="4754219902374918882">"அனுமதிக்க வேண்டாம்"</string>
     <string name="wifi_enabled_apm_first_time_title" msgid="4814302384637588804">"விமானப் பயன்முறையில் வைஃபை இயக்கத்திலேயே இருக்கும்"</string>
-    <string name="wifi_enabled_apm_first_time_message" msgid="5443101896157496353">"வைஃபையை இயக்கத்தில் வைத்திருந்தால், அடுத்த முறை நீங்கள் விமானப் பயன்முறையைப் பயன்படுத்தும்போது உங்கள் மொபைல் வைஃபையை இயக்கத்தில் வைக்கும்"</string>
+    <string name="wifi_enabled_apm_first_time_message" msgid="6416193199042203037">"நீங்கள் வைஃபையை இயக்கத்தில் வைத்திருந்தால், அடுத்த முறை நீங்கள் விமானப் பயன்முறையில் இருக்கும்போது உங்கள் சாதனம் அதை இயக்கத்திலேயே வைத்திருக்கும்"</string>
     <string name="apm_enabled_first_time_title" msgid="2534167413190488009">"வைஃபை இயக்கத்திலேயே இருக்கும்"</string>
-    <string name="apm_enabled_first_time_message" msgid="4753441005253327841">"உங்கள் மொபைல் விமானப் பயன்முறையில் இருக்கும்போது வைஃபையை இயக்கத்திலேயே வைத்திருக்கும். வைஃபையைப் பயன்படுத்த விரும்பவில்லை என்றால் அதை முடக்கவும்."</string>
+    <string name="apm_enabled_first_time_message" msgid="6093911536874954410">"உங்கள் சாதனம் விமானப் பயன்முறையில் வைஃபையை இயக்கத்திலேயே வைத்திருக்கும். வைஃபையை இயக்கத்தில் வைத்திருக்க விரும்பவில்லை எனில் நீங்கள் அதை முடக்கலாம்."</string>
     <string name="wifi_network_disabled_by_admin_title" msgid="9057697656855227293">"நெட்வொர்க் கிடைக்கவில்லை"</string>
     <string name="wifi_network_disabled_by_admin_message" msgid="7830360441333155462">"<xliff:g id="SSID">%1$s</xliff:g> உங்கள் நிர்வாகியால் முடக்கப்பட்டுள்ளது."</string>
     <string name="wifi_network_disabled_by_admin_button" msgid="3350310756265122689">"மூடுக"</string>
-    <string name="wifi_network_switch_dialog_title" msgid="4387595800316985421">"வைஃபை நெட்வொர்க்குகளை மாற்றவா?"</string>
-    <string name="wifi_network_switch_dialog_message" msgid="1122837977780086429">"இணையதளத்தில் இணைப்பதற்காக <xliff:g id="SSID_0">%1$s</xliff:g> காட்டப்படவில்லை. <xliff:g id="SSID_1">%2$s</xliff:g>க்கு மாற்றவா?"</string>
+    <string name="wifi_network_switch_dialog_title_no_internet" msgid="4116969009784041242">"<xliff:g id="SSID_0">%1$s</xliff:g> இணையத்துடன் இணைக்கப்படவில்லை. <xliff:g id="SSID_1">%2$s</xliff:g>க்கு மாற்றவா?"</string>
+    <string name="wifi_network_switch_dialog_title_bad_internet" msgid="6013385270249705547">"<xliff:g id="SSID_0">%1$s</xliff:g> தரம் குறைவாக உள்ளது. <xliff:g id="SSID_1">%2$s</xliff:g>க்கு மாற்றவா?"</string>
     <string name="wifi_network_switch_dialog_positive_button" msgid="7845507995422722454">"மாற்று"</string>
     <string name="wifi_network_switch_dialog_negative_button" msgid="1496665895689498806">"மாற்ற வேண்டாம்"</string>
 </resources>

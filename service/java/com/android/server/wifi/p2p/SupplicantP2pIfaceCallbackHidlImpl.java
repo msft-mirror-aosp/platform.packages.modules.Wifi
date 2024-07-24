@@ -63,7 +63,7 @@ public class SupplicantP2pIfaceCallbackHidlImpl extends ISupplicantP2pIfaceCallb
     }
 
     protected static void logd(String s) {
-        if (sVerboseLoggingEnabled) Log.d(TAG, s);
+        if (sVerboseLoggingEnabled) Log.d(TAG, s, null);
     }
 
     /**
@@ -449,6 +449,7 @@ public class SupplicantP2pIfaceCallbackHidlImpl extends ISupplicantP2pIfaceCallb
             mMonitor.broadcastP2pProvisionDiscoveryShowPin(mInterface, event);
         } else if (!isRequest && (configMethods & WpsConfigMethods.DISPLAY) != 0) {
             event.event = WifiP2pProvDiscEvent.ENTER_PIN;
+            event.pin = generatedPin;
             mMonitor.broadcastP2pProvisionDiscoveryEnterPin(mInterface, event);
         } else if (isRequest && (configMethods & WpsConfigMethods.DISPLAY) != 0) {
             event.event = WifiP2pProvDiscEvent.SHOW_PIN;

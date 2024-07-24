@@ -163,6 +163,13 @@ public class WifiConfigurationUtil {
     }
 
     /**
+     * Helper method to check if the provided |config| corresponds to a DPP network or not.
+     */
+    public static boolean isConfigForDppNetwork(WifiConfiguration config) {
+        return config.isSecurityType(WifiConfiguration.SECURITY_TYPE_DPP);
+    }
+
+    /**
      * Helper method to check if the provided |config| corresponds to a WEP network or not.
      */
     public static boolean isConfigForWepNetwork(WifiConfiguration config) {
@@ -252,7 +259,7 @@ public class WifiConfigurationUtil {
      * MAC randomization setting has changed or not.
      * @param existingConfig Existing WifiConfiguration object corresponding to the network.
      * @param newConfig      New WifiConfiguration object corresponding to the network.
-     * @return true if MAC randomization setting setting changed or the existing confiuration is
+     * @return true if MAC randomization setting changed or the existing configuration is
      * null and the newConfig is setting macRandomizationSetting to the default value.
      */
     public static boolean hasMacRandomizationSettingsChanged(WifiConfiguration existingConfig,
@@ -261,6 +268,22 @@ public class WifiConfigurationUtil {
             return newConfig.macRandomizationSetting != WifiConfiguration.RANDOMIZATION_AUTO;
         }
         return newConfig.macRandomizationSetting != existingConfig.macRandomizationSetting;
+    }
+
+    /**
+     * Compare existing and new WifiConfiguration objects after a network update and return if
+     * DHCP hostname setting has changed or not.
+     * @param existingConfig Existing WifiConfiguration object corresponding to the network.
+     * @param newConfig      New WifiConfiguration object corresponding to the network.
+     * @return true if DHCP hostname setting changed or the existing configuration is
+     * null and the newConfig is setting the DHCP hostname setting to the default value.
+     */
+    public static boolean hasSendDhcpHostnameEnabledChanged(WifiConfiguration existingConfig,
+            WifiConfiguration newConfig) {
+        if (existingConfig == null) {
+            return !newConfig.isSendDhcpHostnameEnabled();
+        }
+        return newConfig.isSendDhcpHostnameEnabled() != existingConfig.isSendDhcpHostnameEnabled();
     }
 
     /**
@@ -334,6 +357,10 @@ public class WifiConfigurationUtil {
             }
             if (!TextUtils.equals(newEnterpriseConfig.getDomainSuffixMatch(),
                     existingEnterpriseConfig.getDomainSuffixMatch())) {
+                return true;
+            }
+            if (newEnterpriseConfig.getMinimumTlsVersion()
+                    != existingEnterpriseConfig.getMinimumTlsVersion()) {
                 return true;
             }
         } else {
@@ -944,6 +971,9 @@ public class WifiConfigurationUtil {
             return false;
         }
         if (WifiConfigurationUtil.hasCredentialChanged(config, config1)) {
+            return false;
+        }
+        if (config.isWifi7Enabled() != config1.isWifi7Enabled()) {
             return false;
         }
         return true;

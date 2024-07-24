@@ -45,6 +45,7 @@ filegroup {
         ":framework-wifi-updatable-java-sources",
         ":framework-wifi-updatable-exported-aidl-sources",
         ":module-utils-os-aidls",
+        ":wifi_framework_aconfig_flags_lib{.generated_srcjars}",
     ],
 }
 
@@ -112,6 +113,9 @@ java_defaults {
         "androidx.annotation_annotation",
         "unsupportedappusage", // for android.compat.annotation.UnsupportedAppUsage
         "app-compat-annotations",
+        // Add aconfig-annotations-lib as a dependency for the optimization
+        "aconfig-annotations-lib",
+        "framework-configinfrastructure",
     ],
     aidl: {
         generate_get_transaction_name: true,
@@ -134,6 +138,8 @@ java_library {
     libs: [
         "framework-annotations-lib",
         "framework-connectivity.stubs.module_lib",
+        "framework-location.stubs.module_lib",
+        "framework-tethering.stubs.module_lib",
     ],
     installable: false,
     visibility: [
@@ -154,20 +160,31 @@ java_sdk_library {
 
     impl_only_libs: [
         "framework-connectivity.stubs.module_lib",
+        "framework-location.stubs.module_lib",
+        "framework-tethering.stubs.module_lib",
     ],
 
     public: {
-        libs: ["framework-connectivity.stubs"],
+        libs: [
+            "framework-connectivity.stubs",
+            "framework-location.stubs",
+            "framework-tethering.stubs",
+        ],
     },
     system: {
-        libs: ["framework-connectivity.stubs.system"],
+        libs: [
+            "framework-connectivity.stubs.system",
+            "framework-location.stubs.system",
+            "framework-tethering.stubs.system",
+        ],
     },
     module_lib: {
-        libs: ["framework-connectivity.stubs.module_lib"],
+        libs: [
+            "framework-connectivity.stubs.module_lib",
+            "framework-location.stubs.module_lib",
+            "framework-tethering.stubs.module_lib",
+        ],
     },
-    api_srcs: [
-        ":wifi_javadoc_only_files",
-    ],
 
     jarjar_rules: ":wifi-jarjar-rules",
 
@@ -196,7 +213,7 @@ java_sdk_library {
     ],
     lint: {
         strict_updatability_linting: true,
-
+        baseline_filename: "lint-baseline.xml",
     },
 }
 

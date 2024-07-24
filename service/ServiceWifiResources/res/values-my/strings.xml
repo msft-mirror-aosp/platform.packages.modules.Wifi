@@ -60,9 +60,7 @@
     <string name="wifi_p2p_to_message" msgid="3809923305696994787">"သို့:"</string>
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"လိုအပ်သော ပင် နံပါတ် ရိုက်ရန်:"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"ပင် နံပါတ်:"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tablet" msgid="2875937871590955304">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> နှင့် ဆက်သွယ်ထားစဉ် တက်ဘလက်ဟာ Wi-Fi  နှင့် ဆက်သွယ်မှု ရပ်ဆိုင်းထားမှာ ဖြစ်ပါတယ်"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tv" msgid="9133053225387001827">"သင်၏ Android TV စက်ပစ္စည်းသည် <xliff:g id="DEVICE_NAME">%1$s</xliff:g> သို့ ချိတ်ဆက်ထားသည့်အခါ Wi-Fi မှနေ၍ ယာယီ ချိတ်ဆက်မှုဖြုတ်သွားပါမည်။"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="default" msgid="2226863827636191980">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> ကို ဆက်သွယ်ထားစဉ် ဖုန်းအား ဝိုင်ဖိုင်မှ ဆက်သွယ်မှု ရပ်ဆိုင်းထားပါမည်"</string>
+    <string name="wifi_p2p_frequency_conflict_message" msgid="8535404941723941766">"သင့်စက်သည် <xliff:g id="DEVICE_NAME">%1$s</xliff:g> သို့ ချိတ်ဆက်ထားစဉ် Wi-Fi နှင့် ချိတ်ဆက်မှုကို ယာယီဖြုတ်ထားမည်"</string>
     <string name="dlg_ok" msgid="254496739491689405">"OK"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_title" msgid="2344570489693915253">"<xliff:g id="SSID">%1$s</xliff:g> နှင့် ချိတ်ဆက်၍မရပါ။"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_message" msgid="4834133226521813352">"ကိုယ်ရေးလုံခြုံမှုဆက်တင်ကို ပြောင်းရန် တို့ပြီးနောက် ပြန်စမ်းကြည့်ပါ"</string>
@@ -162,14 +160,14 @@
     <string name="wifi_enable_request_dialog_positive_button" msgid="6050832555821470466">"ခွင့်ပြုရန်"</string>
     <string name="wifi_enable_request_dialog_negative_button" msgid="4754219902374918882">"ခွင့်မပြုပါ"</string>
     <string name="wifi_enabled_apm_first_time_title" msgid="4814302384637588804">"လေယာဉ်ပျံမုဒ်တွင် Wi‑Fi ပွင့်နေသည်"</string>
-    <string name="wifi_enabled_apm_first_time_message" msgid="5443101896157496353">"Wi‑Fi ဆက်ဖွင့်ထားပါက နောက်တစ်ကြိမ်လေယာဉ်ပျံမုဒ် သုံးချိန်တွင် ၎င်းဆက်ဖွင့်ရန် သင့်ဖုန်းက မှတ်ထားမည်။"</string>
+    <string name="wifi_enabled_apm_first_time_message" msgid="6416193199042203037">"Wi‑Fi ဆက်ဖွင့်ထားပါက နောက်တစ်ကြိမ်လေယာဉ်ပျံမုဒ် သုံးချိန်တွင် ၎င်းဆက်ဖွင့်ရန် သင့်စက်က မှတ်ထားမည်"</string>
     <string name="apm_enabled_first_time_title" msgid="2534167413190488009">"Wi‑Fi ဆက်ပွင့်နေသည်"</string>
-    <string name="apm_enabled_first_time_message" msgid="4753441005253327841">"လေယာဉ်ပျံမုဒ်သုံးစဉ် Wi-Fi ဆက်ဖွင့်ထားရန် သင့်ဖုန်းက မှတ်မိသည်။ Wi‑Fi ဆက်ဖွင့်မထားလိုပါက ပိတ်နိုင်သည်။"</string>
+    <string name="apm_enabled_first_time_message" msgid="6093911536874954410">"လေယာဉ်ပျံမုဒ်သုံးစဉ် Wi-Fi ဆက်ဖွင့်ထားရန် သင့်စက်က မှတ်မိသည်။ Wi‑Fi ဆက်ဖွင့်မထားလိုပါက ပိတ်နိုင်သည်။"</string>
     <string name="wifi_network_disabled_by_admin_title" msgid="9057697656855227293">"ကွန်ရက်မရနိုင်ပါ"</string>
     <string name="wifi_network_disabled_by_admin_message" msgid="7830360441333155462">"သင့်စီမံခန့်ခွဲသူက <xliff:g id="SSID">%1$s</xliff:g> ကို ပိတ်ထားသည်။"</string>
     <string name="wifi_network_disabled_by_admin_button" msgid="3350310756265122689">"ပိတ်ရန်"</string>
-    <string name="wifi_network_switch_dialog_title" msgid="4387595800316985421">"Wi‑Fi ကွန်ရက်များကို ပြောင်းမလား။"</string>
-    <string name="wifi_network_switch_dialog_message" msgid="1122837977780086429">"<xliff:g id="SSID_0">%1$s</xliff:g> ကို အင်တာနက်နှင့် ချိတ်ဆက်ထားပုံမရပါ။ <xliff:g id="SSID_1">%2$s</xliff:g> သို့ ပြောင်းမလား။"</string>
+    <string name="wifi_network_switch_dialog_title_no_internet" msgid="4116969009784041242">"<xliff:g id="SSID_0">%1$s</xliff:g> ကို အင်တာနက်နှင့် ချိတ်ဆက်ထားပုံမရပါ။ <xliff:g id="SSID_1">%2$s</xliff:g> သို့ ပြောင်းမလား။"</string>
+    <string name="wifi_network_switch_dialog_title_bad_internet" msgid="6013385270249705547">"<xliff:g id="SSID_0">%1$s</xliff:g> သည် အရည်အသွေးနိမ့်သည်။ <xliff:g id="SSID_1">%2$s</xliff:g> သို့ ပြောင်းမလား။"</string>
     <string name="wifi_network_switch_dialog_positive_button" msgid="7845507995422722454">"ပြောင်းရန်"</string>
     <string name="wifi_network_switch_dialog_negative_button" msgid="1496665895689498806">"မပြောင်းပါနှင့်"</string>
 </resources>

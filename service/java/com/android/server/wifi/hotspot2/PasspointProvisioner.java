@@ -77,7 +77,7 @@ public class PasspointProvisioner {
     private static final int PROVISIONING_FAILURE = 1;
 
     // TLS version to be used for HTTPS connection with OSU server
-    private static final String TLS_VERSION = "TLSv1";
+    private static final String TLS_VERSION = "TLS";
 
     private final Context mContext;
     private final ProvisioningStateMachine mProvisioningStateMachine;
@@ -1023,10 +1023,8 @@ public class PasspointProvisioner {
             osuProvider.setOsuSsid(null);
 
             // Filter non-Passpoint AP out and sort it by descending order of signal strength.
-            scanResults = scanResults.stream()
-                    .filter((scanResult) -> scanResult.isPasspointNetwork())
-                    .sorted((sr1, sr2) -> sr2.level - sr1.level)
-                    .collect(Collectors.toList());
+            scanResults.removeIf((scanResult) -> !scanResult.isPasspointNetwork());
+            scanResults.sort((sr1, sr2) -> sr2.level - sr1.level);
 
             for (ScanResult scanResult : scanResults) {
                 // Lookup OSU Providers ANQP element by ANQPNetworkKey.

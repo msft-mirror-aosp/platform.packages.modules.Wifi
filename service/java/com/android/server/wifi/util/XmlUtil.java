@@ -363,9 +363,11 @@ public class XmlUtil {
         public static final String XML_TAG_ROAMING_CONSORTIUM_OIS = "RoamingConsortiumOIs";
         public static final String XML_TAG_RANDOMIZED_MAC_ADDRESS = "RandomizedMacAddress";
         public static final String XML_TAG_MAC_RANDOMIZATION_SETTING = "MacRandomizationSetting";
+        public static final String XML_TAG_SEND_DHCP_HOSTNAME = "SendDhcpHostname";
         public static final String XML_TAG_CARRIER_ID = "CarrierId";
         public static final String XML_TAG_SUBSCRIPTION_ID = "SubscriptionId";
         public static final String XML_TAG_IS_AUTO_JOIN = "AutoJoinEnabled";
+        public static final String XML_TAG_PRIORITY = "Priority";
         public static final String XML_TAG_DELETION_PRIORITY = "DeletionPriority";
         public static final String XML_TAG_NUM_REBOOTS_SINCE_LAST_USE = "NumRebootsSinceLastUse";
 
@@ -384,11 +386,12 @@ public class XmlUtil {
         private static final String XML_TAG_IS_RESTRICTED = "IsRestricted";
         private static final String XML_TAG_SUBSCRIPTION_GROUP = "SubscriptionGroup";
         public static final String XML_TAG_BSSID_ALLOW_LIST = "bssidAllowList";
-        private static final String XML_TAG_IS_REPEATER_ENABLED = "RepeaterEnabled";
+        public static final String XML_TAG_IS_REPEATER_ENABLED = "RepeaterEnabled";
         public static final String XML_TAG_DPP_PRIVATE_EC_KEY = "DppPrivateEcKey";
         public static final String XML_TAG_DPP_CONNECTOR = "DppConnector";
         public static final String XML_TAG_DPP_CSIGN_KEY = "DppCSignKey";
         public static final String XML_TAG_DPP_NET_ACCESS_KEY = "DppNetAccessKey";
+        public static final String XML_TAG_ENABLE_WIFI7 = "EnableWifi7";
 
         /**
          * Write Wep Keys to the XML stream.
@@ -423,7 +426,7 @@ public class XmlUtil {
             EncryptedData[] encryptedDataArray = new EncryptedData[len];
             for (int i = 0; i < len; i++) {
                 if (wepKeys[i] == null) {
-                    encryptedDataArray[i] = new EncryptedData(null, null);
+                    encryptedDataArray[i] = new EncryptedData(new byte[0], new byte[0]);
                 } else {
                     encryptedDataArray[i] = encryptionUtil.encrypt(wepKeys[i].getBytes());
                     if (encryptedDataArray[i] == null) {
@@ -514,7 +517,7 @@ public class XmlUtil {
             EncryptedData encryptedData = null;
             if (encryptionUtil != null) {
                 encryptedData = encryptionUtil.encrypt(data);
-                if (encryptedData == null) {
+                if (encryptedData == null && data != null && data.length != 0) {
                     // We silently fail encryption failures!
                     Log.wtf(TAG, "Encryption of " + tag + " failed");
                 }
@@ -591,6 +594,7 @@ public class XmlUtil {
                     configuration.allowedSuiteBCiphers.toByteArray());
             XmlUtil.writeNextValue(out, XML_TAG_SHARED, configuration.shared);
             XmlUtil.writeNextValue(out, XML_TAG_IS_AUTO_JOIN, configuration.allowAutojoin);
+            XmlUtil.writeNextValue(out, XML_TAG_PRIORITY, configuration.priority);
             XmlUtil.writeNextValue(
                     out, XML_TAG_DELETION_PRIORITY,
                     configuration.getDeletionPriority());
@@ -599,7 +603,10 @@ public class XmlUtil {
                     configuration.numRebootsSinceLastUse);
             XmlUtil.writeNextValue(out, XML_TAG_IS_REPEATER_ENABLED,
                     configuration.isRepeaterEnabled());
+            XmlUtil.writeNextValue(out, XML_TAG_ENABLE_WIFI7, configuration.isWifi7Enabled());
             writeSecurityParamsListToXml(out, configuration);
+            XmlUtil.writeNextValue(out, XML_TAG_SEND_DHCP_HOSTNAME,
+                    configuration.isSendDhcpHostnameEnabled());
         }
 
         /**
@@ -733,7 +740,12 @@ public class XmlUtil {
             List<String> wepKeyList = new ArrayList<>();
             final List<EncryptedData> encryptedDataList =
                     XmlUtil.EncryptedDataXmlUtil.parseListFromXml(in, outerTagDepth);
+            EncryptedData emptyData = new EncryptedData(new byte[0], new byte[0]);
             for (int i = 0; i < encryptedDataList.size(); i++) {
+                if (encryptedDataList.get(i).equals(emptyData)) {
+                    wepKeyList.add(null);
+                    continue;
+                }
                 byte[] passphraseBytes = encryptionUtil.decrypt(encryptedDataList.get(i));
                 if (passphraseBytes == null) {
                     Log.wtf(TAG, "Decryption of passphraseBytes failed");
@@ -849,6 +861,7 @@ public class XmlUtil {
             WifiConfiguration configuration = new WifiConfiguration();
             String configKeyInData = null;
             boolean macRandomizationSettingExists = false;
+            boolean sendDhcpHostnameExists = false;
             byte[] dppConnector = null;
             byte[] dppCSign = null;
             byte[] dppNetAccessKey = null;
@@ -987,6 +1000,10 @@ public class XmlUtil {
                             configuration.macRandomizationSetting = (int) value;
                             macRandomizationSettingExists = true;
                             break;
+                        case XML_TAG_SEND_DHCP_HOSTNAME:
+                            configuration.setSendDhcpHostnameEnabled((boolean) value);
+                            sendDhcpHostnameExists = true;
+                            break;
                         case XML_TAG_CARRIER_ID:
                             configuration.carrierId = (int) value;
                             break;
@@ -995,6 +1012,9 @@ public class XmlUtil {
                             break;
                         case XML_TAG_IS_AUTO_JOIN:
                             configuration.allowAutojoin = (boolean) value;
+                            break;
+                        case XML_TAG_PRIORITY:
+                            configuration.priority = (int) value;
                             break;
                         case XML_TAG_DELETION_PRIORITY:
                             configuration.setDeletionPriority((int) value);
@@ -1042,6 +1062,9 @@ public class XmlUtil {
                             break;
                         case XML_TAG_DPP_NET_ACCESS_KEY:
                             dppNetAccessKey = (byte[]) value;
+                            break;
+                        case XML_TAG_ENABLE_WIFI7:
+                            configuration.setWifi7Enabled((boolean) value);
                             break;
                         default:
                             Log.w(TAG, "Ignoring unknown value name found: " + valueName[0]);
@@ -1109,6 +1132,12 @@ public class XmlUtil {
             if (configuration.macRandomizationSetting
                     == WifiConfiguration.RANDOMIZATION_PERSISTENT && !fromSuggestion) {
                 configuration.macRandomizationSetting = WifiConfiguration.RANDOMIZATION_AUTO;
+            }
+            if (!sendDhcpHostnameExists) {
+                // Update legacy configs to send the DHCP hostname for secure networks only.
+                configuration.setSendDhcpHostnameEnabled(
+                        !configuration.isSecurityType(WifiConfiguration.SECURITY_TYPE_OPEN)
+                        && !configuration.isSecurityType(WifiConfiguration.SECURITY_TYPE_OWE));
             }
             configuration.convertLegacyFieldsToSecurityParamsIfNeeded();
             configuration.setDppConnectionKeys(dppConnector, dppCSign, dppNetAccessKey);
@@ -1374,6 +1403,8 @@ public class XmlUtil {
         public static final String XML_TAG_HAS_EVER_CONNECTED = "HasEverConnected";
         public static final String XML_TAG_IS_CAPTIVE_PORTAL_NEVER_DETECTED =
                 "CaptivePortalNeverDetected";
+        public static final String XML_TAG_HAS_EVER_VALIDATED_INTERNET_ACCESS =
+                "HasEverValidatedInternetAccess";
         public static final String XML_TAG_CONNECT_CHOICE_RSSI = "ConnectChoiceRssi";
 
         /**
@@ -1397,6 +1428,8 @@ public class XmlUtil {
                     out, XML_TAG_HAS_EVER_CONNECTED, selectionStatus.hasEverConnected());
             XmlUtil.writeNextValue(out, XML_TAG_IS_CAPTIVE_PORTAL_NEVER_DETECTED,
                     selectionStatus.hasNeverDetectedCaptivePortal());
+            XmlUtil.writeNextValue(out, XML_TAG_HAS_EVER_VALIDATED_INTERNET_ACCESS,
+                    selectionStatus.hasEverValidatedInternetAccess());
         }
 
         /**
@@ -1415,6 +1448,10 @@ public class XmlUtil {
             // Initialize hasNeverDetectedCaptivePortal to "false" for upgrading legacy configs
             // which do not have the XML_TAG_IS_CAPTIVE_PORTAL_NEVER_DETECTED tag.
             selectionStatus.setHasNeverDetectedCaptivePortal(false);
+
+            // Initialize hasEverValidatedInternetAccess to "true" for existing configs which don't
+            // have any value stored.
+            selectionStatus.setHasEverValidatedInternetAccess(true);
 
             // Loop through and parse out all the elements from the stream within this section.
             while (!XmlUtil.isNextSectionEnd(in, outerTagDepth)) {
@@ -1441,6 +1478,10 @@ public class XmlUtil {
                         break;
                     case XML_TAG_IS_CAPTIVE_PORTAL_NEVER_DETECTED:
                         selectionStatus.setHasNeverDetectedCaptivePortal((boolean) value);
+                        break;
+                    case XML_TAG_HAS_EVER_VALIDATED_INTERNET_ACCESS:
+                        selectionStatus.setHasEverValidatedInternetAccess((boolean) value);
+                        break;
                     default:
                         Log.w(TAG, "Ignoring unknown value name found: " + valueName[0]);
                         break;
@@ -1506,6 +1547,8 @@ public class XmlUtil {
         public static final String XML_TAG_TRUST_ON_FIRST_USE = "TrustOnFirstUse";
         public static final String XML_TAG_USER_APPROVE_NO_CA_CERT = "UserApproveNoCaCert";
         public static final String XML_TAG_MINIMUM_TLS_VERSION = "MinimumTlsVersion";
+        public static final String XML_TAG_TOFU_DIALOG_STATE = "TofuDialogState";
+        public static final String XML_TAG_TOFU_CONNECTION_STATE = "TofuConnectionState";
 
         /**
          * Write password key to the XML stream.
@@ -1595,6 +1638,10 @@ public class XmlUtil {
                     enterpriseConfig.isUserApproveNoCaCert());
             XmlUtil.writeNextValue(out, XML_TAG_MINIMUM_TLS_VERSION,
                     enterpriseConfig.getMinimumTlsVersion());
+            XmlUtil.writeNextValue(out, XML_TAG_TOFU_DIALOG_STATE,
+                    enterpriseConfig.getTofuDialogState());
+            XmlUtil.writeNextValue(out, XML_TAG_TOFU_CONNECTION_STATE,
+                    enterpriseConfig.getTofuConnectionState());
         }
 
         /**
@@ -1719,6 +1766,12 @@ public class XmlUtil {
                             break;
                         case XML_TAG_MINIMUM_TLS_VERSION:
                             enterpriseConfig.setMinimumTlsVersion((int) value);
+                            break;
+                        case XML_TAG_TOFU_DIALOG_STATE:
+                            enterpriseConfig.setTofuDialogState((int) value);
+                            break;
+                        case XML_TAG_TOFU_CONNECTION_STATE:
+                            enterpriseConfig.setTofuConnectionState((int) value);
                             break;
                         default:
                             Log.w(TAG, "Ignoring unknown value name found: " + valueName[0]);

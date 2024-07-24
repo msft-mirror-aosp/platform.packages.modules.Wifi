@@ -33,6 +33,11 @@ TEST_MESSAGE = 'test message!'
 
 MESSAGE_ID = 1234
 
+def setup_aware_pairing(device, is_publish, with_password, accept):
+    if is_publish:
+        device.wifi_aware_snippet.respondToPairingSetup(with_password, accept)
+    else:
+        device.wifi_aware_snippet.initiatePairingSetup(with_password, accept)
 
 class WifiAwareTest(base_test.BaseTestClass):
 
@@ -55,6 +60,15 @@ class WifiAwareTest(base_test.BaseTestClass):
             setup_device, ((self.publisher,), (self.subscriber,)),
             max_workers=2,
             raise_on_exception=True)
+
+    def on_fail(self, record):
+        logging.info('Collecting bugreports...')
+        android_device.take_bug_reports(
+            ads=[self.publisher, self.subscriber],
+            test_name=record.test_name,
+            begin_time=record.begin_time,
+            destination=self.current_test_info.output_path
+        )
 
     def test_discovery_base_test_case(self):
         is_unsolicited = True
@@ -84,8 +98,11 @@ class WifiAwareTest(base_test.BaseTestClass):
 
         self.publisher.wifi_aware_snippet.publish(is_unsolicited, is_ranging_required, True)
         self.subscriber.wifi_aware_snippet.subscribe(is_unsolicited, is_ranging_required, True)
-        self.subscriber.wifi_aware_snippet.initiatePairingSetup(True, True)
-        self.subscriber.wifi_aware_snippet.respondToPairingSetup(True, True)
+        utils.concurrent_exec(
+            setup_aware_pairing, ((self.publisher, True, True, True),
+                                  (self.subscriber, False, True, True)),
+            max_workers=2,
+            raise_on_exception=True)
 
     def test_aware_pairing_reject_test_case(self):
         is_pairing_supported = self.publisher.wifi_aware_snippet.checkIfPairingSupported() and \
@@ -99,9 +116,11 @@ class WifiAwareTest(base_test.BaseTestClass):
 
         self.publisher.wifi_aware_snippet.publish(is_unsolicited, is_ranging_required, True)
         self.subscriber.wifi_aware_snippet.subscribe(is_unsolicited, is_ranging_required, True)
-        self.subscriber.wifi_aware_snippet.initiatePairingSetup(True, False)
-        self.subscriber.wifi_aware_snippet.respondToPairingSetup(True, False)
-
+        utils.concurrent_exec(
+            setup_aware_pairing, ((self.publisher, True, True, False),
+                                  (self.subscriber, False, True, False)),
+            max_workers=2,
+            raise_on_exception=True)
 
 if __name__ == '__main__':
     # Take test args

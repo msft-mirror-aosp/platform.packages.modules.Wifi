@@ -60,9 +60,7 @@
     <string name="wifi_p2p_to_message" msgid="3809923305696994787">"ለ፦"</string>
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"የሚፈለገውን ፒን ተይብ፦"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"ፒን፦"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tablet" msgid="2875937871590955304">"ጡባዊው ከ<xliff:g id="DEVICE_NAME">%1$s</xliff:g> ጋር ተገናኝቶ ባለበት ጊዜ በጊዜያዊነት ከWi-Fi ጋር ይላቀቃል"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tv" msgid="9133053225387001827">"ወደ <xliff:g id="DEVICE_NAME">%1$s</xliff:g> ተገናኝቶ ሳለ የእርስዎ Android TV መሣሪያ ለጊዜው ከ Wi-Fi ግንኙነቱ ይቋረጣል"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="default" msgid="2226863827636191980">"ስልኩ ከ<xliff:g id="DEVICE_NAME">%1$s</xliff:g> ጋር ተገናኝቶ ባለበት ጊዜ በጊዜያዊነት ከWi-Fi ጋር ያለው ግንኙነት ይቋረጣል"</string>
+    <string name="wifi_p2p_frequency_conflict_message" msgid="8535404941723941766">"መሣሪያዎ ከ<xliff:g id="DEVICE_NAME">%1$s</xliff:g> ጋር በሚገናኝበት ጊዜ ለጊዜው ከWi-Fi ጋር ግንኙነቱ ይቋረጣል"</string>
     <string name="dlg_ok" msgid="254496739491689405">"እሺ"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_title" msgid="2344570489693915253">"ከ<xliff:g id="SSID">%1$s</xliff:g> ጋር መገናኘት አልተቻለም"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_message" msgid="4834133226521813352">"የግላዊነት ቅንብሮችን ለመቀየር መታ ያድርጉ እና ዳግም ይሞክሩ"</string>
@@ -162,14 +160,14 @@
     <string name="wifi_enable_request_dialog_positive_button" msgid="6050832555821470466">"ፍቀድ"</string>
     <string name="wifi_enable_request_dialog_negative_button" msgid="4754219902374918882">"አትፍቀድ"</string>
     <string name="wifi_enabled_apm_first_time_title" msgid="4814302384637588804">"በአውሮፕላን ሁነታ ላይ Wi-Fi በርቷል"</string>
-    <string name="wifi_enabled_apm_first_time_message" msgid="5443101896157496353">"Wi‑Fiን አብርተው የሚያቆዩ ከሆነ ቀጣይ በአውሮፕላን ሁነታ ላይ ሲሆኑ ስልክዎ አብርቶ ማቆየትን ያስታውሳል።"</string>
+    <string name="wifi_enabled_apm_first_time_message" msgid="6416193199042203037">"Wi‑Fiን አብርተው የሚያቆዩ ከሆነ ቀጣይ በአውሮፕላን ሁነታ ላይ ሲሆኑ መሣሪያዎ እሱን አብርቶ ማቆየትን ያስታውሳል።"</string>
     <string name="apm_enabled_first_time_title" msgid="2534167413190488009">"Wi-Fi በርቶ ይቆያል"</string>
-    <string name="apm_enabled_first_time_message" msgid="4753441005253327841">"ስልክዎ በአውሮፕላን ሁነታ ላይ Wi-Fiን አብርቶ ማቆየትን ያስታውሳል። በርቶ እንዲቆይ ካልፈለጉ Wi-Fiን ያጥፉ።"</string>
+    <string name="apm_enabled_first_time_message" msgid="6093911536874954410">"መሣሪያዎ በአውሮፕላን ሁነታ ውስጥ Wi-Fiን አብርቶ ማቆየትን ያስታውሳል። በርቶ እንዲቆይ ካልፈለጉ Wi-Fiን ያጥፉ።"</string>
     <string name="wifi_network_disabled_by_admin_title" msgid="9057697656855227293">"የማይገኝ አውታረ መረብ"</string>
     <string name="wifi_network_disabled_by_admin_message" msgid="7830360441333155462">"<xliff:g id="SSID">%1$s</xliff:g> በእርስዎ አስተዳዳሪ ተሰናክሏል።"</string>
     <string name="wifi_network_disabled_by_admin_button" msgid="3350310756265122689">"ዝጋ"</string>
-    <string name="wifi_network_switch_dialog_title" msgid="4387595800316985421">"የWi-Fi አውታረ መረቦች ይቀየሩ?"</string>
-    <string name="wifi_network_switch_dialog_message" msgid="1122837977780086429">"<xliff:g id="SSID_0">%1$s</xliff:g> ከበይነመረቡ ጋር የተገናኘ አይመስልም። ወደ <xliff:g id="SSID_1">%2$s</xliff:g> ይቀየር?"</string>
+    <string name="wifi_network_switch_dialog_title_no_internet" msgid="4116969009784041242">"<xliff:g id="SSID_0">%1$s</xliff:g> ከበይነመረቡ ጋር የተገናኘ አይመስልም። ወደ <xliff:g id="SSID_1">%2$s</xliff:g> ይቀየር?"</string>
+    <string name="wifi_network_switch_dialog_title_bad_internet" msgid="6013385270249705547">"<xliff:g id="SSID_0">%1$s</xliff:g> ዝቅተኛ ጥራት ነው። ወደ <xliff:g id="SSID_1">%2$s</xliff:g> ይቀየር?"</string>
     <string name="wifi_network_switch_dialog_positive_button" msgid="7845507995422722454">"ቀይር"</string>
     <string name="wifi_network_switch_dialog_negative_button" msgid="1496665895689498806">"አትቀይር"</string>
 </resources>

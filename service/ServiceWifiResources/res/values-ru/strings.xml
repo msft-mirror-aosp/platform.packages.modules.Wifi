@@ -60,9 +60,7 @@
     <string name="wifi_p2p_to_message" msgid="3809923305696994787">"Кому:"</string>
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"Введите PIN-код:"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"PIN-код:"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tablet" msgid="2875937871590955304">"При подключении к устройству <xliff:g id="DEVICE_NAME">%1$s</xliff:g> планшетный ПК будет временно отключаться от сети Wi-Fi"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tv" msgid="9133053225387001827">"При подключении к устройству <xliff:g id="DEVICE_NAME">%1$s</xliff:g> устройство Android TV будет временно отключаться от сети Wi-Fi."</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="default" msgid="2226863827636191980">"При подключении к устройству <xliff:g id="DEVICE_NAME">%1$s</xliff:g> телефон будет временно отключаться от сети Wi-Fi"</string>
+    <string name="wifi_p2p_frequency_conflict_message" msgid="8535404941723941766">"На время подключения к устройству <xliff:g id="DEVICE_NAME">%1$s</xliff:g> ваше устройство отключится от сети Wi-Fi."</string>
     <string name="dlg_ok" msgid="254496739491689405">"ОК"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_title" msgid="2344570489693915253">"Не удалось подключиться к устройству \"<xliff:g id="SSID">%1$s</xliff:g>\""</string>
     <string name="wifi_cannot_connect_with_randomized_mac_message" msgid="4834133226521813352">"Нажмите, чтобы изменить настройки конфиденциальности и повторить попытку."</string>
@@ -162,14 +160,14 @@
     <string name="wifi_enable_request_dialog_positive_button" msgid="6050832555821470466">"Разрешить"</string>
     <string name="wifi_enable_request_dialog_negative_button" msgid="4754219902374918882">"Не разрешать"</string>
     <string name="wifi_enabled_apm_first_time_title" msgid="4814302384637588804">"Wi‑Fi будет включен в режиме полета"</string>
-    <string name="wifi_enabled_apm_first_time_message" msgid="5443101896157496353">"Если не отключить функцию Wi-Fi, в следующий раз она останется включенной в режиме полета."</string>
+    <string name="wifi_enabled_apm_first_time_message" msgid="6416193199042203037">"Если не отключить функцию Wi-Fi, в следующий раз она останется включенной в режиме полета."</string>
     <string name="apm_enabled_first_time_title" msgid="2534167413190488009">"Функция Wi‑Fi остается включенной"</string>
-    <string name="apm_enabled_first_time_message" msgid="4753441005253327841">"Функция Wi‑Fi останется включенной в режиме полета. Вы можете отключить ее, если хотите."</string>
+    <string name="apm_enabled_first_time_message" msgid="6093911536874954410">"Функция Wi‑Fi останется включенной в режиме полета. Вы можете отключить ее, если хотите."</string>
     <string name="wifi_network_disabled_by_admin_title" msgid="9057697656855227293">"Сеть недоступна"</string>
     <string name="wifi_network_disabled_by_admin_message" msgid="7830360441333155462">"Администратор отключил функцию \"<xliff:g id="SSID">%1$s</xliff:g>\"."</string>
     <string name="wifi_network_disabled_by_admin_button" msgid="3350310756265122689">"Закрыть"</string>
-    <string name="wifi_network_switch_dialog_title" msgid="4387595800316985421">"Перейти на другую сеть Wi‑Fi?"</string>
-    <string name="wifi_network_switch_dialog_message" msgid="1122837977780086429">"Сеть <xliff:g id="SSID_0">%1$s</xliff:g> не подключена к интернету. Перейти на <xliff:g id="SSID_1">%2$s</xliff:g>?"</string>
+    <string name="wifi_network_switch_dialog_title_no_internet" msgid="4116969009784041242">"Сеть <xliff:g id="SSID_0">%1$s</xliff:g> не подключена к интернету. Перейти на <xliff:g id="SSID_1">%2$s</xliff:g>?"</string>
+    <string name="wifi_network_switch_dialog_title_bad_internet" msgid="6013385270249705547">"У сети <xliff:g id="SSID_0">%1$s</xliff:g> низкое качество. Перейти на <xliff:g id="SSID_1">%2$s</xliff:g>?"</string>
     <string name="wifi_network_switch_dialog_positive_button" msgid="7845507995422722454">"Перейти"</string>
     <string name="wifi_network_switch_dialog_negative_button" msgid="1496665895689498806">"Нет"</string>
 </resources>

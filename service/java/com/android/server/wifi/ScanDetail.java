@@ -25,7 +25,6 @@ import androidx.annotation.Nullable;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.wifi.hotspot2.NetworkDetail;
-import com.android.server.wifi.hotspot2.Utils;
 import com.android.server.wifi.hotspot2.anqp.ANQPElement;
 import com.android.server.wifi.hotspot2.anqp.Constants;
 import com.android.server.wifi.hotspot2.anqp.HSFriendlyNameElement;
@@ -43,6 +42,7 @@ public class ScanDetail {
     private volatile NetworkDetail mNetworkDetail;
     private long mSeen = 0;
     private byte[] mInformationElementRawData;
+    private static final ScanResult.Builder sBuilder = new ScanResult.Builder();
 
     /**
      * Main constructor used when converting from NativeScanResult
@@ -60,6 +60,7 @@ public class ScanDetail {
         int centerFreq1 = ScanResult.UNSPECIFIED;
         boolean isPasspoint = false;
         boolean is80211McResponder = false;
+        boolean isTwtResponder = false;
         if (networkDetail != null) {
             hessid = networkDetail.getHESSID();
             anqpDomainId = networkDetail.getAnqpDomainID();
@@ -67,12 +68,27 @@ public class ScanDetail {
             channelWidth = networkDetail.getChannelWidth();
             centerFreq0 = networkDetail.getCenterfreq0();
             centerFreq1 = networkDetail.getCenterfreq1();
-            isPasspoint = caps.contains("EAP")
-                    && networkDetail.isInterworking() && networkDetail.getHSRelease() != null;
+            isPasspoint =
+                    caps.contains("EAP")
+                            && !caps.contains("SUITE_B_192")
+                            && networkDetail.isInterworking()
+                            && networkDetail.getHSRelease() != null;
             is80211McResponder = networkDetail.is80211McResponderSupport();
+            isTwtResponder = networkDetail.isIndividualTwtSupported();
         }
-        mScanResult = new ScanResult(wifiSsid, bssid, hessid, anqpDomainId, osuProviders, caps,
-                level, frequency, tsf);
+        sBuilder.clear();
+        mScanResult = sBuilder
+                .setWifiSsid(wifiSsid)
+                .setBssid(bssid)
+                .setHessid(hessid)
+                .setAnqpDomainId(anqpDomainId)
+                .setOsuProviders(osuProviders)
+                .setCaps(caps)
+                .setRssi(level)
+                .setFrequency(frequency)
+                .setTsf(tsf)
+                .setIsTwtResponder(isTwtResponder)
+                .build();
         mSeen = System.currentTimeMillis();
         mScanResult.seen = mSeen;
         mScanResult.channelWidth = channelWidth;
@@ -182,8 +198,7 @@ public class ScanDetail {
         if (networkDetail != null) {
             return networkDetail.toKeyString();
         } else {
-            return "'" + mScanResult.BSSID + "':" + Utils.macToSimpleString(
-                    Utils.parseMac(mScanResult.BSSID));
+            return "'" + mScanResult.SSID + "':" + mScanResult.BSSID;
         }
     }
 
@@ -212,11 +227,6 @@ public class ScanDetail {
 
     @Override
     public String toString() {
-        try {
-            return "'" + mScanResult.BSSID + "'/" + Utils.macToSimpleString(
-                    Utils.parseMac(mScanResult.BSSID));
-        } catch (IllegalArgumentException iae) {
-            return "'" + mScanResult.BSSID + "'/----";
-        }
+        return "'" + mScanResult.SSID + "'/" + mScanResult.BSSID;
     }
 }

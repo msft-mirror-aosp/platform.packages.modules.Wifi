@@ -73,6 +73,8 @@ public class WifiInfoTest {
     private static final int TEST_MLO_LINK_ID = 3;
     private static final int TEST_CHANNEL = 36;
     private static final int TEST_LINK_SPEED = 300;
+    private static final List<OuiKeyedData> TEST_VENDOR_DATA =
+            OuiKeyedDataUtil.createTestOuiKeyedDataList(5);
 
     private void addMloInfo(WifiInfo info) {
         info.setApMldMacAddress(MacAddress.fromString(AP_MLD_MAC_ADDRESS));
@@ -164,6 +166,9 @@ public class WifiInfoTest {
         if (SdkLevel.isAtLeastT()) {
             addMloInfo(info);
         }
+        if (SdkLevel.isAtLeastV()) {
+            info.setVendorData(TEST_VENDOR_DATA);
+        }
 
         return info;
     }
@@ -210,6 +215,9 @@ public class WifiInfoTest {
         }
         if (SdkLevel.isAtLeastT()) {
             assertMloNoRedaction(info);
+        }
+        if (SdkLevel.isAtLeastV()) {
+            assertTrue(TEST_VENDOR_DATA.equals(info.getVendorData()));
         }
     }
 
@@ -521,6 +529,9 @@ public class WifiInfoTest {
         writeWifiInfo.setIsPrimary(true);
         writeWifiInfo.setRestricted(true);
         writeWifiInfo.enableApTidToLinkMappingNegotiationSupport(true);
+        if (SdkLevel.isAtLeastV()) {
+            writeWifiInfo.setVendorData(TEST_VENDOR_DATA);
+        }
 
         WifiInfo readWifiInfo = new WifiInfo(writeWifiInfo);
 
@@ -548,6 +559,9 @@ public class WifiInfoTest {
             assertTrue(readWifiInfo.isPrimary());
         }
         assertTrue(readWifiInfo.isApTidToLinkMappingNegotiationSupported());
+        if (SdkLevel.isAtLeastV()) {
+            assertTrue(TEST_VENDOR_DATA.equals(readWifiInfo.getVendorData()));
+        }
     }
 
     /**
@@ -577,6 +591,10 @@ public class WifiInfoTest {
         assertNull(wifiInfo.getApMldMacAddress());
         assertEquals(0, wifiInfo.getAffiliatedMloLinks().size());
         assertFalse(wifiInfo.isApTidToLinkMappingNegotiationSupported());
+        if (SdkLevel.isAtLeastV()) {
+            assertNotNull(wifiInfo.getVendorData());
+            assertTrue(wifiInfo.getVendorData().isEmpty());
+        }
     }
 
     /**
@@ -833,6 +851,10 @@ public class WifiInfoTest {
         link1.setRxLinkSpeedMbps(TEST_LINK_SPEED);
         link1.setTxLinkSpeedMbps(TEST_LINK_SPEED);
         link1.setState(MloLink.MLO_LINK_STATE_UNASSOCIATED);
+        link1.setLostTxPacketsPerSecond(10);
+        link1.setRetriedTxPacketsRate(20);
+        link1.setSuccessfulTxPacketsPerSecond(30);
+        link1.setSuccessfulRxPacketsPerSecond(40);
 
         // Make sure all parameters are set.
         assertNotNull(link1.getApMacAddress());
@@ -846,6 +868,15 @@ public class WifiInfoTest {
         assertEquals(TEST_MLO_LINK_ID, link1.getLinkId());
         assertEquals(WifiScanner.WIFI_BAND_5_GHZ, link1.getBand());
         assertEquals(MloLink.MLO_LINK_STATE_UNASSOCIATED, link1.getState());
+        assertEquals(10, link1.getLostTxPacketsPerSecond(), 0);
+        assertEquals(20, link1.getRetriedTxPacketsPerSecond(), 0);
+        assertEquals(30, link1.getSuccessfulTxPacketsPerSecond(), 0);
+        assertEquals(40, link1.getSuccessfulRxPacketsPerSecond(), 0);
+        // Check default values
+        assertEquals(0, link1.txBad);
+        assertEquals(0, link1.txRetries);
+        assertEquals(0, link1.txSuccess);
+        assertEquals(0, link1.rxSuccess);
 
         // Test RSSI range.
         link1.setRssi(WifiInfo.INVALID_RSSI - 1);

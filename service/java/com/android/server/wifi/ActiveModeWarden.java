@@ -18,6 +18,8 @@ package com.android.server.wifi;
 
 import static android.net.wifi.WifiManager.IFACE_IP_MODE_LOCAL_ONLY;
 import static android.net.wifi.WifiManager.IFACE_IP_MODE_TETHERED;
+import static android.net.wifi.WifiManager.SAP_START_FAILURE_GENERAL;
+import static android.net.wifi.WifiManager.WIFI_AP_STATE_FAILED;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLED;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLING;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
@@ -47,6 +49,7 @@ import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiNetworkStateChangedListener;
 import android.net.wifi.SoftApCapability;
 import android.net.wifi.SoftApConfiguration;
+import android.net.wifi.SoftApState;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
@@ -139,6 +142,7 @@ public class ActiveModeWarden {
     private final DppManager mDppManager;
     private final UserManager mUserManager;
     private final LastCallerInfoManager mLastCallerInfoManager;
+    private final WifiGlobals mWifiGlobals;
 
     private WifiServiceImpl.SoftApCallbackInternal mSoftApCallback;
     private WifiServiceImpl.SoftApCallbackInternal mLohsCallback;
@@ -156,6 +160,7 @@ public class ActiveModeWarden {
             WifiManager.DEVICE_MOBILITY_STATE_UNKNOWN;
     /** Cache to store the external scorer for primary and secondary (MBB) client mode manager. */
     @Nullable private Pair<IBinder, IWifiConnectedNetworkScorer> mClientModeManagerScorer;
+    private int mScorerUid;
 
     @Nullable
     private ConcreteClientModeManager mLastPrimaryClientModeManager = null;
@@ -172,6 +177,9 @@ public class ActiveModeWarden {
     private Network mCurrentNetwork;
     @GuardedBy("mServiceApiLock")
     private WifiInfo mCurrentConnectionInfo = new WifiInfo();
+
+    @GuardedBy("mServiceApiLock")
+    private final ArraySet<WorkSource> mRequestWs = new ArraySet<>();
 
     /**
      * One of  {@link WifiManager#WIFI_STATE_DISABLED},
@@ -208,6 +216,17 @@ public class ActiveModeWarden {
         }
     }
 
+    /**
+     * Get the request WorkSource for secondary LOCAL-ONLY CMM
+     *
+     * @return the WorkSources of the current secondary LOCAL-ONLY CMMs
+     */
+    public Set<WorkSource> getSecondaryRequestWs() {
+        synchronized (mServiceApiLock) {
+            return new ArraySet<>(mRequestWs);
+        }
+    }
+
     private String getWifiStateName() {
         switch (mWifiState.get()) {
             case WIFI_STATE_DISABLING:
@@ -232,6 +251,17 @@ public class ActiveModeWarden {
      */
     public int getWifiState() {
         return mWifiState.get();
+    }
+
+    /**
+     * Notify changes in PowerManager#isDeviceIdleMode
+     */
+    public void onIdleModeChanged(boolean isIdle) {
+        // only client mode managers need to get notified for now to consider enabling/disabling
+        // firmware roaming
+        for (ClientModeManager cmm : mClientModeManagers) {
+            cmm.onIdleModeChanged(isIdle);
+        }
     }
 
     /**
@@ -356,7 +386,8 @@ public class ActiveModeWarden {
             WifiPermissionsUtil wifiPermissionsUtil,
             WifiMetrics wifiMetrics,
             ExternalScoreUpdateObserverProxy externalScoreUpdateObserverProxy,
-            DppManager dppManager) {
+            DppManager dppManager,
+            WifiGlobals wifiGlobals) {
         mWifiInjector = wifiInjector;
         mLooper = looper;
         mHandler = new Handler(looper);
@@ -376,6 +407,7 @@ public class ActiveModeWarden {
         mGraveyard = new Graveyard();
         mUserManager = mWifiInjector.getUserManager();
         mLastCallerInfoManager = mWifiInjector.getLastCallerInfoManager();
+        mWifiGlobals = wifiGlobals;
 
         wifiNative.registerStatusListener(isReady -> {
             if (!isReady && !mIsShuttingdown) {
@@ -405,8 +437,8 @@ public class ActiveModeWarden {
                     }
                     if (newPrimaryClientModeManager != null && mClientModeManagerScorer != null) {
                         newPrimaryClientModeManager.setWifiConnectedNetworkScorer(
-                                mClientModeManagerScorer.first,
-                                mClientModeManagerScorer.second);
+                                mClientModeManagerScorer.first, mClientModeManagerScorer.second,
+                                mScorerUid);
                     }
                 });
     }
@@ -475,7 +507,7 @@ public class ActiveModeWarden {
      * WifiManager.WifiConnectedNetworkScorer)}
      */
     public boolean setWifiConnectedNetworkScorer(IBinder binder,
-            IWifiConnectedNetworkScorer scorer) {
+            IWifiConnectedNetworkScorer scorer, int callerUid) {
         try {
             scorer.onSetScoreUpdateObserver(mExternalScoreUpdateObserverProxy);
         } catch (RemoteException e) {
@@ -483,7 +515,9 @@ public class ActiveModeWarden {
             return false;
         }
         mClientModeManagerScorer = Pair.create(binder, scorer);
-        return getPrimaryClientModeManager().setWifiConnectedNetworkScorer(binder, scorer);
+        mScorerUid = callerUid;
+        return getPrimaryClientModeManager().setWifiConnectedNetworkScorer(binder, scorer,
+                callerUid);
     }
 
     /**
@@ -491,6 +525,7 @@ public class ActiveModeWarden {
      */
     public void clearWifiConnectedNetworkScorer() {
         mClientModeManagerScorer = null;
+        mScorerUid = Process.WIFI_UID;
         getPrimaryClientModeManager().clearWifiConnectedNetworkScorer();
     }
 
@@ -684,6 +719,7 @@ public class ActiveModeWarden {
                 }
             }, new IntentFilter(TelephonyManager.ACTION_EMERGENCY_CALL_STATE_CHANGED));
         }
+        mWifiGlobals.setD2dStaConcurrencySupported(mWifiNative.isP2pStaConcurrencySupported());
         // Initialize the supported feature set.
         setSupportedFeatureSet(mWifiNative.getSupportedFeatureSet(null),
                 mWifiNative.isStaApConcurrencySupported(),
@@ -1272,12 +1308,33 @@ public class ActiveModeWarden {
         }
     }
 
+    private List<ConcreteClientModeManager> getClientModeManagersPrimaryLast() {
+        List<ConcreteClientModeManager> primaries = new ArrayList<>();
+        List<ConcreteClientModeManager> others = new ArrayList<>();
+        for (ConcreteClientModeManager clientModeManager : mClientModeManagers) {
+            if (clientModeManager.getRole() == ROLE_CLIENT_PRIMARY) {
+                primaries.add(clientModeManager);
+            } else {
+                others.add(clientModeManager);
+            }
+        }
+        if (primaries.size() > 1) {
+            Log.wtf(TAG, "More than 1 primary CMM detected when turning off Wi-Fi");
+            mWifiDiagnostics.takeBugReport("Wi-Fi ActiveModeWarden bugreport",
+                    "Multiple primary CMMs detected when turning off Wi-Fi.");
+        }
+        List<ConcreteClientModeManager> result = new ArrayList<>();
+        result.addAll(others);
+        result.addAll(primaries);
+        return result;
+    }
+
     /**
      * Method to stop all client mode mangers.
      */
     private void stopAllClientModeManagers() {
         Log.d(TAG, "Shutting down all client mode managers");
-        for (ConcreteClientModeManager clientModeManager : mClientModeManagers) {
+        for (ConcreteClientModeManager clientModeManager : getClientModeManagersPrimaryLast()) {
             clientModeManager.stop();
         }
     }
@@ -1361,6 +1418,11 @@ public class ActiveModeWarden {
         ConcreteClientModeManager manager = mWifiInjector.makeClientModeManager(
                 listener, requestorWs, role, mVerboseLoggingEnabled);
         mClientModeManagers.add(manager);
+        if (ROLE_CLIENT_LOCAL_ONLY.equals(role)) {
+            synchronized (mServiceApiLock) {
+                mRequestWs.add(new WorkSource(requestorWs));
+            }
+        }
         return true;
     }
 
@@ -1374,6 +1436,14 @@ public class ActiveModeWarden {
             @NonNull WorkSource requestorWs) {
         Log.d(TAG, "Switching role for additional ClientModeManager to role: " + role);
         ClientListener listener = new ClientListener(externalRequestListener);
+        synchronized (mServiceApiLock) {
+            mRequestWs.remove(manager.getRequestorWs());
+        }
+        if (ROLE_CLIENT_LOCAL_ONLY.equals(role)) {
+            synchronized (mServiceApiLock) {
+                mRequestWs.add(new WorkSource(requestorWs));
+            }
+        }
         manager.setRole(role, requestorWs, listener);
         return true;
     }
@@ -1446,8 +1516,8 @@ public class ActiveModeWarden {
     @VisibleForTesting
     Collection<ActiveModeManager> getActiveModeManagers() {
         ArrayList<ActiveModeManager> activeModeManagers = new ArrayList<>();
-        activeModeManagers.addAll(mClientModeManagers);
         activeModeManagers.addAll(mSoftApManagers);
+        activeModeManagers.addAll(getClientModeManagersPrimaryLast());
         return activeModeManagers;
     }
 
@@ -1624,6 +1694,11 @@ public class ActiveModeWarden {
 
         private void onStoppedOrStartFailure(ConcreteClientModeManager clientModeManager) {
             mClientModeManagers.remove(clientModeManager);
+            if (ROLE_CLIENT_LOCAL_ONLY.equals(clientModeManager.getPreviousRole())) {
+                synchronized (mServiceApiLock) {
+                    mRequestWs.remove(clientModeManager.getRequestorWs());
+                }
+            }
             mGraveyard.inter(clientModeManager);
             updateClientScanMode();
             updateBatteryStats();
@@ -1976,8 +2051,9 @@ public class ActiveModeWarden {
                                     softApConfig.getTargetMode() == IFACE_IP_MODE_LOCAL_ONLY
                                             ? mLohsCallback : mSoftApCallback;
                             // need to notify SoftApCallback that start/stop AP failed
-                            callback.onStateChanged(WifiManager.WIFI_AP_STATE_FAILED,
-                                    WifiManager.SAP_START_FAILURE_GENERAL);
+                            callback.onStateChanged(new SoftApState(
+                                    WIFI_AP_STATE_FAILED, SAP_START_FAILURE_GENERAL,
+                                    softApConfig.getTetheringRequest(), null /* iface */));
                         }
                         break;
                     default:
@@ -2035,7 +2111,7 @@ public class ActiveModeWarden {
             }
 
             @Override
-            String getMessageLogRec(int what) {
+            public String getMessageLogRec(int what) {
                 return ActiveModeWarden.class.getSimpleName() + "."
                         + DefaultState.class.getSimpleName() + "." + getWhatToString(what);
             }
@@ -2068,17 +2144,17 @@ public class ActiveModeWarden {
             }
 
             @Override
-            String getMessageLogRec(int what) {
+            public String getMessageLogRec(int what) {
                 return ActiveModeWarden.class.getSimpleName() + "."
                         + DefaultState.class.getSimpleName() + "." + getWhatToString(what);
             }
 
             @Override
-            void enterImpl() {
+            public void enterImpl() {
             }
 
             @Override
-            void exitImpl() {
+            public void exitImpl() {
             }
 
             private void checkAndHandleAirplaneModeState() {
@@ -2166,7 +2242,8 @@ public class ActiveModeWarden {
         }
 
         private boolean shouldEnableSta() {
-            return mSettingsStore.isWifiToggleEnabled() || shouldEnableScanOnlyMode();
+            return (mSettingsStore.isWifiToggleEnabled() || shouldEnableScanOnlyMode())
+                    && !mSettingsStore.isSatelliteModeOn();
         }
 
         private void handleStaToggleChangeInDisabledState(WorkSource requestorWs) {
@@ -2330,6 +2407,13 @@ public class ActiveModeWarden {
 
             private void handleAdditionalClientModeManagerRequest(
                     @NonNull AdditionalClientModeManagerRequestInfo requestInfo) {
+                if (mWifiState.get() == WIFI_STATE_DISABLING
+                        || mWifiState.get() == WIFI_STATE_DISABLED) {
+                    // Do no allow getting secondary CMM when wifi is being disabled or disabled.
+                    requestInfo.listener.onAnswer(null);
+                    return;
+                }
+
                 ClientModeManager primaryManager = getPrimaryClientModeManagerNullable();
                 // TODO(b/228529090): Remove this special code once root cause is resolved.
                 // Special case for holders with ENTER_CAR_MODE_PRIORITIZED. Only give them the
@@ -2431,8 +2515,7 @@ public class ActiveModeWarden {
 
                 // fallback decision
                 if (requestInfo.clientRole == ROLE_CLIENT_LOCAL_ONLY
-                        && mContext.getResources().getBoolean(
-                        R.bool.config_wifiMultiStaLocalOnlyConcurrencyEnabled)
+                        && isStaStaConcurrencySupportedForLocalOnlyConnections()
                         && !mWifiPermissionsUtil.isTargetSdkLessThan(
                         requestInfo.requestorWs.getPackageName(0), Build.VERSION_CODES.S,
                         requestInfo.requestorWs.getUid(0))) {
@@ -2488,6 +2571,15 @@ public class ActiveModeWarden {
                                 // airplane mode toggle message to disable airplane mode.
                                 deferMessage(msg);
                             } else {
+                                if (!hasPrimaryOrScanOnlyModeManager()) {
+                                    // SoftAp was enabled during airplane mode and caused
+                                    // WifiController to be in EnabledState without
+                                    // a primary client mode manager.
+                                    // Defer to the default state to handle the airplane mode toggle
+                                    // which may result in enabling wifi if necessary.
+                                    log("airplane mode toggled - and no primary manager");
+                                    return NOT_HANDLED;
+                                }
                                 // when airplane mode is toggled off, but wifi is on, we can keep it
                                 // on
                                 log("airplane mode toggled - and airplane mode is off. return "
@@ -2672,6 +2764,17 @@ public class ActiveModeWarden {
             // It doesn't relate the vendor HAL, set if overlay enables it.
             additionalFeatureSet |= WifiManager.WIFI_FEATURE_STA_BRIDGED_AP;
         }
+        if (mWifiGlobals.isWepSupported()) {
+            additionalFeatureSet |= WifiManager.WIFI_FEATURE_WEP;
+        }
+
+        if (!mWifiGlobals.isWpaPersonalDeprecated()) {
+            // The WPA didn't be deprecated, set it.
+            additionalFeatureSet |= WifiManager.WIFI_FEATURE_WPA_PERSONAL;
+        }
+        if (mWifiGlobals.isD2dSupportedWhenInfraStaDisabled()) {
+            additionalFeatureSet |= WifiManager.WIFI_FEATURE_D2D_WHEN_INFRA_STA_DISABLED;
+        }
         mSupportedFeatureSet.set(
                 (supportedFeatureSet | concurrencyFeatureSet | additionalFeatureSet)
                         & ~excludedFeatureSet);
@@ -2731,7 +2834,7 @@ public class ActiveModeWarden {
      */
     public @NonNull WifiInfo getConnectionInfo() {
         synchronized (mServiceApiLock) {
-            return mCurrentConnectionInfo;
+            return new WifiInfo(mCurrentConnectionInfo);
         }
     }
 

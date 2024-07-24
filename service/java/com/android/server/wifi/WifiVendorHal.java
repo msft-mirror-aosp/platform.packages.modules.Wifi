@@ -26,12 +26,16 @@ import android.content.pm.PackageManager;
 import android.hardware.wifi.WifiStatusCode;
 import android.net.MacAddress;
 import android.net.apf.ApfCapabilities;
+import android.net.wifi.OuiKeyedData;
 import android.net.wifi.ScanResult;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiAvailableChannel;
 import android.net.wifi.WifiManager;
+import android.net.wifi.WifiManager.RoamingMode;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiSsid;
+import android.net.wifi.twt.TwtRequest;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.WorkSource;
 import android.text.TextUtils;
@@ -115,6 +119,7 @@ public class WifiVendorHal {
     private final HalDeviceManagerStatusListener mHalDeviceManagerStatusCallbacks;
     private final WifiStaIface.Callback mWifiStaIfaceEventCallback;
     private final ChipEventCallback mWifiChipEventCallback;
+    private WifiNative.WifiTwtEvents mWifiTwtEvents;
 
     // Plumbing for event handling.
     //
@@ -122,7 +127,6 @@ public class WifiVendorHal {
     // some reasonable assumptions. See
     // https://docs.oracle.com/javase/specs/jls/se7/html/jls-17.html#jls-17.5
     private final Handler mHalEventHandler;
-
 
     /**
      * Wi-Fi chip related info.
@@ -390,18 +394,20 @@ public class WifiVendorHal {
      * @param band The requesting band for this AP interface.
      * @param isBridged Whether or not AP interface is a bridge interface.
      * @param softApManager SoftApManager of the request.
+     * @param vendorData List of {@link OuiKeyedData} containing vendor-provided
+     *                   configuration data. Empty list indicates no vendor data.
      * @return iface name on success, null otherwise.
      */
     public String createApIface(@Nullable InterfaceDestroyedListener destroyedListener,
             @NonNull WorkSource requestorWs,
             @SoftApConfiguration.BandType int band,
             boolean isBridged,
-            @NonNull SoftApManager softApManager) {
+            @NonNull SoftApManager softApManager, @NonNull List<OuiKeyedData> vendorData) {
         synchronized (sLock) {
             WifiApIface iface = mHalDeviceManager.createApIface(
                     getNecessaryCapabilitiesForSoftApMode(band),
                     new ApInterfaceDestroyedListenerInternal(destroyedListener), mHalEventHandler,
-                    requestorWs, isBridged, softApManager);
+                    requestorWs, isBridged, softApManager, vendorData);
             if (iface == null) {
                 mLog.err("Failed to create AP iface").flush();
                 return null;
@@ -709,6 +715,20 @@ public class WifiVendorHal {
             if (iface == null) return null;
             if (mScan == null) return null;
             return mScan.latestScanResults;
+        }
+    }
+
+    /**
+     * Gets the cached scan data.
+     *
+     * @param ifaceName Name of the interface.
+     */
+    @Nullable
+    public WifiScanner.ScanData getCachedScanData(@NonNull String ifaceName) {
+        synchronized (sLock) {
+            WifiStaIface iface = getStaIface(ifaceName);
+            if (iface == null) return null;
+            return iface.getCachedScanData();
         }
     }
 
@@ -1712,6 +1732,82 @@ public class WifiVendorHal {
             }
             eventHandler.onRssiThresholdBreached((byte) currRssi);
         }
+
+        /**
+         * Called when a TWT operation fails.
+         *
+         * @param cmdId        Unique command id which is failed
+         * @param twtErrorCode Error code
+         */
+        @Override
+        public void onTwtFailure(int cmdId, int twtErrorCode) {
+            synchronized (sLock) {
+                mHalEventHandler.post(() -> {
+                    if (mWifiTwtEvents == null) return;
+                    mWifiTwtEvents.onTwtFailure(cmdId, twtErrorCode);
+                });
+            }
+        }
+
+        /**
+         * Called when {@link WifiStaIface#setupTwtSession(int, TwtRequest)} succeeds.
+         *
+         * @param cmdId          Unique command id used in
+         *                       {@link WifiStaIface#setupTwtSession(int, TwtRequest)}
+         * @param wakeDurationUs TWT wake duration for the session in microseconds
+         * @param wakeIntervalUs TWT wake interval for the session in microseconds
+         * @param linkId         Multi link operation link id
+         * @param sessionId      TWT session id
+         */
+        @Override
+        public void onTwtSessionCreate(int cmdId, int wakeDurationUs, long wakeIntervalUs,
+                int linkId, int sessionId) {
+            synchronized (sLock) {
+                mHalEventHandler.post(() -> {
+                    if (mWifiTwtEvents == null) return;
+                    mWifiTwtEvents.onTwtSessionCreate(cmdId, wakeDurationUs, wakeIntervalUs,
+                            linkId,
+                            sessionId);
+                });
+            }
+
+        }
+
+        /**
+         * Called when TWT session is torndown by {@link WifiStaIface#tearDownTwtSession(int, int)}.
+         * Can also be called unsolicitedly by the vendor software with proper reason code.
+         *
+         * @param cmdId        Unique command id used in
+         *                     {@link WifiStaIface#tearDownTwtSession(int, int)}
+         * @param twtSessionId TWT session Id
+         */
+        @Override
+        public void onTwtSessionTeardown(int cmdId, int twtSessionId, int twtReasonCode) {
+            synchronized (sLock) {
+                mHalEventHandler.post(() -> {
+                    if (mWifiTwtEvents == null) return;
+                    mWifiTwtEvents.onTwtSessionTeardown(cmdId, twtSessionId, twtReasonCode);
+                });
+            }
+        }
+
+        /**
+         * Called as a response to {@link WifiStaIface#getStatsTwtSession(int, int)}
+         *
+         * @param cmdId        Unique command id used in
+         *                     {@link WifiStaIface#getStatsTwtSession(int, int)}
+         * @param twtSessionId TWT session Id
+         * @param twtStats     TWT stats bundle
+         */
+        @Override
+        public void onTwtSessionStats(int cmdId, int twtSessionId, Bundle twtStats) {
+            synchronized (sLock) {
+                mHalEventHandler.post(() -> {
+                    if (mWifiTwtEvents == null) return;
+                    mWifiTwtEvents.onTwtSessionStats(cmdId, twtSessionId, twtStats);
+                });
+            }
+        }
     }
 
     /**
@@ -1993,6 +2089,77 @@ public class WifiVendorHal {
             WifiStaIface iface = getStaIface(ifaceName);
             if (iface == null) return null;
             return mHalDeviceManager.getSupportedBandCombinations(iface);
+        }
+    }
+
+    /**
+     * See {@link WifiNative#setAfcChannelAllowance(WifiChip.AfcChannelAllowance)}
+     */
+    public boolean setAfcChannelAllowance(WifiChip.AfcChannelAllowance afcChannelAllowance) {
+        if (mWifiChip == null) return false;
+        return mWifiChip.setAfcChannelAllowance(afcChannelAllowance);
+    }
+
+    /**
+     * See {@link WifiNative#setRoamingMode(String, int)}.
+     */
+    public @WifiStatusCode int setRoamingMode(@NonNull String ifaceName,
+                                              @RoamingMode int roamingMode) {
+        synchronized (sLock) {
+            WifiStaIface iface = getStaIface(ifaceName);
+            if (iface == null) return WifiStatusCode.ERROR_WIFI_IFACE_INVALID;
+            return iface.setRoamingMode(roamingMode);
+        }
+    }
+
+    /**
+     * See {@link WifiNative#getTwtCapabilities(String)}
+     */
+    public Bundle getTwtCapabilities(String ifaceName) {
+        synchronized (sLock) {
+            WifiStaIface wifiStaIface = getStaIface(ifaceName);
+            if (wifiStaIface == null) return null;
+            return wifiStaIface.getTwtCapabilities();
+        }
+    }
+
+    /**
+     * See {@link WifiNative#registerTwtCallbacks(TwtManager.WifiNativeTwtEvents)}
+     */
+    public void registerTwtCallbacks(WifiNative.WifiTwtEvents wifiTwtCallback) {
+        mWifiTwtEvents = wifiTwtCallback;
+    }
+
+    /**
+     * See {@link WifiNative#setupTwtSession(int, String, TwtRequest)}
+     */
+    public boolean setupTwtSession(int cmdId, String ifaceName, TwtRequest twtRequest) {
+        synchronized (sLock) {
+            WifiStaIface wifiStaIface = getStaIface(ifaceName);
+            if (wifiStaIface == null) return false;
+            return wifiStaIface.setupTwtSession(cmdId, twtRequest);
+        }
+    }
+
+    /**
+     * See {@link WifiNative#tearDownTwtSession(int, String, int)}
+     */
+    public boolean tearDownTwtSession(int cmdId, String ifaceName, int sessionId) {
+        synchronized (sLock) {
+            WifiStaIface wifiStaIface = getStaIface(ifaceName);
+            if (wifiStaIface == null) return false;
+            return wifiStaIface.tearDownTwtSession(cmdId, sessionId);
+        }
+    }
+
+    /**
+     * See {@link WifiNative#getStatsTwtSession(int, String, int)}
+     */
+    public boolean getStatsTwtSession(int cmdId, String ifaceName, int sessionId) {
+        synchronized (sLock) {
+            WifiStaIface wifiStaIface = getStaIface(ifaceName);
+            if (wifiStaIface == null) return false;
+            return wifiStaIface.getStatsTwtSession(cmdId, sessionId);
         }
     }
 }

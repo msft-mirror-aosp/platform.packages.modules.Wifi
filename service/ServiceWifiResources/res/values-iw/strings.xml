@@ -60,9 +60,7 @@
     <string name="wifi_p2p_to_message" msgid="3809923305696994787">"אל:"</string>
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"יש להקליד את קוד האימות הנדרש:"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"קוד אימות:"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tablet" msgid="2875937871590955304">"‏הטאבלט יתנתק מרשת ה-Wi-Fi באופן זמני כשהוא מחובר אל <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="tv" msgid="9133053225387001827">"‏מכשיר ה-Android TV יתנתק מרשת ה-Wi-Fi באופן זמני כשהוא מחובר אל <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
-    <string name="wifi_p2p_frequency_conflict_message" product="default" msgid="2226863827636191980">"‏הטלפון יתנתק מרשת ה-Wi-Fi באופן זמני כשהוא מחובר אל <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
+    <string name="wifi_p2p_frequency_conflict_message" msgid="8535404941723941766">"‏המכשיר יתנתק מרשת ה-Wi-Fi באופן זמני כשהוא מחובר אל <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
     <string name="dlg_ok" msgid="254496739491689405">"אישור"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_title" msgid="2344570489693915253">"לא ניתן להתחבר אל <xliff:g id="SSID">%1$s</xliff:g>"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_message" msgid="4834133226521813352">"יש להקיש כדי לשנות את הגדרות הפרטיות ולנסות שוב"</string>
@@ -162,14 +160,14 @@
     <string name="wifi_enable_request_dialog_positive_button" msgid="6050832555821470466">"אישור"</string>
     <string name="wifi_enable_request_dialog_negative_button" msgid="4754219902374918882">"אין אישור"</string>
     <string name="wifi_enabled_apm_first_time_title" msgid="4814302384637588804">"‏Wi‑Fi מופעל במצב טיסה"</string>
-    <string name="wifi_enabled_apm_first_time_message" msgid="5443101896157496353">"‏אם חיבור ה-Wi‑Fi נשאר מופעל, הטלפון יזכור להשאיר אותו מופעל בפעם הבאה שהוא יועבר למצב טיסה"</string>
+    <string name="wifi_enabled_apm_first_time_message" msgid="6416193199042203037">"‏אם חיבור ה-Wi‑Fi נשאר מופעל, המכשיר יזכור להשאיר אותו מופעל בפעם הבאה שהוא יועבר למצב טיסה"</string>
     <string name="apm_enabled_first_time_title" msgid="2534167413190488009">"‏חיבור ה-Wi‑Fi יישאר מופעל"</string>
-    <string name="apm_enabled_first_time_message" msgid="4753441005253327841">"‏חיבור ה-Wi‑Fi בטלפון יישאר מופעל במצב טיסה. אפשר להשבית את ה-Wi-Fi אם לא רוצים שהוא יפעל."</string>
+    <string name="apm_enabled_first_time_message" msgid="6093911536874954410">"‏חיבור ה-Wi‑Fi במכשיר יישאר מופעל במצב טיסה. אפשר להשבית את ה-Wi-Fi אם לא רוצים שהוא יפעל."</string>
     <string name="wifi_network_disabled_by_admin_title" msgid="9057697656855227293">"רשת לא זמינה"</string>
     <string name="wifi_network_disabled_by_admin_message" msgid="7830360441333155462">"האדמין השבית את <xliff:g id="SSID">%1$s</xliff:g>."</string>
     <string name="wifi_network_disabled_by_admin_button" msgid="3350310756265122689">"סגירה"</string>
-    <string name="wifi_network_switch_dialog_title" msgid="4387595800316985421">"‏להחליף בין רשתות ה-Wi-Fi?"</string>
-    <string name="wifi_network_switch_dialog_message" msgid="1122837977780086429">"נראה ש<xliff:g id="SSID_0">%1$s</xliff:g> לא מחובר לאינטרנט. לעבור ל<xliff:g id="SSID_1">%2$s</xliff:g>?"</string>
+    <string name="wifi_network_switch_dialog_title_no_internet" msgid="4116969009784041242">"נראה שאין חיבור של <xliff:g id="SSID_0">%1$s</xliff:g> לאינטרנט. לעבור אל <xliff:g id="SSID_1">%2$s</xliff:g>?"</string>
+    <string name="wifi_network_switch_dialog_title_bad_internet" msgid="6013385270249705547">"האיכות של <xliff:g id="SSID_0">%1$s</xliff:g> היא נמוכה. לעבור אל <xliff:g id="SSID_1">%2$s</xliff:g>?"</string>
     <string name="wifi_network_switch_dialog_positive_button" msgid="7845507995422722454">"מעבר"</string>
     <string name="wifi_network_switch_dialog_negative_button" msgid="1496665895689498806">"לא לעבור"</string>
 </resources>

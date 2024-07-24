@@ -263,6 +263,7 @@ public class AvailableNetworkNotifier {
 
         if (mState != STATE_NO_NOTIFICATION) {
             mWifiNotificationManager.cancel(mSystemMessageNotificationId);
+            Log.i(mTag, "notification canceled");
 
             if (mRecommendedNetwork != null) {
                 Log.d(mTag, "Notification with state="
@@ -434,6 +435,7 @@ public class AvailableNetworkNotifier {
 
     private void postNotification(Notification notification) {
         mWifiNotificationManager.notify(mSystemMessageNotificationId, notification);
+        Log.i(mTag, "notification send");
     }
 
     private void handleConnectToNetworkAction() {
@@ -465,7 +467,7 @@ public class AvailableNetworkNotifier {
                             // only keep netId, discard other fields
                             new NetworkUpdateResult(result.getNetworkId()),
                             new ActionListenerWrapper(listener),
-                            Process.SYSTEM_UID, mContext.getOpPackageName()));
+                            Process.SYSTEM_UID, mContext.getOpPackageName(), null));
             addNetworkToBlocklist(mRecommendedNetwork.SSID);
         }
 
