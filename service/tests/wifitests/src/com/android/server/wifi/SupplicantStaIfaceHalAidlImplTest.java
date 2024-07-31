@@ -1432,6 +1432,9 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
     public void testIeDiffers() throws Exception {
         executeAndValidateInitializationSequence();
         assertNotNull(mISupplicantStaIfaceCallback);
+        executeAndValidateConnectSequenceWithKeyMgmt(
+                SUPPLICANT_NETWORK_ID, false, TRANSLATED_SUPPLICANT_SSID.toString(),
+                WifiConfiguration.SECURITY_TYPE_PSK, null, false);
 
         int reasonCode = StaIfaceReasonCode.IE_IN_4WAY_DIFFERS;
 
@@ -1456,6 +1459,9 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
     public void testApBusy() throws Exception {
         executeAndValidateInitializationSequence();
         assertNotNull(mISupplicantStaIfaceCallback);
+        executeAndValidateConnectSequenceWithKeyMgmt(
+                SUPPLICANT_NETWORK_ID, false, TRANSLATED_SUPPLICANT_SSID.toString(),
+                WifiConfiguration.SECURITY_TYPE_PSK, null, false);
 
         int reasonCode = StaIfaceReasonCode.DISASSOC_AP_BUSY;
 
@@ -1465,7 +1471,7 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
                 SUPPLICANT_NETWORK_ID,
                 NativeUtil.byteArrayFromArrayList(NativeUtil.decodeSsid(SUPPLICANT_SSID)), false);
         mISupplicantStaIfaceCallback.onDisconnected(
-                NativeUtil.macAddressToByteArray(BSSID), true, reasonCode);
+                NativeUtil.macAddressToByteArray(BSSID), false, reasonCode);
         verify(mWifiMonitor, never()).broadcastAuthenticationFailureEvent(any(), anyInt(),
                 anyInt(), any(), any());
     }
@@ -2286,30 +2292,6 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
     }
 
     /**
-     * Tests the handling of incorrect network passwords when
-     * onStateChanged() is used, edge case.
-     *
-     * If the disconnect reason is "IE in 4way differs", do not call it a password mismatch.
-     */
-    @Test
-    public void testIeDiffersWhenOnStateChangedIsUsed() throws Exception {
-        executeAndValidateInitializationSequence();
-        assertNotNull(mISupplicantStaIfaceCallback);
-
-        int reasonCode = StaIfaceReasonCode.IE_IN_4WAY_DIFFERS;
-
-        mISupplicantStaIfaceCallback.onStateChanged(
-                StaIfaceCallbackState.FOURWAY_HANDSHAKE,
-                NativeUtil.macAddressToByteArray(BSSID),
-                SUPPLICANT_NETWORK_ID,
-                NativeUtil.byteArrayFromArrayList(NativeUtil.decodeSsid(SUPPLICANT_SSID)), false);
-        mISupplicantStaIfaceCallback.onDisconnected(
-                NativeUtil.macAddressToByteArray(BSSID), true, reasonCode);
-        verify(mWifiMonitor, times(0)).broadcastAuthenticationFailureEvent(any(), anyInt(),
-                anyInt(), any(), any());
-    }
-
-    /**
      * Tests the handling of state change notification to
      * completed (with FILS HLP IE sent) after configuring a network.
      */
@@ -2444,6 +2426,38 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
         verify(mWifiMonitor, times(1)).broadcastNetworkNotFoundEvent(
                 eq(WLAN0_IFACE_NAME), eq(TRANSLATED_SUPPLICANT_SSID.toString()));
         validateConnectSequence(false, 4, SUPPLICANT_SSID);
+    }
+
+    /**
+     * Tests that network not found notification won't trigger connecting to the fallback SSIDs if
+     * the network has been disabled.
+     */
+    @Test
+    public void testNetworkNotFoundCallbackDoesNotConnectToFallbackAfterDisabled()
+            throws Exception {
+        when(mSupplicantStaNetworkMock.disable()).thenReturn(true);
+        executeAndValidateInitializationSequence();
+        assertNotNull(mISupplicantStaIfaceCallback);
+        // Setup mocks to return two possible original SSIDs. We will pick
+        // TRANSLATED_SUPPLICANT_SSID as the first SSID to try.
+        when(mSsidTranslator.getAllPossibleOriginalSsids(TRANSLATED_SUPPLICANT_SSID)).thenAnswer(
+                (Answer<List<WifiSsid>>) invocation -> {
+                    List<WifiSsid> ssids = new ArrayList<>();
+                    ssids.add(TRANSLATED_SUPPLICANT_SSID);
+                    ssids.add(WifiSsid.fromString(SUPPLICANT_SSID));
+                    return ssids;
+                });
+        executeAndValidateConnectSequence(SUPPLICANT_NETWORK_ID, false,
+                TRANSLATED_SUPPLICANT_SSID.toString());
+
+        // Disable the current network and issue a NETWORK_NOT_FOUND
+        assertTrue(mDut.disableCurrentNetwork(WLAN0_IFACE_NAME));
+        verify(mSupplicantStaNetworkMock).disable();
+        mISupplicantStaIfaceCallback.onNetworkNotFound(NativeUtil.byteArrayFromArrayList(
+                NativeUtil.decodeSsid(SUPPLICANT_SSID)));
+
+        // Validate that we don't initiate another connect sequence.
+        validateConnectSequence(false, 1, TRANSLATED_SUPPLICANT_SSID.toString());
     }
 
     /**
