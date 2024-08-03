@@ -695,21 +695,6 @@ public class WifiServiceImpl extends BaseWifiService {
                     null,
                     new Handler(mWifiHandlerThread.getLooper()));
 
-            mContext.registerReceiver(
-                    new BroadcastReceiver() {
-                        @Override
-                        public void onReceive(Context context, Intent intent) {
-                            if (mVerboseLoggingEnabled) {
-                                Log.v(TAG, "onReceive: MODE_CHANGED_ACTION: intent=" + intent);
-                            }
-                            updateLocationMode();
-                        }
-                    },
-                    new IntentFilter(LocationManager.MODE_CHANGED_ACTION),
-                    null,
-                    new Handler(mWifiHandlerThread.getLooper()));
-            updateLocationMode();
-
             if (SdkLevel.isAtLeastT()) {
                 mContext.registerReceiver(
                         new BroadcastReceiver() {
@@ -888,6 +873,20 @@ public class WifiServiceImpl extends BaseWifiService {
             mWifiInjector.getWifiDeviceStateChangeManager().handleBootCompleted();
             setPulledAtomCallbacks();
             mTwtManager.registerWifiNativeTwtEvents();
+            mContext.registerReceiver(
+                    new BroadcastReceiver() {
+                        @Override
+                        public void onReceive(Context context, Intent intent) {
+                            if (mVerboseLoggingEnabled) {
+                                Log.v(TAG, "onReceive: MODE_CHANGED_ACTION: intent=" + intent);
+                            }
+                            updateLocationMode();
+                        }
+                    },
+                    new IntentFilter(LocationManager.MODE_CHANGED_ACTION),
+                    null,
+                    new Handler(mWifiHandlerThread.getLooper()));
+            updateLocationMode();
         }, TAG + "#handleBootCompleted");
     }
 
@@ -7584,7 +7583,8 @@ public class WifiServiceImpl extends BaseWifiService {
                     true, TAG + " getUsableChannels");
         }
         if (mVerboseLoggingEnabled) {
-            mLog.info("getUsableChannels uid=%").c(Binder.getCallingUid()).flush();
+            mLog.info("getUsableChannels uid=% band=% mode=% filter=%").c(Binder.getCallingUid()).c(
+                    band).c(mode).c(filter).flush();
         }
         if (!isValidBandForGetUsableChannels(band)) {
             throw new IllegalArgumentException("Unsupported band: " + band);
