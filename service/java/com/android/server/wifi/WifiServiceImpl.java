@@ -28,6 +28,7 @@ import static android.net.wifi.WifiManager.LocalOnlyHotspotCallback.ERROR_GENERI
 import static android.net.wifi.WifiManager.LocalOnlyHotspotCallback.ERROR_NO_CHANNEL;
 import static android.net.wifi.WifiManager.NOT_OVERRIDE_EXISTING_NETWORKS_ON_RESTORE;
 import static android.net.wifi.WifiManager.PnoScanResultsCallback.REGISTER_PNO_CALLBACK_PNO_NOT_SUPPORTED;
+import static android.net.wifi.WifiManager.ROAMING_MODE_AGGRESSIVE;
 import static android.net.wifi.WifiManager.SAP_START_FAILURE_GENERAL;
 import static android.net.wifi.WifiManager.SAP_START_FAILURE_NO_CHANNEL;
 import static android.net.wifi.WifiManager.STATUS_NETWORK_SUGGESTIONS_SUCCESS;
@@ -695,21 +696,6 @@ public class WifiServiceImpl extends BaseWifiService {
                     null,
                     new Handler(mWifiHandlerThread.getLooper()));
 
-            mContext.registerReceiver(
-                    new BroadcastReceiver() {
-                        @Override
-                        public void onReceive(Context context, Intent intent) {
-                            if (mVerboseLoggingEnabled) {
-                                Log.v(TAG, "onReceive: MODE_CHANGED_ACTION: intent=" + intent);
-                            }
-                            updateLocationMode();
-                        }
-                    },
-                    new IntentFilter(LocationManager.MODE_CHANGED_ACTION),
-                    null,
-                    new Handler(mWifiHandlerThread.getLooper()));
-            updateLocationMode();
-
             if (SdkLevel.isAtLeastT()) {
                 mContext.registerReceiver(
                         new BroadcastReceiver() {
@@ -888,6 +874,20 @@ public class WifiServiceImpl extends BaseWifiService {
             mWifiInjector.getWifiDeviceStateChangeManager().handleBootCompleted();
             setPulledAtomCallbacks();
             mTwtManager.registerWifiNativeTwtEvents();
+            mContext.registerReceiver(
+                    new BroadcastReceiver() {
+                        @Override
+                        public void onReceive(Context context, Intent intent) {
+                            if (mVerboseLoggingEnabled) {
+                                Log.v(TAG, "onReceive: MODE_CHANGED_ACTION: intent=" + intent);
+                            }
+                            updateLocationMode();
+                        }
+                    },
+                    new IntentFilter(LocationManager.MODE_CHANGED_ACTION),
+                    null,
+                    new Handler(mWifiHandlerThread.getLooper()));
+            updateLocationMode();
         }, TAG + "#handleBootCompleted");
     }
 
@@ -7584,7 +7584,8 @@ public class WifiServiceImpl extends BaseWifiService {
                     true, TAG + " getUsableChannels");
         }
         if (mVerboseLoggingEnabled) {
-            mLog.info("getUsableChannels uid=%").c(Binder.getCallingUid()).flush();
+            mLog.info("getUsableChannels uid=% band=% mode=% filter=%").c(Binder.getCallingUid()).c(
+                    band).c(mode).c(filter).flush();
         }
         if (!isValidBandForGetUsableChannels(band)) {
             throw new IllegalArgumentException("Unsupported band: " + band);
@@ -8575,7 +8576,7 @@ public class WifiServiceImpl extends BaseWifiService {
         if (!SdkLevel.isAtLeastV()) {
             throw new UnsupportedOperationException("SDK level too old");
         }
-        if (!isAggressiveRoamingModeSupported()) {
+        if (!isAggressiveRoamingModeSupported() && roamingMode == ROAMING_MODE_AGGRESSIVE) {
             throw new UnsupportedOperationException("Aggressive roaming mode not supported");
         }
         Objects.requireNonNull(ssid, "ssid cannot be null");
@@ -8610,9 +8611,6 @@ public class WifiServiceImpl extends BaseWifiService {
         if (!SdkLevel.isAtLeastV()) {
             throw new UnsupportedOperationException("SDK level too old");
         }
-        if (!isAggressiveRoamingModeSupported()) {
-            throw new UnsupportedOperationException("Aggressive roaming mode not supported");
-        }
         Objects.requireNonNull(ssid, "ssid cannot be null");
         Objects.requireNonNull(packageName, "packageName cannot be null");
 
@@ -8641,9 +8639,6 @@ public class WifiServiceImpl extends BaseWifiService {
             @NonNull IMapListener listener) {
         if (!SdkLevel.isAtLeastV()) {
             throw new UnsupportedOperationException("SDK level too old");
-        }
-        if (!isAggressiveRoamingModeSupported()) {
-            throw new UnsupportedOperationException("Aggressive roaming mode not supported");
         }
         Objects.requireNonNull(packageName, "packageName cannot be null");
         Objects.requireNonNull(listener, "listener cannot be null");
