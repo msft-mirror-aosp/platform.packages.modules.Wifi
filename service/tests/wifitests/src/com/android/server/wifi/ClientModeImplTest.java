@@ -2261,6 +2261,17 @@ public class ClientModeImplTest extends WifiBaseTest {
         verify(mWifiNative, times(2)).connectToNetwork(eq(WIFI_IFACE_NAME), any());
     }
 
+    @Test
+    public void testWifiInfoNetworkIdSetInScanningState() throws Exception {
+        triggerConnect();
+        assertEquals(WifiConfiguration.INVALID_NETWORK_ID, mWifiInfo.getNetworkId());
+        mCmi.sendMessage(WifiMonitor.SUPPLICANT_STATE_CHANGE_EVENT, 0, 0,
+                new StateChangeResult(0, TEST_WIFI_SSID, TEST_BSSID_STR, sFreq,
+                        SupplicantState.SCANNING));
+        mLooper.dispatchAll();
+        assertEquals(0, mWifiInfo.getNetworkId());
+    }
+
     /**
      * If the interface has been switched to scan, the network disconnection event should clear the
      * current network.
