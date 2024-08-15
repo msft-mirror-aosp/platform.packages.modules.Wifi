@@ -1104,6 +1104,11 @@ public class WifiNetworkSelector {
                 || isNetworkSelectionNeeded(cmmStates);
         final String userConnectChoiceKey;
         if (!networkSelectionNeeded) {
+            if (!isAssociatedNetworkSelectionEnabled()) {
+                // Skip network selection based on connect choice because associated network
+                // selection is disabled.
+                return null;
+            }
             userConnectChoiceKey = getConnectChoiceKey(cmmStates);
             if (userConnectChoiceKey == null) {
                 return null;
@@ -1124,7 +1129,7 @@ public class WifiNetworkSelector {
                 String currentBssid = cmmState.wifiInfo.getBSSID();
                 WifiConfiguration currentNetwork =
                         mWifiConfigManager.getConfiguredNetwork(cmmState.wifiInfo.getNetworkId());
-                if (currentNetwork != null) {
+                if (currentNetwork != null && currentBssid != null) {
                     wifiCandidates.setCurrent(currentNetwork.networkId, currentBssid);
                     // We always want the current network to be a candidate so that it can
                     // participate.
@@ -1437,6 +1442,7 @@ public class WifiNetworkSelector {
                 .getConfiguredNetworkWithPassword(config.networkId);
         if (configWithPassword.isSecurityType(WifiConfiguration.SECURITY_TYPE_PSK)
                 && configWithPassword.isSecurityType(WifiConfiguration.SECURITY_TYPE_SAE)
+                && configWithPassword.preSharedKey != null
                 && !configWithPassword.preSharedKey.startsWith("\"")
                 && configWithPassword.preSharedKey.length() == 64
                 && configWithPassword.preSharedKey.matches("[0-9A-Fa-f]{64}")) {

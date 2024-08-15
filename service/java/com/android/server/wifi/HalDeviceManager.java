@@ -67,7 +67,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1114,7 +1113,6 @@ public class HalDeviceManager {
         dispatchRttControllerLifecycleOnDestroyed();
         mRttControllerLifecycleCallbacks.clear();
         mWifiP2pIfaces.clear();
-        mWifiInjector.getWifiConfigManager().writeDataToStorage();
     }
 
     private class WifiDeathRecipient implements WifiHal.DeathRecipient {
@@ -1852,6 +1850,22 @@ public class HalDeviceManager {
         }
     }
 
+    private boolean isRequestorAllowedToUseP2pNanConcurrency(WorkSource requestorWs) {
+        String[] allowlistArray = mContext.getResources().getStringArray(
+                R.array.config_wifiP2pAwareConcurrencyAllowlist);
+        if (allowlistArray == null || allowlistArray.length == 0) {
+            // No allowlist defined, so allow.
+            return true;
+        }
+        List<String> allowlist = Arrays.asList(allowlistArray);
+        for (int i = 0; i < requestorWs.size(); i++) {
+            if (allowlist.contains(requestorWs.getPackageName(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Checks whether the input chip-create-type-combo can support the requested create type:
      * if not then returns null, if yes then returns information containing the list of interfaces
@@ -1882,6 +1896,21 @@ public class HalDeviceManager {
         if (chipCreateTypeCombo[requestedCreateType] == 0) {
             if (VDBG) Log.d(TAG, "Requested create type not supported by combo");
             return null;
+        }
+
+        // Remove P2P/NAN concurrency if the requestor isn't on the allowlist.
+        if ((requestedCreateType == HDM_CREATE_IFACE_P2P
+                || requestedCreateType == HDM_CREATE_IFACE_NAN)
+                && chipCreateTypeCombo[HDM_CREATE_IFACE_P2P] > 0
+                && chipCreateTypeCombo[HDM_CREATE_IFACE_NAN] > 0) {
+            if (!isRequestorAllowedToUseP2pNanConcurrency(requestorWs)) {
+                chipCreateTypeCombo = chipCreateTypeCombo.clone();
+                if (requestedCreateType == HDM_CREATE_IFACE_P2P) {
+                    chipCreateTypeCombo[HDM_CREATE_IFACE_NAN] = 0;
+                } else {
+                    chipCreateTypeCombo[HDM_CREATE_IFACE_P2P] = 0;
+                }
+            }
         }
 
         IfaceCreationData ifaceCreationData = new IfaceCreationData();
@@ -2493,6 +2522,7 @@ public class HalDeviceManager {
             return false;
         }
 
+        boolean success = false;
         synchronized (mLock) {
             WifiChip chip = getChip(iface);
             if (chip == null) {
@@ -2505,7 +2535,6 @@ public class HalDeviceManager {
                 return false;
             }
 
-            boolean success = false;
             switch (type) {
                 case WifiChip.IFACE_TYPE_STA:
                     mClientModeManagers.remove(name);
@@ -2524,20 +2553,20 @@ public class HalDeviceManager {
                     Log.wtf(TAG, "removeIfaceInternal: invalid type=" + type);
                     return false;
             }
+        }
 
-            // dispatch listeners no matter what status
-            dispatchDestroyedListeners(name, type);
-            if (validateRttController) {
-                // Try to update the RttController
-                updateRttControllerWhenInterfaceChanges();
-            }
+        // dispatch listeners no matter what status
+        dispatchDestroyedListeners(name, type);
+        if (validateRttController) {
+            // Try to update the RttController
+            updateRttControllerWhenInterfaceChanges();
+        }
 
-            if (success) {
-                return true;
-            } else {
-                Log.e(TAG, "IWifiChip.removeXxxIface failed, name=" + name + ", type=" + type);
-                return false;
-            }
+        if (success) {
+            return true;
+        } else {
+            Log.e(TAG, "IWifiChip.removeXxxIface failed, name=" + name + ", type=" + type);
+            return false;
         }
     }
 
@@ -2547,20 +2576,19 @@ public class HalDeviceManager {
     // onlyOnOtherThreads = false: call all listeners
     private void dispatchDestroyedListeners(String name, int type) {
         if (VDBG) Log.d(TAG, "dispatchDestroyedListeners: iface(name)=" + name);
+        InterfaceCacheEntry entry;
+        List<InterfaceDestroyedListenerProxy> triggerList;
         synchronized (mLock) {
-            InterfaceCacheEntry entry = mInterfaceInfoCache.remove(Pair.create(name, type));
+            entry = mInterfaceInfoCache.remove(Pair.create(name, type));
             if (entry == null) {
                 Log.e(TAG, "dispatchDestroyedListeners: no cache entry for iface(name)=" + name);
                 return;
             }
-
-            Iterator<InterfaceDestroyedListenerProxy> iterator =
-                    entry.destroyedListeners.iterator();
-            while (iterator.hasNext()) {
-                InterfaceDestroyedListenerProxy listener = iterator.next();
-                iterator.remove();
-                listener.action();
-            }
+            triggerList = new ArrayList<>(entry.destroyedListeners);
+            entry.destroyedListeners.clear();
+        }
+        for (InterfaceDestroyedListenerProxy listener : triggerList) {
+            listener.action();
         }
     }
 
@@ -2571,9 +2599,7 @@ public class HalDeviceManager {
         List<InterfaceDestroyedListenerProxy> triggerList = new ArrayList<>();
         synchronized (mLock) {
             for (InterfaceCacheEntry cacheEntry: mInterfaceInfoCache.values()) {
-                for (InterfaceDestroyedListenerProxy listener : cacheEntry.destroyedListeners) {
-                    triggerList.add(listener);
-                }
+                triggerList.addAll(cacheEntry.destroyedListeners);
                 cacheEntry.destroyedListeners.clear(); // for insurance
             }
             mInterfaceInfoCache.clear();

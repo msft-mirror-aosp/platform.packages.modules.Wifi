@@ -21,11 +21,12 @@ import static android.net.wifi.WifiManager.WIFI_FEATURE_OWE;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP_BRIDGE;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_NAN;
-import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_STA;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_P2P;
+import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_STA;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_FEATURES;
 import static com.android.server.wifi.p2p.WifiP2pNative.P2P_IFACE_NAME;
 import static com.android.server.wifi.p2p.WifiP2pNative.P2P_INTERFACE_PROPERTY;
+import static com.android.wifi.flags.Flags.rsnOverriding;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -134,6 +135,7 @@ public class WifiNative {
     private NetdWrapper mNetdWrapper;
     private boolean mVerboseLoggingEnabled = false;
     private boolean mIsEnhancedOpenSupported = false;
+    @VisibleForTesting boolean mIsRsnOverridingSupported = false;
     private final List<CoexUnsafeChannel> mCachedCoexUnsafeChannels = new ArrayList<>();
     private int mCachedCoexRestrictions;
     private CountryCodeChangeListenerInternal mCountryCodeChangeListener;
@@ -932,11 +934,11 @@ public class WifiNative {
     private class VendorHalDeathHandlerInternal implements VendorHalDeathEventHandler {
         @Override
         public void onDeath() {
-            synchronized (mLock) {
+            mHandler.post(() -> {
                 Log.i(TAG, "Vendor HAL died. Cleaning up internal state.");
                 onNativeDaemonDeath();
                 mWifiMetrics.incrementNumHalCrashes();
-            }
+            });
         }
     }
 
@@ -947,11 +949,9 @@ public class WifiNative {
         @Override
         public void run() {
             mHandler.post(() -> {
-                synchronized (mLock) {
-                    Log.i(TAG, "wificond died. Cleaning up internal state.");
-                    onNativeDaemonDeath();
-                    mWifiMetrics.incrementNumWificondCrashes();
-                }
+                Log.i(TAG, "wificond died. Cleaning up internal state.");
+                onNativeDaemonDeath();
+                mWifiMetrics.incrementNumWificondCrashes();
             });
         }
     }
@@ -963,11 +963,9 @@ public class WifiNative {
         @Override
         public void onDeath() {
             mHandler.post(() -> {
-                synchronized (mLock) {
-                    Log.i(TAG, "wpa_supplicant died. Cleaning up internal state.");
-                    onNativeDaemonDeath();
-                    mWifiMetrics.incrementNumSupplicantCrashes();
-                }
+                Log.i(TAG, "wpa_supplicant died. Cleaning up internal state.");
+                onNativeDaemonDeath();
+                mWifiMetrics.incrementNumSupplicantCrashes();
             });
         }
     }
@@ -978,11 +976,11 @@ public class WifiNative {
     private class HostapdDeathHandlerInternal implements HostapdDeathEventHandler {
         @Override
         public void onDeath() {
-            synchronized (mLock) {
+            mHandler.post(() -> {
                 Log.i(TAG, "hostapd died. Cleaning up internal state.");
                 onNativeDaemonDeath();
                 mWifiMetrics.incrementNumHostapdCrashes();
-            }
+            });
         }
     }
 
@@ -1561,6 +1559,8 @@ public class WifiNative {
 
             iface.featureSet = getSupportedFeatureSetInternal(iface.name);
             updateSupportedBandForStaInternal(iface);
+            mIsRsnOverridingSupported = mContext.getResources().getBoolean(
+                    R.bool.config_wifiRsnOverridingEnabled) && rsnOverriding();
 
             mWifiVendorHal.enableStaChannelForPeerNetwork(mContext.getResources().getBoolean(
                             R.bool.config_wifiEnableStaIndoorChannelForPeerNetwork),
@@ -2094,6 +2094,7 @@ public class WifiNative {
                     ies,
                     result.getCapabilities(),
                     mIsEnhancedOpenSupported,
+                    mIsRsnOverridingSupported,
                     result.getFrequencyMhz(),
                     mUnknownAkmMap);
             String flags = capabilities.generateCapabilitiesString();
