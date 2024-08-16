@@ -28,6 +28,7 @@ import static android.net.wifi.WifiManager.LocalOnlyHotspotCallback.ERROR_GENERI
 import static android.net.wifi.WifiManager.LocalOnlyHotspotCallback.ERROR_NO_CHANNEL;
 import static android.net.wifi.WifiManager.NOT_OVERRIDE_EXISTING_NETWORKS_ON_RESTORE;
 import static android.net.wifi.WifiManager.PnoScanResultsCallback.REGISTER_PNO_CALLBACK_PNO_NOT_SUPPORTED;
+import static android.net.wifi.WifiManager.ROAMING_MODE_AGGRESSIVE;
 import static android.net.wifi.WifiManager.SAP_START_FAILURE_GENERAL;
 import static android.net.wifi.WifiManager.SAP_START_FAILURE_NO_CHANNEL;
 import static android.net.wifi.WifiManager.STATUS_NETWORK_SUGGESTIONS_SUCCESS;
@@ -337,7 +338,7 @@ public class WifiServiceImpl extends BaseWifiService {
     private static final String CERT_INSTALLER_PKG = "com.android.certinstaller";
 
     private final WifiSettingsConfigStore mSettingsConfigStore;
-    private final WifiResourceCache mWifiResourceCache;
+    private final WifiResourceCache mResourceCache;
 
     /**
      * Callback for use with LocalOnlyHotspot to unregister requesting applications upon death.
@@ -518,7 +519,7 @@ public class WifiServiceImpl extends BaseWifiService {
 
     public WifiServiceImpl(WifiContext context, WifiInjector wifiInjector) {
         mContext = context;
-        mWifiResourceCache = mContext.getResourceCache();
+        mResourceCache = mContext.getResourceCache();
         mWifiInjector = wifiInjector;
         mClock = wifiInjector.getClock();
 
@@ -694,21 +695,6 @@ public class WifiServiceImpl extends BaseWifiService {
                     new IntentFilter(Intent.ACTION_LOCALE_CHANGED),
                     null,
                     new Handler(mWifiHandlerThread.getLooper()));
-
-            mContext.registerReceiver(
-                    new BroadcastReceiver() {
-                        @Override
-                        public void onReceive(Context context, Intent intent) {
-                            if (mVerboseLoggingEnabled) {
-                                Log.v(TAG, "onReceive: MODE_CHANGED_ACTION: intent=" + intent);
-                            }
-                            updateLocationMode();
-                        }
-                    },
-                    new IntentFilter(LocationManager.MODE_CHANGED_ACTION),
-                    null,
-                    new Handler(mWifiHandlerThread.getLooper()));
-            updateLocationMode();
 
             if (SdkLevel.isAtLeastT()) {
                 mContext.registerReceiver(
@@ -888,6 +874,20 @@ public class WifiServiceImpl extends BaseWifiService {
             mWifiInjector.getWifiDeviceStateChangeManager().handleBootCompleted();
             setPulledAtomCallbacks();
             mTwtManager.registerWifiNativeTwtEvents();
+            mContext.registerReceiver(
+                    new BroadcastReceiver() {
+                        @Override
+                        public void onReceive(Context context, Intent intent) {
+                            if (mVerboseLoggingEnabled) {
+                                Log.v(TAG, "onReceive: MODE_CHANGED_ACTION: intent=" + intent);
+                            }
+                            updateLocationMode();
+                        }
+                    },
+                    new IntentFilter(LocationManager.MODE_CHANGED_ACTION),
+                    null,
+                    new Handler(mWifiHandlerThread.getLooper()));
+            updateLocationMode();
         }, TAG + "#handleBootCompleted");
     }
 
@@ -1609,7 +1609,7 @@ public class WifiServiceImpl extends BaseWifiService {
      */
     @Override
     public boolean isDefaultCoexAlgorithmEnabled() {
-        return mContext.getResources().getBoolean(R.bool.config_wifiDefaultCoexAlgorithmEnabled);
+        return mResourceCache.getBoolean(R.bool.config_wifiDefaultCoexAlgorithmEnabled);
     }
 
     /**
@@ -1630,7 +1630,7 @@ public class WifiServiceImpl extends BaseWifiService {
         if (unsafeChannels == null) {
             throw new IllegalArgumentException("unsafeChannels cannot be null");
         }
-        if (mContext.getResources().getBoolean(R.bool.config_wifiDefaultCoexAlgorithmEnabled)) {
+        if (mResourceCache.getBoolean(R.bool.config_wifiDefaultCoexAlgorithmEnabled)) {
             Log.e(TAG, "setCoexUnsafeChannels called but default coex algorithm is enabled");
             return;
         }
@@ -1997,7 +1997,6 @@ public class WifiServiceImpl extends BaseWifiService {
                                 + mCountryCode.getCurrentDriverCountryCode());
                     }
                     // Store Soft AP channels for reference after a reboot before the driver is up.
-                    Resources res = mContext.getResources();
                     mSettingsConfigStore.put(WifiSettingsConfigStore.WIFI_SOFT_AP_COUNTRY_CODE,
                             countryCode);
                     List<Integer> freqs = new ArrayList<>();
@@ -2008,7 +2007,7 @@ public class WifiServiceImpl extends BaseWifiService {
                             continue;
                         }
                         List<Integer> freqsForBand = ApConfigUtil.getAvailableChannelFreqsForBand(
-                                band, mWifiNative, res, true);
+                                band, mWifiNative, mResourceCache, true);
                         if (freqsForBand != null) {
                             freqs.addAll(freqsForBand);
                             int[] channel = new int[freqsForBand.size()];
@@ -2301,7 +2300,7 @@ public class WifiServiceImpl extends BaseWifiService {
             if (carrierConfig == null) return;
             int carrierMaxClient = carrierConfig.getInt(
                     CarrierConfigManager.Wifi.KEY_HOTSPOT_MAX_CLIENT_COUNT);
-            int finalSupportedClientNumber = mContext.getResources().getInteger(
+            int finalSupportedClientNumber = mResourceCache.getInteger(
                     R.integer.config_wifiHardwareSoftapMaxClientCount);
             if (carrierMaxClient > 0) {
                 finalSupportedClientNumber = Math.min(finalSupportedClientNumber,
@@ -3545,7 +3544,7 @@ public class WifiServiceImpl extends BaseWifiService {
             // API was called to override the overlay value.
             return mSettingsConfigStore.get(SHOW_DIALOG_WHEN_THIRD_PARTY_APPS_ENABLE_WIFI);
         } else {
-            return mContext.getResources().getBoolean(
+            return mResourceCache.getBoolean(
                     R.bool.config_showConfirmationDialogForThirdPartyAppsEnablingWifi);
         }
     }
@@ -3811,11 +3810,12 @@ public class WifiServiceImpl extends BaseWifiService {
             Log.w(TAG, "Attempt to retrieve WifiConfiguration with invalid scanResult List");
             return new ParceledListSlice<>(Collections.emptyList());
         }
-        return new ParceledListSlice<>(mWifiThreadRunner.call(
+        return new ParceledListSlice<>(WifiConfigurationUtil.convertMultiTypeConfigsToLegacyConfigs(
+                mWifiThreadRunner.call(
                 () -> mWifiNetworkSuggestionsManager
                         .getWifiConfigForMatchedNetworkSuggestionsSharedWithUser(
                                 scanResults.getList()), Collections.emptyList(),
-                TAG + "#getWifiConfigForMatchedNetworkSuggestionsSharedWithUser"));
+                TAG + "#getWifiConfigForMatchedNetworkSuggestionsSharedWithUser"), true));
     }
 
     /**
@@ -3906,6 +3906,11 @@ public class WifiServiceImpl extends BaseWifiService {
         boolean isCamera = mWifiPermissionsUtil.checkCameraPermission(callingUid);
         boolean isSystem = mWifiPermissionsUtil.isSystem(packageName, callingUid);
         boolean isPrivileged = isPrivileged(callingPid, callingUid);
+        if (!isPrivileged && !isSystem && !isAdmin && config.getBssidAllowlistInternal() != null) {
+            mLog.info("addOrUpdateNetwork with allow bssid list is not allowed for uid=%")
+                    .c(callingUid).flush();
+            return -1;
+        }
 
         if (!isTargetSdkLessThanQOrPrivileged(packageName, callingPid, callingUid)) {
             mLog.info("addOrUpdateNetwork not allowed for uid=%").c(callingUid).flush();
@@ -5043,7 +5048,7 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     private boolean is24GhzBandSupportedInternal() {
-        if (mContext.getResources().getBoolean(R.bool.config_wifi24ghzSupport)) {
+        if (mResourceCache.getBoolean(R.bool.config_wifi24ghzSupport)) {
             return true;
         }
         return mActiveModeWarden.isBandSupportedForSta(WifiScanner.WIFI_BAND_24_GHZ);
@@ -5060,7 +5065,7 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     private boolean is5GhzBandSupportedInternal() {
-        if (mContext.getResources().getBoolean(R.bool.config_wifi5ghzSupport)) {
+        if (mResourceCache.getBoolean(R.bool.config_wifi5ghzSupport)) {
             return true;
         }
         return mActiveModeWarden.isBandSupportedForSta(WifiScanner.WIFI_BAND_5_GHZ);
@@ -5076,7 +5081,7 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     private boolean is6GhzBandSupportedInternal() {
-        if (mContext.getResources().getBoolean(R.bool.config_wifi6ghzSupport)) {
+        if (mResourceCache.getBoolean(R.bool.config_wifi6ghzSupport)) {
             return true;
         }
         return mActiveModeWarden.isBandSupportedForSta(WifiScanner.WIFI_BAND_6_GHZ);
@@ -5096,7 +5101,7 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     private boolean is60GhzBandSupportedInternal() {
-        if (mContext.getResources().getBoolean(R.bool.config_wifi60ghzSupport)) {
+        if (mResourceCache.getBoolean(R.bool.config_wifi60ghzSupport)) {
             return true;
         }
         return mActiveModeWarden.isBandSupportedForSta(WifiScanner.WIFI_BAND_60_GHZ);
@@ -5625,7 +5630,7 @@ public class WifiServiceImpl extends BaseWifiService {
                     mWifiInjector.getWifiVoipDetector().dump(fd, pw, args);
                 }
                 pw.println();
-                mWifiResourceCache.dump(pw);
+                mResourceCache.dump(pw);
             }
         }, TAG + "#dump");
     }
@@ -5760,7 +5765,7 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     private void updateVerboseLoggingEnabled() {
-        final int verboseAlwaysOnLevel = mContext.getResources().getInteger(
+        final int verboseAlwaysOnLevel = mResourceCache.getInteger(
                 R.integer.config_wifiVerboseLoggingAlwaysOnLevel);
         mVerboseLoggingEnabled = WifiManager.VERBOSE_LOGGING_LEVEL_ENABLED == mVerboseLoggingLevel
                 || WifiManager.VERBOSE_LOGGING_LEVEL_ENABLED_SHOW_KEY == mVerboseLoggingLevel
@@ -7583,7 +7588,8 @@ public class WifiServiceImpl extends BaseWifiService {
                     true, TAG + " getUsableChannels");
         }
         if (mVerboseLoggingEnabled) {
-            mLog.info("getUsableChannels uid=%").c(Binder.getCallingUid()).flush();
+            mLog.info("getUsableChannels uid=% band=% mode=% filter=%").c(Binder.getCallingUid()).c(
+                    band).c(mode).c(filter).flush();
         }
         if (!isValidBandForGetUsableChannels(band)) {
             throw new IllegalArgumentException("Unsupported band: " + band);
@@ -7899,7 +7905,7 @@ public class WifiServiceImpl extends BaseWifiService {
      */
     @Override
     public String[] getOemPrivilegedWifiAdminPackages() {
-        return mContext.getResources()
+        return mResourceCache
                 .getStringArray(R.array.config_oemPrivilegedWifiAdminPackages);
     }
 
@@ -7981,7 +7987,7 @@ public class WifiServiceImpl extends BaseWifiService {
     }
     @Override
     public int getMaxNumberOfChannelsPerRequest() {
-        return mContext.getResources()
+        return mResourceCache
                 .getInteger(R.integer.config_wifiNetworkSpecifierMaxPreferredChannels);
     }
 
@@ -8574,7 +8580,7 @@ public class WifiServiceImpl extends BaseWifiService {
         if (!SdkLevel.isAtLeastV()) {
             throw new UnsupportedOperationException("SDK level too old");
         }
-        if (!isAggressiveRoamingModeSupported()) {
+        if (!isAggressiveRoamingModeSupported() && roamingMode == ROAMING_MODE_AGGRESSIVE) {
             throw new UnsupportedOperationException("Aggressive roaming mode not supported");
         }
         Objects.requireNonNull(ssid, "ssid cannot be null");
@@ -8609,9 +8615,6 @@ public class WifiServiceImpl extends BaseWifiService {
         if (!SdkLevel.isAtLeastV()) {
             throw new UnsupportedOperationException("SDK level too old");
         }
-        if (!isAggressiveRoamingModeSupported()) {
-            throw new UnsupportedOperationException("Aggressive roaming mode not supported");
-        }
         Objects.requireNonNull(ssid, "ssid cannot be null");
         Objects.requireNonNull(packageName, "packageName cannot be null");
 
@@ -8640,9 +8643,6 @@ public class WifiServiceImpl extends BaseWifiService {
             @NonNull IMapListener listener) {
         if (!SdkLevel.isAtLeastV()) {
             throw new UnsupportedOperationException("SDK level too old");
-        }
-        if (!isAggressiveRoamingModeSupported()) {
-            throw new UnsupportedOperationException("Aggressive roaming mode not supported");
         }
         Objects.requireNonNull(packageName, "packageName cannot be null");
         Objects.requireNonNull(listener, "listener cannot be null");
