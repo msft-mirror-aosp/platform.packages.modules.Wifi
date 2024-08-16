@@ -760,6 +760,7 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         assertEquals(WifiConnectivityManager.WIFI_STATE_DISCONNECTED,
                 mWifiConnectivityManager.getWifiState());
         mLooper.dispatchAll();
+        verify(mWifiConfigManager).considerStopRestrictingAutoJoinToSubscriptionId();
         verify(mPrimaryClientModeManager).startConnectToNetwork(
                 CANDIDATE_NETWORK_ID, Process.WIFI_UID, "any");
         verify(mPrimaryClientModeManager).enableRoaming(true);
@@ -2987,6 +2988,26 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         setScreenState(true);
 
         verify(mOpenNetworkNotifier).handleScreenStateChanged(true);
+    }
+
+    @Test
+    public void testInitialFastScanAfterStartup() {
+        // Enable the fast initial scan feature
+        mResources.setBoolean(R.bool.config_wifiEnablePartialInitialScan, true);
+        // return 2 available frequencies
+        when(mWifiScoreCard.lookupNetwork(anyString())).thenReturn(mPerNetwork);
+        when(mPerNetwork.getFrequencies(anyLong())).thenReturn(new ArrayList<>(
+                Arrays.asList(TEST_FREQUENCY_1, TEST_FREQUENCY_2)));
+
+        // Simulate wifi toggle
+        setScreenState(true);
+        setWifiEnabled(false);
+        setWifiEnabled(true);
+
+        // verify initial fast scan is triggered
+        assertEquals(WifiConnectivityManager.INITIAL_SCAN_STATE_AWAITING_RESPONSE,
+                mWifiConnectivityManager.getInitialScanState());
+        verify(mWifiMetrics).incrementInitialPartialScanCount();
     }
 
     /**

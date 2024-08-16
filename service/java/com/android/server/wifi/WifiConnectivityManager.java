@@ -658,6 +658,9 @@ public class WifiConnectivityManager {
         }
         boolean skipSufficiencyCheck = shouldSkipSufficiencyCheck(hasExistingSecondaryCmm);
 
+        // If cellular is unavailable, re-enable Wi-Fi networks disabled by pinning to cell.
+        mConfigManager.considerStopRestrictingAutoJoinToSubscriptionId();
+
         // Check if any blocklisted BSSIDs can be freed.
         List<ScanDetail> enabledDetails =
                 mWifiBlocklistMonitor.tryEnablingBlockedBssids(scanDetails);
@@ -2311,7 +2314,7 @@ public class WifiConnectivityManager {
                         getScheduledSingleScanType(mCurrentSingleScanScheduleIndex));
 
                 // Note, initial partial scan may fail due to lack of channel history
-                // Hence, we verify state before changing to AWIATING_RESPONSE
+                // Hence, we verify state before changing to AWAITING_RESPONSE
                 if (mInitialScanState == INITIAL_SCAN_STATE_START) {
                     setInitialScanState(INITIAL_SCAN_STATE_AWAITING_RESPONSE);
                     mWifiMetrics.incrementInitialPartialScanCount();
@@ -3537,14 +3540,24 @@ public class WifiConnectivityManager {
         mConnectivityHelper.getFirmwareRoamingInfo();
         mWifiChannelUtilization.init(getPrimaryClientModeManager().getWifiLinkLayerStats());
         clearConnectionAttemptTimeStamps(); // clear connection attempts.
-
-        if (mContext.getResources().getBoolean(R.bool.config_wifiEnablePartialInitialScan)) {
-            setInitialScanState(INITIAL_SCAN_STATE_START);
-        }
-
         mRunning = true;
         mLatestCandidates = null;
         mLatestCandidatesTimestampMs = 0;
+        if (mContext.getResources().getBoolean(R.bool.config_wifiEnablePartialInitialScan)) {
+            setInitialScanState(INITIAL_SCAN_STATE_START);
+            if (mScreenOn) {
+                // force trigger partial scan at start up to make sure this happens before Settings
+                // scan
+                startSingleScan(false, WIFI_WORK_SOURCE, DEFAULT_SCANNING_TYPE[0]);
+
+                // Note, initial partial scan may fail due to lack of channel history
+                // Hence, we verify state before changing to AWAITING_RESPONSE
+                if (mInitialScanState == INITIAL_SCAN_STATE_START) {
+                    setInitialScanState(INITIAL_SCAN_STATE_AWAITING_RESPONSE);
+                    mWifiMetrics.incrementInitialPartialScanCount();
+                }
+            }
+        }
     }
 
     /**
