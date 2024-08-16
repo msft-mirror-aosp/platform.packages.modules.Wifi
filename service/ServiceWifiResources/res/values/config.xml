@@ -216,6 +216,11 @@
     <!-- boolean indicating whether or not to auto-upgrade band setting configuration to dual bands during cloud configuration restore when device supported -->
     <bool translatable="false" name ="config_wifiSoftapAutoUpgradeToBridgedConfigWhenSupported">true</bool>
 
+    <!-- boolean indicating whether or not to temporarily auto-upgrade tethering softap to
+         2.4 + 5GHz Bridged if it is currently available and the usable configured bands only
+         contain 2.4 or 5Ghz.-->
+    <bool translatable="false" name ="config_wifiSoftapUpgradeTetheredTo2g5gBridgedIfBandsAreSubset">false</bool>
+
     <!-- List of allowed channels in 2GHz band for softap. If the device doesn't want to restrict
          channels this should be empty. Values is a comma separated channel string and/or channel
          range string like '1-6,11'. -->
@@ -1363,4 +1368,11 @@
          See also config_wifiDelayedSelectionCarrierIds.
      -->
     <integer translatable="false" name="config_wifiDelayedCarrierSelectionTimeMs">90000</integer>
+
+    <!-- Boolean indicating whether the device supports Wi-Fi Alliance WPA3 Specification
+         version 3.3 Section 14 - RSN Overriding.
+         Enabling this config allows framework to parse the RSNO IE and RSNO2 IE.
+         Only enable this flag if Supplicant and driver/firmware supports RSN Overriding. otherwise
+         the connection may fail or downgrade to WPA2 -->
+    <bool translatable="false" name ="config_wifiRsnOverridingEnabled">false</bool>
 </resources>
