@@ -107,6 +107,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto;
 import com.android.server.wifi.scanner.WifiScannerInternal;
 import com.android.server.wifi.util.LruConnectionTracker;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
 import org.junit.After;
@@ -179,6 +180,8 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         when(mPrimaryClientModeManager.getRole()).thenReturn(ActiveModeManager.ROLE_CLIENT_PRIMARY);
         when(mPrimaryClientModeManager.getConnectionInfo()).thenReturn(mWifiInfo);
         when(mActiveModeWarden.getPrimaryClientModeManager()).thenReturn(mPrimaryClientModeManager);
+        when(mDeviceConfigFacade.getFeatureFlags()).thenReturn(mFeatureFlags);
+        when(mFeatureFlags.delayedCarrierNetworkSelection()).thenReturn(true);
         doAnswer(new AnswerWithArguments() {
             public void answer(ExternalClientModeManagerRequestListener listener,
                     WorkSource requestorWs, String ssid, String bssid) {
@@ -267,6 +270,10 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         resources.setInteger(R.integer.config_wifiPnoScanIterations, EXPECTED_PNO_ITERATIONS);
         resources.setInteger(R.integer.config_wifiPnoScanIntervalMultiplier,
                 EXPECTED_PNO_MULTIPLIER);
+        resources.setIntArray(R.array.config_wifiDelayedSelectionCarrierIds,
+                DELAYED_SELECTION_CARRIER_IDS);
+        resources.setInteger(R.integer.config_wifiDelayedCarrierSelectionTimeMs,
+                DELAYED_CARRIER_SELECTION_TIME_MS);
     }
 
     /**
@@ -313,6 +320,7 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
     @Mock private WifiNetworkSuggestion mWifiNetworkSuggestion;
     @Mock private IPowerManager mPowerManagerService;
     @Mock private DeviceConfigFacade mDeviceConfigFacade;
+    @Mock private FeatureFlags mFeatureFlags;
     @Mock private ActiveModeWarden mActiveModeWarden;
     @Mock private ConcreteClientModeManager mPrimaryClientModeManager;
     @Mock private ConcreteClientModeManager mSecondaryClientModeManager;
@@ -350,6 +358,7 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
     @Captor ArgumentCaptor<MultiInternetManager.ConnectionStatusListener>
             mMultiInternetConnectionStatusListenerCaptor;
     @Captor ArgumentCaptor<WifiDialogManager.SimpleDialogCallback> mSimpleDialogCallbackCaptor;
+    @Captor ArgumentCaptor<WifiScannerInternal.ScanListener> mAllSingleScanListenerCaptor;
     private MockitoSession mSession;
     private MockResources mResources;
 
@@ -408,6 +417,8 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
     private static final int EXPECTED_PNO_MULTIPLIER = 4;
     private static final int TEST_FREQUENCY_2G = 2412;
     private static final int TEST_FREQUENCY_5G = 5262;
+    private static final int[] DELAYED_SELECTION_CARRIER_IDS = new int[]{123};
+    private static final int DELAYED_CARRIER_SELECTION_TIME_MS = 100_000;
 
     /**
     * A test Handler that stores one single incoming Message with delayed time internally, to be
@@ -477,10 +488,7 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
     }
 
     void mockWifiScanner() {
-        ArgumentCaptor<WifiScannerInternal.ScanListener> allSingleScanListenerCaptor =
-                ArgumentCaptor.forClass(WifiScannerInternal.ScanListener.class);
-
-        doNothing().when(mWifiScanner).registerScanListener(allSingleScanListenerCaptor.capture());
+        doNothing().when(mWifiScanner).registerScanListener(mAllSingleScanListenerCaptor.capture());
 
         ScanData[] scanDatas = new ScanData[1];
         scanDatas[0] = mScanData;
@@ -493,11 +501,11 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
                 // same as onResult for single scans).
                 if (mScanData != null && mScanData.getResults() != null) {
                     for (int i = 0; i < mScanData.getResults().length; i++) {
-                        allSingleScanListenerCaptor.getValue().getWifiScannerListener()
+                        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener()
                                 .onFullResult(mScanData.getResults()[i]);
                     }
                 }
-                allSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(
+                mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(
                         scanDatas);
             }}).when(mWifiScanner).startScan(anyObject(), anyObject());
 
@@ -752,6 +760,7 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         assertEquals(WifiConnectivityManager.WIFI_STATE_DISCONNECTED,
                 mWifiConnectivityManager.getWifiState());
         mLooper.dispatchAll();
+        verify(mWifiConfigManager).considerStopRestrictingAutoJoinToSubscriptionId();
         verify(mPrimaryClientModeManager).startConnectToNetwork(
                 CANDIDATE_NETWORK_ID, Process.WIFI_UID, "any");
         verify(mPrimaryClientModeManager).enableRoaming(true);
@@ -2272,6 +2281,130 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         }
     }
 
+    private void setAllScanCandidatesToDelayedCarrierCandidates() {
+        WifiConfiguration delayedCarrierSelectionConfig =
+                getTestWifiConfig(CANDIDATE_NETWORK_ID, "DelayedSelectionCarrier");
+        delayedCarrierSelectionConfig.carrierId = DELAYED_SELECTION_CARRIER_IDS[0];
+        when(mWifiConfigManager.getConfiguredNetwork(anyInt()))
+                .thenReturn(delayedCarrierSelectionConfig);
+    }
+
+    /**
+     * Verify that candidates with a carrier ID in the delayed selection list are only considered
+     * for network selection after the specified delay.
+     */
+    @Test
+    public void testDelayedCarrierCandidateSelection() {
+        ScanData[] scanDatas = new ScanData[]{mScanData};
+        setAllScanCandidatesToDelayedCarrierCandidates();
+
+        // Produce results for the initial scan. Expect no connection,
+        // since this is the first time we're seeing the carrier network.
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(0L);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+        verify(mPrimaryClientModeManager, never()).startConnectToNetwork(
+                CANDIDATE_NETWORK_ID, Process.WIFI_UID, CANDIDATE_BSSID);
+
+        // Complete an additional scan before the delay period has ended. Expect no connection.
+        when(mClock.getElapsedSinceBootMillis())
+                .thenReturn(DELAYED_CARRIER_SELECTION_TIME_MS - 1000L);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+        verify(mPrimaryClientModeManager, never()).startConnectToNetwork(
+                CANDIDATE_NETWORK_ID, Process.WIFI_UID, CANDIDATE_BSSID);
+
+        // Complete a scan after the delay period has ended. Expect a connection.
+        when(mClock.getElapsedSinceBootMillis())
+                .thenReturn(DELAYED_CARRIER_SELECTION_TIME_MS + 1000L);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+        verify(mPrimaryClientModeManager).startConnectToNetwork(
+                CANDIDATE_NETWORK_ID, Process.WIFI_UID, CANDIDATE_BSSID);
+    }
+
+    /**
+     * Verify that a partial scan containing no results does not affect the delayed carrier
+     * selection cache. Partial scans may be running on channels where carrier networks
+     * are not operating.
+     */
+    @Test
+    public void testDelayedCarrierSelectionEmptyPartialScan() {
+        ScanData[] scanDatas = new ScanData[]{mScanData};
+        setAllScanCandidatesToDelayedCarrierCandidates();
+
+        // Issue a full scan to add the carrier candidate to the cache.
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(0L);
+        when(mScanData.getScannedBandsInternal()).thenReturn(WifiScanner.WIFI_BAND_ALL);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+        verify(mPrimaryClientModeManager, never()).startConnectToNetwork(
+                CANDIDATE_NETWORK_ID, Process.WIFI_UID, CANDIDATE_BSSID);
+
+        // Issue a partial scan that does not locate any candidates. This should not affect
+        // the cache populated by the full scan.
+        when(mWifiNS.getCandidatesFromScan(any(), any(), any(), anyBoolean(), anyBoolean(),
+                anyBoolean(), any(), anyBoolean())).thenReturn(null);
+        when(mScanData.getScannedBandsInternal()).thenReturn(WifiScanner.WIFI_BAND_6_GHZ);
+        when(mClock.getElapsedSinceBootMillis())
+                .thenReturn(DELAYED_CARRIER_SELECTION_TIME_MS - 1000L);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+        verify(mPrimaryClientModeManager, never()).startConnectToNetwork(
+                CANDIDATE_NETWORK_ID, Process.WIFI_UID, CANDIDATE_BSSID);
+
+        // Issue a full scan after the delay period has passed. Since the cache was not modified by
+        // the partial scan, the delayed carrier candidate should still be in the timestamp cache.
+        when(mWifiNS.getCandidatesFromScan(any(), any(), any(), anyBoolean(), anyBoolean(),
+                anyBoolean(), any(), anyBoolean())).thenReturn(Arrays.asList(mCandidate1));
+        when(mScanData.getScannedBandsInternal()).thenReturn(WifiScanner.WIFI_BAND_ALL);
+        when(mClock.getElapsedSinceBootMillis())
+                .thenReturn(DELAYED_CARRIER_SELECTION_TIME_MS + 1000L);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+        verify(mPrimaryClientModeManager).startConnectToNetwork(
+                CANDIDATE_NETWORK_ID, Process.WIFI_UID, CANDIDATE_BSSID);
+    }
+
+    /**
+     * Verify that a partial scan is scheduled when a full scan locates delayed carrier
+     * selection candidates.
+     */
+    @Test
+    public void testDelayedCarrierSelectionSchedulePartialScan() {
+        ScanData[] scanDatas = new ScanData[]{mScanData};
+        setAllScanCandidatesToDelayedCarrierCandidates();
+
+        // Initial full scan with a delayed carrier candidate should schedule a partial scan.
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(0L);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+
+        // Move time forward and verify that the delayed partial scan is started.
+        when(mClock.getElapsedSinceBootMillis())
+                .thenReturn(DELAYED_CARRIER_SELECTION_TIME_MS + 1L);
+        mLooper.dispatchAll();
+        verify(mWifiScanner).startScan(
+                (ScanSettings) argThat(new WifiPartialScanSettingMatcher()),  any());
+    }
+
+    /**
+     * Verify that if a delayed carrier partial scan is cancelled, no scan is triggered
+     * at the end of the delay period.
+     */
+    @Test
+    public void testDelayedCarrierSelectionCancelPartialScan() {
+        ScanData[] scanDatas = new ScanData[]{mScanData};
+        setAllScanCandidatesToDelayedCarrierCandidates();
+
+        // Initial full scan with a delayed carrier candidate should schedule a partial scan.
+        when(mClock.getElapsedSinceBootMillis()).thenReturn(0L);
+        mAllSingleScanListenerCaptor.getValue().getWifiScannerListener().onResults(scanDatas);
+
+        // Turn off Wifi to cancel the partial scan.
+        setWifiEnabled(false);
+
+        // Move time forward and verify that a delayed partial scan is not started.
+        when(mClock.getElapsedSinceBootMillis())
+                .thenReturn(DELAYED_CARRIER_SELECTION_TIME_MS + 1L);
+        mLooper.dispatchAll();
+        verify(mWifiScanner, never()).startScan(
+                (ScanSettings) argThat(new WifiPartialScanSettingMatcher()), any());
+    }
+
     /**
      * Verify that when there are we obtain more than one valid candidates from scan results and
      * network connection fails, connection is immediately retried on the remaining candidates.
@@ -2855,6 +2988,26 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         setScreenState(true);
 
         verify(mOpenNetworkNotifier).handleScreenStateChanged(true);
+    }
+
+    @Test
+    public void testInitialFastScanAfterStartup() {
+        // Enable the fast initial scan feature
+        mResources.setBoolean(R.bool.config_wifiEnablePartialInitialScan, true);
+        // return 2 available frequencies
+        when(mWifiScoreCard.lookupNetwork(anyString())).thenReturn(mPerNetwork);
+        when(mPerNetwork.getFrequencies(anyLong())).thenReturn(new ArrayList<>(
+                Arrays.asList(TEST_FREQUENCY_1, TEST_FREQUENCY_2)));
+
+        // Simulate wifi toggle
+        setScreenState(true);
+        setWifiEnabled(false);
+        setWifiEnabled(true);
+
+        // verify initial fast scan is triggered
+        assertEquals(WifiConnectivityManager.INITIAL_SCAN_STATE_AWAITING_RESPONSE,
+                mWifiConnectivityManager.getInitialScanState());
+        verify(mWifiMetrics).incrementInitialPartialScanCount();
     }
 
     /**

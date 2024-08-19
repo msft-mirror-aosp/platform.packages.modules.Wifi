@@ -29,6 +29,9 @@ import static android.net.wifi.WifiManager.VERBOSE_LOGGING_LEVEL_DISABLED;
 import static android.net.wifi.WifiManager.VERBOSE_LOGGING_LEVEL_WIFI_AWARE_ENABLED_ONLY;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLED;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
+import static android.net.wifi.WifiManager.ROAMING_MODE_NONE;
+import static android.net.wifi.WifiManager.ROAMING_MODE_NORMAL;
+import static android.net.wifi.WifiManager.ROAMING_MODE_AGGRESSIVE;
 
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP_BRIDGE;
@@ -76,6 +79,7 @@ import android.net.wifi.WifiNetworkSuggestion;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.WifiSsid;
 import android.net.wifi.util.ScanResultUtil;
+import android.net.wifi.util.WifiResourceCache;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
@@ -184,6 +188,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
             "set-mock-wifimodem-methods",
             "force-overlay-config-value",
             "get-softap-supported-features",
+            "get-overlay-config-values"
     };
 
     private static final Map<String, Pair<NetworkRequest, ConnectivityManager.NetworkCallback>>
@@ -215,6 +220,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
     private final WifiDiagnostics mWifiDiagnostics;
     private final DeviceConfigFacade mDeviceConfig;
     private final AfcManager mAfcManager;
+    private final WifiInjector mWifiInjector;
     private static final int[] OP_MODE_LIST = {
             WifiAvailableChannel.OP_MODE_STA,
             WifiAvailableChannel.OP_MODE_SAP,
@@ -439,6 +445,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
 
     WifiShellCommand(WifiInjector wifiInjector, WifiServiceImpl wifiService, WifiContext context,
             WifiGlobals wifiGlobals, WifiThreadRunner wifiThreadRunner) {
+        mWifiInjector = wifiInjector;
         mWifiGlobals = wifiGlobals;
         mWifiThreadRunner = wifiThreadRunner;
         mActiveModeWarden = wifiInjector.getActiveModeWarden();
@@ -513,28 +520,70 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                             + mWifiGlobals.getIpReachabilityDisconnectEnabled());
                     return 0;
                 case "set-poll-rssi-interval-msecs":
-                    int newPollIntervalMsecs;
-                    try {
-                        newPollIntervalMsecs = Integer.parseInt(getNextArgRequired());
-                    } catch (NumberFormatException e) {
-                        pw.println(
+                    List<Integer> newPollIntervals = new ArrayList<>();
+                    while (getRemainingArgsCount() > 0) {
+                        int newPollIntervalMsecs;
+                        try {
+                            newPollIntervalMsecs = Integer.parseInt(getNextArgRequired());
+                        } catch (NumberFormatException e) {
+                            pw.println(
                                 "Invalid argument to 'set-poll-rssi-interval-msecs' "
-                                        + "- must be a positive integer");
-                        return -1;
+                                    + "- must be a positive integer");
+                            return -1;
+                        }
+
+                        if (newPollIntervalMsecs < 1) {
+                            pw.println(
+                                "Invalid argument to 'set-poll-rssi-interval-msecs' "
+                                    + "- must be a positive integer");
+                            return -1;
+                        }
+
+                        newPollIntervals.add(newPollIntervalMsecs);
                     }
 
-                    if (newPollIntervalMsecs < 1) {
-                        pw.println(
-                                "Invalid argument to 'set-poll-rssi-interval-msecs' "
-                                        + "- must be a positive integer");
-                        return -1;
+                    switch (newPollIntervals.size()) {
+                        case 0:
+                            throw new IllegalArgumentException(
+                                "Need at least one valid rssi polling interval");
+                        case 1:
+                            mActiveModeWarden.getPrimaryClientModeManager()
+                                    .setLinkLayerStatsPollingInterval(newPollIntervals.get(0));
+                            break;
+                        case 2:
+                            int newShortIntervalMsecs = newPollIntervals.get(0);
+                            int newLongIntervalMsecs = newPollIntervals.get(1);
+                            if (newShortIntervalMsecs >= newLongIntervalMsecs) {
+                                pw.println(
+                                        "Invalid argument to 'set-poll-rssi-interval-msecs' "
+                                                + "- the long polling interval must be greater "
+                                                + "than the short polling interval");
+                                return -1;
+                            }
+                            mWifiGlobals.setPollRssiShortIntervalMillis(newShortIntervalMsecs);
+                            mWifiGlobals.setPollRssiLongIntervalMillis(newLongIntervalMsecs);
+                            mWifiGlobals.setPollRssiIntervalMillis(newShortIntervalMsecs);
+                            mActiveModeWarden.getPrimaryClientModeManager()
+                                    .setLinkLayerStatsPollingInterval(0);
+                            break;
+                        default:
+                            pw.println("Too many arguments, need at most two valid rssi polling "
+                                    + "intervals");
+                            return -1;
                     }
-
-                    mWifiGlobals.setPollRssiIntervalMillis(newPollIntervalMsecs);
                     return 0;
                 case "get-poll-rssi-interval-msecs":
-                    pw.println("WifiGlobals.getPollRssiIntervalMillis() = "
+                    pw.println("Current interval between RSSI polls (milliseconds) = "
                             + mWifiGlobals.getPollRssiIntervalMillis());
+                    if (mWifiGlobals.isAdjustPollRssiIntervalEnabled()
+                            && mDeviceConfig.isAdjustPollRssiIntervalEnabled()
+                            && !mWifiGlobals.isPollRssiIntervalOverridden()) {
+                        pw.println("Auto adjustment of poll rssi is enabled");
+                        pw.println("Regular (short) interval between RSSI polls (milliseconds) = "
+                                + mWifiGlobals.getPollRssiShortIntervalMillis());
+                        pw.println("Long interval between RSSI polls (milliseconds) = "
+                                + mWifiGlobals.getPollRssiLongIntervalMillis());
+                    }
                     return 0;
                 case "force-hi-perf-mode": {
                     boolean enabled = getNextArgRequiredTrueOrFalse("enabled", "disabled");
@@ -1119,7 +1168,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         return -1;
                     }
                     int errorCode = mWifiService.addNetworkSuggestions(
-                            Arrays.asList(suggestion), SHELL_PACKAGE_NAME, null);
+                            new ParceledListSlice(List.of(suggestion)), SHELL_PACKAGE_NAME, null);
                     if (errorCode != WifiManager.STATUS_NETWORK_SUGGESTIONS_SUCCESS) {
                         pw.println("Add network suggestion failed with error code: " + errorCode);
                         return -1;
@@ -1160,7 +1209,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         actionCode = ACTION_REMOVE_SUGGESTION_LINGER;
                     }
                     List<WifiNetworkSuggestion> suggestions =
-                            mWifiService.getNetworkSuggestions(SHELL_PACKAGE_NAME);
+                            mWifiService.getNetworkSuggestions(SHELL_PACKAGE_NAME).getList();
                     WifiNetworkSuggestion suggestion = suggestions.stream()
                             .filter(s -> s.getSsid().equals(ssid))
                             .findAny()
@@ -1170,7 +1219,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         return -1;
                     }
                     mWifiService.removeNetworkSuggestions(
-                            Arrays.asList(suggestion), SHELL_PACKAGE_NAME, actionCode);
+                            new ParceledListSlice<>(List.of(suggestion)),
+                            SHELL_PACKAGE_NAME, actionCode);
                     // untrusted/oem-paid networks need a corresponding NetworkRequest.
                     if (suggestion.isUntrusted()
                             || (SdkLevel.isAtLeastS()
@@ -1188,12 +1238,12 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 }
                 case "remove-all-suggestions":
                     mWifiService.removeNetworkSuggestions(
-                            Collections.emptyList(), SHELL_PACKAGE_NAME,
+                            new ParceledListSlice<>(Collections.emptyList()), SHELL_PACKAGE_NAME,
                             WifiManager.ACTION_REMOVE_SUGGESTION_DISCONNECT);
                     return 0;
                 case "list-suggestions": {
                     List<WifiNetworkSuggestion> suggestions =
-                            mWifiService.getNetworkSuggestions(SHELL_PACKAGE_NAME);
+                            mWifiService.getNetworkSuggestions(SHELL_PACKAGE_NAME).getList();
                     printWifiNetworkSuggestions(pw, suggestions);
                     return 0;
                 }
@@ -1206,7 +1256,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 case "list-suggestions-from-app": {
                     String packageName = getNextArgRequired();
                     List<WifiNetworkSuggestion> suggestions =
-                            mWifiService.getNetworkSuggestions(packageName);
+                            mWifiService.getNetworkSuggestions(packageName).getList();
                     printWifiNetworkSuggestions(pw, suggestions);
                     return 0;
                 }
@@ -1240,8 +1290,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     pw.println("Removing request: " + nrAndNc.first);
                     mWifiThreadRunner.post(() -> mConnectivityManager
                                     .unregisterNetworkCallback(nrAndNc.second),
-                            "shell#remove-request")
-                    ;
+                            "shell#remove-request");
                     return 0;
                 }
                 case "remove-all-requests":
@@ -1252,7 +1301,9 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     for (Pair<NetworkRequest, ConnectivityManager.NetworkCallback> nrAndNc
                             : sActiveRequests.values()) {
                         pw.println("Removing request: " + nrAndNc.first);
-                        mConnectivityManager.unregisterNetworkCallback(nrAndNc.second);
+                        mWifiThreadRunner.post(() ->
+                                mConnectivityManager.unregisterNetworkCallback(nrAndNc.second),
+                                "shell#remove-request");
                     }
                     sActiveRequests.clear();
                     return 0;
@@ -2159,15 +2210,71 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     }
                     return 0;
                 case "force-overlay-config-value":
-                    String configValue = getNextArgRequired();
-                    String overlayName = getNextArgRequired();
-                    boolean isEnabled = getNextArgRequiredTrueOrFalse("enabled", "disabled");
-                    if (mWifiService.forceOverlayConfigValue(overlayName, configValue, isEnabled)) {
-                        pw.print("true");
-                    } else {
-                        pw.print("fail to force overlay : " + overlayName);
+                    int uid = Binder.getCallingUid();
+                    if (!mWifiInjector.getWifiPermissionsUtil()
+                            .checkNetworkSettingsPermission(Binder.getCallingUid())) {
+                        pw.println("current shell caller Uid " + uid
+                                + " Missing NETWORK_SETTINGS permission");
                         return -1;
                     }
+                    WifiResourceCache resourceCache = mContext.getResourceCache();
+                    String type = getNextArgRequired();
+                    String overlayName = getNextArgRequired();
+                    boolean isEnabled = getNextArgRequiredTrueOrFalse("enabled", "disabled");
+                    switch (type) {
+                        case "bool" -> {
+                            boolean value = false;
+                            if (isEnabled) {
+                                value = getNextArgRequiredTrueOrFalse("true", "false");
+                                resourceCache.overrideBooleanValue(overlayName, value);
+                            } else {
+                                resourceCache.restoreBooleanValue(overlayName);
+                            }
+                        }
+                        case "integer" -> {
+                            int value = 0;
+                            if (isEnabled) {
+                                value = Integer.parseInt(getNextArgRequired());
+                                resourceCache.overrideIntegerValue(overlayName, value);
+                            } else {
+                                resourceCache.restoreIntegerValue(overlayName);
+                            }
+                        }
+                        default -> {
+                            pw.print("require a valid type of the overlay");
+                            return -1;
+                        }
+                    }
+                    pw.println("true");
+                    return 0;
+                case "get-overlay-config-values":
+                    mContext.getResourceCache().dump(pw);
+                    return 0;
+                case "set-ssid-roaming-mode":
+                    String ssid = getNextArgRequired();
+                    String roamingMode = getNextArgRequired();
+                    String option = getNextOption();
+
+                    WifiSsid wifiSsid;
+                    if (option != null && option.equals("-x")) {
+                        wifiSsid = WifiSsid.fromString(ssid);
+                    } else {
+                        wifiSsid = WifiSsid.fromString("\"" + ssid + "\"");
+                    }
+
+                    int mode;
+                    if (roamingMode.equals("none")) {
+                        mode = ROAMING_MODE_NONE;
+                    } else if (roamingMode.equals("normal")) {
+                        mode = ROAMING_MODE_NORMAL;
+                    } else if (roamingMode.equals("aggressive")) {
+                        mode = ROAMING_MODE_AGGRESSIVE;
+                    } else {
+                        pw.println("Unsupported roaming mode");
+                        return -1;
+                    }
+
+                    mWifiService.setPerSsidRoamingMode(wifiSsid, mode, SHELL_PACKAGE_NAME);
                     return 0;
                 default:
                     return handleDefaultCommands(cmd);
@@ -2964,18 +3071,17 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("       '31' - band 2.4, 5, 6 and 60 GHz with DFS channels");
         pw.println("  get-cached-scan-data");
         pw.println("    Gets scan data cached by the firmware");
-        pw.println("  force-overlay-config-value <configValue> <overlayName> enabled|disabled");
-        pw.println("    Force overlay to a specified value. See below for supported overlays.");
-        pw.println("    <configValue> - override value of the overlay. See above for accepted "
-                + "values per overlay.");
+        pw.println("  force-overlay-config-value bool|integer <overlayName> enabled|disabled"
+                + "<configValue>");
+        pw.println("    Force overlay to a specified value.");
+        pw.println("    bool|integer   - specified the type of the overlay");
         pw.println("    <overlayName> - name of the overlay whose value is overridden.");
-        pw.println("        - Currently supports:");
-        pw.println("          <configValue> = true|false for <overlayName> = "
-                + "'config_wifi_background_scan_support'");
-        pw.println("          <configValue> = true|false for <overlayName> = "
-                + "'config_wifiWepDeprecated'");
-        pw.println("    <enabled|disabled>: enable the override or disable it and revert to using "
+        pw.println("    enabled|disabled: enable the override or disable it and revert to using "
                 + "the built-in value.");
+        pw.println("    <configValue> - override value of the overlay."
+                + "Must match the overlay type");
+        pw.println("  get-overlay-config-values");
+        pw.println("    Get current overlay value in resource cache.");
         pw.println("  get-softap-supported-features");
         pw.println("    Gets softap supported features. Will print 'wifi_softap_acs_supported'");
         pw.println("    and/or 'wifi_softap_wpa3_sae_supported',");
@@ -2985,8 +3091,15 @@ public class WifiShellCommand extends BasicShellCommandHandler {
     }
 
     private void onHelpPrivileged(PrintWriter pw) {
-        pw.println("  set-poll-rssi-interval-msecs <int>");
-        pw.println("    Sets the interval between RSSI polls to <int> milliseconds.");
+        pw.println("  set-poll-rssi-interval-msecs <int> [<int>]");
+        pw.println("    Sets the interval between RSSI polls to the specified value(s), in "
+                + "milliseconds.");
+        pw.println("    When only one value is specified, set the interval to that value. "
+                + "When two values are specified, set the regular (short) interval to the first "
+                + "value, and set the long interval to the second value. Note that the "
+                + "enabling/disabling of auto adjustment between the two intervals is handled by "
+                + "the respective flags. If the auto adjustment is disabled, it is equivalent to "
+                + "only specifying the first value, and then setting the interval to that value");
         pw.println("  get-poll-rssi-interval-msecs");
         pw.println("    Gets current interval between RSSI polls, in milliseconds.");
         pw.println("  force-hi-perf-mode enabled|disabled");
@@ -3251,6 +3364,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 + "option provided or no arguments provided after the -r option, then set the "
                 + "request properties to none in the request.");
         pw.println("    Example: configure-afc-server https://testURL -r key1 value1 key2 value2");
+        pw.println("  set-ssid-roaming-mode <ssid> none|normal|aggressive [-x]");
+        pw.println("    Sets the roaming mode for the given SSID.");
+        pw.println("    -x - Specifies the SSID as hex digits instead of plain text.");
+        pw.println("    Example: set-ssid-roaming-mode test_ssid aggressive");
     }
 
     @Override
