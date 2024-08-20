@@ -127,6 +127,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkProbeStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkProbeStats.ExperimentProbeCounts;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkProbeStats.LinkProbeFailureReasonCount;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkSpeedCount;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.MeteredNetworkStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.NetworkDisableReason;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.NetworkSelectionExperimentDecisions;
@@ -5202,6 +5203,17 @@ public class WifiMetrics {
             }
         }
         line.append(",wifi_link_count=" + entry.wifiLinkCount);
+        for (LinkStats linkStat : entry.linkStats) {
+            line.append(",Link Stats from link_id=" + linkStat.linkId);
+            line.append(",state=" + linkStat.state);
+            line.append(",radio_id=" + linkStat.radioId);
+            line.append(",frequency_mhz=" + linkStat.frequencyMhz);
+            line.append(",beacon_rx=" + linkStat.beaconRx);
+            line.append(",rssi_mgmt=" + linkStat.rssiMgmt);
+            line.append(",time_slice_duty_cycle_in_percent="
+                    + linkStat.timeSliceDutyCycleInPercent);
+            line.append(",rssi=" + linkStat.rssi);
+        }
         pw.println(line.toString());
     }
 
@@ -7088,10 +7100,31 @@ public class WifiMetrics {
                     < MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE
                     ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove();
             if (isWiFiScorerNewStatsCollected()) {
-                if (stats.links != null) {
-                    wifiUsabilityStatsEntry.wifiLinkCount = stats.links.length;
+                SparseArray<MloLink> mloLinks = new SparseArray<>();
+                for (MloLink link: info.getAffiliatedMloLinks()) {
+                    mloLinks.put(link.getLinkId(), link);
+                }
+                if (stats.links != null && stats.links.length > 0) {
+                    int numLinks = stats.links.length;
+                    wifiUsabilityStatsEntry.wifiLinkCount = numLinks;
+                    wifiUsabilityStatsEntry.linkStats = new LinkStats[numLinks];
+                    for (int i = 0; i < numLinks; ++i) {
+                        LinkStats linkStats = new LinkStats();
+                        WifiLinkLayerStats.LinkSpecificStats link = stats.links[i];
+                        linkStats.linkId = link.link_id;
+                        linkStats.state = link.state;
+                        linkStats.radioId = link.radio_id;
+                        linkStats.frequencyMhz = link.frequencyMhz;
+                        linkStats.beaconRx = link.beacon_rx;
+                        linkStats.rssiMgmt = link.rssi_mgmt;
+                        linkStats.timeSliceDutyCycleInPercent = link.timeSliceDutyCycleInPercent;
+                        linkStats.rssi = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
+                                new MloLink()).getRssi() : info.getRssi();
+                        wifiUsabilityStatsEntry.linkStats[i] = linkStats;
+                    }
                 }
             }
+
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
             wifiUsabilityStatsEntry.totalTxSuccess = stats.txmpdu_be + stats.txmpdu_bk
                     + stats.txmpdu_vi + stats.txmpdu_vo;
@@ -7433,6 +7466,7 @@ public class WifiMetrics {
                             inStat.state, inStat.radio_id,
                             (mloLinks.size() > 0) ? mloLinks.get(inStat.link_id,
                                     new MloLink()).getRssi() : info.getRssi(),
+                                    inStat.frequencyMhz, inStat.rssi_mgmt,
                             (mloLinks.size() > 0) ? mloLinks.get(inStat.link_id,
                                     new MloLink()).getTxLinkSpeedMbps() : info.getTxLinkSpeedMbps(),
                             (mloLinks.size() > 0) ? mloLinks.get(inStat.link_id,
@@ -7687,6 +7721,7 @@ public class WifiMetrics {
         out.channelUtilization = s.channelUtilization;
         out.radioStats = s.radioStats;
         out.wifiLinkCount = s.wifiLinkCount;
+        out.linkStats = s.linkStats;
         return out;
     }
 
