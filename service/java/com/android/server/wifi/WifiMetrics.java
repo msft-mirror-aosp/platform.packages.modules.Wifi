@@ -5213,6 +5213,11 @@ public class WifiMetrics {
             line.append(",time_slice_duty_cycle_in_percent="
                     + linkStat.timeSliceDutyCycleInPercent);
             line.append(",rssi=" + linkStat.rssi);
+            line.append(",channel_width=" + linkStat.channelWidth);
+            line.append(",center_freq_first_seg=" + linkStat.centerFreqFirstSeg);
+            line.append(",center_freq_second_seg=" + linkStat.centerFreqSecondSeg);
+            line.append(",on_time_in_ms=" + linkStat.onTimeInMs);
+            line.append(",cca_busy_time_in_ms=" + linkStat.ccaBusyTimeInMs);
         }
         line.append(",mlo_mode=" + entry.mloMode);
         pw.println(line.toString());
@@ -7121,6 +7126,17 @@ public class WifiMetrics {
                         linkStats.timeSliceDutyCycleInPercent = link.timeSliceDutyCycleInPercent;
                         linkStats.rssi = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
                                 new MloLink()).getRssi() : info.getRssi();
+                        WifiLinkLayerStats.ChannelStats channlStatsEntryOnFreq =
+                                stats.channelStatsMap.get(link.frequencyMhz);
+                        if (channlStatsEntryOnFreq != null) {
+                            linkStats.channelWidth = channlStatsEntryOnFreq.channelWidth;
+                            linkStats.centerFreqFirstSeg =
+                                channlStatsEntryOnFreq.frequencyFirstSegment;
+                            linkStats.centerFreqSecondSeg =
+                                channlStatsEntryOnFreq.frequencySecondSegment;
+                            linkStats.onTimeInMs = channlStatsEntryOnFreq.radioOnTimeMs;
+                            linkStats.ccaBusyTimeInMs = channlStatsEntryOnFreq.ccaBusyTimeMs;
+                        }
                         wifiUsabilityStatsEntry.linkStats[i] = linkStats;
                     }
                 }
@@ -7468,7 +7484,10 @@ public class WifiMetrics {
                             inStat.state, inStat.radio_id,
                             (mloLinks.size() > 0) ? mloLinks.get(inStat.link_id,
                                     new MloLink()).getRssi() : info.getRssi(),
-                                    inStat.frequencyMhz, inStat.rssi_mgmt,
+                            inStat.frequencyMhz, inStat.rssi_mgmt,
+                            (channelStatsMap != null) ? channelStatsMap.channelWidth : 0,
+                            (channelStatsMap != null) ? channelStatsMap.frequencyFirstSegment : 0,
+                            (channelStatsMap != null) ? channelStatsMap.frequencySecondSegment : 0,
                             (mloLinks.size() > 0) ? mloLinks.get(inStat.link_id,
                                     new MloLink()).getTxLinkSpeedMbps() : info.getTxLinkSpeedMbps(),
                             (mloLinks.size() > 0) ? mloLinks.get(inStat.link_id,

@@ -2517,11 +2517,11 @@ public class WifiManagerTest {
         SparseArray<LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0,
                 new LinkStats(0, WifiUsabilityStatsEntry.LINK_STATE_NOT_IN_USE, 0, -50, 2412,
-                        -50, 300, 200, 188, 2, 2, 100, 300, 100, 100, 200,
+                        -50, 0, 0, 0, 300, 200, 188, 2, 2, 100, 300, 100, 100, 200,
                         contentionTimeStats, rateStats));
         linkStats.put(1,
                 new LinkStats(0, WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -40, 5500,
-                        -40, 860, 600, 388, 2, 2, 200, 400, 100, 100, 200,
+                        -40, 1, 0, 0, 860, 600, 388, 2, 2, 200, 400, 100, 100, 200,
                         contentionTimeStats, rateStats));
         callbackCaptor.getValue().onWifiUsabilityStats(1, true,
                 new WifiUsabilityStatsEntry(System.currentTimeMillis(), -50, 100, 10, 0, 5, 5,

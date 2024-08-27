@@ -1484,6 +1484,9 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
             WifiLinkLayerStats.ChannelStats channelStatsEntry =
                     new WifiLinkLayerStats.ChannelStats();
             channelStatsEntry.frequency = channelStats.channel.centerFreq;
+            channelStatsEntry.frequencyFirstSegment = channelStats.channel.centerFreq0;
+            channelStatsEntry.frequencySecondSegment = channelStats.channel.centerFreq1;
+            channelStatsEntry.channelWidth = channelStats.channel.width;
             channelStatsEntry.radioOnTimeMs = channelStats.onTimeInMs;
             channelStatsEntry.ccaBusyTimeMs = channelStats.ccaBusyTimeInMs;
             radio.channelStatsMap.put(channelStats.channel.centerFreq, channelStatsEntry);
