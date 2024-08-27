@@ -3768,6 +3768,7 @@ public class WifiNative {
         WifiLinkLayerStats stats = mWifiVendorHal.getWifiLinkLayerStats(ifaceName);
         if (stats != null) {
             stats.aggregateLinkLayerStats();
+            stats.wifiMloMode = getMloMode();
         }
         return stats;
     }

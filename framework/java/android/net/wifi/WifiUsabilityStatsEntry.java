@@ -153,6 +153,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final int mTimeSliceDutyCycleInPercent;
 
     private final int mWifiLinkCount;
+    /** Refer to WifiManager.MloMode */
+    private @WifiManager.MloMode int mMloMode;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -842,7 +844,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             boolean isCellularDataAvailable, @NetworkType int cellularDataNetworkType,
             int cellularSignalStrengthDbm, int cellularSignalStrengthDb,
             boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats,
-            int wifiLinkCount) {
+            int wifiLinkCount, @WifiManager.MloMode int mloMode) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -880,6 +882,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mIsSameRegisteredCell = isSameRegisteredCell;
         mLinkStats = linkStats;
         mWifiLinkCount = wifiLinkCount;
+        mMloMode = mloMode;
     }
 
     /** Implement the Parcelable interface */
@@ -926,6 +929,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeBoolean(mIsSameRegisteredCell);
         dest.writeSparseArray(mLinkStats);
         dest.writeInt(mWifiLinkCount);
+        dest.writeInt(mMloMode);
     }
 
     /** Implement the Parcelable interface */
@@ -947,7 +951,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readInt(), in.readBoolean(), in.readBoolean(),
                     in.readBoolean(), in.readInt(), in.readInt(),
                     in.readInt(), in.readBoolean(),
-                    in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt()
+                    in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
+                    in.readInt()
             );
         }
 
@@ -1533,5 +1538,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public int getWifiLinkCount() {
         return mWifiLinkCount;
+    }
+
+    /** @hide */
+    public int getMloMode() {
+        return mMloMode;
     }
 }

@@ -2715,6 +2715,10 @@ message WifiUsabilityStatsEntry {
 
   // Link layer radio stats for all WiFi links
   repeated LinkStats link_stats = 46;
+
+  // The MLO mode
+  // See details in @WifiManager.MloMode
+  optional int32 mlo_mode = 47;
 }
 
 message ContentionTimeStats {
