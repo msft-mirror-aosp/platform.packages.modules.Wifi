@@ -95,7 +95,7 @@ public class WifiUsabilityStatsEntryTest {
         radioStats[0] = new RadioStats(0, 10, 11, 12, 13, 14, 15, 16, 17, 18);
         radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28);
         PeerInfo[] peerInfo = new PeerInfo[1];
-        peerInfo[0] = new PeerInfo(1, 50);
+        peerInfo[0] = new PeerInfo(1, 50, rateStats);
 
         SparseArray<WifiUsabilityStatsEntry.LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(0,
@@ -156,7 +156,7 @@ public class WifiUsabilityStatsEntryTest {
         radioStats[0] = new RadioStats(0, 10, 11, 12, 13, 14, 15, 16, 17, 18);
         radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28);
         PeerInfo[] peerInfo = new PeerInfo[1];
-        peerInfo[0] = new PeerInfo(1, 50);
+        peerInfo[0] = new PeerInfo(1, 50, rateStats);
         SparseArray<WifiUsabilityStatsEntry.LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(3,
                 WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -50, 2412, -50, 0, 0, 0, 300,

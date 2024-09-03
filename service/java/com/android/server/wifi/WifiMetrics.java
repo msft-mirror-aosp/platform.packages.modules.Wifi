@@ -5246,6 +5246,19 @@ public class WifiMetrics {
                 for (PeerInfo peerInfo : linkStat.peerInfo) {
                     line.append(",sta_count=" + peerInfo.staCount);
                     line.append(",chan_util=" + peerInfo.chanUtil);
+                    if (peerInfo.rateStats != null) {
+                        for (RateStats rateStat : peerInfo.rateStats) {
+                            line.append(",preamble=" + rateStat.preamble);
+                            line.append(",nss=" + rateStat.nss);
+                            line.append(",bw=" + rateStat.bw);
+                            line.append(",rate_mcs_idx=" + rateStat.rateMcsIdx);
+                            line.append(",bit_rate_in_kbps=" + rateStat.bitRateInKbps);
+                            line.append(",tx_mpdu=" + rateStat.txMpdu);
+                            line.append(",rx_mpdu=" + rateStat.rxMpdu);
+                            line.append(",mpdu_lost=" + rateStat.mpduLost);
+                            line.append(",retries=" + rateStat.retries);
+                        }
+                    }
                 }
             }
         }
@@ -7257,8 +7270,28 @@ public class WifiMetrics {
                             linkStats.peerInfo = new PeerInfo[numPeers];
                             for (int peerIndex = 0; peerIndex < numPeers; ++peerIndex) {
                                 PeerInfo peerInfo = new PeerInfo();
-                                peerInfo.staCount = link.peerInfo[peerIndex].staCount;
-                                peerInfo.chanUtil = link.peerInfo[peerIndex].chanUtil;
+                                WifiLinkLayerStats.PeerInfo curPeer = link.peerInfo[peerIndex];
+                                peerInfo.staCount = curPeer.staCount;
+                                peerInfo.chanUtil = curPeer.chanUtil;
+                                if (curPeer.rateStats != null && curPeer.rateStats.length > 0) {
+                                    int numRates = curPeer.rateStats.length;
+                                    peerInfo.rateStats = new RateStats[numRates];
+                                    for (int rateIndex = 0; rateIndex < numRates; rateIndex++) {
+                                        RateStats rateStats = new RateStats();
+                                        WifiLinkLayerStats.RateStat curRate =
+                                                curPeer.rateStats[rateIndex];
+                                        rateStats.preamble = curRate.preamble;
+                                        rateStats.nss = curRate.nss;
+                                        rateStats.bw = curRate.bw;
+                                        rateStats.rateMcsIdx = curRate.rateMcsIdx;
+                                        rateStats.bitRateInKbps = curRate.bitRateInKbps;
+                                        rateStats.txMpdu = curRate.txMpdu;
+                                        rateStats.rxMpdu = curRate.rxMpdu;
+                                        rateStats.mpduLost = curRate.mpduLost;
+                                        rateStats.retries = curRate.retries;
+                                        peerInfo.rateStats[rateIndex] = rateStats;
+                                    }
+                                }
                                 linkStats.peerInfo[peerIndex] = peerInfo;
                             }
                         }
@@ -7644,9 +7677,29 @@ public class WifiMetrics {
             peerInfos = new android.net.wifi.WifiUsabilityStatsEntry.PeerInfo[numPeers];
             for (int i = 0; i < numPeers; i++) {
                 WifiLinkLayerStats.PeerInfo curPeer = stats.peerInfo[i];
+                android.net.wifi.WifiUsabilityStatsEntry.RateStats[] rateStats = null;
+                if (curPeer.rateStats != null && curPeer.rateStats.length > 0) {
+                    int numRates = curPeer.rateStats.length;
+                    rateStats = new android.net.wifi.WifiUsabilityStatsEntry.RateStats[numRates];
+                    for (int rateIndex = 0; rateIndex < numRates; ++rateIndex) {
+                        WifiLinkLayerStats.RateStat curRate = curPeer.rateStats[rateIndex];
+                        rateStats[rateIndex] =
+                                new android.net.wifi.WifiUsabilityStatsEntry.RateStats(
+                                        convertPreambleTypeEnumToUsabilityStatsType(
+                                                curRate.preamble),
+                                        convertSpatialStreamEnumToUsabilityStatsType(curRate.nss),
+                                        convertBandwidthEnumToUsabilityStatsType(curRate.bw),
+                                        curRate.rateMcsIdx,
+                                        curRate.bitRateInKbps,
+                                        curRate.txMpdu,
+                                        curRate.rxMpdu,
+                                        curRate.mpduLost,
+                                        curRate.retries);
+                    }
+                }
                 android.net.wifi.WifiUsabilityStatsEntry.PeerInfo peerInfo =
                         new android.net.wifi.WifiUsabilityStatsEntry.PeerInfo(
-                                curPeer.staCount, curPeer.chanUtil);
+                                curPeer.staCount, curPeer.chanUtil, rateStats);
                 peerInfos[i] = peerInfo;
             }
         }
