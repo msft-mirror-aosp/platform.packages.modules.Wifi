@@ -216,6 +216,11 @@
     <!-- boolean indicating whether or not to auto-upgrade band setting configuration to dual bands during cloud configuration restore when device supported -->
     <bool translatable="false" name ="config_wifiSoftapAutoUpgradeToBridgedConfigWhenSupported">true</bool>
 
+    <!-- boolean indicating whether or not to temporarily auto-upgrade tethering softap to
+         2.4 + 5GHz Bridged if it is currently available and the usable configured bands only
+         contain 2.4 or 5Ghz.-->
+    <bool translatable="false" name ="config_wifiSoftapUpgradeTetheredTo2g5gBridgedIfBandsAreSubset">false</bool>
+
     <!-- List of allowed channels in 2GHz band for softap. If the device doesn't want to restrict
          channels this should be empty. Values is a comma separated channel string and/or channel
          range string like '1-6,11'. -->
@@ -1349,6 +1354,9 @@
          of setting up TWT session.
     -->
     <bool translatable="false" name="config_wifiTwtSupported">true</bool>
+
+    <!-- Boolean indicating whether the WiFi framework network selection should set the target BSSID. -->
+    <bool translatable="false" name="config_wifiNetworkSelectionSetTargetBssid">false</bool>
 
     <!-- Array containing carrier IDs whose networks should not auto-connect upon initial discovery.
          These networks are eligible to become network selection candidates if they still appear in
