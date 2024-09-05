@@ -468,6 +468,10 @@ public class WifiLinkLayerStats {
          * Channel stats list
          */
         public final SparseArray<ChannelStats> channelStatsMap = new SparseArray<>();
+        /**
+         * Time for which the radio is in active tranmission per tx level
+         */
+        public int[] tx_time_in_ms_per_level;
     }
 
     /**

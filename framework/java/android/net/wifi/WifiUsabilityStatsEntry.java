@@ -649,6 +649,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         private long mTotalRoamScanTimeMillis;
         private long mTotalPnoScanTimeMillis;
         private long mTotalHotspot2ScanTimeMillis;
+        private int[] mTxTimeMsPerLevel;
 
         /** @hide */
         public RadioStats() {
@@ -692,6 +693,47 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             this.mTotalHotspot2ScanTimeMillis = onTimeHs20Scan;
         }
 
+        /**
+         * Constructor function
+         * @param radioId Firmware/Hardware implementation specific persistent value for this
+         *                device, identifying the radio interface for which the stats are produced.
+         * @param onTime The total time the wifi radio is on in ms counted from the last radio
+         *               chip reset
+         * @param txTime The total time the wifi radio is transmitting in ms counted from the last
+         *               radio chip reset
+         * @param rxTime The total time the wifi radio is receiving in ms counted from the last
+         *               radio chip reset
+         * @param onTimeScan The total time spent on all types of scans in ms counted from the
+         *                   last radio chip reset
+         * @param onTimeNanScan The total time spent on nan scans in ms counted from the last radio
+         *                      chip reset
+         * @param onTimeBackgroundScan The total time spent on background scans in ms counted from
+         *                             the last radio chip reset
+         * @param onTimeRoamScan The total time spent on roam scans in ms counted from the last
+         *                       radio chip reset
+         * @param onTimePnoScan The total time spent on pno scans in ms counted from the last radio
+         *                      chip reset
+         * @param onTimeHs20Scan The total time spent on hotspot2.0 scans and GAS exchange in ms
+         *                       counted from the last radio chip reset
+         * @param txTimeMsPerLevel Time for which the radio is in active tranmission per tx level
+         */
+        /** @hide */
+        public RadioStats(int radioId, long onTime, long txTime, long rxTime, long onTimeScan,
+                long onTimeNanScan, long onTimeBackgroundScan, long onTimeRoamScan,
+                long onTimePnoScan, long onTimeHs20Scan, int[] txTimeMsPerLevel) {
+            this.mRadioId = radioId;
+            this.mTotalRadioOnTimeMillis = onTime;
+            this.mTotalRadioTxTimeMillis = txTime;
+            this.mTotalRadioRxTimeMillis = rxTime;
+            this.mTotalScanTimeMillis = onTimeScan;
+            this.mTotalNanScanTimeMillis = onTimeNanScan;
+            this.mTotalBackgroundScanTimeMillis = onTimeBackgroundScan;
+            this.mTotalRoamScanTimeMillis = onTimeRoamScan;
+            this.mTotalPnoScanTimeMillis = onTimePnoScan;
+            this.mTotalHotspot2ScanTimeMillis = onTimeHs20Scan;
+            this.mTxTimeMsPerLevel = txTimeMsPerLevel;
+        }
+
         @Override
         public int describeContents() {
             return 0;
@@ -709,6 +751,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             dest.writeLong(mTotalRoamScanTimeMillis);
             dest.writeLong(mTotalPnoScanTimeMillis);
             dest.writeLong(mTotalHotspot2ScanTimeMillis);
+            dest.writeIntArray(mTxTimeMsPerLevel);
         }
 
         /** Implement the Parcelable interface */
@@ -726,6 +769,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                         stats.mTotalRoamScanTimeMillis = in.readLong();
                         stats.mTotalPnoScanTimeMillis = in.readLong();
                         stats.mTotalHotspot2ScanTimeMillis = in.readLong();
+                        stats.mTxTimeMsPerLevel = in.createIntArray();
                         return stats;
                     }
                     public RadioStats[] newArray(int size) {
@@ -794,6 +838,13 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
          */
         public long getTotalHotspot2ScanTimeMillis() {
             return mTotalHotspot2ScanTimeMillis;
+        }
+        /**
+         * Time for which the radio is in active tranmission per tx level
+         */
+        /** @hide */
+        public int[] getTxTimeMsPerLevel() {
+            return mTxTimeMsPerLevel;
         }
     }
     private final RadioStats[] mRadioStats;
