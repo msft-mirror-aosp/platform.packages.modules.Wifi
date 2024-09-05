@@ -25,6 +25,7 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_LO
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TRANSIENT;
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
 import static com.android.server.wifi.WifiMetrics.ConnectionEvent.FAILURE_AUTHENTICATION_FAILURE;
+import static com.android.server.wifi.WifiMetrics.ConnectionEvent.FAILURE_NO_RESPONSE;
 import static com.android.server.wifi.proto.nano.WifiMetricsProto.ConnectionEvent.AUTH_FAILURE_EAP_FAILURE;
 
 import android.annotation.NonNull;
@@ -1958,8 +1959,10 @@ public class WifiConnectivityManager {
         // Need to connect to a different network id
         // Framework specifies the connection target BSSID if firmware doesn't support
         // {@link android.net.wifi.WifiManager#WIFI_FEATURE_CONTROL_ROAMING} or the
-        // candidate configuration contains a specified BSSID.
+        // candidate configuration contains a specified BSSID, or the feature to set target BSSID
+        // is enabled.
         if (mConnectivityHelper.isFirmwareRoamingSupported()
+                && !mWifiGlobals.isNetworkSelectionSetTargetBssid()
                 && (targetNetwork.BSSID == null
                 || targetNetwork.BSSID.equals(ClientModeImpl.SUPPLICANT_BSSID_ANY))) {
             targetBssid = ClientModeImpl.SUPPLICANT_BSSID_ANY;
@@ -3302,6 +3305,7 @@ public class WifiConnectivityManager {
             // Only attempt to reconnect when connection on the primary CMM fails, since MBB
             // CMM will be destroyed after the connection failure.
             if (clientModeManager.getRole() == ROLE_CLIENT_PRIMARY
+                    && failureCode != FAILURE_NO_RESPONSE // Do not retry since this is a timeout
                     && !mWifiPermissionsUtil.isAdminRestrictedNetwork(config)) {
                 retryConnectionOnLatestCandidates(clientModeManager, bssid, config,
                         failureCode == FAILURE_AUTHENTICATION_FAILURE
