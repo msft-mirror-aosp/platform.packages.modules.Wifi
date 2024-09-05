@@ -42,6 +42,7 @@ import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_LONG_LIVED;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_TRANSIENT;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__SUPPLICANT_DISCONNECTED;
+import static com.android.server.wifi.util.GeneralUtil.bitsetToLong;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -1979,7 +1980,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      * Get the supported feature set synchronously
      */
     public long getSupportedFeatures() {
-        return mWifiNative.getSupportedFeatureSet(mInterfaceName);
+        return bitsetToLong(mWifiNative.getSupportedFeatureSet(mInterfaceName));
     }
 
     /**

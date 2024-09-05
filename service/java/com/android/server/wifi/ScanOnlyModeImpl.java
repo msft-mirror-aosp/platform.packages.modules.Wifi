@@ -16,6 +16,8 @@
 
 package com.android.server.wifi;
 
+import static com.android.server.wifi.util.GeneralUtil.bitsetToLong;
+
 import android.annotation.NonNull;
 
 /**
@@ -41,7 +43,7 @@ public class ScanOnlyModeImpl implements ClientModeDefaults {
 
     @Override
     public long getSupportedFeatures() {
-        return mWifiNative.getSupportedFeatureSet(mIfaceName);
+        return bitsetToLong(mWifiNative.getSupportedFeatureSet(mIfaceName));
     }
 
     @Override
