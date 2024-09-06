@@ -38,7 +38,6 @@ import static android.net.wifi.WifiManager.WIFI_AP_STATE_DISABLING;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_ENABLED;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_ENABLING;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_FAILED;
-import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
 import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_AP;
 import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_AWARE;
 import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_DIRECT;
@@ -66,6 +65,8 @@ import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_AWARE_VERBOSE
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_VERBOSE_LOGGING_ENABLED;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_WEP_ALLOWED;
+import static com.android.server.wifi.util.GeneralUtil.bitsetToLong;
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 
 import android.Manifest;
 import android.annotation.AnyThread;
@@ -245,6 +246,7 @@ import java.security.cert.PKIXParameters;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -3224,12 +3226,12 @@ public class WifiServiceImpl extends BaseWifiService {
      * often clusters of several back-to-back calls; avoid repeated logging if
      * the feature set has not changed and the time interval is short.
      */
-    private boolean needToLogSupportedFeatures(long features) {
+    private boolean needToLogSupportedFeatures(BitSet features) {
         if (mVerboseLoggingEnabled) {
             long now = mClock.getElapsedSinceBootMillis();
             synchronized (this) {
                 if (now > mLastLoggedSupportedFeaturesTimestamp + A_FEW_MILLISECONDS
-                        || features != mLastLoggedSupportedFeatures) {
+                        || !features.equals(mLastLoggedSupportedFeatures)) {
                     mLastLoggedSupportedFeaturesTimestamp = now;
                     mLastLoggedSupportedFeatures = features;
                     return true;
@@ -3239,7 +3241,7 @@ public class WifiServiceImpl extends BaseWifiService {
         return false;
     }
     private static final int A_FEW_MILLISECONDS = 250;
-    private long mLastLoggedSupportedFeatures = -1;
+    private BitSet mLastLoggedSupportedFeatures = new BitSet();
     private long mLastLoggedSupportedFeaturesTimestamp = 0;
 
     /**
@@ -3247,12 +3249,17 @@ public class WifiServiceImpl extends BaseWifiService {
      */
     @Override
     public long getSupportedFeatures() {
+        BitSet features = getSupportedFeaturesIfAllowed();
+        return bitsetToLong(features);
+    }
+
+    protected BitSet getSupportedFeaturesIfAllowed() {
         enforceAccessPermission();
-        long features = getSupportedFeaturesInternal();
+        BitSet features = getSupportedFeaturesInternal();
         if (needToLogSupportedFeatures(features)) {
             mLog.info("getSupportedFeatures uid=% returns %")
                     .c(Binder.getCallingUid())
-                    .c(Long.toHexString(features))
+                    .c(features.toString())
                     .flush();
         }
         return features;
@@ -3270,7 +3277,8 @@ public class WifiServiceImpl extends BaseWifiService {
                     .c(Binder.getCallingUid())
                     .flush();
         }
-        if ((getSupportedFeatures() & WifiManager.WIFI_FEATURE_LINK_LAYER_STATS) == 0) {
+        if (!getSupportedFeaturesIfAllowed().get(
+                getCapabilityIndex(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS))) {
             try {
                 listener.onWifiActivityEnergyInfo(null);
             } catch (RemoteException e) {
@@ -5611,7 +5619,7 @@ public class WifiServiceImpl extends BaseWifiService {
                         mContext, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 0));
                 pw.println("mInIdleMode " + mInIdleMode);
                 pw.println("mScanPending " + mScanPending);
-                pw.println("SupportedFeatures:" + Long.toHexString(getSupportedFeaturesInternal()));
+                pw.println("SupportedFeatures: " + getSupportedFeaturesInternal());
                 pw.println("SettingsStore:");
                 mSettingsStore.dump(fd, pw, args);
                 mActiveModeWarden.dump(fd, pw, args);
@@ -6242,7 +6250,7 @@ public class WifiServiceImpl extends BaseWifiService {
                 TAG + "#unregisterTrafficStateCallback");
     }
 
-    private long getSupportedFeaturesInternal() {
+    private BitSet getSupportedFeaturesInternal() {
         return mActiveModeWarden.getSupportedFeatureSet();
     }
 
@@ -7737,21 +7745,23 @@ public class WifiServiceImpl extends BaseWifiService {
      */
     @Override
     public boolean isPnoSupported() {
+        boolean featureSetSupportsPno = getSupportedFeaturesIfAllowed()
+                .get(getCapabilityIndex(WifiManager.WIFI_FEATURE_PNO));
         return mWifiGlobals.isSwPnoEnabled()
-                || (mWifiGlobals.isBackgroundScanSupported()
-                        && (getSupportedFeatures() & WifiManager.WIFI_FEATURE_PNO) != 0);
+                || (mWifiGlobals.isBackgroundScanSupported() && featureSetSupportsPno);
     }
 
     private boolean isAggressiveRoamingModeSupported() {
-        return (getSupportedFeatures() & WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT)
-                != 0;
+        return getSupportedFeaturesIfAllowed()
+                .get(getCapabilityIndex(WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT));
     }
 
     /**
      * @return true if this device supports Trust On First Use
      */
     private boolean isTrustOnFirstUseSupported() {
-        return (getSupportedFeatures() & WIFI_FEATURE_TRUST_ON_FIRST_USE) != 0;
+        return getSupportedFeaturesIfAllowed()
+                .get(getCapabilityIndex(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
     }
 
     /**

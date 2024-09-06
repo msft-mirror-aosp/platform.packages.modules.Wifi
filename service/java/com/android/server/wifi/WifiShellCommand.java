@@ -39,6 +39,7 @@ import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_NAN;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_P2P;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_STA;
 import static com.android.server.wifi.SelfRecovery.REASON_API_CALL;
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -122,6 +123,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -1002,14 +1004,12 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     if (ApConfigUtil.isWpa3SaeSupported(mContext)) {
                         pw.println("wifi_softap_wpa3_sae_supported");
                     }
-                    if ((mWifiService.getSupportedFeatures()
-                            & WifiManager.WIFI_FEATURE_BRIDGED_AP)
-                            == WifiManager.WIFI_FEATURE_BRIDGED_AP) {
+                    BitSet featureSet = mWifiService.getSupportedFeaturesIfAllowed();
+                    if (featureSet.get(getCapabilityIndex(WifiManager.WIFI_FEATURE_BRIDGED_AP))) {
                         pw.println("wifi_softap_bridged_ap_supported");
                     }
-                    if ((mWifiService.getSupportedFeatures()
-                            & WifiManager.WIFI_FEATURE_STA_BRIDGED_AP)
-                            == WifiManager.WIFI_FEATURE_STA_BRIDGED_AP) {
+                    if (featureSet.get(getCapabilityIndex(
+                            WifiManager.WIFI_FEATURE_STA_BRIDGED_AP))) {
                         pw.println("wifi_softap_bridged_ap_with_sta_supported");
                     }
                     return 0;

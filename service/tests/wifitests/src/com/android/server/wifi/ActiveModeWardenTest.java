@@ -31,6 +31,7 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_LOCAL_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_TETHERED;
 import static com.android.server.wifi.ActiveModeWarden.INTERNAL_REQUESTOR_WS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_STA_BANDS;
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 import static com.android.server.wifi.util.GeneralUtil.longToBitset;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -53,6 +54,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.never;
@@ -122,6 +124,7 @@ import org.mockito.stubbing.Answer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -281,6 +284,8 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 any(WifiServiceImpl.SoftApCallbackInternal.class), any(), any(), any(),
                 anyBoolean());
         when(mWifiNative.initialize()).thenReturn(true);
+        when(mWifiNative.getSupportedFeatureSet(isNull())).thenReturn(new BitSet());
+        when(mWifiNative.getSupportedFeatureSet(anyString())).thenReturn(new BitSet());
         when(mWifiPermissionsUtil.isSystem(TEST_PACKAGE, TEST_UID)).thenReturn(true);
 
         mActiveModeWarden = createActiveModeWarden();
@@ -416,7 +421,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         }
         verify(mClientModeManager, atLeastOnce()).getInterfaceName();
         verify(mWifiNative, atLeastOnce()).getSupportedFeatureSet(WIFI_IFACE_NAME);
-        assertEquals(testFeatureSet, mActiveModeWarden.getSupportedFeatureSet());
+        assertTrue(longToBitset(testFeatureSet).equals(mActiveModeWarden.getSupportedFeatureSet()));
         verify(mScanRequestProxy, times(4)).enableScanning(true, true);
         assertEquals(mClientModeManager, mActiveModeWarden.getPrimaryClientModeManager());
         verify(mModeChangeCallback).onActiveModeManagerRoleChanged(mClientModeManager);
@@ -458,7 +463,8 @@ public class ActiveModeWardenTest extends WifiBaseTest {
             verify(mModeChangeCallback, times(2))
                     .onActiveModeManagerRoleChanged(mClientModeManager);
             verify(mWifiNative, atLeastOnce()).getSupportedFeatureSet(null);
-            assertEquals(TEST_FEATURE_SET, mActiveModeWarden.getSupportedFeatureSet());
+            assertTrue(longToBitset(TEST_FEATURE_SET)
+                    .equals(mActiveModeWarden.getSupportedFeatureSet()));
         }
         assertInEnabledState();
         verify(mScanRequestProxy).enableScanning(true, false);
@@ -3014,13 +3020,13 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         enterClientModeActiveState();
         when(mWifiNative.isStaApConcurrencySupported()).thenReturn(false);
         mClientListener.onStarted(mClientModeManager);
-        assertEquals(0L,
-                mActiveModeWarden.getSupportedFeatureSet() & WifiManager.WIFI_FEATURE_AP_STA);
+        assertFalse(mActiveModeWarden.getSupportedFeatureSet()
+                .get(getCapabilityIndex(WifiManager.WIFI_FEATURE_AP_STA)));
 
         when(mWifiNative.isStaApConcurrencySupported()).thenReturn(true);
         mClientListener.onStarted(mClientModeManager);
-        assertEquals(WifiManager.WIFI_FEATURE_AP_STA,
-                mActiveModeWarden.getSupportedFeatureSet() & WifiManager.WIFI_FEATURE_AP_STA);
+        assertTrue(mActiveModeWarden.getSupportedFeatureSet()
+                .get(getCapabilityIndex(WifiManager.WIFI_FEATURE_AP_STA)));
     }
 
     @Test
@@ -4880,14 +4886,14 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         when(mWifiNative.isStaApConcurrencySupported()).thenReturn(false);
         mClientListener.onStarted(mClientModeManager);
 
-        assertEquals(supportedFeaturesFromWifiNative,
-                mActiveModeWarden.getSupportedFeatureSet());
+        assertTrue(longToBitset(supportedFeaturesFromWifiNative)
+                .equals(mActiveModeWarden.getSupportedFeatureSet()));
 
         when(mWifiNative.isStaApConcurrencySupported()).thenReturn(true);
         mClientListener.onStarted(mClientModeManager);
 
-        assertEquals(supportedFeaturesFromWifiNative | WifiManager.WIFI_FEATURE_AP_STA,
-                mActiveModeWarden.getSupportedFeatureSet());
+        assertTrue(longToBitset(supportedFeaturesFromWifiNative | WifiManager.WIFI_FEATURE_AP_STA)
+                .equals(mActiveModeWarden.getSupportedFeatureSet()));
     }
 
     /**
@@ -4903,39 +4909,40 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 longToBitset(supportedFeaturesFromWifiNative));
 
         mClientListener.onStarted(mClientModeManager);
-        assertEquals(supportedFeaturesFromWifiNative, mActiveModeWarden.getSupportedFeatureSet());
+        assertTrue(longToBitset(supportedFeaturesFromWifiNative)
+                .equals(mActiveModeWarden.getSupportedFeatureSet()));
 
         when(mWifiNative.isStaStaConcurrencySupported()).thenReturn(true);
         when(mWifiResourceCache.getBoolean(R.bool.config_wifiMultiStaLocalOnlyConcurrencyEnabled))
                 .thenReturn(true);
         mClientListener.onStarted(mClientModeManager);
-        assertEquals(supportedFeaturesFromWifiNative
-                        | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY,
-                mActiveModeWarden.getSupportedFeatureSet());
+        assertTrue(longToBitset(supportedFeaturesFromWifiNative
+                | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY)
+                        .equals(mActiveModeWarden.getSupportedFeatureSet()));
 
         when(mWifiResourceCache.getBoolean(
                 R.bool.config_wifiMultiStaNetworkSwitchingMakeBeforeBreakEnabled))
                 .thenReturn(true);
         mClientListener.onStarted(mClientModeManager);
-        assertEquals(supportedFeaturesFromWifiNative
-                        | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY
-                        | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MBB,
-                mActiveModeWarden.getSupportedFeatureSet());
+        assertTrue(longToBitset(supportedFeaturesFromWifiNative
+                | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY
+                | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MBB)
+                        .equals(mActiveModeWarden.getSupportedFeatureSet()));
 
         when(mWifiResourceCache.getBoolean(R.bool.config_wifiMultiStaRestrictedConcurrencyEnabled))
                 .thenReturn(true);
         when(mWifiResourceCache.getBoolean(
                 R.bool.config_wifiMultiStaMultiInternetConcurrencyEnabled)).thenReturn(true);
         mClientListener.onStarted(mClientModeManager);
-        assertEquals(supportedFeaturesFromWifiNative
-                        | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY
-                        | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MBB
-                        | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_RESTRICTED
-                        | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MULTI_INTERNET,
-                mActiveModeWarden.getSupportedFeatureSet());
+        assertTrue(longToBitset(supportedFeaturesFromWifiNative
+                | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY
+                | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MBB
+                | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_RESTRICTED
+                | WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MULTI_INTERNET)
+                .equals(mActiveModeWarden.getSupportedFeatureSet()));
     }
 
-    private long testGetSupportedFeaturesCaseForMacRandomization(
+    private BitSet testGetSupportedFeaturesCaseForMacRandomization(
             long supportedFeaturesFromWifiNative, boolean apMacRandomizationEnabled,
             boolean staConnectedMacRandomizationEnabled, boolean p2pMacRandomizationEnabled) {
         when(mWifiResourceCache.getBoolean(
@@ -4965,19 +4972,19 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 WifiManager.WIFI_FEATURE_CONNECTED_RAND_MAC;
 
         enterClientModeActiveState();
-        assertEquals(featureStaConnectedMacRandomization | featureApMacRandomization
-                        | featureP2pMacRandomization,
-                testGetSupportedFeaturesCaseForMacRandomization(
-                        featureP2pMacRandomization, true, true, true));
+        assertTrue(longToBitset(featureStaConnectedMacRandomization | featureApMacRandomization
+                        | featureP2pMacRandomization)
+                .equals(testGetSupportedFeaturesCaseForMacRandomization(
+                        featureP2pMacRandomization, true, true, true)));
         // p2p supported by HAL, but disabled by overlay.
-        assertEquals(featureStaConnectedMacRandomization | featureApMacRandomization,
-                testGetSupportedFeaturesCaseForMacRandomization(
-                        featureP2pMacRandomization, true, true, false));
-        assertEquals(featureStaConnectedMacRandomization | featureApMacRandomization,
-                testGetSupportedFeaturesCaseForMacRandomization(0, true, true, false));
+        assertTrue(longToBitset(featureStaConnectedMacRandomization | featureApMacRandomization)
+                .equals(testGetSupportedFeaturesCaseForMacRandomization(
+                        featureP2pMacRandomization, true, true, false)));
+        assertTrue(longToBitset(featureStaConnectedMacRandomization | featureApMacRandomization)
+                .equals(testGetSupportedFeaturesCaseForMacRandomization(0, true, true, false)));
     }
 
-    private long testGetSupportedFeaturesCaseForRtt(
+    private BitSet testGetSupportedFeaturesCaseForRtt(
             long supportedFeaturesFromWifiNative, boolean rttDisabled) {
         when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_RTT)).thenReturn(
                 !rttDisabled);
@@ -4997,33 +5004,33 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         final long featureD2apRtt = WifiManager.WIFI_FEATURE_D2AP_RTT;
         final long featureLongBits = 0x1000000000L;
         enterClientModeActiveState();
-        assertEquals(0, testGetSupportedFeaturesCaseForRtt(0, false));
-        assertEquals(0, testGetSupportedFeaturesCaseForRtt(0, true));
-        assertEquals(featureAware | featureInfra,
-                testGetSupportedFeaturesCaseForRtt(featureAware | featureInfra, false));
-        assertEquals(featureAware | featureInfra,
-                testGetSupportedFeaturesCaseForRtt(featureAware | featureInfra, true));
-        assertEquals(featureInfra | featureD2dRtt,
-                testGetSupportedFeaturesCaseForRtt(featureInfra | featureD2dRtt, false));
-        assertEquals(featureInfra,
-                testGetSupportedFeaturesCaseForRtt(featureInfra | featureD2dRtt, true));
-        assertEquals(featureInfra | featureD2apRtt,
-                testGetSupportedFeaturesCaseForRtt(featureInfra | featureD2apRtt, false));
-        assertEquals(featureInfra,
-                testGetSupportedFeaturesCaseForRtt(featureInfra | featureD2apRtt, true));
-        assertEquals(featureInfra | featureD2dRtt | featureD2apRtt,
+        assertTrue(testGetSupportedFeaturesCaseForRtt(0, false).equals(new BitSet()));
+        assertTrue(testGetSupportedFeaturesCaseForRtt(0, true).equals(new BitSet()));
+        assertTrue(longToBitset(featureAware | featureInfra).equals(
+                testGetSupportedFeaturesCaseForRtt(featureAware | featureInfra, false)));
+        assertTrue(longToBitset(featureAware | featureInfra).equals(
+                testGetSupportedFeaturesCaseForRtt(featureAware | featureInfra, true)));
+        assertTrue(longToBitset(featureInfra | featureD2dRtt).equals(
+                testGetSupportedFeaturesCaseForRtt(featureInfra | featureD2dRtt, false)));
+        assertTrue(longToBitset(featureInfra).equals(
+                testGetSupportedFeaturesCaseForRtt(featureInfra | featureD2dRtt, true)));
+        assertTrue(longToBitset(featureInfra | featureD2apRtt).equals(
+                testGetSupportedFeaturesCaseForRtt(featureInfra | featureD2apRtt, false)));
+        assertTrue(longToBitset(featureInfra).equals(
+                testGetSupportedFeaturesCaseForRtt(featureInfra | featureD2apRtt, true)));
+        assertTrue(longToBitset(featureInfra | featureD2dRtt | featureD2apRtt).equals(
                 testGetSupportedFeaturesCaseForRtt(
-                        featureInfra | featureD2dRtt | featureD2apRtt, false));
-        assertEquals(featureInfra,
+                        featureInfra | featureD2dRtt | featureD2apRtt, false)));
+        assertTrue(longToBitset(featureInfra).equals(
                 testGetSupportedFeaturesCaseForRtt(
-                        featureInfra | featureD2dRtt | featureD2apRtt, true));
+                        featureInfra | featureD2dRtt | featureD2apRtt, true)));
 
-        assertEquals(featureLongBits | featureInfra | featureD2dRtt | featureD2apRtt,
+        assertTrue(longToBitset(featureLongBits | featureInfra | featureD2dRtt | featureD2apRtt)
+                .equals(testGetSupportedFeaturesCaseForRtt(
+                        featureLongBits | featureInfra | featureD2dRtt | featureD2apRtt, false)));
+        assertTrue(longToBitset(featureLongBits | featureInfra).equals(
                 testGetSupportedFeaturesCaseForRtt(
-                        featureLongBits | featureInfra | featureD2dRtt | featureD2apRtt, false));
-        assertEquals(featureLongBits | featureInfra,
-                testGetSupportedFeaturesCaseForRtt(
-                        featureLongBits | featureInfra | featureD2dRtt | featureD2apRtt, true));
+                        featureLongBits | featureInfra | featureD2dRtt | featureD2apRtt, true)));
     }
 
     @Test
