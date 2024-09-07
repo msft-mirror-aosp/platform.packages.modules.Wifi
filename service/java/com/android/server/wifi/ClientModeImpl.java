@@ -5395,7 +5395,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      * @param bssid BSSID of the AP.
      * @return true if BSSID matches to one of the affiliated link BSSIDs, false otherwise.
      */
-    public boolean isAffiliatedLinkBssid(@NonNull MacAddress bssid) {
+    public boolean isAffiliatedLinkBssid(@Nullable MacAddress bssid) {
+        if (bssid == null) return false;
         List<MloLink> links = mWifiInfo.getAffiliatedMloLinks();
         for (MloLink link: links) {
             if (bssid.equals(link.getApMacAddress())) {
@@ -6791,12 +6792,15 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             && mLastNetworkId != WifiConfiguration.INVALID_NETWORK_ID) {
                         WifiConfiguration config =
                                 mWifiConfigManager.getConfiguredNetwork(mLastNetworkId);
-                        if (config != null
-                            && ((message.arg1 == RESET_SIM_REASON_DEFAULT_DATA_SIM_CHANGED
+                        if (config == null) {
+                            break;
+                        }
+                        boolean isSimBasedNetwork = config.enterpriseConfig != null
+                                && config.enterpriseConfig.isAuthenticationSimBased();
+                        boolean isLastSubReady = mWifiCarrierInfoManager.isSimReady(mLastSubId);
+                        if ((message.arg1 == RESET_SIM_REASON_DEFAULT_DATA_SIM_CHANGED
                                 && config.carrierId != TelephonyManager.UNKNOWN_CARRIER_ID)
-                                || (config.enterpriseConfig != null
-                                && config.enterpriseConfig.isAuthenticationSimBased()
-                                && !mWifiCarrierInfoManager.isSimReady(mLastSubId)))) {
+                                || (isSimBasedNetwork && !isLastSubReady)) {
                             mWifiMetrics.logStaEvent(mInterfaceName,
                                     StaEvent.TYPE_FRAMEWORK_DISCONNECT,
                                     StaEvent.DISCONNECT_RESET_SIM_NETWORKS);
@@ -6804,7 +6808,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             mWifiNative.removeNetworkCachedData(mLastNetworkId);
                             // remove network so that supplicant's PMKSA cache is cleared
                             mWifiNative.removeAllNetworks(mInterfaceName);
-                            if (isPrimary() && !mWifiCarrierInfoManager.isSimReady(mLastSubId)) {
+                            if (isPrimary() && isSimBasedNetwork && !isLastSubReady) {
                                 mSimRequiredNotifier.showSimRequiredNotification(
                                         config, mLastSimBasedConnectionCarrierName);
                             }
@@ -6924,7 +6928,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         mWifiCarrierInfoManager.isMobileDataEnabled(),
                         mWifiGlobals.getPollRssiIntervalMillis(),
                         mWifiScoreReport.getAospScorerPredictionStatusForEvaluation(),
-                        mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
+                        mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation(),
+                        mWifiScoreReport.getLingering());
                 mWifiScoreReport.clearScorerPredictionStatusForEvaluation();
             }
 
