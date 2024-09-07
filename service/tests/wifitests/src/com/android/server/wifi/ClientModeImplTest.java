@@ -10154,8 +10154,6 @@ public class ClientModeImplTest extends WifiBaseTest {
         assertTrue(mCmi.isAffiliatedLinkBssid(MacAddress.fromString(TEST_BSSID_STR)));
         assertTrue(mCmi.isAffiliatedLinkBssid(MacAddress.fromString(TEST_BSSID_STR1)));
         assertFalse(mCmi.isAffiliatedLinkBssid(MacAddress.fromString(TEST_BSSID_STR2)));
-        // Check for null BSSID
-        assertFalse(mCmi.isAffiliatedLinkBssid(null));
     }
 
     @Test
@@ -10183,8 +10181,6 @@ public class ClientModeImplTest extends WifiBaseTest {
         mLooper.dispatchAll();
         // Test isAffiliatedLinkBssid match fails with no NPE
         assertFalse(mCmi.isAffiliatedLinkBssid(MacAddress.fromString(TEST_BSSID_STR)));
-        // Check for null BSSID
-        assertFalse(mCmi.isAffiliatedLinkBssid(null));
     }
 
     /**

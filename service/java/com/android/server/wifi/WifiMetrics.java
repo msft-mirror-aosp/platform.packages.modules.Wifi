@@ -32,10 +32,6 @@ import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESUL
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_FIRMWARE_ALERT;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_IP_REACHABILITY_LOST;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_NONE;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_UNKNOWN;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_CONNECTED;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING;
 
 
 import static java.lang.StrictMath.toIntExact;
@@ -283,8 +279,7 @@ public class WifiMetrics {
     private WifiHealthMonitor mWifiHealthMonitor;
     private WifiScoreCard mWifiScoreCard;
     private SessionData mPreviousSession;
-    @VisibleForTesting
-    public SessionData mCurrentSession;
+    private SessionData mCurrentSession;
     private String mLastBssid;
     private int mLastFrequency = -1;
     private int mSeqNumInsideFramework = 0;
@@ -507,7 +502,7 @@ public class WifiMetrics {
     /** WifiConfigStore write duration histogram. */
     private SparseIntArray mWifiConfigStoreWriteDurationHistogram = new SparseIntArray();
 
-    /** New API surface metrics */
+    /** New  API surface metrics */
     private final WifiNetworkRequestApiLog mWifiNetworkRequestApiLog =
             new WifiNetworkRequestApiLog();
     private static final int[] NETWORK_REQUEST_API_MATCH_SIZE_HISTOGRAM_BUCKETS =
@@ -679,15 +674,13 @@ public class WifiMetrics {
         }
     }
 
-    @VisibleForTesting
-    public static class SessionData {
+    private static class SessionData {
         private String mSsid;
-        @VisibleForTesting
-        public long mSessionStartTimeMillis;
+        private long mSessionStartTimeMillis;
         private long mSessionEndTimeMillis;
         private int mBand;
         private int mAuthType;
-        public ConnectionEvent mConnectionEvent;
+        private ConnectionEvent mConnectionEvent;
         private long mLastRoamCompleteMillis;
 
         SessionData(ConnectionEvent connectionEvent, String ssid, long sessionStartTimeMillis,
@@ -1205,8 +1198,7 @@ public class WifiMetrics {
         private int mPasspointRoamingType;
         private int mTofuConnectionState;
 
-        @VisibleForTesting
-        ConnectionEvent() {
+        private ConnectionEvent() {
             mConnectionEvent = new WifiMetricsProto.ConnectionEvent();
             mRouterFingerPrint = new RouterFingerPrint();
             mConnectionEvent.routerFingerprint = mRouterFingerPrint.mRouterFingerPrintProto;
@@ -8831,22 +8823,6 @@ public class WifiMetrics {
         }
     }
 
-    @VisibleForTesting
-    int getFrameworkStateForScorer(int pollingIntervalMs, boolean lingering) {
-        if (mCurrentSession == null) {
-            return SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_UNKNOWN;
-        }
-        // The first pollingIntervalMs*1.5 milliseconds are considered part of the awakening state.
-        if ((mClock.getElapsedSinceBootMillis() - mCurrentSession.mSessionStartTimeMillis
-                + pollingIntervalMs / 2) / pollingIntervalMs <= 1) {
-            return SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING;
-        }
-        if (lingering) {
-            return SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING;
-        }
-        return SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_CONNECTED;
-    }
-
     /**
      * Log a ScorerPredictionResultReported atom.
      */
@@ -8855,32 +8831,28 @@ public class WifiMetrics {
             boolean isMobileDataEnabled,
             int pollingIntervalMs,
             int aospScorerPrediction,
-            int externalScorerPrediction,
-            boolean lingering) {
+            int externalScorerPrediction) {
         boolean isCellularDataAvailable = mWifiDataStall.isCellularDataAvailable();
         boolean isThroughputSufficient = mWifiDataStall.isThroughputSufficient();
         int deviceState = getDeviceStateForScorer(
                 hasActiveModem,
                 hasActiveSubInfo, isMobileDataEnabled, isCellularDataAvailable,
                 mAdaptiveConnectivityEnabled);
-        int scorerUnusableEvent = convertWifiUnusableTypeForScorer(mUnusableEventType);
-        int wifiFrameworkState = getFrameworkStateForScorer(pollingIntervalMs, lingering);
 
+        int scorerUnusableEvent = convertWifiUnusableTypeForScorer(mUnusableEventType);
         WifiStatsLog.write_non_chained(SCORER_PREDICTION_RESULT_REPORTED,
                     Process.WIFI_UID,
                     null,
                     aospScorerPrediction,
                     scorerUnusableEvent,
-                    isThroughputSufficient, deviceState, pollingIntervalMs,
-                    wifiFrameworkState);
+                    isThroughputSufficient, deviceState, pollingIntervalMs);
         if (mScorerUid != Process.WIFI_UID) {
             WifiStatsLog.write_non_chained(SCORER_PREDICTION_RESULT_REPORTED,
                     mScorerUid,
                     null, // TODO(b/354737760): log the attribution tag
                     externalScorerPrediction,
                     scorerUnusableEvent,
-                    isThroughputSufficient, deviceState, pollingIntervalMs,
-                    wifiFrameworkState);
+                    isThroughputSufficient, deviceState, pollingIntervalMs);
         }
 
         // We'd better reset to TYPE_NONE if it is defined in the future.

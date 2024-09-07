@@ -16,7 +16,6 @@
 
 package com.google.snippet.wifi.aware;
 
-import android.net.NetworkRequest;
 import android.net.wifi.aware.PublishConfig;
 import android.net.wifi.aware.SubscribeConfig;
 
@@ -50,8 +49,6 @@ public class WifiAwareSnippetConverter implements SnippetObjectConverter {
             return WifiAwareJsonDeserializer.jsonToSubscribeConfig(jsonObject);
         } else if (type == PublishConfig.class) {
             return WifiAwareJsonDeserializer.jsonToPublishConfig(jsonObject);
-        } else if (type == NetworkRequest.class) {
-            return WifiAwareJsonDeserializer.jsonToNetworkRequest(jsonObject);
         }
         // If the type is not recognized, you can throw an exception or return null
         // depending on your application's needs.
