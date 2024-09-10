@@ -77,6 +77,7 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.proto.nano.WifiMetricsProto;
 import com.android.server.wifi.util.ActionListenerWrapper;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
 import java.io.FileDescriptor;
@@ -151,6 +152,7 @@ public class WifiNetworkFactory extends NetworkFactory {
     private final FrameworkFacade mFacade;
     private final MultiInternetManager mMultiInternetManager;
     private final NetworkCapabilities mCapabilitiesFilter;
+    private final FeatureFlags mFeatureFlags;
     private RemoteCallbackList<INetworkRequestMatchCallback> mRegisteredCallbacks;
     // Store all user approved access points for apps.
     @VisibleForTesting
@@ -599,6 +601,7 @@ public class WifiNetworkFactory extends NetworkFactory {
         mFacade = facade;
         mMultiInternetManager = multiInternetManager;
         mCapabilitiesFilter = nc;
+        mFeatureFlags = mWifiInjector.getDeviceConfigFacade().getFeatureFlags();
 
         // register the data store for serializing/deserializing data.
         configStore.registerStoreData(
@@ -1228,6 +1231,14 @@ public class WifiNetworkFactory extends NetworkFactory {
 
     private void handleRejectUserSelection() {
         Log.w(TAG, "User dismissed notification, cancelling " + mActiveSpecificNetworkRequest);
+        if (mFeatureFlags.localOnlyConnectionOptimization()
+                && mActiveSpecificNetworkRequestSpecifier != null
+                && mActiveSpecificNetworkRequest != null) {
+            sendConnectionFailureIfAllowed(mActiveSpecificNetworkRequest.getRequestorPackageName(),
+                    mActiveSpecificNetworkRequest.getRequestorUid(),
+                    mActiveSpecificNetworkRequestSpecifier,
+                    WifiManager.STATUS_LOCAL_ONLY_CONNECTION_FAILURE_USER_REJECT);
+        }
         teardownForActiveRequest();
         mWifiMetrics.incrementNetworkRequestApiNumUserReject();
     }
@@ -1326,7 +1337,8 @@ public class WifiNetworkFactory extends NetworkFactory {
         }
         sendConnectionFailureIfAllowed(mActiveSpecificNetworkRequest.getRequestorPackageName(),
                 mActiveSpecificNetworkRequest.getRequestorUid(),
-                mActiveSpecificNetworkRequestSpecifier, failureCode);
+                mActiveSpecificNetworkRequestSpecifier,
+                internalConnectionEventToLocalOnlyFailureCode(failureCode));
         teardownForActiveRequest();
     }
 
@@ -2127,7 +2139,8 @@ public class WifiNetworkFactory extends NetworkFactory {
     }
 
     private void sendConnectionFailureIfAllowed(String packageName,
-            int uid, @NonNull WifiNetworkSpecifier networkSpecifier, int connectionEvent) {
+            int uid, @NonNull WifiNetworkSpecifier networkSpecifier,
+            @WifiManager.LocalOnlyConnectionStatusCode int failureReason) {
         RemoteCallbackList<ILocalOnlyConnectionStatusListener> listenersTracker =
                 mLocalOnlyStatusListenerPerApp.get(packageName);
         if (listenersTracker == null || listenersTracker.getRegisteredCallbackCount() == 0) {
@@ -2141,7 +2154,7 @@ public class WifiNetworkFactory extends NetworkFactory {
         for (int i = 0; i < n; i++) {
             try {
                 listenersTracker.getBroadcastItem(i).onConnectionStatus(networkSpecifier,
-                        internalConnectionEventToLocalOnlyFailureCode(connectionEvent));
+                        failureReason);
             } catch (RemoteException e) {
                 Log.e(TAG, "sendNetworkCallback: remote exception -- " + e);
             }

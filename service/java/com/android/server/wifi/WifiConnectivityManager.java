@@ -25,6 +25,7 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_LO
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TRANSIENT;
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
 import static com.android.server.wifi.WifiMetrics.ConnectionEvent.FAILURE_AUTHENTICATION_FAILURE;
+import static com.android.server.wifi.WifiMetrics.ConnectionEvent.FAILURE_NO_RESPONSE;
 import static com.android.server.wifi.proto.nano.WifiMetricsProto.ConnectionEvent.AUTH_FAILURE_EAP_FAILURE;
 
 import android.annotation.NonNull;
@@ -657,6 +658,9 @@ public class WifiConnectivityManager {
             cmmStates.add(cmmState);
         }
         boolean skipSufficiencyCheck = shouldSkipSufficiencyCheck(hasExistingSecondaryCmm);
+
+        // If cellular is unavailable, re-enable Wi-Fi networks disabled by pinning to cell.
+        mConfigManager.considerStopRestrictingAutoJoinToSubscriptionId();
 
         // Check if any blocklisted BSSIDs can be freed.
         List<ScanDetail> enabledDetails =
@@ -1955,8 +1959,10 @@ public class WifiConnectivityManager {
         // Need to connect to a different network id
         // Framework specifies the connection target BSSID if firmware doesn't support
         // {@link android.net.wifi.WifiManager#WIFI_FEATURE_CONTROL_ROAMING} or the
-        // candidate configuration contains a specified BSSID.
+        // candidate configuration contains a specified BSSID, or the feature to set target BSSID
+        // is enabled.
         if (mConnectivityHelper.isFirmwareRoamingSupported()
+                && !mWifiGlobals.isNetworkSelectionSetTargetBssid()
                 && (targetNetwork.BSSID == null
                 || targetNetwork.BSSID.equals(ClientModeImpl.SUPPLICANT_BSSID_ANY))) {
             targetBssid = ClientModeImpl.SUPPLICANT_BSSID_ANY;
@@ -2311,7 +2317,7 @@ public class WifiConnectivityManager {
                         getScheduledSingleScanType(mCurrentSingleScanScheduleIndex));
 
                 // Note, initial partial scan may fail due to lack of channel history
-                // Hence, we verify state before changing to AWIATING_RESPONSE
+                // Hence, we verify state before changing to AWAITING_RESPONSE
                 if (mInitialScanState == INITIAL_SCAN_STATE_START) {
                     setInitialScanState(INITIAL_SCAN_STATE_AWAITING_RESPONSE);
                     mWifiMetrics.incrementInitialPartialScanCount();
@@ -3299,6 +3305,7 @@ public class WifiConnectivityManager {
             // Only attempt to reconnect when connection on the primary CMM fails, since MBB
             // CMM will be destroyed after the connection failure.
             if (clientModeManager.getRole() == ROLE_CLIENT_PRIMARY
+                    && failureCode != FAILURE_NO_RESPONSE // Do not retry since this is a timeout
                     && !mWifiPermissionsUtil.isAdminRestrictedNetwork(config)) {
                 retryConnectionOnLatestCandidates(clientModeManager, bssid, config,
                         failureCode == FAILURE_AUTHENTICATION_FAILURE
@@ -3537,14 +3544,24 @@ public class WifiConnectivityManager {
         mConnectivityHelper.getFirmwareRoamingInfo();
         mWifiChannelUtilization.init(getPrimaryClientModeManager().getWifiLinkLayerStats());
         clearConnectionAttemptTimeStamps(); // clear connection attempts.
-
-        if (mContext.getResources().getBoolean(R.bool.config_wifiEnablePartialInitialScan)) {
-            setInitialScanState(INITIAL_SCAN_STATE_START);
-        }
-
         mRunning = true;
         mLatestCandidates = null;
         mLatestCandidatesTimestampMs = 0;
+        if (mContext.getResources().getBoolean(R.bool.config_wifiEnablePartialInitialScan)) {
+            setInitialScanState(INITIAL_SCAN_STATE_START);
+            if (mScreenOn) {
+                // force trigger partial scan at start up to make sure this happens before Settings
+                // scan
+                startSingleScan(false, WIFI_WORK_SOURCE, DEFAULT_SCANNING_TYPE[0]);
+
+                // Note, initial partial scan may fail due to lack of channel history
+                // Hence, we verify state before changing to AWAITING_RESPONSE
+                if (mInitialScanState == INITIAL_SCAN_STATE_START) {
+                    setInitialScanState(INITIAL_SCAN_STATE_AWAITING_RESPONSE);
+                    mWifiMetrics.incrementInitialPartialScanCount();
+                }
+            }
+        }
     }
 
     /**

@@ -18,6 +18,7 @@ package com.android.server.wifi;
 
 import static android.net.wifi.WifiManager.STATUS_LOCAL_ONLY_CONNECTION_FAILURE_AUTHENTICATION;
 import static android.net.wifi.WifiManager.STATUS_LOCAL_ONLY_CONNECTION_FAILURE_IP_PROVISIONING;
+import static android.net.wifi.WifiManager.STATUS_LOCAL_ONLY_CONNECTION_FAILURE_USER_REJECT;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.server.wifi.WifiNetworkFactory.PERIODIC_SCAN_INTERVAL_MS;
@@ -105,6 +106,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto;
 import com.android.server.wifi.util.ActionListenerWrapper;
 import com.android.server.wifi.util.WifiConfigStoreEncryptionUtil;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
 import org.junit.After;
@@ -188,6 +190,8 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
     private @Mock ClientModeManager mPrimaryClientModeManager;
     private @Mock WifiGlobals mWifiGlobals;
     @Mock WifiDeviceStateChangeManager mWifiDeviceStateChangeManager;
+    @Mock FeatureFlags mFeatureFlags;
+    @Mock DeviceConfigFacade mDeviceConfigFacade;
     private MockitoSession mStaticMockSession = null;
     NetworkCapabilities mNetworkCapabilities;
     TestLooper mLooper;
@@ -265,11 +269,13 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         when(mPackageManager.getApplicationLabel(any())).thenReturn(TEST_APP_NAME);
         mockPackageImportance(TEST_PACKAGE_NAME_1, true, false);
         mockPackageImportance(TEST_PACKAGE_NAME_2, true, false);
+        when(mDeviceConfigFacade.getFeatureFlags()).thenReturn(mFeatureFlags);
         when(mWifiInjector.getWifiScanner()).thenReturn(mWifiScanner);
         when(mWifiInjector.getActiveModeWarden()).thenReturn(mActiveModeWarden);
         when(mWifiInjector.getWifiGlobals()).thenReturn(mWifiGlobals);
         when(mWifiInjector.getWifiDeviceStateChangeManager())
                 .thenReturn(mWifiDeviceStateChangeManager);
+        when(mWifiInjector.getDeviceConfigFacade()).thenReturn(mDeviceConfigFacade);
         when(mWifiGlobals.isWpa3SaeUpgradeEnabled()).thenReturn(true);
         when(mWifiGlobals.isOweUpgradeEnabled()).thenReturn(true);
         when(mWifiConfigManager.addOrUpdateNetwork(any(), anyInt(), anyString(), eq(false)))
@@ -1687,8 +1693,10 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
      */
     @Test
     public void testNetworkSpecifierHandleUserSelectionReject() throws Exception {
+        when(mFeatureFlags.localOnlyConnectionOptimization()).thenReturn(true);
         sendNetworkRequestAndSetupForUserSelection();
-
+        mWifiNetworkFactory.addLocalOnlyConnectionStatusListener(mLocalOnlyConnectionStatusListener,
+                TEST_PACKAGE_NAME_1, null);
         INetworkRequestUserSelectionCallback networkRequestUserSelectionCallback =
                 mNetworkRequestUserSelectionCallback.getValue();
         assertNotNull(networkRequestUserSelectionCallback);
@@ -1703,6 +1711,9 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         verify(mConnectivityManager).declareNetworkRequestUnfulfillable(eq(mNetworkRequest));
 
         verify(mWifiMetrics).incrementNetworkRequestApiNumUserReject();
+        verify(mLocalOnlyConnectionStatusListener).onConnectionStatus(
+                eq((WifiNetworkSpecifier) mNetworkRequest.getNetworkSpecifier()),
+                eq(STATUS_LOCAL_ONLY_CONNECTION_FAILURE_USER_REJECT));
 
         // Verify we did not attempt to trigger a connection.
         verifyNoMoreInteractions(mClientModeManager, mWifiConfigManager);
