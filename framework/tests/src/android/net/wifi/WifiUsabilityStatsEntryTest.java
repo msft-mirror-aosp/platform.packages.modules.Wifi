@@ -27,6 +27,7 @@ import android.net.wifi.WifiUsabilityStatsEntry.PacketStats;
 import android.net.wifi.WifiUsabilityStatsEntry.PeerInfo;
 import android.net.wifi.WifiUsabilityStatsEntry.RadioStats;
 import android.net.wifi.WifiUsabilityStatsEntry.RateStats;
+import android.net.wifi.WifiUsabilityStatsEntry.ScanResultWithSameFreq;
 import android.os.Parcel;
 import android.util.SparseArray;
 
@@ -96,16 +97,20 @@ public class WifiUsabilityStatsEntryTest {
         radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28, new int[] {1, 2, 3});
         PeerInfo[] peerInfo = new PeerInfo[1];
         peerInfo[0] = new PeerInfo(1, 50, rateStats);
+        ScanResultWithSameFreq[] scanResultsWithSameFreq2G = new ScanResultWithSameFreq[1];
+        scanResultsWithSameFreq2G[0] = new ScanResultWithSameFreq(100, -50, 2412);
+        ScanResultWithSameFreq[] scanResultsWithSameFreq5G = new ScanResultWithSameFreq[1];
+        scanResultsWithSameFreq5G[0] = new ScanResultWithSameFreq(100, -50, 5500);
 
         SparseArray<WifiUsabilityStatsEntry.LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(0,
                 WifiUsabilityStatsEntry.LINK_STATE_UNKNOWN, 0, -50, 2412, -50, 0, 0, 0,
                 300, 200, 188, 2, 2, 100, 300, 100, 100, 200,
-                contentionTimeStats, rateStats, packetStats, peerInfo));
+                contentionTimeStats, rateStats, packetStats, peerInfo, scanResultsWithSameFreq2G));
         linkStats.put(1, new WifiUsabilityStatsEntry.LinkStats(1,
                 WifiUsabilityStatsEntry.LINK_STATE_UNKNOWN, 0, -40, 5500, -40, 1, 0, 0,
                 860, 600, 388, 2, 2, 200, 400, 100, 150, 300,
-                contentionTimeStats, rateStats, packetStats, peerInfo));
+                contentionTimeStats, rateStats, packetStats, peerInfo, scanResultsWithSameFreq5G));
 
         WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
@@ -157,15 +162,19 @@ public class WifiUsabilityStatsEntryTest {
         radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28, new int[] {1, 2, 3});
         PeerInfo[] peerInfo = new PeerInfo[1];
         peerInfo[0] = new PeerInfo(1, 50, rateStats);
+        ScanResultWithSameFreq[] scanResultsWithSameFreq2G = new ScanResultWithSameFreq[1];
+        scanResultsWithSameFreq2G[0] = new ScanResultWithSameFreq(100, -50, 2412);
+        ScanResultWithSameFreq[] scanResultsWithSameFreq5G = new ScanResultWithSameFreq[1];
+        scanResultsWithSameFreq5G[0] = new ScanResultWithSameFreq(100, -50, 5500);
         SparseArray<WifiUsabilityStatsEntry.LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(3,
                 WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -50, 2412, -50, 0, 0, 0, 300,
                 200, 188, 2, 2, 100, 300, 100, 100, 200,
-                contentionTimeStats, rateStats, packetStats, peerInfo));
+                contentionTimeStats, rateStats, packetStats, peerInfo, scanResultsWithSameFreq2G));
         linkStats.put(1, new WifiUsabilityStatsEntry.LinkStats(8,
                 WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -40, 5500, -40, 1, 0, 0, 860,
                 600, 388, 2, 2, 200, 400, 100, 150, 300,
-                contentionTimeStats, rateStats, packetStats, peerInfo));
+                contentionTimeStats, rateStats, packetStats, peerInfo, scanResultsWithSameFreq5G));
 
         return new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
@@ -622,6 +631,16 @@ public class WifiUsabilityStatsEntryTest {
                     assertEquals(expectedStats.getStaCount(), actualStats.getStaCount());
                     assertEquals(expectedStats.getChanUtil(), actualStats.getChanUtil());
                 }
+                for (int j = 0; j < expected.getScanResultsWithSameFreq(link).length; j++) {
+                    assertEquals(expected.getScanResultsWithSameFreq(link)[j]
+                                .getScanResultTimestampMicros(),
+                                actual.getScanResultsWithSameFreq(link)[j]
+                                .getScanResultTimestampMicros());
+                    assertEquals(expected.getScanResultsWithSameFreq(link)[j].getRssi(),
+                                actual.getScanResultsWithSameFreq(link)[j].getRssi());
+                    assertEquals(expected.getScanResultsWithSameFreq(link)[j].getFrequency(),
+                                actual.getScanResultsWithSameFreq(link)[j].getFrequency());
+                }
             }
         }
         assertEquals(expected.getWifiLinkCount(), actual.getWifiLinkCount());
@@ -637,7 +656,7 @@ public class WifiUsabilityStatsEntryTest {
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(0,
                 WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -50, 2412, -50, 0, 0, 0, 300,
                 200, 188, 2, 2, 100, 300, 100, 100, 200,
-                null, null, null, null));
+                null, null, null, null, null));
 
         WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
