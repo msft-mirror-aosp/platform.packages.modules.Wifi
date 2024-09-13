@@ -7609,6 +7609,33 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
                 WpsInfo.PBC, WifiP2pManager.CONNECTION_REQUEST_ACCEPT);
     }
 
+    /**
+     * Verify sunny scenario for setConnectionRequestResult show pin event.
+     */
+    @Test
+    public void testSetConnectionRequestResultSuccessShowPin() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
+        forceP2pEnabled(mClient1);
+        Binder binder = new Binder();
+        verifyAddExternalApprover(binder, true, true,
+                MacAddress.fromString(mTestWifiP2pDevice.deviceAddress));
+
+        WifiP2pProvDiscEvent pdEvent = new WifiP2pProvDiscEvent();
+        pdEvent.device = mTestWifiP2pDevice;
+        pdEvent.pin = "pin";
+        sendSimpleMsg(null,
+                WifiP2pMonitor.P2P_PROV_DISC_SHOW_PIN_EVENT,
+                pdEvent);
+        mLooper.dispatchAll();
+
+        sendSetConnectionRequestResultMsg(mClientMessenger,
+                MacAddress.fromString(mTestWifiP2pDevice.deviceAddress),
+                WifiP2pManager.CONNECTION_REQUEST_ACCEPT, binder);
+
+        verify(mWifiNative).p2pConnect(any(), anyBoolean());
+        verify(mWifiNative, never()).p2pStopFind();
+    }
+
     private void verifyMultiApproverMatch(List<MacAddress> addresses, MacAddress expectedMatch)
             throws Exception {
         when(mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(anyInt()))
@@ -8548,6 +8575,35 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         assertThrows(SecurityException.class,
                 () -> mWifiP2pServiceImpl.registerWifiP2pListener(mP2pListener, TEST_PACKAGE_NAME,
                         mExtras));
+    }
+
+    /**
+     * Verify that p2p listener group created callback is sent for negotiated GO
+     */
+    @Test
+    public void testP2pListenerWpsGroupCreated() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastT());
+        forceP2pEnabled(mClient1);
+
+        WifiP2pGroup group = new WifiP2pGroup();
+        group.setNetworkId(WifiP2pGroup.NETWORK_ID_PERSISTENT);
+        group.setNetworkName(TEST_NETWORK_NAME);
+        group.setOwner(new WifiP2pDevice("thisDeviceMac"));
+        group.setIsGroupOwner(true);
+        group.setInterface(IFACE_NAME_P2P);
+        sendGroupStartedMsg(group);
+        simulateTetherReady();
+        ArgumentCaptor<WifiP2pInfo> p2pInfoCaptor = ArgumentCaptor.forClass(WifiP2pInfo.class);
+        ArgumentCaptor<WifiP2pGroup> p2pGroupCaptor = ArgumentCaptor.forClass(WifiP2pGroup.class);
+        WifiP2pDevice peerClientDevice = new WifiP2pDevice();
+        peerClientDevice.deviceName = "peerClientDeviceName";
+        peerClientDevice.deviceAddress = "11:22:33:aa:bb:cc";
+        peerClientDevice.setInterfaceMacAddress(MacAddress.fromString(PEER_INTERFACE_ADDRESS));
+        sendSimpleMsg(null, WifiP2pMonitor.AP_STA_CONNECTED_EVENT, peerClientDevice);
+        verify(mP2pListener).onGroupCreated(p2pInfoCaptor.capture(), p2pGroupCaptor.capture());
+        assertEquals(TEST_NETWORK_NAME, p2pGroupCaptor.getValue().getNetworkName());
+        assertFalse(p2pGroupCaptor.getValue().isClientListEmpty());
+        assertTrue(p2pInfoCaptor.getValue().groupFormed);
     }
 
     /**

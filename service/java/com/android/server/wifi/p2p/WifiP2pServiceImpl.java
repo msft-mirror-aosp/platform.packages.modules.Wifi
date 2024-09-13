@@ -1371,6 +1371,12 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 != PackageManager.PERMISSION_DENIED;
     }
 
+    private boolean isDualP2pSupported() {
+        return mFeatureFlags.p2pDual()
+                && mFeatureFlags.p2pOwnership()
+                && mWifiNative.isP2pP2pConcurrencySupported();
+    }
+
     @Override
     protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         if (mContext.checkCallingOrSelfPermission(android.Manifest.permission.DUMP)
@@ -1393,6 +1399,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         pw.println("mClientInfoList " + mClientInfoList.size());
         pw.println("mActiveClients " + mActiveClients);
         pw.println("mPeerAuthorizingTimestamp" + mPeerAuthorizingTimestamp);
+        pw.println("isDualP2pSupported" + isDualP2pSupported());
         pw.println();
 
         final IIpClient ipClient = mIpClient;
@@ -3878,7 +3885,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             break;
                         }
                         mSavedPeerConfig = new WifiP2pConfig();
-                        mSavedPeerConfig.wps.setup = WpsInfo.KEYPAD;
+                        mSavedPeerConfig.wps.setup = WpsInfo.DISPLAY;
                         mSavedPeerConfig.deviceAddress = device.deviceAddress;
                         mSavedPeerConfig.wps.pin = provDisc.pin;
                         if (SdkLevel.isAtLeastV() && provDisc.getVendorData() != null) {
@@ -4356,7 +4363,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             break;
                         }
                         mSavedPeerConfig = new WifiP2pConfig();
-                        mSavedPeerConfig.wps.setup = WpsInfo.KEYPAD;
+                        mSavedPeerConfig.wps.setup = WpsInfo.DISPLAY;
                         mSavedPeerConfig.deviceAddress = device.deviceAddress;
                         mSavedPeerConfig.wps.pin = provDisc.pin;
                         if (SdkLevel.isAtLeastV() && provDisc.getVendorData() != null) {
@@ -5727,6 +5734,11 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             mWifiP2pMetrics.updateGroupEvent(mGroup);
                         } else {
                             loge("Connect on null device address, ignore");
+                        }
+                        if (!mAutonomousGroup && mGroup.getClientList().size() == 1) {
+                            onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
+                                    eraseOwnDeviceAddress(mGroup),
+                                    generateCallbackList(mGroup));
                         }
                         onPeerClientJoined(new WifiP2pInfo(mWifiP2pInfo),
                                 eraseOwnDeviceAddress(mGroup),
@@ -8485,7 +8497,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             if (WifiP2pManager.CONNECTION_REQUEST_ACCEPT == message.arg1) {
                 if (WifiP2pManager.ExternalApproverRequestListener.REQUEST_TYPE_NEGOTIATION
                         == requestType
-                        && WpsInfo.KEYPAD == mSavedPeerConfig.wps.setup) {
+                        && WpsInfo.DISPLAY == mSavedPeerConfig.wps.setup) {
                     sendMessage(PEER_CONNECTION_USER_CONFIRM);
                 } else {
                     Bundle extras = message.getData().getBundle(
