@@ -20,6 +20,8 @@ import static android.net.wifi.WifiEnterpriseConfig.OCSP_NONE;
 import static android.net.wifi.WifiEnterpriseConfig.OCSP_REQUIRE_CERT_STATUS;
 import static android.net.wifi.hotspot2.PasspointConfiguration.MAX_URL_BYTES;
 
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -58,6 +60,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 
@@ -78,7 +81,7 @@ public class WifiConfigurationUtilTest extends WifiBaseTest {
     static final List<UserInfo> PROFILES = Arrays.asList(
             new UserInfo(CURRENT_USER_ID, "owner", 0),
             new UserInfo(CURRENT_USER_MANAGED_PROFILE_USER_ID, "managed profile", 0));
-    private static final long SUPPORTED_FEATURES_ALL = Long.MAX_VALUE;
+    private static final BitSet SUPPORTED_FEATURES_ALL = new BitSet();
     private final String mGeneratedString256 = "a".repeat(256);
 
     private MockitoSession mSession;
@@ -98,6 +101,7 @@ public class WifiConfigurationUtilTest extends WifiBaseTest {
                 .startMocking();
         when(WifiInjector.getInstance()).thenReturn(mWifiInjector);
         when(mWifiInjector.getWifiGlobals()).thenReturn(mWifiGlobals);
+        SUPPORTED_FEATURES_ALL.set(0, 63); // mark all features as supported
     }
 
     @After
@@ -1501,7 +1505,8 @@ public class WifiConfigurationUtilTest extends WifiBaseTest {
      */
     @Test
     public void testValidateSecurityTypeDppAkm() {
-        long supportedFeatures = SUPPORTED_FEATURES_ALL & ~WifiManager.WIFI_FEATURE_DPP_AKM;
+        BitSet supportedFeatures = SUPPORTED_FEATURES_ALL;
+        supportedFeatures.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_DPP_AKM), false);
         WifiConfiguration config = WifiConfigurationTestUtil.createOpenNetwork();
         config.setSecurityParams(WifiInfo.SECURITY_TYPE_DPP);
 
@@ -1510,7 +1515,7 @@ public class WifiConfigurationUtilTest extends WifiBaseTest {
         assertFalse(WifiConfigurationUtil.validate(config, supportedFeatures,
                   WifiConfigurationUtil.VALIDATE_FOR_UPDATE));
 
-        supportedFeatures = WifiManager.WIFI_FEATURE_DPP_AKM;
+        supportedFeatures.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_DPP_AKM), true);
         assertTrue(WifiConfigurationUtil.validate(config, supportedFeatures,
                   WifiConfigurationUtil.VALIDATE_FOR_ADD));
         assertTrue(WifiConfigurationUtil.validate(config, supportedFeatures,

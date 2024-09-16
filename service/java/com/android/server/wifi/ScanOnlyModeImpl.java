@@ -16,9 +16,9 @@
 
 package com.android.server.wifi;
 
-import static com.android.server.wifi.util.GeneralUtil.bitsetToLong;
-
 import android.annotation.NonNull;
+
+import java.util.BitSet;
 
 /**
  * Used to respond to calls to ClientMode interface when ClientModeImpl is not up
@@ -42,8 +42,8 @@ public class ScanOnlyModeImpl implements ClientModeDefaults {
     }
 
     @Override
-    public long getSupportedFeatures() {
-        return bitsetToLong(mWifiNative.getSupportedFeatureSet(mIfaceName));
+    public @NonNull BitSet getSupportedFeatures() {
+        return mWifiNative.getSupportedFeatureSet(mIfaceName);
     }
 
     @Override
