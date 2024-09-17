@@ -202,6 +202,7 @@ public class WifiConnectivityManager {
     private int mInitialScanState = INITIAL_SCAN_STATE_COMPLETE;
     private boolean mAutoJoinEnabledExternal = true; // enabled by default
     private boolean mAutoJoinEnabledExternalSetByDeviceAdmin = false;
+    private int mAutojoinRestrictionSecurityTypes = 0; // restrict none by default
     private boolean mUntrustedConnectionAllowed = false;
     private Set<Integer> mRestrictedConnectionAllowedUids = new ArraySet<>();
     private boolean mOemPaidConnectionAllowed = false;
@@ -683,8 +684,8 @@ public class WifiConnectivityManager {
         List<WifiCandidates.Candidate> candidates = mNetworkSelector.getCandidatesFromScan(
                 scanDetails, bssidBlocklist, cmmStates, mUntrustedConnectionAllowed,
                 mOemPaidConnectionAllowed, mOemPrivateConnectionAllowed,
-                mRestrictedConnectionAllowedUids, skipSufficiencyCheck);
-
+                mRestrictedConnectionAllowedUids, skipSufficiencyCheck,
+                mAutojoinRestrictionSecurityTypes);
         // Filter candidates before caching to avoid reconnecting on failure
         if (mFeatureFlags.delayedCarrierNetworkSelection()) {
             candidates = filterDelayedCarrierSelectionCandidates(candidates, listenerName,
@@ -3662,6 +3663,22 @@ public class WifiConnectivityManager {
      */
     public boolean getAutoJoinEnabledExternal() {
         return mAutoJoinEnabledExternal;
+    }
+
+    /**
+     * Set auto join restriction on select security types
+     */
+    public void setAutojoinRestrictionSecurityTypes(int restrictions) {
+        localLog("Set auto join restriction on select security types - restrictions: "
+                + restrictions);
+        mAutojoinRestrictionSecurityTypes = restrictions;
+    }
+
+    /**
+     * Return auto join restriction on select security types
+     */
+    public int getAutojoinRestrictionSecurityTypes() {
+        return mAutojoinRestrictionSecurityTypes;
     }
 
     /**

@@ -12906,4 +12906,62 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 expectedConfigs, configs.getList());
     }
 
+    @Test
+    public void testSetAutojoinRestrictionSecurityTypesWithPermission() throws RemoteException {
+        assumeTrue(SdkLevel.isAtLeastT());
+        // No permission to call API
+        when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(false);
+        when(mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(anyInt()))
+                .thenReturn(false);
+        assertThrows(SecurityException.class,
+                () -> mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(0/*restrict none*/,
+                        mExtras));
+        // Has permission to call API
+        when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(true);
+        // Null argument
+        assertThrows(IllegalArgumentException.class,
+                () -> mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(0/*restrict none*/,
+                        null));
+        // Invalid argument
+        assertThrows(IllegalArgumentException.class,
+                () -> mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(
+                        0x1 << WifiInfo.SECURITY_TYPE_OWE, mExtras));
+        assertThrows(IllegalArgumentException.class,
+                () -> mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(
+                        0x1 << WifiInfo.SECURITY_TYPE_SAE, mExtras));
+        assertThrows(IllegalArgumentException.class,
+                () -> mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(
+                        0x1 << WifiInfo.SECURITY_TYPE_EAP_WPA3_ENTERPRISE, mExtras));
+        // Valid argument
+        int restrictions = (0x1 << WifiInfo.SECURITY_TYPE_OPEN)
+                | (0x1 << WifiInfo.SECURITY_TYPE_OWE) | (0x1 << WifiInfo.SECURITY_TYPE_WEP);
+        mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(restrictions, mExtras);
+        mLooper.dispatchAll();
+        verify(mWifiConnectivityManager).setAutojoinRestrictionSecurityTypes(eq(restrictions));
+    }
+
+    @Test
+    public void testGetAutojoinRestrictionSecurityTypesWithPermission() throws RemoteException {
+        assumeTrue(SdkLevel.isAtLeastT());
+        // Mock listener.
+        IIntegerListener listener = mock(IIntegerListener.class);
+        InOrder inOrder = inOrder(listener);
+        // No permission to call API
+        when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(false);
+        when(mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(anyInt()))
+                .thenReturn(false);
+        assertThrows(SecurityException.class,
+                () -> mWifiServiceImpl.getAutojoinRestrictionSecurityTypes(listener, mExtras));
+        // Null arguments
+        assertThrows(IllegalArgumentException.class,
+                () -> mWifiServiceImpl.getAutojoinRestrictionSecurityTypes(null, mExtras));
+        assertThrows(IllegalArgumentException.class,
+                () -> mWifiServiceImpl.getAutojoinRestrictionSecurityTypes(listener, null));
+        // has permission to call API
+        when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(true);
+        when(mWifiConnectivityManager.getAutojoinRestrictionSecurityTypes()).thenReturn(7);
+        mWifiServiceImpl.getAutojoinRestrictionSecurityTypes(listener, mExtras);
+        mLooper.dispatchAll();
+        inOrder.verify(listener).onResult(7);
+    }
 }

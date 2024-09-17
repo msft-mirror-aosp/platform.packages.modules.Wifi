@@ -1220,4 +1220,14 @@ public class BaseWifiService extends IWifiManager.Stub {
     public boolean isPnoSupported() {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public void setAutojoinRestrictionSecurityTypes(int restrictions, Bundle extras) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void getAutojoinRestrictionSecurityTypes(IIntegerListener listener, Bundle extras) {
+        throw new UnsupportedOperationException();
+    }
 }

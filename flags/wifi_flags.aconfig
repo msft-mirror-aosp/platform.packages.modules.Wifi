@@ -137,6 +137,15 @@ flag {
 }
 
 flag {
+    name: "autojoin_restriction_security_types_api"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add new API to set or get Autojoin Restriction security types"
+    bug: "340351634"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "rsn_overriding"
     namespace: "wifi"
     description: "Wi-Fi Alliance RSN Overriding feature"
