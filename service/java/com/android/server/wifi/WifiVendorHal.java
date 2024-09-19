@@ -380,10 +380,10 @@ public class WifiVendorHal {
         }
     }
 
-    private long getNecessaryCapabilitiesForSoftApMode(@SoftApConfiguration.BandType int band) {
-        long caps = HalDeviceManager.CHIP_CAPABILITY_ANY;
+    private BitSet getNecessaryCapabilitiesForSoftApMode(@SoftApConfiguration.BandType int band) {
+        BitSet caps = new BitSet();
         if ((band & SoftApConfiguration.BAND_60GHZ) != 0) {
-            caps |= WifiManager.WIFI_FEATURE_INFRA_60G;
+            caps.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_INFRA_60G));
         }
         return caps;
     }
