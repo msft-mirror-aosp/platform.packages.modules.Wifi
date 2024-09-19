@@ -159,6 +159,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final long mTxTransmittedBytes;
     /** The number of rx bytes transmitted on current interface */
     private final long mRxTransmittedBytes;
+    /** The total number of LABEL_BAD event happens */
+    private final int mLabelBadEventCount;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -1081,7 +1083,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             int cellularSignalStrengthDbm, int cellularSignalStrengthDb,
             boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats,
             int wifiLinkCount, @WifiManager.MloMode int mloMode,
-            long txTransmittedBytes, long rxTransmittedBytes) {
+            long txTransmittedBytes, long rxTransmittedBytes, int labelBadEventCount) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -1122,6 +1124,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mMloMode = mloMode;
         mTxTransmittedBytes = txTransmittedBytes;
         mRxTransmittedBytes = rxTransmittedBytes;
+        mLabelBadEventCount = labelBadEventCount;
     }
 
     /** Implement the Parcelable interface */
@@ -1171,6 +1174,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeInt(mMloMode);
         dest.writeLong(mTxTransmittedBytes);
         dest.writeLong(mRxTransmittedBytes);
+        dest.writeInt(mLabelBadEventCount);
     }
 
     /** Implement the Parcelable interface */
@@ -1193,7 +1197,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readBoolean(), in.readInt(), in.readInt(),
                     in.readInt(), in.readBoolean(),
                     in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
-                    in.readInt(), in.readLong(), in.readLong()
+                    in.readInt(), in.readLong(), in.readLong(), in.readInt()
             );
         }
 
@@ -1912,5 +1916,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public long getRxTransmittedBytes() {
         return mRxTransmittedBytes;
+    }
+
+    /** @hide */
+    public long getLabelBadEventCount() {
+        return mLabelBadEventCount;
     }
 }
