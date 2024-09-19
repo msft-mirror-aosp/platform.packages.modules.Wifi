@@ -64,7 +64,6 @@ import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESUL
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_FIRMWARE_ALERT;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_IP_REACHABILITY_LOST;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__UNUSABLE_EVENT__EVENT_NONE;
-import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_UNKNOWN;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_CONNECTED;
 import static com.android.server.wifi.proto.WifiStatsLog.SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING;
@@ -87,6 +86,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import static java.lang.StrictMath.toIntExact;
 
@@ -168,6 +168,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStatsEntry;
 import com.android.server.wifi.rtt.RttMetrics;
 import com.android.server.wifi.util.InformationElementUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import org.junit.After;
@@ -318,6 +319,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         mSession = ExtendedMockito.mockitoSession()
                 .strictness(Strictness.LENIENT)
                 .mockStatic(WifiStatsLog.class)
+                .mockStatic(Flags.class, withSettings().lenient())
                 .startMocking();
 
         when(mWifiInfo.getLinkSpeed()).thenReturn(10);
@@ -7417,34 +7419,18 @@ public class WifiMetricsTest extends WifiBaseTest {
 
     @Test
     public void getFrameworkStateForScorer() {
-        when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 1000);
-
-        assertEquals(
-                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_UNKNOWN,
-                mWifiMetrics.getFrameworkStateForScorer(3000, false));
-
-        WifiMetrics.ConnectionEvent connectionEvent = mWifiMetrics.new ConnectionEvent();
-        WifiMetrics.SessionData currentSession =
-                new WifiMetrics.SessionData(connectionEvent, "", (long) 1000, 0, 0);
-        mWifiMetrics.mCurrentSession = currentSession;
-
+        mWifiMetrics.mLastScreenOffTimeMillis = 3000;
+        mWifiMetrics.mLastIgnoredPollTimeMillis = 1000;
+        when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 4000);
         assertEquals(
                 SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING,
-                mWifiMetrics.getFrameworkStateForScorer(3000, false));
-
-        // We transition from 'awakening' to 'connected' at 1.5 polling intervals.
-        when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 5400);
-        assertEquals(
-                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING,
-                mWifiMetrics.getFrameworkStateForScorer(3000, false));
-        when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 5600);
+                mWifiMetrics.getFrameworkStateForScorer(false));
         assertEquals(
                 SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_CONNECTED,
-                mWifiMetrics.getFrameworkStateForScorer(3000, false));
-
+                mWifiMetrics.getFrameworkStateForScorer(false));
         assertEquals(
                 SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
-                mWifiMetrics.getFrameworkStateForScorer(3000, true));
+                mWifiMetrics.getFrameworkStateForScorer(true));
     }
 
     @Test
@@ -7646,7 +7632,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 false,
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_DEFAULT,
-                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
+                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
@@ -7678,7 +7664,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 false,
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_DEFAULT,
-                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
+                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
@@ -7692,7 +7678,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 false,
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_DEFAULT,
-                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
+                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
@@ -7723,7 +7709,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 false,
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_NOT_DEFAULT,
-                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
+                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
@@ -7757,7 +7743,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 false,
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_DEFAULT,
-                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
+                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
@@ -7788,7 +7774,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 true,
                 SCORER_PREDICTION_RESULT_REPORTED__DEVICE_STATE__STATE_NO_CELLULAR_MODEM,
                 POLLING_INTERVAL_DEFAULT,
-                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_LINGERING,
+                SCORER_PREDICTION_RESULT_REPORTED__WIFI_FRAMEWORK_STATE__FRAMEWORK_STATE_AWAKENING,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_DS__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_NETWORK_CAPABILITIES_US__UNKNOWN,
                 SCORER_PREDICTION_RESULT_REPORTED__SPEED_SUFFICIENT_THROUGHPUT_PREDICTOR_DS__UNKNOWN,
@@ -7839,5 +7825,14 @@ public class WifiMetricsTest extends WifiBaseTest {
         assertEquals(WifiIsUnusableEvent.TYPE_IP_REACHABILITY_LOST, mWifiMetrics.mUnusableEventType);
         mWifiMetrics.resetWifiUnusableEvent();
         assertEquals(WifiIsUnusableEvent.TYPE_UNKNOWN, mWifiMetrics.mUnusableEventType);
+    }
+
+    /** Verifies WiFi Scorer new stats collection flag could be set properly */
+    @Test
+    public void verifyWifiScorerNewStatsCollectionFlagTrue() {
+        when(Flags.wifiScorerNewStatsCollection()).thenReturn(true);
+        assertEquals(mWifiMetrics.isWiFiScorerNewStatsCollected(), true);
+        when(Flags.wifiScorerNewStatsCollection()).thenReturn(false);
+        assertEquals(mWifiMetrics.isWiFiScorerNewStatsCollected(), false);
     }
 }
