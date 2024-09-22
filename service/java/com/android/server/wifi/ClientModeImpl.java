@@ -4870,6 +4870,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     if (!isTrustOnFirstUseSupported()) {
                         mInsecureEapNetworkHandler.startUserApprovalIfNecessary(mIsUserSelected);
                     }
+                    mFrameworkDisconnectReasonOverride = 0;
                     connectToNetwork(config);
                     break;
                 }
@@ -6941,7 +6942,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         mWifiGlobals.getPollRssiIntervalMillis(),
                         mWifiScoreReport.getAospScorerPredictionStatusForEvaluation(),
                         mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation(),
-                        mWifiScoreReport.getLingering());
+                        mWifiScoreReport.getLingering(),
+                        mWifiInfo, mLastConnectionCapabilities);
                 mWifiScoreReport.clearScorerPredictionStatusForEvaluation();
             }
 
