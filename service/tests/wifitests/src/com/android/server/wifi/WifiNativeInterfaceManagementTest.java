@@ -40,11 +40,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import android.app.test.MockAnswerUtil;
 import android.net.wifi.OuiKeyedData;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.WifiContext;
+import android.net.wifi.WifiMigration;
 import android.net.wifi.WifiScanner;
 import android.net.wifi.nl80211.WifiNl80211Manager;
 import android.os.Handler;
@@ -53,6 +55,7 @@ import android.os.test.TestLooper;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.HalDeviceManager.InterfaceDestroyedListener;
 import com.android.server.wifi.WifiNative.SupplicantDeathEventHandler;
@@ -61,6 +64,7 @@ import com.android.server.wifi.hal.WifiNanIface;
 import com.android.server.wifi.p2p.WifiP2pNative;
 import com.android.server.wifi.util.NetdWrapper;
 import com.android.server.wifi.util.NetdWrapper.NetdEventObserver;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import org.junit.After;
@@ -70,6 +74,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.MockitoSession;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -127,6 +132,7 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
     @Mock private SoftApManager mSoftApManager;
     @Mock private WifiNanIface mActiveWifiNanIface;
     @Mock DeviceConfigFacade mDeviceConfigFacade;
+    private MockitoSession mSession;
 
     private TestLooper mLooper;
     private WifiNative.Iface mActiveP2pIface;
@@ -241,6 +247,12 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
                 eq(WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_STA_BANDS)))
                 .thenReturn(TEST_SUPPORTED_BANDS);
 
+        mSession = ExtendedMockito.mockitoSession()
+                .mockStatic(Flags.class, withSettings().lenient())
+                .mockStatic(WifiMigration.class, withSettings().lenient())
+                .startMocking();
+        when(Flags.rsnOverriding()).thenReturn(false);
+
         mInOrder = inOrder(mWifiVendorHal, mWificondControl, mSupplicantStaIfaceHal, mHostapdHal,
                 mWifiMonitor, mNetdWrapper, mIfaceCallback0, mIfaceCallback1, mIfaceEventCallback0,
                 mWifiMetrics, mWifiP2pNative);
@@ -263,6 +275,9 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
 
     @After
     public void tearDown() throws Exception {
+        if (mSession != null) {
+            mSession.finishMocking();
+        }
         verifyNoMoreInteractions(mWifiVendorHal, mWificondControl, mSupplicantStaIfaceHal,
                 mHostapdHal, mWifiMonitor, mNetdWrapper, mIfaceCallback0, mIfaceCallback1,
                 mIfaceEventCallback0, mWifiMetrics);
