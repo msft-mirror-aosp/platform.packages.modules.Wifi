@@ -161,6 +161,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final long mRxTransmittedBytes;
     /** The total number of LABEL_BAD event happens */
     private final int mLabelBadEventCount;
+    /** The current WiFi state in framework */
+    private final int mWifiFrameworkState;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -1083,7 +1085,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             int cellularSignalStrengthDbm, int cellularSignalStrengthDb,
             boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats,
             int wifiLinkCount, @WifiManager.MloMode int mloMode,
-            long txTransmittedBytes, long rxTransmittedBytes, int labelBadEventCount) {
+            long txTransmittedBytes, long rxTransmittedBytes, int labelBadEventCount,
+            int wifiFrameworkState) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -1125,6 +1128,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mTxTransmittedBytes = txTransmittedBytes;
         mRxTransmittedBytes = rxTransmittedBytes;
         mLabelBadEventCount = labelBadEventCount;
+        mWifiFrameworkState = wifiFrameworkState;
     }
 
     /** Implement the Parcelable interface */
@@ -1175,6 +1179,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeLong(mTxTransmittedBytes);
         dest.writeLong(mRxTransmittedBytes);
         dest.writeInt(mLabelBadEventCount);
+        dest.writeInt(mWifiFrameworkState);
     }
 
     /** Implement the Parcelable interface */
@@ -1197,7 +1202,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readBoolean(), in.readInt(), in.readInt(),
                     in.readInt(), in.readBoolean(),
                     in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
-                    in.readInt(), in.readLong(), in.readLong(), in.readInt()
+                    in.readInt(), in.readLong(), in.readLong(), in.readInt(), in.readInt()
             );
         }
 
@@ -1921,5 +1926,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public long getLabelBadEventCount() {
         return mLabelBadEventCount;
+    }
+
+    /** @hide */
+    public int getWifiFrameworkState() {
+        return mWifiFrameworkState;
     }
 }
