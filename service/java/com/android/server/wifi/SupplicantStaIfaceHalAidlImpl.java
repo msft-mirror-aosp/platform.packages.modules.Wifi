@@ -2762,6 +2762,27 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
     }
 
     /**
+     * Returns true if this device supports RSN Overriding, false otherwise. Need service version
+     * at least 4 or higher.
+     */
+    public boolean isRsnOverridingSupported(@NonNull String ifaceName) {
+        synchronized (mLock) {
+            final String methodStr = "isRsnOverridingSupported";
+            if (!isServiceVersionAtLeast(4)) {
+                return false;
+            }
+            int drvCapabilitiesMask = getWpaDriverCapabilities(ifaceName);
+            boolean rsnOverridingSupported =
+                    (drvCapabilitiesMask & WpaDriverCapabilitiesMask.RSN_OVERRIDING) != 0;
+            if (mVerboseLoggingEnabled) {
+                Log.v(TAG, methodStr + ": RSN Overriding supported: "
+                        + rsnOverridingSupported);
+            }
+            return rsnOverridingSupported;
+        }
+    }
+
+    /**
      * Get the bitmask of supplicant/driver supported features in
      * AIDL WpaDriverCapabilitiesMask format.
      */
