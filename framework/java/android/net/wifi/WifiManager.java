@@ -12868,4 +12868,133 @@ public class WifiManager {
             throw e.rethrowFromSystemServer();
         }
     }
+
+    /**
+     * Restrict Wi-Fi autojoin on ScanResults matching the selected security types.
+     * This does not restrict manual connections.
+     *
+     * @param restrictions The autojoin restriction types to be set. It should be a Set of Integers.
+     *                     If null value is provided, an IllegalArgumentException will be thrown.
+     *                     Set of {@link WifiAnnotations.SecurityType} constants specifying the
+     *                     autojoin restrictions on the device. If any restrictions are set, then
+     *                     the autojoin to the network should be skipped for the specified security
+     *                     types.
+     *                     However, certain combinations of restricted security types are not
+     *                     allowed.
+     *                     1. restrictions contains WifiInfo.SECURITY_TYPE_OWE,
+     *                        but not WifiInfo.SECURITY_TYPE_OPEN.
+     *                     2. restrictions contains WifiInfo.SECURITY_TYPE_SAE,
+     *                        but not WifiInfo.SECURITY_TYPE_PSK.
+     *                     3. restrictions contains WifiInfo.SECURITY_TYPE_EAP_WPA3_ENTERPRISE,
+     *                        but not WifiInfo.SECURITY_TYPE_EAP.
+     *
+     * Usage example:
+     * <pre>
+     *                     To restrict autojoin to Wi-Fi networks with security type, OPEN, WEP
+     *                     or OWE, use following argument.
+     *
+     *                     {@code
+     *                         Set<Integer> restrictions = new ArraySet<>(
+     *                                 Set.of(WifiInfo.SECURITY_TYPE_OPEN,
+     *                                         WifiInfo.SECURITY_TYPE_WEP,
+     *                                         WifiInfo.SECURITY_TYPE_OWE));
+     *                         wifiManager.setAutojoinRestrictionSecurityTypes(restrictions);
+     *                     }
+     *
+     *                     To clear autojoin restriction on all security types, use following
+     *                     argument.
+     *
+     *                     {@code
+     *                         wifiManager.setAutojoinRestrictionSecurityTypes(
+     *                                 Collections.emptySet());
+     *                     }
+     * </pre>
+     *
+     * @throws IllegalArgumentException if restrictions is null.
+     * @throws IllegalArgumentException if restrictions contains
+     *         Integer element out of [0, Integer.SIZE) range.
+     * @throws RemoteException if there is an error communicating with the system server.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_AUTOJOIN_RESTRICTION_SECURITY_TYPES_API)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.NETWORK_SETTINGS,
+            MANAGE_WIFI_NETWORK_SELECTION
+    })
+    public void setAutojoinRestrictionSecurityTypes(
+            @NonNull @WifiAnnotations.SecurityType Set<Integer> restrictions) {
+        if (restrictions == null) {
+            throw new IllegalArgumentException("restrictions cannot be null");
+        }
+        for (int securityType : restrictions) {
+            if (securityType < 0 || securityType >= Integer.SIZE) {
+                throw new IllegalArgumentException("restrictions include invalid value.");
+            }
+        }
+        try {
+            Bundle extras = new Bundle();
+            if (SdkLevel.isAtLeastS()) {
+                extras.putParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE,
+                        mContext.getAttributionSource());
+            }
+            int restrictionBitmap = 0;
+            for (int securityType : restrictions) {
+                restrictionBitmap |= 0x1 << securityType;
+            }
+            mService.setAutojoinRestrictionSecurityTypes(restrictionBitmap, extras);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Retrieves the autojoin restricted Wi-Fi security types, currently set for the device.
+     *
+     * @param executor The executor to run the callback on.
+     * @param resultsCallback The callback to receive the result. It will be called with the
+     *                        retrieved autojoin restriction type as a Set of Integers.
+     *
+     * @throws NullPointerException if either executor or resultsCallback is null.
+     * @throws RemoteException if there is an error communicating with the system server.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_AUTOJOIN_RESTRICTION_SECURITY_TYPES_API)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.NETWORK_SETTINGS,
+            MANAGE_WIFI_NETWORK_SELECTION
+    })
+    public void getAutojoinRestrictionSecurityTypes(@NonNull @CallbackExecutor Executor executor,
+            @NonNull Consumer<Set<Integer>> resultsCallback) {
+        Objects.requireNonNull(executor, "executor cannot be null");
+        Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+        try {
+            Bundle extras = new Bundle();
+            if (SdkLevel.isAtLeastS()) {
+                extras.putParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE,
+                        mContext.getAttributionSource());
+            }
+            mService.getAutojoinRestrictionSecurityTypes(new IIntegerListener.Stub() {
+                @Override
+                public void onResult(int value) {
+                    Binder.clearCallingIdentity();
+                    executor.execute(() -> {
+                        Set<Integer> restrictions = new ArraySet<>();
+                        for (int i = 0; i < Integer.SIZE; i++) {
+                            if (((0x1 << i) & value) != 0) {
+                                restrictions.add(i);
+                            }
+                        }
+                        resultsCallback.accept(restrictions);
+                    });
+                }
+            }, extras);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
 }
