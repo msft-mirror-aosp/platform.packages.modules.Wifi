@@ -17,11 +17,15 @@
 package com.google.snippet.wifi.aware;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.net.wifi.aware.AttachCallback;
 import android.net.wifi.aware.Characteristics;
 import android.net.wifi.aware.DiscoverySession;
 import android.net.wifi.aware.DiscoverySessionCallback;
+import android.net.wifi.aware.IdentityChangedListener;
 import android.net.wifi.aware.PeerHandle;
 import android.net.wifi.aware.PublishConfig;
 import android.net.wifi.aware.PublishDiscoverySession;
@@ -50,6 +54,7 @@ import com.google.android.mobly.snippet.util.Log;
 import org.json.JSONException;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +72,8 @@ public class WifiAwareManagerSnippet implements Snippet {
     private final Map<String, DiscoverySession> mDiscoverySessions = new HashMap<>();
     private final Map<Integer, PeerHandle> mPeerHandles = new HashMap<>();
     private final Object mLock = new Object();
+    private final EventCache eventCache = EventCache.getInstance();
+    private WifiAwareStateChangedReceiver stateChangedReceiver;
 
     private static class WifiAwareManagerSnippetException extends Exception {
         WifiAwareManagerSnippetException(String msg) {
@@ -94,6 +101,17 @@ public class WifiAwareManagerSnippet implements Snippet {
     @AsyncRpc(description = "Attach to the Wi-Fi Aware service - enabling the application to "
             + "create discovery sessions or publish or subscribe to services.")
     public void wifiAwareAttach(String callbackId) throws WifiAwareManagerSnippetException {
+        attach(callbackId, true);
+    }
+
+    @AsyncRpc(description = "Attach to the Wi-Fi Aware service - enabling the application to "
+            + "create discovery sessions or publish or subscribe to services.")
+    public void wifiAwareAttached(String callbackId, boolean identityCb)
+        throws WifiAwareManagerSnippetException {
+        attach(callbackId, identityCb);
+    }
+
+    private void attach(String callbackId, boolean identityCb){
         AttachCallback attachCallback = new AttachCallback() {
             @Override
             public void onAttachFailed() {
@@ -117,7 +135,70 @@ public class WifiAwareManagerSnippet implements Snippet {
                 sendEvent(callbackId, "onAwareSessionTerminated");
             }
         };
-        mWifiAwareManager.attach(attachCallback, mHandler);
+        mWifiAwareManager.attach(attachCallback,
+        (identityCb ? new AwareIdentityChangeListenerPostsEvents(eventCache, callbackId) : null),
+        mHandler);
+    }
+
+    private static class AwareIdentityChangeListenerPostsEvents extends IdentityChangedListener {
+        private final EventCache eventCache;
+        private final String callbackId;
+
+        public AwareIdentityChangeListenerPostsEvents(EventCache eventCache, String callbackId) {
+            this.eventCache = eventCache;
+            this.callbackId = callbackId;
+        }
+
+        @Override
+        public void onIdentityChanged(byte[] mac) {
+            SnippetEvent event = new SnippetEvent(
+            callbackId,
+                  "WifiAwareAttachOnIdentityChanged");
+            event.getData().putLong("timestampMs", System.currentTimeMillis());
+            event.getData().putString("mac", Arrays.toString(mac));
+            eventCache.postEvent(event);
+            Log.d("WifiAwareattach identity changed called for WifiAwareAttachOnIdentityChanged");
+        }
+    }
+
+    /**
+    * Starts listening for wifiAware state change related broadcasts.
+    *
+    * @param callbackId the callback id
+    */
+    @AsyncRpc(description = "Start listening for wifiAware state change related broadcasts.")
+    public void wifiAwareMonitorStateChange(String callbackId) {
+        stateChangedReceiver = new WifiAwareStateChangedReceiver(eventCache, callbackId);
+        IntentFilter filter = new IntentFilter(WifiAwareManager.ACTION_WIFI_AWARE_STATE_CHANGED);
+        mContext.registerReceiver(stateChangedReceiver, filter);
+    }
+
+    /** Stops listening for wifiAware state change related broadcasts. */
+    @Rpc(description = "Stop listening for wifiAware state change related broadcasts.")
+    public void wifiAwareMonitorStopStateChange() {
+        if (stateChangedReceiver != null) {
+            mContext.unregisterReceiver(stateChangedReceiver);
+            stateChangedReceiver = null;
+        }
+    }
+
+    class WifiAwareStateChangedReceiver extends BroadcastReceiver {
+        private final EventCache eventCache;
+        private final String callbackId;
+
+        public WifiAwareStateChangedReceiver(EventCache eventCache, String callbackId) {
+            this.eventCache = eventCache;
+            this.callbackId = callbackId;
+        }
+
+        @Override
+        public void onReceive(Context c, Intent intent) {
+            boolean isAvailable = mWifiAwareManager.isAvailable();
+            SnippetEvent event =
+              new SnippetEvent(
+                callbackId, "WifiAwareState" + (isAvailable ? "Available" : "NotAvailable"));
+            eventCache.postEvent(event);
+         }
     }
 
     /**

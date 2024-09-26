@@ -889,6 +889,70 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
         }
     }
 
+    private String getWhatToStringInternal(int what) {
+        switch (what) {
+            case WifiScanner.CMD_START_BACKGROUND_SCAN:
+                return "WifiScanner.CMD_START_BACKGROUND_SCAN";
+            case WifiScanner.CMD_STOP_BACKGROUND_SCAN:
+                return "WifiScanner.CMD_STOP_BACKGROUND_SCAN";
+            case WifiScanner.CMD_GET_SCAN_RESULTS:
+                return "WifiScanner.CMD_GET_SCAN_RESULTS";
+            case WifiScanner.CMD_SCAN_RESULT:
+                return "WifiScanner.CMD_SCAN_RESULT";
+            case WifiScanner.CMD_CACHED_SCAN_DATA:
+                return "WifiScanner.CMD_CACHED_SCAN_DATA";
+            case WifiScanner.CMD_OP_SUCCEEDED:
+                return "WifiScanner.CMD_OP_SUCCEEDED";
+            case WifiScanner.CMD_OP_FAILED:
+                return "WifiScanner.CMD_OP_FAILED";
+            case WifiScanner.CMD_FULL_SCAN_RESULT:
+                return "WifiScanner.CMD_FULL_SCAN_RESULT";
+            case WifiScanner.CMD_START_SINGLE_SCAN:
+                return "WifiScanner.CMD_START_SINGLE_SCAN";
+            case WifiScanner.CMD_STOP_SINGLE_SCAN:
+                return "WifiScanner.CMD_STOP_SINGLE_SCAN";
+            case WifiScanner.CMD_SINGLE_SCAN_COMPLETED:
+                return "WifiScanner.CMD_SINGLE_SCAN_COMPLETED";
+            case WifiScanner.CMD_START_PNO_SCAN:
+                return "WifiScanner.CMD_START_PNO_SCAN";
+            case WifiScanner.CMD_STOP_PNO_SCAN:
+                return "WifiScanner.CMD_STOP_PNO_SCAN";
+            case WifiScanner.CMD_PNO_NETWORK_FOUND:
+                return "WifiScanner.CMD_PNO_NETWORK_FOUND";
+            case WifiScanner.CMD_REGISTER_SCAN_LISTENER:
+                return "WifiScanner.CMD_REGISTER_SCAN_LISTENER";
+            case WifiScanner.CMD_DEREGISTER_SCAN_LISTENER:
+                return "WifiScanner.CMD_DEREGISTER_SCAN_LISTENER";
+            case WifiScanner.CMD_GET_SINGLE_SCAN_RESULTS:
+                return "WifiScanner.CMD_GET_SINGLE_SCAN_RESULTS";
+            case WifiScanner.CMD_ENABLE:
+                return "WifiScanner.CMD_ENABLE";
+            case WifiScanner.CMD_DISABLE:
+                return "WifiScanner.CMD_DISABLE";
+            case CMD_SCAN_RESULTS_AVAILABLE:
+                return "CMD_SCAN_RESULTS_AVAILABLE";
+            case CMD_FULL_SCAN_SINGLE_RESULT:
+                return "CMD_FULL_SCAN_SINGLE_RESULT";
+            case CMD_FULL_SCAN_ALL_RESULTS:
+                return "CMD_FULL_SCAN_ALL_RESULTS";
+            case CMD_SCAN_PAUSED:
+                return "CMD_SCAN_PAUSED";
+            case CMD_SCAN_RESTARTED:
+                return "CMD_SCAN_RESTARTED";
+            case CMD_SCAN_FAILED:
+                return "CMD_SCAN_FAILED";
+            case CMD_PNO_NETWORK_FOUND:
+                return "CMD_PNO_NETWORK_FOUND";
+            case CMD_PNO_SCAN_FAILED:
+                return "CMD_PNO_SCAN_FAILED";
+            case CMD_SW_PNO_SCAN:
+                return "CMD_SW_PNO_SCAN";
+            default:
+                return "what:" + what;
+        }
+    }
+
+
     /**
      * State machine that holds the state of single scans. Scans should only be active in the
      * ScanningState. The pending scans and active scans maps are swapped when entering
@@ -951,6 +1015,30 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             // CHECKSTYLE:ON IndentationCheck
 
             setInitialState(mDefaultState);
+        }
+
+        /**
+         * @return the string for msg.what
+         */
+        @Override
+        protected String getWhatToString(int what) {
+            return getWhatToStringInternal(what);
+        }
+
+        /**
+         * Return the additional string to be logged by LogRec, default
+         *
+         * @param msg that was processed
+         * @return information to be logged as a String
+         */
+        @Override
+        protected String getLogRecString(Message msg) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(" ");
+            sb.append(Integer.toString(msg.arg1));
+            sb.append(" ");
+            sb.append(Integer.toString(msg.arg2));
+            return sb.toString();
         }
 
         /**
@@ -2336,6 +2424,30 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             // CHECKSTYLE:ON IndentationCheck
 
             setInitialState(mDefaultState);
+        }
+
+        /**
+         * @return the string for msg.what
+         */
+        @Override
+        protected String getWhatToString(int what) {
+            return getWhatToStringInternal(what);
+        }
+
+        /**
+         * Return the additional string to be logged by LogRec, default
+         *
+         * @param msg that was processed
+         * @return information to be logged as a String
+         */
+        @Override
+        protected String getLogRecString(Message msg) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(" ");
+            sb.append(Integer.toString(msg.arg1));
+            sb.append(" ");
+            sb.append(Integer.toString(msg.arg2));
+            return sb.toString();
         }
 
         public void removePnoSettings(ClientInfo ci) {
