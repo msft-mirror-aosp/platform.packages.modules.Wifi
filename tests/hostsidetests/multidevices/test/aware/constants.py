@@ -18,6 +18,7 @@
 import enum
 import dataclasses
 import datetime
+import operator
 
 # Package name for the Wi-Fi Aware snippet application
 WIFI_AWARE_SNIPPET_PACKAGE_NAME = "com.google.snippet.wifi.aware"
@@ -356,3 +357,51 @@ class NetworkRequest:
             'network_specifier': self.network_specifier_parcel,
         }
         return result
+
+
+@enum.unique
+class AttachCallBackMethodType(enum.StrEnum):
+    """Represents Attach Callback Method Type in Wi-Fi Aware.
+
+    https://developer.android.com/reference/android/net/wifi/aware/AttachCallback
+    """
+    ATTACHED = 'onAttached'
+    ATTACH_FAILED = 'onAttachFailed'
+    AWARE_SESSION_TERMINATED = 'onAwareSessionTerminated'
+    ID_CHANGED = 'WifiAwareAttachOnIdentityChanged'
+
+
+@enum.unique
+class WifiAwareBroadcast(enum.StrEnum):
+    WIFI_AWARE_AVAILABLE = "WifiAwareStateAvailable"
+    WIFI_AWARE_NOT_AVAILABLE = "WifiAwareStateNotAvailable"
+
+
+@enum.unique
+class DeviceidleState(enum.StrEnum):
+  ACTIVE = "ACTIVE"
+  IDLE = "IDLE"
+  INACTIVE = "INACTIVE"
+  OVERRIDE = "OVERRIDE"
+
+
+@enum.unique
+class Operator(enum.Enum):
+  """Operator used in the comparison."""
+
+  GREATER = operator.gt
+  GREATER_EQUAL = operator.ge
+  NOT_EQUAL = operator.ne
+  EQUAL = operator.eq
+  LESS = operator.lt
+  LESS_EQUAL = operator.le
+
+
+@enum.unique
+class AndroidVersion(enum.IntEnum):
+  """Android OS version."""
+
+  R = 11
+  S = 12
+  T = 13
+  U = 14
