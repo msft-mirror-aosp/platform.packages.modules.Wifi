@@ -16,8 +16,6 @@
 
 package com.android.server.wifi;
 
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
-
 import android.annotation.NonNull;
 import android.app.ActivityManager;
 import android.content.Context;
@@ -858,7 +856,7 @@ public class WifiLockManager {
             return LOW_LATENCY_SUPPORT_UNDEFINED;
         }
 
-        if (supportedFeatures.get(getCapabilityIndex(WifiManager.WIFI_FEATURE_LOW_LATENCY))) {
+        if (supportedFeatures.get(WifiManager.WIFI_FEATURE_LOW_LATENCY)) {
             mLatencyModeSupport = LOW_LATENCY_SUPPORTED;
         } else {
             mLatencyModeSupport = LOW_LATENCY_NOT_SUPPORTED;

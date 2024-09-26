@@ -16,7 +16,7 @@
 
 package com.android.server.wifi.hal;
 
-import static com.android.server.wifi.util.GeneralUtil.longToBitset;
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -100,9 +100,8 @@ public class WifiStaIfaceAidlImplTest extends WifiBaseTest {
                 IWifiStaIface.FeatureSetMask.BACKGROUND_SCAN
                         | IWifiStaIface.FeatureSetMask.LINK_LAYER_STATS
         );
-        BitSet expected = longToBitset(
-                WifiManager.WIFI_FEATURE_SCANNER
-                        | WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+        BitSet expected = createCapabilityBitset(
+                WifiManager.WIFI_FEATURE_SCANNER, WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
         assertTrue(expected.equals(mDut.halToFrameworkStaFeatureSet(halFeatures)));
     }
 

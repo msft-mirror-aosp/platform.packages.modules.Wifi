@@ -18,7 +18,7 @@ package com.android.server.wifi;
 
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_STA;
-import static com.android.server.wifi.util.GeneralUtil.longToBitset;
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -554,9 +554,9 @@ public class WifiVendorHalTest extends WifiBaseTest {
      */
     @Test
     public void testGetSupportedFeatures() throws Exception {
-        BitSet staIfaceCaps = longToBitset(
-                WifiManager.WIFI_FEATURE_SCANNER | WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
-        BitSet chipCaps = longToBitset(WifiManager.WIFI_FEATURE_TX_POWER_LIMIT);
+        BitSet staIfaceCaps = createCapabilityBitset(
+                WifiManager.WIFI_FEATURE_SCANNER, WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+        BitSet chipCaps = createCapabilityBitset(WifiManager.WIFI_FEATURE_TX_POWER_LIMIT);
         WifiChip.Response<BitSet> chipCapsResponse = new WifiChip.Response<>(chipCaps);
         chipCapsResponse.setStatusCode(WifiHal.WIFI_STATUS_SUCCESS);
         when(mWifiStaIface.getCapabilities()).thenReturn(staIfaceCaps);
@@ -569,15 +569,13 @@ public class WifiVendorHalTest extends WifiBaseTest {
         when(mWifiGlobals.isWpa3SaeH2eSupported()).thenReturn(true);
         when(mHalDeviceManager.is24g5gDbsSupported(any())).thenReturn(true);
 
-        BitSet expectedFeatureSet = longToBitset(
-                WifiManager.WIFI_FEATURE_SCANNER
-                        | WifiManager.WIFI_FEATURE_LINK_LAYER_STATS
-                        | WifiManager.WIFI_FEATURE_TX_POWER_LIMIT
-                        | WifiManager.WIFI_FEATURE_INFRA
-                        | WifiManager.WIFI_FEATURE_P2P
-                        | WifiManager.WIFI_FEATURE_SAE_H2E
-                        | WifiManager.WIFI_FEATURE_DUAL_BAND_SIMULTANEOUS
-        );
+        BitSet expectedFeatureSet = createCapabilityBitset(WifiManager.WIFI_FEATURE_SCANNER,
+                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS,
+                WifiManager.WIFI_FEATURE_TX_POWER_LIMIT,
+                WifiManager.WIFI_FEATURE_INFRA,
+                WifiManager.WIFI_FEATURE_P2P,
+                WifiManager.WIFI_FEATURE_SAE_H2E,
+                WifiManager.WIFI_FEATURE_DUAL_BAND_SIMULTANEOUS);
         assertTrue(mWifiVendorHal.startVendorHalSta(mConcreteClientModeManager));
         assertTrue(expectedFeatureSet.equals(
                 mWifiVendorHal.getSupportedFeatureSet(TEST_IFACE_NAME)));
@@ -605,11 +603,8 @@ public class WifiVendorHalTest extends WifiBaseTest {
         when(mPackageManager.hasSystemFeature(eq(PackageManager.FEATURE_WIFI_AWARE)))
                 .thenReturn(true);
 
-        BitSet expectedFeatureSet = longToBitset(
-                WifiManager.WIFI_FEATURE_INFRA
-                        | WifiManager.WIFI_FEATURE_P2P
-                        | WifiManager.WIFI_FEATURE_AWARE
-        );
+        BitSet expectedFeatureSet = createCapabilityBitset(WifiManager.WIFI_FEATURE_INFRA,
+                WifiManager.WIFI_FEATURE_P2P, WifiManager.WIFI_FEATURE_AWARE);
         assertTrue(expectedFeatureSet.equals(
                 mWifiVendorHal.getSupportedFeatureSet(TEST_IFACE_NAME)));
     }

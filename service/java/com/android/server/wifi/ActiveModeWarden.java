@@ -33,7 +33,6 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_LO
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TRANSIENT;
 import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_TETHERED;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_STA_BANDS;
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -2747,28 +2746,24 @@ public class ActiveModeWarden {
 
         // Concurrency features
         if (isStaApConcurrencySupported) {
-            featureSet.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_AP_STA));
+            featureSet.set(WifiManager.WIFI_FEATURE_AP_STA);
         }
         if (isStaStaConcurrencySupported) {
             if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaLocalOnlyConcurrencyEnabled)) {
-                featureSet.set(getCapabilityIndex(
-                        WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY));
+                featureSet.set(WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY);
             }
             if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaNetworkSwitchingMakeBeforeBreakEnabled)) {
-                featureSet.set(getCapabilityIndex(
-                        WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MBB));
+                featureSet.set(WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MBB);
             }
             if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaRestrictedConcurrencyEnabled)) {
-                featureSet.set(getCapabilityIndex(
-                        WifiManager.WIFI_FEATURE_ADDITIONAL_STA_RESTRICTED));
+                featureSet.set(WifiManager.WIFI_FEATURE_ADDITIONAL_STA_RESTRICTED);
             }
             if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaMultiInternetConcurrencyEnabled)) {
-                featureSet.set(getCapabilityIndex(
-                        WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MULTI_INTERNET));
+                featureSet.set(WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MULTI_INTERNET);
             }
         }
 
@@ -2776,44 +2771,42 @@ public class ActiveModeWarden {
         if (mResourceCache.getBoolean(
                 R.bool.config_wifi_connected_mac_randomization_supported)) {
             // no corresponding flags in vendor HAL, set if overlay enables it.
-            featureSet.set(getCapabilityIndex(
-                    WifiManager.WIFI_FEATURE_CONNECTED_RAND_MAC));
+            featureSet.set(WifiManager.WIFI_FEATURE_CONNECTED_RAND_MAC);
         }
         if (ApConfigUtil.isApMacRandomizationSupported(mContext)) {
             // no corresponding flags in vendor HAL, set if overlay enables it.
-            featureSet.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_AP_RAND_MAC));
+            featureSet.set(WifiManager.WIFI_FEATURE_AP_RAND_MAC);
         }
         if (ApConfigUtil.isBridgedModeSupported(mContext, mWifiNative)) {
             // The bridged mode requires the kernel network modules support.
             // It doesn't relate the vendor HAL, set if overlay enables it.
-            featureSet.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_BRIDGED_AP));
+            featureSet.set(WifiManager.WIFI_FEATURE_BRIDGED_AP);
         }
         if (ApConfigUtil.isStaWithBridgedModeSupported(mContext, mWifiNative)) {
             // The bridged mode requires the kernel network modules support.
             // It doesn't relate the vendor HAL, set if overlay enables it.
-            featureSet.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_STA_BRIDGED_AP));
+            featureSet.set(WifiManager.WIFI_FEATURE_STA_BRIDGED_AP);
         }
         if (mWifiGlobals.isWepSupported()) {
-            featureSet.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_WEP));
+            featureSet.set(WifiManager.WIFI_FEATURE_WEP);
         }
 
         if (!mWifiGlobals.isWpaPersonalDeprecated()) {
             // The WPA didn't be deprecated, set it.
-            featureSet.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_WPA_PERSONAL));
+            featureSet.set(WifiManager.WIFI_FEATURE_WPA_PERSONAL);
         }
         if (mWifiGlobals.isD2dSupportedWhenInfraStaDisabled()) {
-            featureSet.set(getCapabilityIndex(
-                    WifiManager.WIFI_FEATURE_D2D_WHEN_INFRA_STA_DISABLED));
+            featureSet.set(WifiManager.WIFI_FEATURE_D2D_WHEN_INFRA_STA_DISABLED);
         }
 
         // Remove capabilities that are disabled by the system properties
         if (!mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_RTT)) {
-            featureSet.clear(getCapabilityIndex(WifiManager.WIFI_FEATURE_D2D_RTT));
-            featureSet.clear(getCapabilityIndex(WifiManager.WIFI_FEATURE_D2AP_RTT));
+            featureSet.clear(WifiManager.WIFI_FEATURE_D2D_RTT);
+            featureSet.clear(WifiManager.WIFI_FEATURE_D2AP_RTT);
         }
         if (!mResourceCache.getBoolean(
                 R.bool.config_wifi_p2p_mac_randomization_supported)) {
-            featureSet.clear(getCapabilityIndex(WifiManager.WIFI_FEATURE_P2P_RAND_MAC));
+            featureSet.clear(WifiManager.WIFI_FEATURE_P2P_RAND_MAC);
         }
 
         synchronized (mServiceApiLock) {

@@ -65,8 +65,6 @@ import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_AWARE_VERBOSE
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_VERBOSE_LOGGING_ENABLED;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_WEP_ALLOWED;
-import static com.android.server.wifi.util.GeneralUtil.bitsetToLong;
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 
 import android.Manifest;
 import android.annotation.AnyThread;
@@ -3244,15 +3242,6 @@ public class WifiServiceImpl extends BaseWifiService {
     private BitSet mLastLoggedSupportedFeatures = new BitSet();
     private long mLastLoggedSupportedFeaturesTimestamp = 0;
 
-    /**
-     * see {@link android.net.wifi.WifiManager#getSupportedFeatures}
-     */
-    @Override
-    public long getSupportedFeatures() {
-        BitSet features = getSupportedFeaturesIfAllowed();
-        return bitsetToLong(features);
-    }
-
     protected BitSet getSupportedFeaturesIfAllowed() {
         enforceAccessPermission();
         BitSet features = getSupportedFeaturesInternal();
@@ -3267,8 +3256,8 @@ public class WifiServiceImpl extends BaseWifiService {
 
     @Override
     public boolean isFeatureSupported(int feature) {
-        // TODO: Check whether features are supported
-        return false;
+        BitSet supportedFeatures = getSupportedFeaturesIfAllowed();
+        return supportedFeatures.get(feature);
     }
 
     @Override
@@ -3283,8 +3272,7 @@ public class WifiServiceImpl extends BaseWifiService {
                     .c(Binder.getCallingUid())
                     .flush();
         }
-        if (!getSupportedFeaturesIfAllowed().get(
-                getCapabilityIndex(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS))) {
+        if (!getSupportedFeaturesIfAllowed().get(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS)) {
             try {
                 listener.onWifiActivityEnergyInfo(null);
             } catch (RemoteException e) {
@@ -7751,23 +7739,22 @@ public class WifiServiceImpl extends BaseWifiService {
      */
     @Override
     public boolean isPnoSupported() {
-        boolean featureSetSupportsPno = getSupportedFeaturesIfAllowed()
-                .get(getCapabilityIndex(WifiManager.WIFI_FEATURE_PNO));
+        boolean featureSetSupportsPno =
+                getSupportedFeaturesIfAllowed().get(WifiManager.WIFI_FEATURE_PNO);
         return mWifiGlobals.isSwPnoEnabled()
                 || (mWifiGlobals.isBackgroundScanSupported() && featureSetSupportsPno);
     }
 
     private boolean isAggressiveRoamingModeSupported() {
         return getSupportedFeaturesIfAllowed()
-                .get(getCapabilityIndex(WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT));
+                .get(WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT);
     }
 
     /**
      * @return true if this device supports Trust On First Use
      */
     private boolean isTrustOnFirstUseSupported() {
-        return getSupportedFeaturesIfAllowed()
-                .get(getCapabilityIndex(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
+        return getSupportedFeaturesIfAllowed().get(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
     }
 
     /**
