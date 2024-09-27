@@ -1364,7 +1364,10 @@
          feature are included in the array by default.
      -->
     <integer-array translatable="false" name="config_wifiDelayedSelectionCarrierIds">
-        <item>2032</item>
+        <!-- Below is a sample configuration for this list:
+        <item>1234</item>
+        <item>5678</item>
+        -->
     </integer-array>
 
     <!-- Delay time in milliseconds for delayed carrier network selection.
