@@ -688,10 +688,8 @@ public class WifiConnectivityManager {
                 mRestrictedConnectionAllowedUids, skipSufficiencyCheck,
                 mAutojoinRestrictionSecurityTypes);
         // Filter candidates before caching to avoid reconnecting on failure
-        if (mFeatureFlags.delayedCarrierNetworkSelection()) {
-            candidates = filterDelayedCarrierSelectionCandidates(candidates, listenerName,
-                    isFullScan);
-        }
+        candidates = filterDelayedCarrierSelectionCandidates(candidates, listenerName,
+                isFullScan);
         mLatestCandidates = candidates;
         mLatestCandidatesTimestampMs = mClock.getElapsedSinceBootMillis();
 
