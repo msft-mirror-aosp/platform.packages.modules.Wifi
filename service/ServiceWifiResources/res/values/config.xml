@@ -1364,7 +1364,10 @@
          feature are included in the array by default.
      -->
     <integer-array translatable="false" name="config_wifiDelayedSelectionCarrierIds">
-        <item>2032</item>
+        <!-- Below is a sample configuration for this list:
+        <item>1234</item>
+        <item>5678</item>
+        -->
     </integer-array>
 
     <!-- Delay time in milliseconds for delayed carrier network selection.
@@ -1374,8 +1377,12 @@
 
     <!-- Boolean indicating whether the device supports Wi-Fi Alliance WPA3 Specification
          version 3.3 Section 14 - RSN Overriding.
-         Enabling this config allows framework to parse the RSNO IE and RSNO2 IE.
-         Only enable this flag if Supplicant and driver/firmware supports RSN Overriding. otherwise
-         the connection may fail or downgrade to WPA2 -->
+         Enabling this config allows framework to parse the RSNO IE and RSNO2 IE on devices running
+         Supplicant AIDL interface version lower than 4. Only enable this flag if Supplicant and
+         driver/firmware supports RSN Overriding. otherwise the connection may fail or downgrade to
+         WPA2.
+         If the device is running the AIDL interface version 4 or later, this config item has
+         no effect. The feature will be enabled/disabled based on the chip capability for RSN
+         Overriding advertised via Supplicant AIDL wpa driver capability interface -->
     <bool translatable="false" name ="config_wifiRsnOverridingEnabled">false</bool>
 </resources>

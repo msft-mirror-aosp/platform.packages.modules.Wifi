@@ -299,8 +299,8 @@ public class WifiMetrics {
     private SessionData mPreviousSession;
     @VisibleForTesting
     public SessionData mCurrentSession;
-    private String mLastBssid;
-    private int mLastFrequency = -1;
+    private Map<String, String> mLastBssidPerIfaceMap = new ArrayMap<>();
+    private Map<String, Integer> mLastFrequencyPerIfaceMap = new ArrayMap<>();
     private int mSeqNumInsideFramework = 0;
     private int mLastWifiUsabilityScore = -1;
     private int mLastWifiUsabilityScoreNoReset = -1;
@@ -6020,8 +6020,8 @@ public class WifiMetrics {
             mWifiP2pMetrics.clear();
             mDppMetrics.clear();
             mWifiUsabilityStatsCounter = 0;
-            mLastBssid = null;
-            mLastFrequency = -1;
+            mLastBssidPerIfaceMap.clear();
+            mLastFrequencyPerIfaceMap.clear();
             mSeqNumInsideFramework = 0;
             mLastWifiUsabilityScore = -1;
             mLastWifiUsabilityScoreNoReset = -1;
@@ -7126,11 +7126,12 @@ public class WifiMetrics {
             mLastTotalBeaconRx = stats.beacon_rx;
             wifiUsabilityStatsEntry.timeSliceDutyCycleInPercent = stats.timeSliceDutyCycleInPercent;
 
-            boolean isSameBssidAndFreq = mLastBssid == null || mLastFrequency == -1
-                    || (mLastBssid.equals(info.getBSSID())
-                    && mLastFrequency == info.getFrequency());
-            mLastBssid = info.getBSSID();
-            mLastFrequency = info.getFrequency();
+            String lastBssid = mLastBssidPerIfaceMap.get(ifaceName);
+            int lastFrequency = mLastFrequencyPerIfaceMap.getOrDefault(ifaceName, -1);
+            boolean isSameBssidAndFreq = lastBssid == null || lastFrequency == -1
+                    || (lastBssid.equals(info.getBSSID()) && lastFrequency == info.getFrequency());
+            mLastBssidPerIfaceMap.put(ifaceName, info.getBSSID());
+            mLastFrequencyPerIfaceMap.put(ifaceName, info.getFrequency());
             wifiUsabilityStatsEntry.wifiScore = mLastScoreNoReset;
             wifiUsabilityStatsEntry.wifiUsabilityScore = mLastWifiUsabilityScoreNoReset;
             wifiUsabilityStatsEntry.seqNumToFramework = mSeqNumToFramework;
@@ -7220,7 +7221,7 @@ public class WifiMetrics {
             }
             if (mWifiChannelUtilization != null) {
                 wifiUsabilityStatsEntry.channelUtilizationRatio =
-                        mWifiChannelUtilization.getUtilizationRatio(mLastFrequency);
+                        mWifiChannelUtilization.getUtilizationRatio(lastFrequency);
             }
             if (mWifiDataStall != null) {
                 wifiUsabilityStatsEntry.isThroughputSufficient =
