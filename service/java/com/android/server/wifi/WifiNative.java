@@ -1562,8 +1562,6 @@ public class WifiNative {
 
             iface.featureSet = getSupportedFeatureSetInternal(iface.name);
             updateSupportedBandForStaInternal(iface);
-            mIsRsnOverridingSupported = mContext.getResources().getBoolean(
-                    R.bool.config_wifiRsnOverridingEnabled) && rsnOverriding();
 
             mWifiVendorHal.enableStaChannelForPeerNetwork(mContext.getResources().getBoolean(
                             R.bool.config_wifiEnableStaIndoorChannelForPeerNetwork),
@@ -1765,6 +1763,12 @@ public class WifiNative {
             saveCompleteFeatureSetInConfigStoreIfNecessary(iface.featureSet);
             updateSupportedBandForStaInternal(iface);
             mIsEnhancedOpenSupported = (iface.featureSet & WIFI_FEATURE_OWE) != 0;
+            if (rsnOverriding()) {
+                mIsRsnOverridingSupported = isSupplicantAidlServiceVersionAtLeast(4)
+                        ? mSupplicantStaIfaceHal.isRsnOverridingSupported(iface.name)
+                        : mContext.getResources().getBoolean(
+                                R.bool.config_wifiRsnOverridingEnabled);
+            }
             Log.i(TAG, "Successfully switched to connectivity mode on iface=" + iface);
             return true;
         }

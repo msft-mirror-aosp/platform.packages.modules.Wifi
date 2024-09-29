@@ -2196,6 +2196,21 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
     }
 
     /**
+     * Test RSN Overriding feature capability.
+     */
+    @Test
+    public void testIsRsnOverridingSupported() throws Exception {
+        executeAndValidateInitializationSequence();
+        doReturn(WpaDriverCapabilitiesMask.RSN_OVERRIDING)
+                .when(mISupplicantStaIfaceMock).getWpaDriverCapabilities();
+        if (mDut.isServiceVersionAtLeast(4)) {
+            assertTrue(mDut.isRsnOverridingSupported(WLAN0_IFACE_NAME));
+        } else {
+            assertFalse(mDut.isRsnOverridingSupported(WLAN0_IFACE_NAME));
+        }
+    }
+
+    /**
      * Test the handling of BSS transition request callback.
      */
     @Test
