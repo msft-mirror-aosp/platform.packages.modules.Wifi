@@ -8857,4 +8857,90 @@ public class WifiServiceImpl extends BaseWifiService {
             }
         }, TAG + "#queryD2dAllowedWhenInfraStaDisabled");
     }
+
+    /**
+     * See {@link WifiManager#setAutoJoinRestrictionSecurityTypes(int)}
+     * @param restrictions The autojoin restriction security types to be set.
+     * @throws SecurityException if the caller does not have permission.
+     * @throws IllegalArgumentException if the arguments are null or invalid
+     */
+    @Override
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    public void setAutojoinRestrictionSecurityTypes(int restrictions, @NonNull Bundle extras) {
+        // SDK check.
+        if (!SdkLevel.isAtLeastT()) {
+            throw new UnsupportedOperationException("SDK level too old");
+        }
+        // Check null argument
+        if (extras == null) {
+            throw new IllegalArgumentException("extras cannot be null");
+        }
+        // Check invalid argument
+        if ((restrictions & (0x1 << WifiInfo.SECURITY_TYPE_OPEN)) == 0
+                && (restrictions & (0x1 << WifiInfo.SECURITY_TYPE_OWE)) != 0) {
+            throw new IllegalArgumentException("Restricting OWE but not OPEN is not allowed");
+        }
+        if ((restrictions & (0x1 << WifiInfo.SECURITY_TYPE_PSK)) == 0
+                && (restrictions & (0x1 << WifiInfo.SECURITY_TYPE_SAE)) != 0) {
+            throw new IllegalArgumentException("Restricting SAE but not PSK is not allowed");
+        }
+        if ((restrictions & (0x1 << WifiInfo.SECURITY_TYPE_EAP)) == 0
+                && (restrictions & (0x1 << WifiInfo.SECURITY_TYPE_EAP_WPA3_ENTERPRISE)) != 0) {
+            throw new IllegalArgumentException(
+                    "Restricting EAP_WPA3_ENTERPRISE but not EAP is not allowed");
+        }
+        // Permission check.
+        int uid = Binder.getCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)
+                && !mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)) {
+            throw new SecurityException(
+                    "Uid=" + uid + " is not allowed to set AutoJoinRestrictionSecurityTypes");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("setAutoJoinRestrictionSecurityTypes uid=% Package Name=% restrictions=%")
+                    .c(uid).c(getPackageName(extras)).c(restrictions).flush();
+        }
+        mWifiThreadRunner.post(() -> {
+            mWifiConnectivityManager.setAutojoinRestrictionSecurityTypes(restrictions);
+        }, TAG + "#setAutoJoinRestrictionSecurityTypes");
+    }
+
+    /**
+     * See {@link WifiManager#getAutojoinRestrictionSecurityTypes(Executor, Consumer)}
+     */
+    @Override
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    public void getAutojoinRestrictionSecurityTypes(@NonNull IIntegerListener listener,
+            @NonNull Bundle extras) {
+        // SDK check.
+        if (!SdkLevel.isAtLeastT()) {
+            throw new UnsupportedOperationException("SDK level too old");
+        }
+        // Argument check
+        if (listener == null) {
+            throw new IllegalArgumentException("listener cannot be null");
+        }
+        if (extras == null) {
+            throw new IllegalArgumentException("extras cannot be null");
+        }
+        // Permission check.
+        int uid = Binder.getCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)
+                && !mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)) {
+            throw new SecurityException(
+                    "Uid=" + uid + " is not allowed to get AutoJoinRestrictionSecurityTypes");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("getAutojoinRestrictionSecurityTypes:  Uid=% Package Name=%").c(
+                    Binder.getCallingUid()).c(getPackageName(extras)).flush();
+        }
+
+        mWifiThreadRunner.post(() -> {
+            try {
+                listener.onResult(mWifiConnectivityManager.getAutojoinRestrictionSecurityTypes());
+            } catch (RemoteException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }, TAG + "#getAutojoinRestrictionSecurityTypes");
+    }
 }
