@@ -6933,12 +6933,18 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             }
             WifiLinkLayerStats stats = updateLinkLayerStatsRssiSpeedFrequencyCapabilities(txBytes,
                     rxBytes);
-            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats);
             // checkDataStallAndThroughputSufficiency() should be called before
             // mWifiScoreReport.calculateAndReportScore() which needs the latest throughput
             int statusDataStall = mWifiDataStall.checkDataStallAndThroughputSufficiency(
                     mInterfaceName, mLastConnectionCapabilities, mLastLinkLayerStats, stats,
                     mWifiInfo, txBytes, rxBytes);
+            // This function will update stats that are used for WifiUsabilityStatsEntry and
+            // logScorerPredictionResult, so it should be called before
+            // mWifiMetrics.updateWifiUsabilityStatsEntries and
+            // mWifiMetrics.logScorerPredictionResult
+            mWifiMetrics.updateWiFiEvaluationAndScorerStats(mWifiScoreReport.getLingering(),
+                    mWifiInfo, mLastConnectionCapabilities);
+            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats);
             if (getClientRoleForMetrics(getConnectedWifiConfiguration())
                     == WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
                 mWifiMetrics.logScorerPredictionResult(mWifiInjector.hasActiveModem(),
@@ -6946,9 +6952,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         mWifiCarrierInfoManager.isMobileDataEnabled(),
                         mWifiGlobals.getPollRssiIntervalMillis(),
                         mWifiScoreReport.getAospScorerPredictionStatusForEvaluation(),
-                        mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation(),
-                        mWifiScoreReport.getLingering(),
-                        mWifiInfo, mLastConnectionCapabilities);
+                        mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
                 mWifiScoreReport.clearScorerPredictionStatusForEvaluation();
             }
 
