@@ -138,6 +138,8 @@ public class WifiScoreReport {
 
     /**
      * Callback from {@link ExternalScoreUpdateObserverProxy}
+     *
+     * Wifi Scorer calls these callbacks when it needs to send information to us.
      */
     private class ScoreUpdateObserverProxy implements WifiManager.ScoreUpdateObserver {
         @Override
@@ -652,12 +654,13 @@ public class WifiScoreReport {
     }
 
     /**
-     * Calculate wifi network score based on updated link layer stats and send the score to
-     * the WifiNetworkAgent.
-     *
-     * If the score has changed from the previous value, update the WifiNetworkAgent.
+     * Calculate the new wifi network score based on updated link layer stats.
      *
      * Called periodically (POLL_RSSI_INTERVAL_MSECS) about every 3 seconds.
+     *
+     * Note: This function will only notify connectivity services of the updated route if we are NOT
+     * using a connected external WiFi scorer.
+     *
      */
     public void calculateAndReportScore() {
         if (mWifiInfo.getRssi() == mWifiInfo.INVALID_RSSI) {
