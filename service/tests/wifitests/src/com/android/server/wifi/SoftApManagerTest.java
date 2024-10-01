@@ -29,6 +29,7 @@ import static android.net.wifi.WifiManager.WIFI_AP_STATE_ENABLED;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_ENABLING;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_FAILED;
 
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_LOCAL_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_TETHERED;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP_BRIDGE;
@@ -92,6 +93,7 @@ import android.util.SparseIntArray;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.dx.mockito.inline.extended.StaticMockitoSession;
 import com.android.internal.util.StateMachine;
 import com.android.internal.util.WakeupMessage;
 import com.android.modules.utils.build.SdkLevel;
@@ -100,12 +102,14 @@ import com.android.wifi.resources.R;
 
 import com.google.common.collect.ImmutableList;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.quality.Strictness;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -238,6 +242,7 @@ public class SoftApManagerTest extends WifiBaseTest {
             ArgumentCaptor.forClass(BroadcastReceiver.class);
 
     SoftApManager mSoftApManager;
+    private StaticMockitoSession mStaticMockSession;
 
     /** Old callback event from wificond */
     private void mockChannelSwitchEvent(int frequency, int bandwidth) {
@@ -323,8 +328,13 @@ public class SoftApManagerTest extends WifiBaseTest {
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
+        mStaticMockSession = mockitoSession()
+                .mockStatic(WifiInjector.class)
+                .strictness(Strictness.LENIENT)
+                .startMocking();
         mLooper = new TestLooper();
 
+        when(WifiInjector.getInstance()).thenReturn(mWifiInjector);
         when(mWifiNative.isItPossibleToCreateApIface(any())).thenReturn(true);
         when(mWifiNative.isItPossibleToCreateBridgedApIface(any())).thenReturn(true);
         when(mWifiNative.isApSetMacAddressSupported(any())).thenReturn(true);
@@ -452,6 +462,12 @@ public class SoftApManagerTest extends WifiBaseTest {
         mTestWifiClientsMap.clear();
         mTempConnectedClientListMap.forEach((key, value) -> value.clear());
     }
+
+    @After
+    public void cleanUp() throws Exception {
+        mStaticMockSession.finishMocking();
+    }
+
 
     private SoftApConfiguration createDefaultApConfig() {
         Builder defaultConfigBuilder = new SoftApConfiguration.Builder();
