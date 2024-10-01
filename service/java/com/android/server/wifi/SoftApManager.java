@@ -663,6 +663,13 @@ public class SoftApManager implements ActiveModeManager {
     }
 
     /**
+     * Return true when current softap state is enabled.
+     */
+    public boolean isStarted() {
+        return mCurrentApState == WifiManager.WIFI_AP_STATE_ENABLED;
+    }
+
+    /**
      * Dump info about this softap manager.
      */
     @Override
@@ -1298,8 +1305,12 @@ public class SoftApManager implements ActiveModeManager {
                             DeviceWiphyCapabilities capabilities =
                                     mWifiNative.getDeviceWiphyCapabilities(
                                             mApInterfaceName, isBridgeRequired());
+                            int numberOf11beSoftApManager =
+                                    mActiveModeWarden.getNumberOf11beSoftApManager();
                             if (!ApConfigUtil.is11beAllowedForThisConfiguration(capabilities,
-                                    mContext, mCurrentSoftApConfiguration, isBridgedMode())) {
+                                    mContext, mCurrentSoftApConfiguration, isBridgedMode(),
+                                    numberOf11beSoftApManager,
+                                    false /* TODO: pass the real isChipSupportMultiLinkOnMLD */)) {
                                 Log.d(getTag(), "11BE is not allowed,"
                                         + " removing from configuration");
                                 mCurrentSoftApConfiguration = new SoftApConfiguration.Builder(

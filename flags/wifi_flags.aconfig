@@ -196,3 +196,12 @@ flag {
     bug: "365585450"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "mlo_sap"
+    is_exported: true
+    namespace: "wifi"
+    description: "Mlo SoftAp"
+    bug: "362355566"
+    is_fixed_read_only: true
+}

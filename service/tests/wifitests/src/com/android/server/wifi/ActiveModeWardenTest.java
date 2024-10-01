@@ -5435,4 +5435,21 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         verify(mWifiGlobals).setD2dStaConcurrencySupported(true);
         verify(mWifiGlobals, atLeastOnce()).isD2dSupportedWhenInfraStaDisabled();
     }
+
+    @Test
+    public void testGetNumberOf11beSoftApManager() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastT());
+        enterSoftApActiveMode();
+        when(mSoftApManager.isStarted()).thenReturn(true);
+        SoftApModeConfiguration mockSoftApModeConfiguration = mock(SoftApModeConfiguration.class);
+        SoftApConfiguration mockSoftApConfiguration = mock(SoftApConfiguration.class);
+        when(mockSoftApConfiguration.isIeee80211beEnabled()).thenReturn(true);
+        when(mockSoftApModeConfiguration.getSoftApConfiguration())
+                .thenReturn(mockSoftApConfiguration);
+        when(mSoftApManager.getSoftApModeConfiguration()).thenReturn(mockSoftApModeConfiguration);
+        assertEquals(1, mActiveModeWarden.getNumberOf11beSoftApManager());
+        when(mockSoftApConfiguration.isIeee80211beEnabled()).thenReturn(false);
+        assertEquals(0, mActiveModeWarden.getNumberOf11beSoftApManager());
+    }
+
 }
