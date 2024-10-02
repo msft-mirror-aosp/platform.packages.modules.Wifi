@@ -2740,6 +2740,18 @@ message WifiUsabilityStatsEntry {
 
   // Current WiFi state in framework
   optional int32 wifi_framework_state = 51;
+
+  // Downstream throughput estimation provided by Network Capabilities
+  optional int32 is_network_capabilities_downstream_sufficient = 52;
+
+  // Upstream throughput estimation provided by Network Capabilities
+  optional int32 is_network_capabilities_upstream_sufficient = 53;
+
+  // Downstream throughput estimation used in Network Selection
+  optional int32 is_throughput_predictor_downstream_sufficient = 54;
+
+  // Upstream throughput estimation provided by Network Capabilities
+  optional int32 is_throughput_predictor_upstream_sufficient = 55;
 }
 
 message ContentionTimeStats {

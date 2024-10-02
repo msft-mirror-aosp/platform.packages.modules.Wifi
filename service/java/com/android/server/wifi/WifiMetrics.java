@@ -5272,10 +5272,18 @@ public class WifiMetrics {
             }
         }
         line.append(",mlo_mode=" + entry.mloMode);
-        line.append(",tx_transmitted_bytes" + entry.txTransmittedBytes);
-        line.append(",rx_transmitted_bytes" + entry.rxTransmittedBytes);
-        line.append(",label_bad_event_count" + entry.labelBadEventCount);
-        line.append(",wifi_framework_state" + entry.wifiFrameworkState);
+        line.append(",tx_transmitted_bytes=" + entry.txTransmittedBytes);
+        line.append(",rx_transmitted_bytes=" + entry.rxTransmittedBytes);
+        line.append(",label_bad_event_count=" + entry.labelBadEventCount);
+        line.append(",wifi_framework_state=" + entry.wifiFrameworkState);
+        line.append(",is_network_capabilities_downstream_sufficient="
+                + entry.isNetworkCapabilitiesDownstreamSufficient);
+        line.append(",is_network_capabilities_upstream_sufficient="
+                + entry.isNetworkCapabilitiesUpstreamSufficient);
+        line.append(",is_throughput_predictor_downstream_sufficient="
+                + entry.isThroughputPredictorDownstreamSufficient);
+        line.append(",is_throughput_predictor_upstream_sufficient="
+                + entry.isThroughputPredictorUpstreamSufficient);
         pw.println(line.toString());
     }
 
@@ -7325,6 +7333,14 @@ public class WifiMetrics {
                 wifiUsabilityStatsEntry.mloMode = stats.wifiMloMode;
                 wifiUsabilityStatsEntry.labelBadEventCount = mAccumulatedLabelBadCount;
                 wifiUsabilityStatsEntry.wifiFrameworkState = mWifiFrameworkState;
+                wifiUsabilityStatsEntry.isNetworkCapabilitiesDownstreamSufficient =
+                        mSpeedSufficientNetworkCapabilities.Downstream;
+                wifiUsabilityStatsEntry.isNetworkCapabilitiesUpstreamSufficient =
+                        mSpeedSufficientNetworkCapabilities.Upstream;
+                wifiUsabilityStatsEntry.isThroughputPredictorDownstreamSufficient =
+                        mSpeedSufficientThroughputPredictor.Downstream;
+                wifiUsabilityStatsEntry.isThroughputPredictorUpstreamSufficient =
+                        mSpeedSufficientThroughputPredictor.Upstream;
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7848,7 +7864,10 @@ public class WifiMetrics {
                 s.isWifiScoringEnabled, s.isCellularDataAvailable, 0, 0, 0, false,
                 convertLinkStats(stats, info), s.wifiLinkCount, s.mloMode,
                 s.txTransmittedBytes, s.rxTransmittedBytes, s.labelBadEventCount,
-                s.wifiFrameworkState
+                s.wifiFrameworkState, s.isNetworkCapabilitiesDownstreamSufficient,
+                s.isNetworkCapabilitiesUpstreamSufficient,
+                s.isThroughputPredictorDownstreamSufficient,
+                s.isThroughputPredictorUpstreamSufficient
         );
     }
 
@@ -8053,6 +8072,10 @@ public class WifiMetrics {
         out.rxTransmittedBytes = s.rxTransmittedBytes;
         out.labelBadEventCount = s.labelBadEventCount;
         out.wifiFrameworkState = s.wifiFrameworkState;
+        out.isNetworkCapabilitiesDownstreamSufficient = s.isNetworkCapabilitiesDownstreamSufficient;
+        out.isNetworkCapabilitiesUpstreamSufficient = s.isNetworkCapabilitiesUpstreamSufficient;
+        out.isThroughputPredictorDownstreamSufficient = s.isThroughputPredictorDownstreamSufficient;
+        out.isThroughputPredictorUpstreamSufficient = s.isThroughputPredictorUpstreamSufficient;
         return out;
     }
 
