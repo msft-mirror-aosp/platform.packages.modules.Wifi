@@ -1466,6 +1466,15 @@ message StaEvent {
 
     // Wi-Fi 7 support for this network has been enabled or disabled.
     DISCONNECT_NETWORK_WIFI7_TOGGLED = 17;
+
+    // IP configuration is lost. Triggered by connectivity
+    DISCONNECT_IP_CONFIGURATION_LOST = 18;
+
+    // IP reachability is lost. Triggered by connectivity
+    DISCONNECT_IP_REACHABILITY_LOST = 19;
+
+    // No credentials
+    DISCONNECT_NO_CREDENTIALS = 20;
   }
 
   // Authentication Failure reasons as reported through the API.

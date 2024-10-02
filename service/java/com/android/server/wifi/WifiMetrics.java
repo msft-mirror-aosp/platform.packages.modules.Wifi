@@ -6621,6 +6621,16 @@ public class WifiMetrics {
                 return "DISCONNECT_VCN_REQUEST";
             case StaEvent.DISCONNECT_UNKNOWN_NETWORK:
                 return "DISCONNECT_UNKNOWN_NETWORK";
+            case StaEvent.DISCONNECT_NETWORK_UNTRUSTED:
+                return "DISCONNECT_NETWORK_UNTRUSTED";
+            case StaEvent.DISCONNECT_NETWORK_WIFI7_TOGGLED:
+                return "DISCONNECT_NETWORK_WIFI7_TOGGLED";
+            case StaEvent.DISCONNECT_IP_CONFIGURATION_LOST:
+                return "DISCONNECT_IP_CONFIGURATION_LOST";
+            case StaEvent.DISCONNECT_IP_REACHABILITY_LOST:
+                return "DISCONNECT_IP_REACHABILITY_LOST";
+            case StaEvent.DISCONNECT_NO_CREDENTIALS:
+                return "DISCONNECT_NO_CREDENTIALS";
             default:
                 return "DISCONNECT_UNKNOWN=" + frameworkDisconnectReason;
         }
