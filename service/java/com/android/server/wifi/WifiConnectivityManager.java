@@ -69,7 +69,6 @@ import com.android.server.wifi.hotspot2.PasspointManager;
 import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.scanner.WifiScannerInternal;
 import com.android.server.wifi.util.WifiPermissionsUtil;
-import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
 import java.io.FileDescriptor;
@@ -184,7 +183,6 @@ public class WifiConnectivityManager {
     private final WifiChannelUtilization mWifiChannelUtilization;
     private final PowerManager mPowerManager;
     private final DeviceConfigFacade mDeviceConfigFacade;
-    private final FeatureFlags mFeatureFlags;
     private final ActiveModeWarden mActiveModeWarden;
     private final FrameworkFacade mFrameworkFacade;
     private final WifiPermissionsUtil mWifiPermissionsUtil;
@@ -1506,7 +1504,6 @@ public class WifiConnectivityManager {
         mPasspointManager = passpointManager;
         mMultiInternetManager = multiInternetManager;
         mDeviceConfigFacade = deviceConfigFacade;
-        mFeatureFlags = mDeviceConfigFacade.getFeatureFlags();
         mActiveModeWarden = activeModeWarden;
         mFrameworkFacade = frameworkFacade;
         mWifiGlobals = wifiGlobals;
