@@ -326,17 +326,6 @@ public class WifiAwareManagerSnippet implements Snippet {
         }
 
         @Override
-        public void onServiceDiscovered(PeerHandle peerHandle, byte[] serviceSpecificInfo,
-                                        List<byte[]> matchFilter) {
-            mPeerHandles.put(peerHandle.hashCode(), peerHandle);
-            SnippetEvent event = new SnippetEvent(mCallBackId, "onServiceDiscovered");
-            event.getData().putByteArray("serviceSpecificInfo", serviceSpecificInfo);
-            event.getData().putInt("peerId", peerHandle.hashCode());
-            putMatchFilterData(matchFilter, event);
-            EventCache.getInstance().postEvent(event);
-        }
-
-        @Override
         public void onServiceDiscovered(ServiceDiscoveryInfo info) {
             mPeerHandles.put(info.getPeerHandle().hashCode(), info.getPeerHandle());
             List<byte[]> matchFilter = info.getMatchFilters();
@@ -615,6 +604,75 @@ public class WifiAwareManagerSnippet implements Snippet {
         // Encode the byte array to a Base64 string
         return Base64.encodeToString(bytes, Base64.DEFAULT);
     }
+
+    /**
+    * Returns the characteristics of the WiFi Aware interface.
+    *
+    * @return WiFi Aware characteristics
+    */
+    @Rpc(description = "Get the characteristics of the WiFi Aware interface.")
+    public Characteristics getCharacteristics() {
+        return mWifiAwareManager.getCharacteristics();
+    }
+
+    /**
+     * Creates a wifiAwareUpdatePublish discovery session.
+     * Requires NEARBY_WIFI_DEVICES (with neverForLocation) or ACCESS_FINE_LOCATION for Android
+     * TIRAMISU+.
+     * ACCESS_FINE_LOCATION is required for earlier versions.
+     *
+     * @param sessionId     The Id of the Aware attach session, should be the callbackId from
+     *                      {@link #wifiAwareAttach(String)}
+     * @param publishConfig Defines the publish configuration via WifiAwareJsonDeserializer.
+     */
+    @Rpc(description = "Create a wifiAwareUpdatePublish discovery session and handle callbacks.")
+    public void wifiAwareUpdatePublish(String sessionId, PublishConfig publishConfig)
+      throws JSONException, WifiAwareManagerSnippetException {
+        DiscoverySession session = getDiscoverySession(sessionId);
+        if (session == null) {
+            throw new IllegalStateException(
+                "Calling wifiAwareUpdatePublish before session (session ID "
+                    + sessionId + ") is ready");
+        }
+        if (!(session instanceof PublishDiscoverySession)) {
+            throw new IllegalArgumentException(
+                "Calling wifiAwareUpdatePublish with a subscribe session ID");
+        }
+        Log.v("Updating a  Aware publish session with config: " + publishConfig.toString());
+
+        ((PublishDiscoverySession) session).updatePublish(publishConfig);
+    }
+
+    /**
+     * Creates a wifiAwareUpdateSubscribe discovery session.
+     * For Android T and later, this method requires NEARBY_WIFI_DEVICES permission and user
+     * permission flag "neverForLocation". For earlier versions, this method requires
+     * NEARBY_WIFI_DEVICES and ACCESS_FINE_LOCATION permissions.
+     *
+     * @param sessionId       The Id of the Aware attach session, should be the callbackId from
+     *                        {@link #wifiAwareAttach(String)}
+     * @param subscribeConfig Defines the subscription configuration via
+     *                        WifiAwareJsonDeserializer.
+     */
+    @Rpc(description = "Create a wifiAwareUpdateSubscribe discovery session and handle callbacks.")
+    public void wifiAwareUpdateSubscribe( String sessionId,
+        SubscribeConfig subscribeConfig) throws JSONException,
+            WifiAwareManagerSnippetException {
+                DiscoverySession session = getDiscoverySession(sessionId);
+                if (session == null) {
+                    throw new IllegalStateException(
+                        "Calling wifiAwareUpdateSubscribe before session (session ID "
+                        + sessionId + ") is ready");
+                }
+                if (!(session instanceof SubscribeDiscoverySession)) {
+                throw new IllegalArgumentException(
+                    "Calling wifiAwareUpdateSubscribe with a publish session ID");
+                }
+                Log.v("Creating a wifiAwareUpdateSubscribe session with config: " +
+                      subscribeConfig.toString());
+                ((SubscribeDiscoverySession) session).updateSubscribe(subscribeConfig);
+
+        }
 
 }
 
