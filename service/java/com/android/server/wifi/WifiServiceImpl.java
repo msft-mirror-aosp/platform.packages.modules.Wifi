@@ -3266,6 +3266,12 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     @Override
+    public boolean isFeatureSupported(int feature) {
+        // TODO: Check whether features are supported
+        return false;
+    }
+
+    @Override
     public void getWifiActivityEnergyInfoAsync(@NonNull IOnWifiActivityEnergyInfoListener
             listener) {
         if (listener == null) {

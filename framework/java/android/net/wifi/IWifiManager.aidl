@@ -89,6 +89,7 @@ import com.android.modules.utils.StringParceledListSlice;
 interface IWifiManager
 {
     long getSupportedFeatures();
+    boolean isFeatureSupported(int feature);
 
     oneway void getWifiActivityEnergyInfoAsync(in IOnWifiActivityEnergyInfoListener listener);
 
