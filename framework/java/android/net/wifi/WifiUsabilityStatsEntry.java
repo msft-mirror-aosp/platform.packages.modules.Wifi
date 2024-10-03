@@ -155,6 +155,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final int mWifiLinkCount;
     /** Refer to WifiManager.MloMode */
     private @WifiManager.MloMode int mMloMode;
+    /** The number of tx bytes transmitted on current interface */
+    private final long mTxTransmittedBytes;
+    /** The number of rx bytes transmitted on current interface */
+    private final long mRxTransmittedBytes;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -1076,7 +1080,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             boolean isCellularDataAvailable, @NetworkType int cellularDataNetworkType,
             int cellularSignalStrengthDbm, int cellularSignalStrengthDb,
             boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats,
-            int wifiLinkCount, @WifiManager.MloMode int mloMode) {
+            int wifiLinkCount, @WifiManager.MloMode int mloMode,
+            long txTransmittedBytes, long rxTransmittedBytes) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -1115,6 +1120,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mLinkStats = linkStats;
         mWifiLinkCount = wifiLinkCount;
         mMloMode = mloMode;
+        mTxTransmittedBytes = txTransmittedBytes;
+        mRxTransmittedBytes = rxTransmittedBytes;
     }
 
     /** Implement the Parcelable interface */
@@ -1162,6 +1169,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeSparseArray(mLinkStats);
         dest.writeInt(mWifiLinkCount);
         dest.writeInt(mMloMode);
+        dest.writeLong(mTxTransmittedBytes);
+        dest.writeLong(mRxTransmittedBytes);
     }
 
     /** Implement the Parcelable interface */
@@ -1184,7 +1193,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readBoolean(), in.readInt(), in.readInt(),
                     in.readInt(), in.readBoolean(),
                     in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
-                    in.readInt()
+                    in.readInt(), in.readLong(), in.readLong()
             );
         }
 
@@ -1893,5 +1902,15 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public int getMloMode() {
         return mMloMode;
+    }
+
+    /** @hide */
+    public long getTxTransmittedBytes() {
+        return mTxTransmittedBytes;
+    }
+
+    /** @hide */
+    public long getRxTransmittedBytes() {
+        return mRxTransmittedBytes;
     }
 }

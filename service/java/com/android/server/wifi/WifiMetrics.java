@@ -5268,6 +5268,8 @@ public class WifiMetrics {
             }
         }
         line.append(",mlo_mode=" + entry.mloMode);
+        line.append(",tx_transmitted_bytes" + entry.txTransmittedBytes);
+        line.append(",rx_transmitted_bytes" + entry.rxTransmittedBytes);
         pw.println(line.toString());
     }
 
@@ -7472,6 +7474,12 @@ public class WifiMetrics {
                         mWifiDataStall.isThroughputSufficient();
                 wifiUsabilityStatsEntry.isCellularDataAvailable =
                         mWifiDataStall.isCellularDataAvailable();
+                if (isWiFiScorerNewStatsCollected()) {
+                    wifiUsabilityStatsEntry.txTransmittedBytes =
+                        mWifiDataStall.getTxTransmittedBytes();
+                    wifiUsabilityStatsEntry.rxTransmittedBytes =
+                        mWifiDataStall.getRxTransmittedBytes();
+                }
             }
             if (mWifiSettingsStore != null) {
                 wifiUsabilityStatsEntry.isWifiScoringEnabled =
@@ -7819,7 +7827,8 @@ public class WifiMetrics {
                 s.rxLinkSpeedMbps, s.timeSliceDutyCycleInPercent, contentionTimeStats, rateStats,
                 radioStats, s.channelUtilizationRatio, s.isThroughputSufficient,
                 s.isWifiScoringEnabled, s.isCellularDataAvailable, 0, 0, 0, false,
-                convertLinkStats(stats, info), s.wifiLinkCount, s.mloMode
+                convertLinkStats(stats, info), s.wifiLinkCount, s.mloMode,
+                s.txTransmittedBytes, s.rxTransmittedBytes
         );
     }
 
@@ -8020,6 +8029,8 @@ public class WifiMetrics {
         out.wifiLinkCount = s.wifiLinkCount;
         out.linkStats = s.linkStats;
         out.mloMode = s.mloMode;
+        out.txTransmittedBytes = s.txTransmittedBytes;
+        out.rxTransmittedBytes = s.rxTransmittedBytes;
         return out;
     }
 

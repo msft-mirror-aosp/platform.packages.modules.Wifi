@@ -2719,6 +2719,12 @@ message WifiUsabilityStatsEntry {
   // The MLO mode
   // See details in @WifiManager.MloMode
   optional int32 mlo_mode = 47;
+
+  // The number of tx bytes transmitted on current interface
+  optional int64 tx_transmitted_bytes = 48;
+
+  // The number of rx bytes transmitted on current interface
+  optional int64 rx_transmitted_bytes = 49;
 }
 
 message ContentionTimeStats {
