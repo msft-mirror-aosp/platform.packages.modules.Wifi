@@ -131,6 +131,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.MeteredNetworkStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.NetworkDisableReason;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.NetworkSelectionExperimentDecisions;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.PacketStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PasspointProfileTypeCount;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PasspointProvisionStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PasspointProvisionStats.ProvisionFailureCount;
@@ -5231,6 +5232,15 @@ public class WifiMetrics {
                             + contentionTimeStat.contentionNumSamples);
                 }
             }
+            if (linkStat.packetStats != null) {
+                for (PacketStats packetStats : linkStat.packetStats) {
+                    line.append(",access_category=" + packetStats.accessCategory);
+                    line.append(",tx_success=" + packetStats.txSuccess);
+                    line.append(",tx_retries=" + packetStats.txRetries);
+                    line.append(",tx_bad=" + packetStats.txBad);
+                    line.append(",rx_success=" + packetStats.rxSuccess);
+                }
+            }
         }
         line.append(",mlo_mode=" + entry.mloMode);
         pw.println(line.toString());
@@ -7152,8 +7162,10 @@ public class WifiMetrics {
                         }
                         linkStats.contentionTimeStats =
                                 new ContentionTimeStats[NUM_WME_ACCESS_CATEGORIES];
+                        linkStats.packetStats = new PacketStats[NUM_WME_ACCESS_CATEGORIES];
                         for (int ac = 0; ac < NUM_WME_ACCESS_CATEGORIES; ac++) {
                             ContentionTimeStats contentionTimeStats = new ContentionTimeStats();
+                            PacketStats packetStats = new PacketStats();
                             switch (ac) {
                                 case ContentionTimeStats.WME_ACCESS_CATEGORY_BE:
                                     contentionTimeStats.accessCategory =
@@ -7166,6 +7178,12 @@ public class WifiMetrics {
                                             stats.contentionTimeAvgBeInUsec;
                                     contentionTimeStats.contentionNumSamples =
                                             stats.contentionNumSamplesBe;
+                                    packetStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_BE;
+                                    packetStats.txSuccess = link.txmpdu_be;
+                                    packetStats.txRetries = link.retries_be;
+                                    packetStats.txBad = link.lostmpdu_be;
+                                    packetStats.rxSuccess = link.rxmpdu_be;
                                     break;
                                 case ContentionTimeStats.WME_ACCESS_CATEGORY_BK:
                                     contentionTimeStats.accessCategory =
@@ -7178,6 +7196,12 @@ public class WifiMetrics {
                                             stats.contentionTimeAvgBkInUsec;
                                     contentionTimeStats.contentionNumSamples =
                                             stats.contentionNumSamplesBk;
+                                    packetStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_BK;
+                                    packetStats.txSuccess = link.txmpdu_bk;
+                                    packetStats.txRetries = link.retries_bk;
+                                    packetStats.txBad = link.lostmpdu_bk;
+                                    packetStats.rxSuccess = link.rxmpdu_bk;
                                     break;
                                 case ContentionTimeStats.WME_ACCESS_CATEGORY_VI:
                                     contentionTimeStats.accessCategory =
@@ -7190,6 +7214,12 @@ public class WifiMetrics {
                                             stats.contentionTimeAvgViInUsec;
                                     contentionTimeStats.contentionNumSamples =
                                             stats.contentionNumSamplesVi;
+                                    packetStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_VI;
+                                    packetStats.txSuccess = link.txmpdu_vi;
+                                    packetStats.txRetries = link.retries_vi;
+                                    packetStats.txBad = link.lostmpdu_vi;
+                                    packetStats.rxSuccess = link.rxmpdu_vi;
                                     break;
                                 case ContentionTimeStats.WME_ACCESS_CATEGORY_VO:
                                     contentionTimeStats.accessCategory =
@@ -7202,11 +7232,18 @@ public class WifiMetrics {
                                             stats.contentionTimeAvgVoInUsec;
                                     contentionTimeStats.contentionNumSamples =
                                             stats.contentionNumSamplesVo;
+                                    packetStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_VO;
+                                    packetStats.txSuccess = link.txmpdu_vo;
+                                    packetStats.txRetries = link.retries_vo;
+                                    packetStats.txBad = link.lostmpdu_vo;
+                                    packetStats.rxSuccess = link.rxmpdu_vo;
                                     break;
                                 default:
                                     Log.e(TAG, "Unknown WME Access Category: " + ac);
                             }
                             linkStats.contentionTimeStats[ac] = contentionTimeStats;
+                            linkStats.packetStats[ac] = packetStats;
                         }
                         wifiUsabilityStatsEntry.linkStats[i] = linkStats;
                     }
@@ -7505,6 +7542,60 @@ public class WifiMetrics {
         return contentionTimeStatsArray;
     }
 
+    private android.net.wifi.WifiUsabilityStatsEntry.PacketStats[]
+            convertPacketStats(WifiLinkLayerStats.LinkSpecificStats stats) {
+        android.net.wifi.WifiUsabilityStatsEntry.PacketStats[] packetStatsArray =
+                new android.net.wifi.WifiUsabilityStatsEntry.PacketStats[
+                        android.net.wifi.WifiUsabilityStatsEntry.NUM_WME_ACCESS_CATEGORIES];
+        for (int ac = 0; ac < android.net.wifi.WifiUsabilityStatsEntry.NUM_WME_ACCESS_CATEGORIES;
+                ac++) {
+            android.net.wifi.WifiUsabilityStatsEntry.PacketStats packetStats = null;
+            switch (ac) {
+                case android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE:
+                    packetStats =
+                            new android.net.wifi.WifiUsabilityStatsEntry.PacketStats(
+                                    stats.txmpdu_be,
+                                    stats.retries_be,
+                                    stats.lostmpdu_be,
+                                    stats.rxmpdu_be
+                            );
+                    break;
+                case android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK:
+                    packetStats =
+                            new android.net.wifi.WifiUsabilityStatsEntry.PacketStats(
+                                    stats.txmpdu_bk,
+                                    stats.retries_bk,
+                                    stats.lostmpdu_bk,
+                                    stats.rxmpdu_bk
+                            );
+                    break;
+                case android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO:
+                    packetStats =
+                            new android.net.wifi.WifiUsabilityStatsEntry.PacketStats(
+                                    stats.txmpdu_vo,
+                                    stats.retries_vo,
+                                    stats.lostmpdu_vo,
+                                    stats.rxmpdu_vo
+                            );
+                    break;
+                case android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI:
+                    packetStats =
+                            new android.net.wifi.WifiUsabilityStatsEntry.PacketStats(
+                                    stats.txmpdu_vi,
+                                    stats.retries_vi,
+                                    stats.lostmpdu_vi,
+                                    stats.rxmpdu_vi
+                            );
+                    break;
+                default:
+                    Log.d(TAG, "Unknown WME Access Category: " + ac);
+                    packetStats = null;
+            }
+            packetStatsArray[ac] = packetStats;
+        }
+        return packetStatsArray;
+    }
+
     private android.net.wifi.WifiUsabilityStatsEntry.RateStats[] convertRateStats(
             WifiLinkLayerStats.LinkSpecificStats stats) {
         android.net.wifi.WifiUsabilityStatsEntry.RateStats[] rateStats = null;
@@ -7574,8 +7665,8 @@ public class WifiMetrics {
                             inStat.beacon_rx, inStat.timeSliceDutyCycleInPercent,
                             (channelStatsMap != null) ? channelStatsMap.ccaBusyTimeMs : 0 ,
                             (channelStatsMap != null) ? channelStatsMap.radioOnTimeMs : 0,
-                            convertContentionTimeStats(inStat),
-                            convertRateStats(inStat));
+                            convertContentionTimeStats(inStat), convertRateStats(inStat),
+                            convertPacketStats(inStat));
             linkStats.put(inStat.link_id, outStat);
         }
 

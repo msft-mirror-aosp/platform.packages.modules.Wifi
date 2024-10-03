@@ -269,6 +269,83 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     }
     private final ContentionTimeStats[] mContentionTimeStats;
 
+    /**
+     * Packet statistics.
+     */
+    /** @hide */
+    public static final class PacketStats implements Parcelable {
+        private long mTxSuccess;
+        private long mTxRetries;
+        private long mTxBad;
+        private long mRxSuccess;
+
+        public PacketStats() {
+        }
+
+        /**
+         * Constructor function
+         * @param txSuccess Number of successfully transmitted unicast data pkts (ACK rcvd)
+         * @param txRetries Number of transmitted unicast data retry pkts
+         * @param txBad Number of transmitted unicast data pkt losses (no ACK)
+         * @param rxSuccess Number of received unicast data packets
+         */
+        public PacketStats(long txSuccess, long txRetries, long txBad, long rxSuccess) {
+            this.mTxSuccess = txSuccess;
+            this.mTxRetries = txRetries;
+            this.mTxBad = txBad;
+            this.mRxSuccess = rxSuccess;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(@NonNull Parcel dest, int flags) {
+            dest.writeLong(mTxSuccess);
+            dest.writeLong(mTxRetries);
+            dest.writeLong(mTxBad);
+            dest.writeLong(mRxSuccess);
+        }
+
+        /** Implement the Parcelable interface */
+        public static final @NonNull Creator<PacketStats> CREATOR =
+                new Creator<PacketStats>() {
+                    public PacketStats createFromParcel(Parcel in) {
+                        PacketStats stats = new PacketStats();
+                        stats.mTxSuccess = in.readLong();
+                        stats.mTxRetries = in.readLong();
+                        stats.mTxBad = in.readLong();
+                        stats.mRxSuccess = in.readLong();
+                        return stats;
+                    }
+                    public PacketStats[] newArray(int size) {
+                        return new PacketStats[size];
+                    }
+                };
+
+        /** Number of successfully transmitted unicast data pkts (ACK rcvd) */
+        public long getTxSuccess() {
+            return mTxSuccess;
+        }
+
+        /** Number of transmitted unicast data retry pkts */
+        public long getTxRetries() {
+            return mTxRetries;
+        }
+
+        /** Number of transmitted unicast data pkt losses (no ACK) */
+        public long getTxBad() {
+            return mTxBad;
+        }
+
+        /** Number of received unicast data packets */
+        public long getRxSuccess() {
+            return mRxSuccess;
+        }
+    }
+
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"WIFI_PREAMBLE_"}, value = {
@@ -711,6 +788,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         private final ContentionTimeStats[] mContentionTimeStats;
         /** Rate information and statistics */
         private final RateStats[] mRateStats;
+        /** Packet statistics */
+        private final PacketStats[] mPacketStats;
 
         /** @hide */
         public LinkStats() {
@@ -735,6 +814,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             mTotalRadioOnFreqTimeMillis = 0;
             mContentionTimeStats = null;
             mRateStats = null;
+            mPacketStats = null;
         }
 
         /** @hide
@@ -763,6 +843,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
          *                                    last radio chip reset.
          * @param contentionTimeStats         Data packet contention time statistics.
          * @param rateStats                   Rate information.
+         * @param packetStats                 Packet statistics.
          */
         public LinkStats(int linkId, int state, int radioId, int rssi, int frequencyMhz,
                 int rssiMgmt, @WifiChannelBandwidth int channelWidth, int centerFreqFirstSegment,
@@ -770,7 +851,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                 long totalTxSuccess, long totalTxRetries, long totalTxBad, long totalRxSuccess,
                 long totalBeaconRx, int timeSliceDutyCycleInPercent,
                 long totalCcaBusyFreqTimeMillis, long totalRadioOnFreqTimeMillis,
-                ContentionTimeStats[] contentionTimeStats, RateStats[] rateStats) {
+                ContentionTimeStats[] contentionTimeStats, RateStats[] rateStats,
+                PacketStats[] packetStats) {
             this.mLinkId = linkId;
             this.mState = state;
             this.mRadioId = radioId;
@@ -792,6 +874,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             this.mTotalRadioOnFreqTimeMillis = totalRadioOnFreqTimeMillis;
             this.mContentionTimeStats = contentionTimeStats;
             this.mRateStats = rateStats;
+            this.mPacketStats = packetStats;
         }
 
         @Override
@@ -822,6 +905,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             dest.writeLong(mTotalRadioOnFreqTimeMillis);
             dest.writeTypedArray(mContentionTimeStats, flags);
             dest.writeTypedArray(mRateStats, flags);
+            dest.writeTypedArray(mPacketStats, flags);
         }
 
         /** Implement the Parcelable interface */
@@ -835,7 +919,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                                 in.readLong(), in.readLong(), in.readLong(), in.readLong(),
                                 in.readInt(), in.readLong(), in.readLong(),
                                 in.createTypedArray(ContentionTimeStats.CREATOR),
-                                in.createTypedArray(RateStats.CREATOR));
+                                in.createTypedArray(RateStats.CREATOR),
+                                in.createTypedArray(PacketStats.CREATOR));
                     }
 
                     public LinkStats[] newArray(int size) {
@@ -1467,6 +1552,30 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         Log.e(TAG, "The ContentionTimeStats is not filled out correctly: "
                 + Arrays.toString(mContentionTimeStats));
         return new ContentionTimeStats();
+    }
+
+    /**
+     * Packet statistics of a WiFi link for Access Category.
+     *
+     * @param linkId Identifier of the link.
+     * @param ac The access category, see {@link WmeAccessCategory}.
+     * @return The packet statistics, see {@link PacketStats}.
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    @NonNull
+    public PacketStats getPacketStats(int linkId, @WmeAccessCategory int ac) {
+        if (!mLinkStats.contains(linkId)) {
+            throw new NoSuchElementException("linkId is invalid - " + linkId);
+        }
+        PacketStats[] linkPacketStats = mLinkStats.get(
+                linkId).mPacketStats;
+        if (linkPacketStats != null
+                && linkPacketStats.length == NUM_WME_ACCESS_CATEGORIES) {
+            return linkPacketStats[ac];
+        }
+        Log.e(TAG, "The PacketStats is not filled out correctly");
+        return new PacketStats();
     }
 
     /**

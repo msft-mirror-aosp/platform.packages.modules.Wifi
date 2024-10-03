@@ -2752,6 +2752,37 @@ message ContentionTimeStats {
   optional int64 contention_num_samples = 5;
 }
 
+message PacketStats {
+  enum AccessCategory {
+    // WME Best Effort Access Category
+    WME_ACCESS_CATEGORY_BE = 0;
+
+    // WME Background Access Category
+    WME_ACCESS_CATEGORY_BK = 1;
+
+    // WME Video Access Category
+    WME_ACCESS_CATEGORY_VI = 2;
+
+    // WME Voice Access Category
+    WME_ACCESS_CATEGORY_VO = 3;
+  }
+
+  // WME access category
+  optional AccessCategory access_category = 1;
+
+  // The number of tx success counted from the last radio chip reset
+  optional int64 tx_success = 2;
+
+  // The number of MPDU data packet retries counted from the last radio chip reset
+  optional int64 tx_retries = 3;
+
+  // The number of tx bad counted from the last radio chip reset
+  optional int64 tx_bad = 4;
+
+  // The number of rx success counted from the last radio chip reset
+  optional int64 rx_success = 5;
+}
+
 message RateStats {
   enum WifiPreambleType {
     // Preamble type for IEEE 802.11a/g, IEEE Std 802.11-2020, Section 17
@@ -2937,6 +2968,9 @@ message LinkStats {
 
   // WME data packet contention time statistics for all four categories: BE, BK, VI, VO
   repeated ContentionTimeStats contention_time_stats = 14;
+
+  // Packet statistics for all four categories: BE, BK, VI, VO
+  repeated PacketStats packet_stats = 15;
 }
 
 message WifiUsabilityStats {
