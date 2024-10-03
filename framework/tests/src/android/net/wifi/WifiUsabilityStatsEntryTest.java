@@ -93,7 +93,7 @@ public class WifiUsabilityStatsEntryTest {
 
         RadioStats[] radioStats = new RadioStats[2];
         radioStats[0] = new RadioStats(0, 10, 11, 12, 13, 14, 15, 16, 17, 18);
-        radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28);
+        radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28, new int[] {1, 2, 3});
         PeerInfo[] peerInfo = new PeerInfo[1];
         peerInfo[0] = new PeerInfo(1, 50, rateStats);
 
@@ -154,7 +154,7 @@ public class WifiUsabilityStatsEntryTest {
 
         RadioStats[] radioStats = new RadioStats[2];
         radioStats[0] = new RadioStats(0, 10, 11, 12, 13, 14, 15, 16, 17, 18);
-        radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28);
+        radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28, new int[] {1, 2, 3});
         PeerInfo[] peerInfo = new PeerInfo[1];
         peerInfo[0] = new PeerInfo(1, 50, rateStats);
         SparseArray<WifiUsabilityStatsEntry.LinkStats> linkStats = new SparseArray<>();

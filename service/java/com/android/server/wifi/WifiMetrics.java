@@ -5149,6 +5149,11 @@ public class WifiMetrics {
                 line.append(",roam_scan_time_ms=" + radioStat.totalRoamScanTimeMs);
                 line.append(",pno_scan_time_ms=" + radioStat.totalPnoScanTimeMs);
                 line.append(",hotspot_2_scan_time_ms=" + radioStat.totalHotspot2ScanTimeMs);
+                if (radioStat.txTimeMsPerLevel != null && radioStat.txTimeMsPerLevel.length > 0) {
+                    for (int i = 0; i < radioStat.txTimeMsPerLevel.length; ++i) {
+                        line.append(",tx_time_ms_per_level=" + radioStat.txTimeMsPerLevel[i]);
+                    }
+                }
             }
         }
         line.append(",total_radio_on_time_ms=" + entry.totalRadioOnTimeMs);
@@ -7328,6 +7333,19 @@ public class WifiMetrics {
                     radioStats.totalRoamScanTimeMs = radio.on_time_roam_scan;
                     radioStats.totalPnoScanTimeMs = radio.on_time_pno_scan;
                     radioStats.totalHotspot2ScanTimeMs = radio.on_time_hs20_scan;
+                    if (isWiFiScorerNewStatsCollected()) {
+                        if (radio.tx_time_in_ms_per_level != null
+                                && radio.tx_time_in_ms_per_level.length > 0) {
+                            int txTimePerLevelLength = radio.tx_time_in_ms_per_level.length;
+                            radioStats.txTimeMsPerLevel = new int[txTimePerLevelLength];
+                            for (int txTimePerLevelIndex = 0;
+                                    txTimePerLevelIndex < txTimePerLevelLength;
+                                    ++txTimePerLevelIndex) {
+                                radioStats.txTimeMsPerLevel[txTimePerLevelIndex] =
+                                    radio.tx_time_in_ms_per_level[txTimePerLevelIndex];
+                            }
+                        }
+                    }
                     wifiUsabilityStatsEntry.radioStats[i] = radioStats;
                 }
             }
@@ -7933,6 +7951,14 @@ public class WifiMetrics {
             return;
         }
         for (int i = 0; i < stats.length; i++) {
+            int[] txTimeMsPerLevel = null;
+            if (stats[i].txTimeMsPerLevel != null && stats[i].txTimeMsPerLevel.length > 0) {
+                int txTimeMsPerLevelLength = stats[i].txTimeMsPerLevel.length;
+                txTimeMsPerLevel = new int[txTimeMsPerLevelLength];
+                for (int j = 0; j < txTimeMsPerLevelLength; ++j) {
+                    txTimeMsPerLevel[j] = stats[i].txTimeMsPerLevel[j];
+                }
+            }
             statsParcelable[i] =
                     new android.net.wifi.WifiUsabilityStatsEntry.RadioStats(
                             stats[i].radioId,
@@ -7944,7 +7970,8 @@ public class WifiMetrics {
                             stats[i].totalBackgroundScanTimeMs,
                             stats[i].totalRoamScanTimeMs,
                             stats[i].totalPnoScanTimeMs,
-                            stats[i].totalHotspot2ScanTimeMs);
+                            stats[i].totalHotspot2ScanTimeMs,
+                            txTimeMsPerLevel);
         }
     }
 

@@ -2892,6 +2892,9 @@ message RadioStats {
   // The total time spent on hotspot2.0 scans and GAS exchange in ms counted from the last radio
   // chip reset
   optional int64 total_hotspot_2_scan_time_ms = 10;
+
+  // Time for which the radio is in active tranmission per tx level
+  repeated int32 tx_time_ms_per_level = 11;
 }
 
 message LinkStats {
