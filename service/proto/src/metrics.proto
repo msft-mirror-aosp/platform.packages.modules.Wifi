@@ -2712,6 +2712,9 @@ message WifiUsabilityStatsEntry {
 
   // Number of WiFi links.
   optional int32 wifi_link_count = 45;
+
+  // Link layer radio stats for all WiFi links
+  repeated LinkStats link_stats = 46;
 }
 
 message ContentionTimeStats {
@@ -2852,6 +2855,43 @@ message RadioStats {
   // The total time spent on hotspot2.0 scans and GAS exchange in ms counted from the last radio
   // chip reset
   optional int64 total_hotspot_2_scan_time_ms = 10;
+}
+
+message LinkStats {
+  enum LinkState {
+    // Chip does not support reporting the state of the link
+    LINK_STATE_UNKNOWN = 0;
+
+    // Link has not been in use since last report. It is placed in power save
+    LINK_STATE_NOT_IN_USE = 1;
+
+    // Link is in use. In presence of traffic, it is set to be power active.
+    LINK_STATE_IN_USE = 2;
+  }
+
+  // The Link ID
+  optional int32 link_id = 1;
+
+  // Link state
+  optional LinkState state = 2;
+
+  // Identifier of the radio on which link is currently operating
+  optional int32 radio_id = 3;
+
+  // Frequency of the link in MHz
+  optional int32 frequency_mhz = 4;
+
+  // Number of beacons received from our own AP
+  optional int32 beacon_rx = 5;
+
+  // RSSI of management frames
+  optional int32 rssi_mgmt = 6;
+
+  // Duty cycle of the link.
+  optional int32 time_slice_duty_cycle_in_percent = 7;
+
+  // Overall RSSI from wpa_supplicant signal_poll
+  optional int32 rssi = 8;
 }
 
 message WifiUsabilityStats {
