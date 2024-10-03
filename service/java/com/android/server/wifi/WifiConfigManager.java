@@ -23,6 +23,8 @@ import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_NO_PERMISSION
 import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_SUCCESS;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
 
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
+
 import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -81,6 +83,7 @@ import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -1439,7 +1442,7 @@ public class WifiConfigManager {
         }
         WifiConfiguration newInternalConfig = null;
 
-        long supportedFeatures = mWifiInjector.getActiveModeWarden()
+        BitSet supportedFeatures = mWifiInjector.getActiveModeWarden()
                 .getPrimaryClientModeManager().getSupportedFeatures();
 
         // First check if we already have a network with the provided network id or configKey.
@@ -1589,7 +1592,7 @@ public class WifiConfigManager {
 
         // Validate an Enterprise network with Trust On First Use.
         if (config.isEnterprise() && config.enterpriseConfig.isTrustOnFirstUseEnabled()) {
-            if ((supportedFeatures & WIFI_FEATURE_TRUST_ON_FIRST_USE) == 0) {
+            if (!supportedFeatures.get(getCapabilityIndex(WIFI_FEATURE_TRUST_ON_FIRST_USE))) {
                 Log.e(TAG, "Trust On First Use could not be set "
                         + "when Trust On First Use is not supported.");
                 return new Pair<>(
@@ -3554,7 +3557,7 @@ public class WifiConfigManager {
             List<WifiConfiguration> configurations,
             Map<String, String> macAddressMapping) {
 
-        long supportedFeatures = mWifiInjector.getActiveModeWarden()
+        BitSet supportedFeatures = mWifiInjector.getActiveModeWarden()
                 .getPrimaryClientModeManager().getSupportedFeatures();
 
         for (WifiConfiguration configuration : configurations) {
@@ -3593,7 +3596,7 @@ public class WifiConfigManager {
      * @param configurations list of configurations retrieved from store.
      */
     private void loadInternalDataFromUserStore(List<WifiConfiguration> configurations) {
-        long supportedFeatures = mWifiInjector.getActiveModeWarden()
+        BitSet supportedFeatures = mWifiInjector.getActiveModeWarden()
                 .getPrimaryClientModeManager().getSupportedFeatures();
 
         for (WifiConfiguration configuration : configurations) {
