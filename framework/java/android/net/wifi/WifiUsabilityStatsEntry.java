@@ -678,6 +678,12 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         private final int mFrequencyMhz;
         /** RSSI of management frames on this WiFi link */
         private final int mRssiMgmt;
+        /** Channel bandwidth on this WiFi link */
+        @WifiChannelBandwidth private int mChannelWidth;
+        /** Center frequency (MHz) first segment on this WiFi link */
+        private final int mCenterFreqFirstSegment;
+        /** Center frequency (MHz) second segment on this WiFi link */
+        private final int mCenterFreqSecondSegment;
         /** Tx Link speed at the sample time in Mbps */
         private final int mTxLinkSpeedMbps;
         /** Rx link speed at the sample time in Mbps */
@@ -714,6 +720,9 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             mRadioId = RadioStats.INVALID_RADIO_ID;
             mFrequencyMhz = 0;
             mRssiMgmt = 0;
+            mChannelWidth = WIFI_BANDWIDTH_20_MHZ;
+            mCenterFreqFirstSegment = 0;
+            mCenterFreqSecondSegment = 0;
             mTxLinkSpeedMbps = WifiInfo.LINK_SPEED_UNKNOWN;
             mRxLinkSpeedMbps = WifiInfo.LINK_SPEED_UNKNOWN;
             mTotalTxSuccess = 0;
@@ -737,6 +746,9 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
          * @param rssi                        Link Rssi (in dBm) at sample time.
          * @param frequencyMhz                Frequency of the link in MHz
          * @param rssiMgmt                    RSSI of management frames on this WiFi link
+         * @param channelWidth                channel width of WiFi link
+         * @param centerFreqFirstSegment      Center frequency (MHz) of first segment
+         * @param centerFreqSecondSegment     Center frequency (MHz) of second segment
          * @param txLinkSpeedMpbs             Transmit link speed in Mpbs at sample time.
          * @param rxLinkSpeedMpbs             Receive link speed in Mbps at sample time.
          * @param totalTxSuccess              Total number of Tx success.
@@ -753,17 +765,21 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
          * @param rateStats                   Rate information.
          */
         public LinkStats(int linkId, int state, int radioId, int rssi, int frequencyMhz,
-                int rssiMgmt, int txLinkSpeedMpbs, int rxLinkSpeedMpbs, long totalTxSuccess,
-                long totalTxRetries, long totalTxBad, long totalRxSuccess, long totalBeaconRx,
-                int timeSliceDutyCycleInPercent, long totalCcaBusyFreqTimeMillis,
-                long totalRadioOnFreqTimeMillis, ContentionTimeStats[] contentionTimeStats,
-                RateStats[] rateStats) {
+                int rssiMgmt, @WifiChannelBandwidth int channelWidth, int centerFreqFirstSegment,
+                int centerFreqSecondSegment, int txLinkSpeedMpbs, int rxLinkSpeedMpbs,
+                long totalTxSuccess, long totalTxRetries, long totalTxBad, long totalRxSuccess,
+                long totalBeaconRx, int timeSliceDutyCycleInPercent,
+                long totalCcaBusyFreqTimeMillis, long totalRadioOnFreqTimeMillis,
+                ContentionTimeStats[] contentionTimeStats, RateStats[] rateStats) {
             this.mLinkId = linkId;
             this.mState = state;
             this.mRadioId = radioId;
             this.mRssi = rssi;
             this.mFrequencyMhz = frequencyMhz;
             this.mRssiMgmt = rssiMgmt;
+            this.mChannelWidth = channelWidth;
+            this.mCenterFreqFirstSegment = centerFreqFirstSegment;
+            this.mCenterFreqSecondSegment = centerFreqSecondSegment;
             this.mTxLinkSpeedMbps = txLinkSpeedMpbs;
             this.mRxLinkSpeedMbps = rxLinkSpeedMpbs;
             this.mTotalTxSuccess = totalTxSuccess;
@@ -791,6 +807,9 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             dest.writeInt(mRssi);
             dest.writeInt(mFrequencyMhz);
             dest.writeInt(mRssiMgmt);
+            dest.writeInt(mChannelWidth);
+            dest.writeInt(mCenterFreqFirstSegment);
+            dest.writeInt(mCenterFreqSecondSegment);
             dest.writeInt(mTxLinkSpeedMbps);
             dest.writeInt(mRxLinkSpeedMbps);
             dest.writeLong(mTotalTxSuccess);
@@ -812,8 +831,9 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     public LinkStats createFromParcel(Parcel in) {
                         return new LinkStats(in.readInt(), in.readInt(), in.readInt(), in.readInt(),
                                 in.readInt(), in.readInt(), in.readInt(), in.readInt(),
+                                in.readInt(), in.readInt(), in.readInt(), in.readLong(),
                                 in.readLong(), in.readLong(), in.readLong(), in.readLong(),
-                                in.readLong(), in.readInt(), in.readLong(), in.readLong(),
+                                in.readInt(), in.readLong(), in.readLong(),
                                 in.createTypedArray(ContentionTimeStats.CREATOR),
                                 in.createTypedArray(RateStats.CREATOR));
                     }
@@ -1049,6 +1069,51 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public int getRssiMgmt(int linkId) {
         if (mLinkStats.contains(linkId)) return mLinkStats.get(linkId).mRssiMgmt;
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Get channel width of this WiFi link
+     *
+     * @param linkId Identifier of the link.
+     * @return channel width of this WiFi link
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    public int getChannelWidth(int linkId) {
+        if (mLinkStats.contains(linkId)) {
+            return mLinkStats.get(linkId).mChannelWidth;
+        }
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Get center frequency (MHz) of first segment of this WiFi link
+     *
+     * @param linkId Identifier of the link.
+     * @return center frequency (MHz) of first segment of this WiFi link
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    public int getCenterFreqFirstSegment(int linkId) {
+        if (mLinkStats.contains(linkId)) {
+            return mLinkStats.get(linkId).mCenterFreqFirstSegment;
+        }
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Get center frequency (MHz) of second segment of this WiFi link
+     *
+     * @param linkId Identifier of the link.
+     * @return center frequency (MHz) of second segment of this WiFi link
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    public int getCenterFreqSecondSegment(int linkId) {
+        if (mLinkStats.contains(linkId)) {
+            return mLinkStats.get(linkId).mCenterFreqSecondSegment;
+        }
         throw new NoSuchElementException("linkId is invalid - " + linkId);
     }
 

@@ -18,6 +18,7 @@ package com.android.server.wifi;
 
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiUsabilityStatsEntry.LinkState;
+import android.net.wifi.WifiUsabilityStatsEntry.WifiChannelBandwidth;
 import android.util.SparseArray;
 
 import java.util.Arrays;
@@ -303,6 +304,18 @@ public class WifiLinkLayerStats {
          * Channel frequency in MHz;
          */
         public int frequency;
+        /**
+         * Center frequency in MHz for first segment
+         */
+        public int frequencyFirstSegment;
+        /**
+         * Center frequency in MHz for second segment
+         */
+        public int frequencySecondSegment;
+        /**
+         * Channel Width as {@link WifiChannelBandwidth}
+         */
+        public @WifiChannelBandwidth int channelWidth;
         /**
          * Cumulative milliseconds radio is awake on this channel
          */
