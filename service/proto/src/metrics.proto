@@ -2982,6 +2982,10 @@ message PeerInfo {
 
   // Channel utilization.
   optional int32 chan_util = 2;
+
+  // Rate statistics, including number of successful packets, retries, etc.,
+  // indexed by preamble, bandwidth, number of spatial streams, MCS.
+  repeated RateStats rate_stats = 3;
 }
 
 message WifiUsabilityStats {

@@ -568,6 +568,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     public static final class PeerInfo implements Parcelable {
         private int mStaCount;
         private int mChanUtil;
+        private RateStats[] mRateStats;
 
         public PeerInfo() {
         }
@@ -576,10 +577,12 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
          * Constructor function.
          * @param staCount Station count
          * @param chanUtil Channel utilization
+         * @param rateStats Per rate statistics on this WiFi peer
          */
-        public PeerInfo(int staCount, int chanUtil) {
+        public PeerInfo(int staCount, int chanUtil, RateStats[] rateStats) {
             this.mStaCount = staCount;
             this.mChanUtil = chanUtil;
+            this.mRateStats = rateStats;
         }
 
         @Override
@@ -591,6 +594,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         public void writeToParcel(@NonNull Parcel dest, int flags) {
             dest.writeInt(mStaCount);
             dest.writeInt(mChanUtil);
+            dest.writeTypedArray(mRateStats, flags);
         }
 
         /** Implement the Parcelable interface */
@@ -599,6 +603,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                 PeerInfo stats = new PeerInfo();
                 stats.mStaCount = in.readInt();
                 stats.mChanUtil = in.readInt();
+                stats.mRateStats = in.createTypedArray(RateStats.CREATOR);
                 return stats;
             }
             public PeerInfo[] newArray(int size) {
@@ -614,6 +619,14 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         /** Channel utilization */
         public int getChanUtil() {
             return mChanUtil;
+        }
+
+        /** Per rate statistics */
+        public List<RateStats> getRateStats() {
+            if (mRateStats != null) {
+                return Arrays.asList(mRateStats);
+            }
+            return Collections.emptyList();
         }
     }
 
@@ -1687,6 +1700,37 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         if (mLinkStats.contains(linkId)) {
             RateStats[] rateStats = mLinkStats.get(linkId).mRateStats;
             if (rateStats != null) return Arrays.asList(rateStats);
+            return Collections.emptyList();
+        }
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Rate information and statistics, which are ordered by preamble, modulation and coding scheme
+     * (MCS), and number of spatial streams (NSS) for WiFi peer.
+     *
+     * @param linkId Identifier of the link.
+     * @param peerIndex Identifier of PeerInfo.
+     * @return A list of rate statistics in the form of a list of {@link RateStats} objects.
+     *         Depending on the link type, the list is created following the order of:
+     *         - HT (IEEE Std 802.11-2020, Section 19): LEGACY rates (1Mbps, ..., 54Mbps),
+     *           HT MCS0, ..., MCS15;
+     *         - VHT (IEEE Std 802.11-2020, Section 21): LEGACY rates (1Mbps, ..., 54Mbps),
+     *           VHT MCS0/NSS1, ..., VHT MCS11/NSS1, VHT MCSO/NSS2, ..., VHT MCS11/NSS2;
+     *         - HE (IEEE Std 802.11ax-2020, Section 27): LEGACY rates (1Mbps, ..., 54Mbps),
+     *           HE MCS0/NSS1, ..., HE MCS11/NSS1, HE MCSO/NSS2, ..., HE MCS11/NSS2.
+     *         - EHT (IEEE std 802.11be-2021, Section 36): Legacy rates (1Mbps, ..., 54Mbps),
+     *           EHT MSC0/NSS1, ..., EHT MCS14/NSS1, EHT MCS0/NSS2, ..., EHT MCS14/NSS2.
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    @NonNull
+    public List<RateStats> getRateStats(int linkId, int peerIndex) {
+        if (mLinkStats.contains(linkId)) {
+            if (getPeerInfo(linkId).size() > 0 && peerIndex < getPeerInfo(linkId).size()) {
+                RateStats[] rateStats = mLinkStats.get(linkId).mPeerInfo[peerIndex].mRateStats;
+                if (rateStats != null) return Arrays.asList(rateStats);
+            }
             return Collections.emptyList();
         }
         throw new NoSuchElementException("linkId is invalid - " + linkId);
