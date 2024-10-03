@@ -2934,6 +2934,9 @@ message LinkStats {
 
   // Total time for which CCA is held busy on this channel.
   optional int64 cca_busy_time_in_ms = 13;
+
+  // WME data packet contention time statistics for all four categories: BE, BK, VI, VO
+  repeated ContentionTimeStats contention_time_stats = 14;
 }
 
 message WifiUsabilityStats {

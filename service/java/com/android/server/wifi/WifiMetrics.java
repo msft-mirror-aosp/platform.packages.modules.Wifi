@@ -5218,6 +5218,19 @@ public class WifiMetrics {
             line.append(",center_freq_second_seg=" + linkStat.centerFreqSecondSeg);
             line.append(",on_time_in_ms=" + linkStat.onTimeInMs);
             line.append(",cca_busy_time_in_ms=" + linkStat.ccaBusyTimeInMs);
+            if (linkStat.contentionTimeStats != null) {
+                for (ContentionTimeStats contentionTimeStat : linkStat.contentionTimeStats) {
+                    line.append(",access_category=" + contentionTimeStat.accessCategory);
+                    line.append(",contention_time_min_micros="
+                            + contentionTimeStat.contentionTimeMinMicros);
+                    line.append(",contention_time_max_micros="
+                            + contentionTimeStat.contentionTimeMaxMicros);
+                    line.append(",contention_time_avg_micros="
+                            + contentionTimeStat.contentionTimeAvgMicros);
+                    line.append(",contention_num_samples="
+                            + contentionTimeStat.contentionNumSamples);
+                }
+            }
         }
         line.append(",mlo_mode=" + entry.mloMode);
         pw.println(line.toString());
@@ -7136,6 +7149,64 @@ public class WifiMetrics {
                                 channlStatsEntryOnFreq.frequencySecondSegment;
                             linkStats.onTimeInMs = channlStatsEntryOnFreq.radioOnTimeMs;
                             linkStats.ccaBusyTimeInMs = channlStatsEntryOnFreq.ccaBusyTimeMs;
+                        }
+                        linkStats.contentionTimeStats =
+                                new ContentionTimeStats[NUM_WME_ACCESS_CATEGORIES];
+                        for (int ac = 0; ac < NUM_WME_ACCESS_CATEGORIES; ac++) {
+                            ContentionTimeStats contentionTimeStats = new ContentionTimeStats();
+                            switch (ac) {
+                                case ContentionTimeStats.WME_ACCESS_CATEGORY_BE:
+                                    contentionTimeStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_BE;
+                                    contentionTimeStats.contentionTimeMinMicros =
+                                            stats.contentionTimeMinBeInUsec;
+                                    contentionTimeStats.contentionTimeMaxMicros =
+                                            stats.contentionTimeMaxBeInUsec;
+                                    contentionTimeStats.contentionTimeAvgMicros =
+                                            stats.contentionTimeAvgBeInUsec;
+                                    contentionTimeStats.contentionNumSamples =
+                                            stats.contentionNumSamplesBe;
+                                    break;
+                                case ContentionTimeStats.WME_ACCESS_CATEGORY_BK:
+                                    contentionTimeStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_BK;
+                                    contentionTimeStats.contentionTimeMinMicros =
+                                            stats.contentionTimeMinBkInUsec;
+                                    contentionTimeStats.contentionTimeMaxMicros =
+                                            stats.contentionTimeMaxBkInUsec;
+                                    contentionTimeStats.contentionTimeAvgMicros =
+                                            stats.contentionTimeAvgBkInUsec;
+                                    contentionTimeStats.contentionNumSamples =
+                                            stats.contentionNumSamplesBk;
+                                    break;
+                                case ContentionTimeStats.WME_ACCESS_CATEGORY_VI:
+                                    contentionTimeStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_VI;
+                                    contentionTimeStats.contentionTimeMinMicros =
+                                            stats.contentionTimeMinViInUsec;
+                                    contentionTimeStats.contentionTimeMaxMicros =
+                                            stats.contentionTimeMaxViInUsec;
+                                    contentionTimeStats.contentionTimeAvgMicros =
+                                            stats.contentionTimeAvgViInUsec;
+                                    contentionTimeStats.contentionNumSamples =
+                                            stats.contentionNumSamplesVi;
+                                    break;
+                                case ContentionTimeStats.WME_ACCESS_CATEGORY_VO:
+                                    contentionTimeStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_VO;
+                                    contentionTimeStats.contentionTimeMinMicros =
+                                            stats.contentionTimeMinVoInUsec;
+                                    contentionTimeStats.contentionTimeMaxMicros =
+                                            stats.contentionTimeMaxVoInUsec;
+                                    contentionTimeStats.contentionTimeAvgMicros =
+                                            stats.contentionTimeAvgVoInUsec;
+                                    contentionTimeStats.contentionNumSamples =
+                                            stats.contentionNumSamplesVo;
+                                    break;
+                                default:
+                                    Log.e(TAG, "Unknown WME Access Category: " + ac);
+                            }
+                            linkStats.contentionTimeStats[ac] = contentionTimeStats;
                         }
                         wifiUsabilityStatsEntry.linkStats[i] = linkStats;
                     }
