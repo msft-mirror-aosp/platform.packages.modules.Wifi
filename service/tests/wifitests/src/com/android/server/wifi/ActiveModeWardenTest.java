@@ -21,6 +21,7 @@ import static android.net.wifi.WifiManager.WIFI_AP_STATE_FAILED;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLING;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
 
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_LOCAL_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SCAN_ONLY;
@@ -96,6 +97,7 @@ import android.util.Log;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.dx.mockito.inline.extended.StaticMockitoSession;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.ActiveModeManager.ClientConnectivityRole;
 import com.android.server.wifi.ActiveModeManager.Listener;
@@ -206,6 +208,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
     private BroadcastReceiver mEmergencyCallbackModeChangedBr;
     private BroadcastReceiver mEmergencyCallStateChangedBr;
+    private StaticMockitoSession mStaticMockSession;
 
     /**
      * Set up the test environment.
@@ -215,8 +218,12 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         Log.d(TAG, "Setting up ...");
 
         MockitoAnnotations.initMocks(this);
+        mStaticMockSession = mockitoSession()
+                .mockStatic(WifiInjector.class)
+                .startMocking();
         mLooper = new TestLooper();
 
+        when(WifiInjector.getInstance()).thenReturn(mWifiInjector);
         when(mWifiInjector.getScanRequestProxy()).thenReturn(mScanRequestProxy);
         when(mWifiInjector.getSarManager()).thenReturn(mSarManager);
         when(mWifiInjector.getHalDeviceManager()).thenReturn(mHalDeviceManager);
@@ -341,6 +348,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
     @After
     public void cleanUp() throws Exception {
         mActiveModeWarden = null;
+        mStaticMockSession.finishMocking();
         mLooper.dispatchAll();
     }
 
