@@ -318,6 +318,7 @@ public class WifiMetrics {
     private int mProbeElapsedTimeSinceLastUpdateMs = -1;
     private int mProbeMcsRateSinceLastUpdate = -1;
     private long mScoreBreachLowTimeMillis = -1;
+    private int mAccumulatedLabelBadCount = 0;
 
     public static final int MAX_STA_EVENTS = 768;
     @VisibleForTesting static final int MAX_USER_ACTION_EVENTS = 200;
@@ -5270,6 +5271,7 @@ public class WifiMetrics {
         line.append(",mlo_mode=" + entry.mloMode);
         line.append(",tx_transmitted_bytes" + entry.txTransmittedBytes);
         line.append(",rx_transmitted_bytes" + entry.rxTransmittedBytes);
+        line.append(",label_bad_event_count" + entry.labelBadEventCount);
         pw.println(line.toString());
     }
 
@@ -6113,6 +6115,7 @@ public class WifiMetrics {
             mProbeElapsedTimeSinceLastUpdateMs = -1;
             mProbeMcsRateSinceLastUpdate = -1;
             mScoreBreachLowTimeMillis = -1;
+            mAccumulatedLabelBadCount = 0;
             mMeteredNetworkStatsBuilder.clear();
             mWifiConfigStoreReadDurationHistogram.clear();
             mWifiConfigStoreWriteDurationHistogram.clear();
@@ -7306,6 +7309,7 @@ public class WifiMetrics {
                     }
                 }
                 wifiUsabilityStatsEntry.mloMode = stats.wifiMloMode;
+                wifiUsabilityStatsEntry.labelBadEventCount = mAccumulatedLabelBadCount;
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7828,7 +7832,7 @@ public class WifiMetrics {
                 radioStats, s.channelUtilizationRatio, s.isThroughputSufficient,
                 s.isWifiScoringEnabled, s.isCellularDataAvailable, 0, 0, 0, false,
                 convertLinkStats(stats, info), s.wifiLinkCount, s.mloMode,
-                s.txTransmittedBytes, s.rxTransmittedBytes
+                s.txTransmittedBytes, s.rxTransmittedBytes, s.labelBadEventCount
         );
     }
 
@@ -8031,6 +8035,7 @@ public class WifiMetrics {
         out.mloMode = s.mloMode;
         out.txTransmittedBytes = s.txTransmittedBytes;
         out.rxTransmittedBytes = s.rxTransmittedBytes;
+        out.labelBadEventCount = s.labelBadEventCount;
         return out;
     }
 
@@ -8103,6 +8108,7 @@ public class WifiMetrics {
                             createWifiUsabilityStatsWithLabel(label, triggerType,
                                     firmwareAlertCode));
                 }
+                mAccumulatedLabelBadCount++;
             }
             mWifiUsabilityStatsEntryCounter = 0;
             mWifiUsabilityStatsEntriesRingBuffer.clear();

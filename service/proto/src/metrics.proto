@@ -2725,6 +2725,9 @@ message WifiUsabilityStatsEntry {
 
   // The number of rx bytes transmitted on current interface
   optional int64 rx_transmitted_bytes = 49;
+
+  // The total number of LABEL_BAD event happens
+  optional int32 label_bad_event_count = 50;
 }
 
 message ContentionTimeStats {
