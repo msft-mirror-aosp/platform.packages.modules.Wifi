@@ -2971,6 +2971,17 @@ message LinkStats {
 
   // Packet statistics for all four categories: BE, BK, VI, VO
   repeated PacketStats packet_stats = 15;
+
+  // Peer statistics on this WiFi link
+  repeated PeerInfo peer_info = 16;
+}
+
+message PeerInfo {
+  // Station count.
+  optional int32 sta_count = 1;
+
+  // Channel utilization.
+  optional int32 chan_util = 2;
 }
 
 message WifiUsabilityStats {

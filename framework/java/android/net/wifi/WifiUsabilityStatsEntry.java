@@ -562,6 +562,62 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final RateStats[] mRateStats;
 
     /**
+     * Per peer statistics for WiFi the link
+     */
+    /** @hide */
+    public static final class PeerInfo implements Parcelable {
+        private int mStaCount;
+        private int mChanUtil;
+
+        public PeerInfo() {
+        }
+
+        /**
+         * Constructor function.
+         * @param staCount Station count
+         * @param chanUtil Channel utilization
+         */
+        public PeerInfo(int staCount, int chanUtil) {
+            this.mStaCount = staCount;
+            this.mChanUtil = chanUtil;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(@NonNull Parcel dest, int flags) {
+            dest.writeInt(mStaCount);
+            dest.writeInt(mChanUtil);
+        }
+
+        /** Implement the Parcelable interface */
+        public static final @NonNull Creator<PeerInfo> CREATOR = new Creator<PeerInfo>() {
+            public PeerInfo createFromParcel(Parcel in) {
+                PeerInfo stats = new PeerInfo();
+                stats.mStaCount = in.readInt();
+                stats.mChanUtil = in.readInt();
+                return stats;
+            }
+            public PeerInfo[] newArray(int size) {
+                return new PeerInfo[size];
+            }
+        };
+
+        /** Station count */
+        public int getStaCount() {
+            return mStaCount;
+        }
+
+        /** Channel utilization */
+        public int getChanUtil() {
+            return mChanUtil;
+        }
+    }
+
+    /**
      * Wifi link layer radio stats.
      */
     public static final class RadioStats implements Parcelable {
@@ -790,6 +846,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         private final RateStats[] mRateStats;
         /** Packet statistics */
         private final PacketStats[] mPacketStats;
+        /** Peer statistics */
+        private final PeerInfo[] mPeerInfo;
 
         /** @hide */
         public LinkStats() {
@@ -815,6 +873,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             mContentionTimeStats = null;
             mRateStats = null;
             mPacketStats = null;
+            mPeerInfo = null;
         }
 
         /** @hide
@@ -844,6 +903,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
          * @param contentionTimeStats         Data packet contention time statistics.
          * @param rateStats                   Rate information.
          * @param packetStats                 Packet statistics.
+         * @param peerInfo                    Peer statistics.
          */
         public LinkStats(int linkId, int state, int radioId, int rssi, int frequencyMhz,
                 int rssiMgmt, @WifiChannelBandwidth int channelWidth, int centerFreqFirstSegment,
@@ -852,7 +912,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                 long totalBeaconRx, int timeSliceDutyCycleInPercent,
                 long totalCcaBusyFreqTimeMillis, long totalRadioOnFreqTimeMillis,
                 ContentionTimeStats[] contentionTimeStats, RateStats[] rateStats,
-                PacketStats[] packetStats) {
+                PacketStats[] packetStats, PeerInfo[] peerInfo) {
             this.mLinkId = linkId;
             this.mState = state;
             this.mRadioId = radioId;
@@ -875,6 +935,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             this.mContentionTimeStats = contentionTimeStats;
             this.mRateStats = rateStats;
             this.mPacketStats = packetStats;
+            this.mPeerInfo = peerInfo;
         }
 
         @Override
@@ -906,6 +967,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             dest.writeTypedArray(mContentionTimeStats, flags);
             dest.writeTypedArray(mRateStats, flags);
             dest.writeTypedArray(mPacketStats, flags);
+            dest.writeTypedArray(mPeerInfo, flags);
         }
 
         /** Implement the Parcelable interface */
@@ -920,7 +982,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                                 in.readInt(), in.readLong(), in.readLong(),
                                 in.createTypedArray(ContentionTimeStats.CREATOR),
                                 in.createTypedArray(RateStats.CREATOR),
-                                in.createTypedArray(PacketStats.CREATOR));
+                                in.createTypedArray(PacketStats.CREATOR),
+                                in.createTypedArray(PeerInfo.CREATOR));
                     }
 
                     public LinkStats[] newArray(int size) {
@@ -1624,6 +1687,24 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         if (mLinkStats.contains(linkId)) {
             RateStats[] rateStats = mLinkStats.get(linkId).mRateStats;
             if (rateStats != null) return Arrays.asList(rateStats);
+            return Collections.emptyList();
+        }
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Peer information and statistics
+     *
+     * @param linkId Identifier of the link.
+     * @return A list of peer statistics in the form of a list of {@link PeerInfo} objects.
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    @NonNull
+    public List<PeerInfo> getPeerInfo(int linkId) {
+        if (mLinkStats.contains(linkId)) {
+            PeerInfo[] peerInfo = mLinkStats.get(linkId).mPeerInfo;
+            if (peerInfo != null) return Arrays.asList(peerInfo);
             return Collections.emptyList();
         }
         throw new NoSuchElementException("linkId is invalid - " + linkId);

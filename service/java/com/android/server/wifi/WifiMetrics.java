@@ -135,6 +135,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto.PacketStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PasspointProfileTypeCount;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PasspointProvisionStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PasspointProvisionStats.ProvisionFailureCount;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.PeerInfo;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PnoScanMetrics;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.RadioStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.RateStats;
@@ -5241,6 +5242,12 @@ public class WifiMetrics {
                     line.append(",rx_success=" + packetStats.rxSuccess);
                 }
             }
+            if (linkStat.peerInfo != null) {
+                for (PeerInfo peerInfo : linkStat.peerInfo) {
+                    line.append(",sta_count=" + peerInfo.staCount);
+                    line.append(",chan_util=" + peerInfo.chanUtil);
+                }
+            }
         }
         line.append(",mlo_mode=" + entry.mloMode);
         pw.println(line.toString());
@@ -7245,6 +7252,16 @@ public class WifiMetrics {
                             linkStats.contentionTimeStats[ac] = contentionTimeStats;
                             linkStats.packetStats[ac] = packetStats;
                         }
+                        if (link.peerInfo != null && link.peerInfo.length > 0) {
+                            int numPeers = link.peerInfo.length;
+                            linkStats.peerInfo = new PeerInfo[numPeers];
+                            for (int peerIndex = 0; peerIndex < numPeers; ++peerIndex) {
+                                PeerInfo peerInfo = new PeerInfo();
+                                peerInfo.staCount = link.peerInfo[peerIndex].staCount;
+                                peerInfo.chanUtil = link.peerInfo[peerIndex].chanUtil;
+                                linkStats.peerInfo[peerIndex] = peerInfo;
+                            }
+                        }
                         wifiUsabilityStatsEntry.linkStats[i] = linkStats;
                     }
                 }
@@ -7619,6 +7636,23 @@ public class WifiMetrics {
         return rateStats;
     }
 
+    private android.net.wifi.WifiUsabilityStatsEntry.PeerInfo[] convertPeerInfo(
+            WifiLinkLayerStats.LinkSpecificStats stats) {
+        android.net.wifi.WifiUsabilityStatsEntry.PeerInfo[] peerInfos = null;
+        if (stats.peerInfo != null && stats.peerInfo.length > 0) {
+            int numPeers = stats.peerInfo.length;
+            peerInfos = new android.net.wifi.WifiUsabilityStatsEntry.PeerInfo[numPeers];
+            for (int i = 0; i < numPeers; i++) {
+                WifiLinkLayerStats.PeerInfo curPeer = stats.peerInfo[i];
+                android.net.wifi.WifiUsabilityStatsEntry.PeerInfo peerInfo =
+                        new android.net.wifi.WifiUsabilityStatsEntry.PeerInfo(
+                                curPeer.staCount, curPeer.chanUtil);
+                peerInfos[i] = peerInfo;
+            }
+        }
+        return peerInfos;
+    }
+
     private SparseArray<android.net.wifi.WifiUsabilityStatsEntry.LinkStats> convertLinkStats(
             WifiLinkLayerStats stats, WifiInfo info) {
         SparseArray<android.net.wifi.WifiUsabilityStatsEntry.LinkStats> linkStats =
@@ -7666,7 +7700,7 @@ public class WifiMetrics {
                             (channelStatsMap != null) ? channelStatsMap.ccaBusyTimeMs : 0 ,
                             (channelStatsMap != null) ? channelStatsMap.radioOnTimeMs : 0,
                             convertContentionTimeStats(inStat), convertRateStats(inStat),
-                            convertPacketStats(inStat));
+                            convertPacketStats(inStat), convertPeerInfo(inStat));
             linkStats.put(inStat.link_id, outStat);
         }
 

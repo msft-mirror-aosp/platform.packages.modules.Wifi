@@ -24,6 +24,7 @@ import static org.mockito.Mockito.validateMockitoUsage;
 
 import android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats;
 import android.net.wifi.WifiUsabilityStatsEntry.PacketStats;
+import android.net.wifi.WifiUsabilityStatsEntry.PeerInfo;
 import android.net.wifi.WifiUsabilityStatsEntry.RadioStats;
 import android.net.wifi.WifiUsabilityStatsEntry.RateStats;
 import android.os.Parcel;
@@ -93,16 +94,18 @@ public class WifiUsabilityStatsEntryTest {
         RadioStats[] radioStats = new RadioStats[2];
         radioStats[0] = new RadioStats(0, 10, 11, 12, 13, 14, 15, 16, 17, 18);
         radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28);
+        PeerInfo[] peerInfo = new PeerInfo[1];
+        peerInfo[0] = new PeerInfo(1, 50);
 
         SparseArray<WifiUsabilityStatsEntry.LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(0,
                 WifiUsabilityStatsEntry.LINK_STATE_UNKNOWN, 0, -50, 2412, -50, 0, 0, 0,
                 300, 200, 188, 2, 2, 100, 300, 100, 100, 200,
-                contentionTimeStats, rateStats, packetStats));
+                contentionTimeStats, rateStats, packetStats, peerInfo));
         linkStats.put(1, new WifiUsabilityStatsEntry.LinkStats(1,
                 WifiUsabilityStatsEntry.LINK_STATE_UNKNOWN, 0, -40, 5500, -40, 1, 0, 0,
                 860, 600, 388, 2, 2, 200, 400, 100, 150, 300,
-                contentionTimeStats, rateStats, packetStats));
+                contentionTimeStats, rateStats, packetStats, peerInfo));
 
         WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
@@ -152,15 +155,17 @@ public class WifiUsabilityStatsEntryTest {
         RadioStats[] radioStats = new RadioStats[2];
         radioStats[0] = new RadioStats(0, 10, 11, 12, 13, 14, 15, 16, 17, 18);
         radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28);
+        PeerInfo[] peerInfo = new PeerInfo[1];
+        peerInfo[0] = new PeerInfo(1, 50);
         SparseArray<WifiUsabilityStatsEntry.LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(3,
                 WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -50, 2412, -50, 0, 0, 0, 300,
                 200, 188, 2, 2, 100, 300, 100, 100, 200,
-                contentionTimeStats, rateStats, packetStats));
+                contentionTimeStats, rateStats, packetStats, peerInfo));
         linkStats.put(1, new WifiUsabilityStatsEntry.LinkStats(8,
                 WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -40, 5500, -40, 1, 0, 0, 860,
                 600, 388, 2, 2, 200, 400, 100, 150, 300,
-                contentionTimeStats, rateStats, packetStats));
+                contentionTimeStats, rateStats, packetStats, peerInfo));
 
         return new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
@@ -611,7 +616,12 @@ public class WifiUsabilityStatsEntryTest {
                     assertEquals(expectedStats.getMpduLost(), actualStats.getMpduLost());
                     assertEquals(expectedStats.getRetries(), actualStats.getRetries());
                 }
-
+                for (int j = 0; j < expected.getPeerInfo(link).size(); j++) {
+                    PeerInfo expectedStats = expected.getPeerInfo(link).get(j);
+                    PeerInfo actualStats = actual.getPeerInfo(link).get(j);
+                    assertEquals(expectedStats.getStaCount(), actualStats.getStaCount());
+                    assertEquals(expectedStats.getChanUtil(), actualStats.getChanUtil());
+                }
             }
         }
         assertEquals(expected.getWifiLinkCount(), actual.getWifiLinkCount());
@@ -627,7 +637,7 @@ public class WifiUsabilityStatsEntryTest {
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(0,
                 WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -50, 2412, -50, 0, 0, 0, 300,
                 200, 188, 2, 2, 100, 300, 100, 100, 200,
-                null, null, null));
+                null, null, null, null));
 
         WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
