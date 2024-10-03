@@ -16,6 +16,7 @@
 
 package com.android.server.wifi;
 
+import android.net.wifi.WifiManager;
 import android.net.wifi.WifiUsabilityStatsEntry.LinkState;
 import android.util.SparseArray;
 
@@ -460,6 +461,8 @@ public class WifiLinkLayerStats {
      * Radio stats of all the radios.
      */
     public RadioStat[] radioStats;
+
+    public @WifiManager.MloMode int wifiMloMode;
 
     @Override
     public String toString() {

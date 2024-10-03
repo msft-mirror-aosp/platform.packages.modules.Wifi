@@ -5214,6 +5214,7 @@ public class WifiMetrics {
                     + linkStat.timeSliceDutyCycleInPercent);
             line.append(",rssi=" + linkStat.rssi);
         }
+        line.append(",mlo_mode=" + entry.mloMode);
         pw.println(line.toString());
     }
 
@@ -7123,6 +7124,7 @@ public class WifiMetrics {
                         wifiUsabilityStatsEntry.linkStats[i] = linkStats;
                     }
                 }
+                wifiUsabilityStatsEntry.mloMode = stats.wifiMloMode;
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7531,7 +7533,7 @@ public class WifiMetrics {
                 s.rxLinkSpeedMbps, s.timeSliceDutyCycleInPercent, contentionTimeStats, rateStats,
                 radioStats, s.channelUtilizationRatio, s.isThroughputSufficient,
                 s.isWifiScoringEnabled, s.isCellularDataAvailable, 0, 0, 0, false,
-                convertLinkStats(stats, info), s.wifiLinkCount
+                convertLinkStats(stats, info), s.wifiLinkCount, s.mloMode
         );
     }
 
@@ -7722,6 +7724,7 @@ public class WifiMetrics {
         out.radioStats = s.radioStats;
         out.wifiLinkCount = s.wifiLinkCount;
         out.linkStats = s.linkStats;
+        out.mloMode = s.mloMode;
         return out;
     }
 
