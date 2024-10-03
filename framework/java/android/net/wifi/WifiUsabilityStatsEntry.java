@@ -152,6 +152,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @see #getTimeSliceDutyCycleInPercent() */
     private final int mTimeSliceDutyCycleInPercent;
 
+    private final int mWifiLinkCount;
+
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"WME_ACCESS_CATEGORY_"}, value = {
@@ -826,7 +828,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             boolean isThroughputSufficient, boolean isWifiScoringEnabled,
             boolean isCellularDataAvailable, @NetworkType int cellularDataNetworkType,
             int cellularSignalStrengthDbm, int cellularSignalStrengthDb,
-            boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats) {
+            boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats,
+            int wifiLinkCount) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -863,6 +866,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mCellularSignalStrengthDb = cellularSignalStrengthDb;
         mIsSameRegisteredCell = isSameRegisteredCell;
         mLinkStats = linkStats;
+        mWifiLinkCount = wifiLinkCount;
     }
 
     /** Implement the Parcelable interface */
@@ -908,6 +912,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeInt(mCellularSignalStrengthDb);
         dest.writeBoolean(mIsSameRegisteredCell);
         dest.writeSparseArray(mLinkStats);
+        dest.writeInt(mWifiLinkCount);
     }
 
     /** Implement the Parcelable interface */
@@ -929,7 +934,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readInt(), in.readBoolean(), in.readBoolean(),
                     in.readBoolean(), in.readInt(), in.readInt(),
                     in.readInt(), in.readBoolean(),
-                    in.readSparseArray(LinkStats.class.getClassLoader())
+                    in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt()
             );
         }
 
@@ -1484,5 +1489,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** Whether the primary registered cell of current entry is same as that of previous entry */
     public boolean isSameRegisteredCell() {
         return mIsSameRegisteredCell;
+    }
+
+    /** @hide */
+    public int getWifiLinkCount() {
+        return mWifiLinkCount;
     }
 }

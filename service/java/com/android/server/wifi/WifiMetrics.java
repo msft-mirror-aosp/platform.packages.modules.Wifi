@@ -5201,6 +5201,7 @@ public class WifiMetrics {
                 line.append(",retries=" + rateStat.retries);
             }
         }
+        line.append(",wifi_link_count=" + entry.wifiLinkCount);
         pw.println(line.toString());
     }
 
@@ -7086,6 +7087,11 @@ public class WifiMetrics {
                     mWifiUsabilityStatsEntriesRingBuffer.size()
                     < MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE
                     ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove();
+            if (isWiFiScorerNewStatsCollected()) {
+                if (stats.links != null) {
+                    wifiUsabilityStatsEntry.wifiLinkCount = stats.links.length;
+                }
+            }
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
             wifiUsabilityStatsEntry.totalTxSuccess = stats.txmpdu_be + stats.txmpdu_bk
                     + stats.txmpdu_vi + stats.txmpdu_vo;
@@ -7491,7 +7497,7 @@ public class WifiMetrics {
                 s.rxLinkSpeedMbps, s.timeSliceDutyCycleInPercent, contentionTimeStats, rateStats,
                 radioStats, s.channelUtilizationRatio, s.isThroughputSufficient,
                 s.isWifiScoringEnabled, s.isCellularDataAvailable, 0, 0, 0, false,
-                convertLinkStats(stats, info)
+                convertLinkStats(stats, info), s.wifiLinkCount
         );
     }
 
@@ -7680,6 +7686,7 @@ public class WifiMetrics {
         out.staCount = s.staCount;
         out.channelUtilization = s.channelUtilization;
         out.radioStats = s.radioStats;
+        out.wifiLinkCount = s.wifiLinkCount;
         return out;
     }
 
