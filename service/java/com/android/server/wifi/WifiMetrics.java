@@ -531,6 +531,7 @@ public class WifiMetrics {
 
     private final WifiMonitor mWifiMonitor;
     private ActiveModeWarden mActiveModeWarden;
+    private WifiGlobals mWifiGlobals;
     private final Map<String, ActiveModeManager.ClientRole> mIfaceToRoleMap = new ArrayMap<>();
 
     /** WifiConfigStore read duration histogram. */
@@ -1678,7 +1679,8 @@ public class WifiMetrics {
             WifiP2pMetrics wifiP2pMetrics,
             DppMetrics dppMetrics,
             WifiMonitor wifiMonitor,
-            WifiDeviceStateChangeManager wifiDeviceStateChangeManager) {
+            WifiDeviceStateChangeManager wifiDeviceStateChangeManager,
+            WifiGlobals wifiGlobals) {
         mContext = context;
         mFacade = facade;
         mClock = clock;
@@ -1713,6 +1715,7 @@ public class WifiMetrics {
                         handleScreenStateChanged(screenOn);
                     }
                 });
+        mWifiGlobals = wifiGlobals;
     }
 
     /** Sets internal ScoringParams member */
@@ -5284,6 +5287,7 @@ public class WifiMetrics {
                 + entry.isThroughputPredictorDownstreamSufficient);
         line.append(",is_throughput_predictor_upstream_sufficient="
                 + entry.isThroughputPredictorUpstreamSufficient);
+        line.append(",is_bluetooth_connected=" + entry.isBluetoothConnected);
         pw.println(line.toString());
     }
 
@@ -7341,6 +7345,8 @@ public class WifiMetrics {
                         mSpeedSufficientThroughputPredictor.Downstream;
                 wifiUsabilityStatsEntry.isThroughputPredictorUpstreamSufficient =
                         mSpeedSufficientThroughputPredictor.Upstream;
+                wifiUsabilityStatsEntry.isBluetoothConnected =
+                        mWifiGlobals.isBluetoothConnected();
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7867,7 +7873,7 @@ public class WifiMetrics {
                 s.wifiFrameworkState, s.isNetworkCapabilitiesDownstreamSufficient,
                 s.isNetworkCapabilitiesUpstreamSufficient,
                 s.isThroughputPredictorDownstreamSufficient,
-                s.isThroughputPredictorUpstreamSufficient
+                s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected
         );
     }
 
@@ -8076,6 +8082,7 @@ public class WifiMetrics {
         out.isNetworkCapabilitiesUpstreamSufficient = s.isNetworkCapabilitiesUpstreamSufficient;
         out.isThroughputPredictorDownstreamSufficient = s.isThroughputPredictorDownstreamSufficient;
         out.isThroughputPredictorUpstreamSufficient = s.isThroughputPredictorUpstreamSufficient;
+        out.isBluetoothConnected = s.isBluetoothConnected;
         return out;
     }
 
