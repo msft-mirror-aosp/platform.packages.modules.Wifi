@@ -116,6 +116,10 @@ public class WifiRttController {
         public boolean ntbInitiatorSupported;
         // Whether IEEE 802.11az Non-Trigger-based (non-TB) responder mode is supported.
         public boolean ntbResponderSupported;
+        // Whether secure HE-LTF (Long Training Field) is supported
+        public boolean secureHeLtfSupported;
+        // Whether ranging frame protection is supported
+        public boolean rangingFrameProtectionSupported;
 
         public Capabilities() {
         }
@@ -166,6 +170,9 @@ public class WifiRttController {
             azBwSupported = rttHalCapabilities.azBwSupport;
             ntbInitiatorSupported = rttHalCapabilities.ntbInitiatorSupported;
             ntbResponderSupported = rttHalCapabilities.ntbResponderSupported;
+            //TODO: Fill this in from HAL
+            secureHeLtfSupported = false;
+            rangingFrameProtectionSupported = false;
         }
     }
 

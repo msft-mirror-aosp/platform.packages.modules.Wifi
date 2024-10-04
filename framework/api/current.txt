@@ -1852,6 +1852,8 @@ package android.net.wifi.rtt {
     field public static final String CHARACTERISTICS_KEY_BOOLEAN_LCR = "key_lcr";
     field @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") public static final String CHARACTERISTICS_KEY_BOOLEAN_NTB_INITIATOR = "key_ntb_initiator";
     field public static final String CHARACTERISTICS_KEY_BOOLEAN_ONE_SIDED_RTT = "key_one_sided_rtt";
+    field @FlaggedApi("com.android.wifi.flags.secure_ranging") public static final String CHARACTERISTICS_KEY_BOOLEAN_RANGING_FRAME_PROTECTION_SUPPORTED = "key_rnm_mfp_supported";
+    field @FlaggedApi("com.android.wifi.flags.secure_ranging") public static final String CHARACTERISTICS_KEY_BOOLEAN_SECURE_HE_LTF_SUPPORTED = "key_secure_he_ltf_supported";
     field public static final String CHARACTERISTICS_KEY_BOOLEAN_STA_RESPONDER = "key_sta_responder";
   }
 
