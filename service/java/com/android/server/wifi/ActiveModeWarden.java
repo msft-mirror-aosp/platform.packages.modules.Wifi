@@ -33,6 +33,7 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_LO
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TRANSIENT;
 import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_TETHERED;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_STA_BANDS;
+import static com.android.server.wifi.util.GeneralUtil.bitsetToLong;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -98,6 +99,7 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -2738,9 +2740,10 @@ public class ActiveModeWarden {
      * @param isStaApConcurrencySupported true if Sta+Ap concurrency supported
      * @param isStaStaConcurrencySupported true if Sta+Sta concurrency supported
      */
-    private void setSupportedFeatureSet(long supportedFeatureSet,
+    private void setSupportedFeatureSet(BitSet supportedFeatureBitset,
             boolean isStaApConcurrencySupported,
             boolean isStaStaConcurrencySupported) {
+        long supportedFeatureSet = bitsetToLong(supportedFeatureBitset);
         long concurrencyFeatureSet = 0L;
         if (isStaApConcurrencySupported) {
             concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_AP_STA;
