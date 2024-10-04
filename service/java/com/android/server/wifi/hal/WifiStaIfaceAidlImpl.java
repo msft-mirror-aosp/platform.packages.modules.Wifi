@@ -1479,11 +1479,21 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
         radio.on_time_roam_scan = aidlRadioStats.onTimeInMsForRoamScan;
         radio.on_time_pno_scan = aidlRadioStats.onTimeInMsForPnoScan;
         radio.on_time_hs20_scan = aidlRadioStats.onTimeInMsForHs20Scan;
+        if (aidlRadioStats.txTimeInMsPerLevel != null
+                && aidlRadioStats.txTimeInMsPerLevel.length > 0) {
+            radio.tx_time_in_ms_per_level = new int[aidlRadioStats.txTimeInMsPerLevel.length];
+            for (int i = 0; i < aidlRadioStats.txTimeInMsPerLevel.length; ++i) {
+                radio.tx_time_in_ms_per_level[i] = aidlRadioStats.txTimeInMsPerLevel[i];
+            }
+        }
         /* Copy list of channel stats */
         for (WifiChannelStats channelStats : aidlRadioStats.channelStats) {
             WifiLinkLayerStats.ChannelStats channelStatsEntry =
                     new WifiLinkLayerStats.ChannelStats();
             channelStatsEntry.frequency = channelStats.channel.centerFreq;
+            channelStatsEntry.frequencyFirstSegment = channelStats.channel.centerFreq0;
+            channelStatsEntry.frequencySecondSegment = channelStats.channel.centerFreq1;
+            channelStatsEntry.channelWidth = channelStats.channel.width;
             channelStatsEntry.radioOnTimeMs = channelStats.onTimeInMs;
             channelStatsEntry.ccaBusyTimeMs = channelStats.ccaBusyTimeInMs;
             radio.channelStatsMap.put(channelStats.channel.centerFreq, channelStatsEntry);

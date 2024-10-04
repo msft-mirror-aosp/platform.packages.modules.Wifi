@@ -43,6 +43,7 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Set;
 
@@ -136,7 +137,8 @@ public interface ClientMode {
     DhcpResultsParcelable syncGetDhcpResultsParcelable();
 
     /** Get the supported feature set synchronously */
-    long getSupportedFeatures();
+    @NonNull
+    BitSet getSupportedFeatures();
 
     boolean syncStartSubscriptionProvisioning(int callingUid, OsuProvider provider,
             IProvisioningCallback callback);

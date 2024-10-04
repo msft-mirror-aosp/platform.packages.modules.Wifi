@@ -1614,7 +1614,7 @@ public class WifiNativeTest extends WifiBaseTest {
                 .thenReturn(legacyFeatures);
         when(mSettingsConfigStore.get(eq(WIFI_NATIVE_EXTENDED_SUPPORTED_FEATURES)))
                 .thenReturn(WIFI_TEST_FEATURE.toLongArray());
-        BitSet featureSet = longToBitset(mWifiNative.getSupportedFeatureSet(null));
+        BitSet featureSet = mWifiNative.getSupportedFeatureSet(null);
         assertTrue(featureSet.equals(WIFI_TEST_FEATURE));
     }
 
@@ -1630,7 +1630,7 @@ public class WifiNativeTest extends WifiBaseTest {
                 .thenReturn(legacyFeatures);
         when(mSettingsConfigStore.get(eq(WIFI_NATIVE_EXTENDED_SUPPORTED_FEATURES)))
                 .thenReturn(new long[0]); // no extended features
-        BitSet featureSet = longToBitset(mWifiNative.getSupportedFeatureSet(null));
+        BitSet featureSet = mWifiNative.getSupportedFeatureSet(null);
         assertTrue(featureSet.equals(longToBitset(legacyFeatures)));
     }
 

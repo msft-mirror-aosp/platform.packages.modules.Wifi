@@ -19,11 +19,15 @@ package com.android.server.wifi;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_MBO;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_OCE;
 
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
+
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import com.android.server.wifi.SupplicantStaIfaceHal.MboAssocDisallowedReasonCode;
+
+import java.util.BitSet;
 
 /**
  * MboOceController is responsible for controlling MBO and OCE operations.
@@ -60,9 +64,9 @@ public class MboOceController {
         if (clientModeManager == null) {
             return;
         }
-        long supportedFeatures = clientModeManager.getSupportedFeatures();
-        mIsMboSupported = (supportedFeatures & WIFI_FEATURE_MBO) != 0;
-        mIsOceSupported = (supportedFeatures & WIFI_FEATURE_OCE) != 0;
+        BitSet supportedFeatures = clientModeManager.getSupportedFeatures();
+        mIsMboSupported = supportedFeatures.get(getCapabilityIndex(WIFI_FEATURE_MBO));
+        mIsOceSupported = supportedFeatures.get(getCapabilityIndex(WIFI_FEATURE_OCE));
         mEnabled = true;
         if (mVerboseLoggingEnabled) {
             Log.d(TAG, "Enable MBO-OCE MBO support: " + mIsMboSupported

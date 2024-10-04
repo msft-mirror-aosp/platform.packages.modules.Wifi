@@ -121,6 +121,8 @@ import android.net.wifi.WifiManager.TrafficStateCallback;
 import android.net.wifi.WifiManager.WifiConnectedNetworkScorer;
 import android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats;
 import android.net.wifi.WifiUsabilityStatsEntry.LinkStats;
+import android.net.wifi.WifiUsabilityStatsEntry.PacketStats;
+import android.net.wifi.WifiUsabilityStatsEntry.PeerInfo;
 import android.net.wifi.WifiUsabilityStatsEntry.RadioStats;
 import android.net.wifi.WifiUsabilityStatsEntry.RateStats;
 import android.net.wifi.twt.TwtRequest;
@@ -2508,27 +2510,33 @@ public class WifiManagerTest {
         contentionTimeStats[1] = new ContentionTimeStats(5, 6, 7, 8);
         contentionTimeStats[2] = new ContentionTimeStats(9, 10, 11, 12);
         contentionTimeStats[3] = new ContentionTimeStats(13, 14, 15, 16);
+        PacketStats[] packetStats = new PacketStats[4];
+        packetStats[0] = new PacketStats(1, 2, 3, 4);
+        packetStats[1] = new PacketStats(5, 6, 7, 8);
+        packetStats[2] = new PacketStats(9, 10, 11, 12);
+        packetStats[3] = new PacketStats(13, 14, 15, 16);
         RateStats[] rateStats = new RateStats[2];
         rateStats[0] = new RateStats(1, 3, 5, 7, 9, 11, 13, 15, 17);
         rateStats[1] = new RateStats(2, 4, 6, 8, 10, 12, 14, 16, 18);
         RadioStats[] radioStats = new RadioStats[2];
         radioStats[0] = new RadioStats(0, 10, 11, 12, 13, 14, 15, 16, 17, 18);
-        radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28);
+        radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28, new int[] {1, 2, 3});
+        PeerInfo[] peerInfo = new PeerInfo[1];
+        peerInfo[0] = new PeerInfo(1, 50, rateStats);
         SparseArray<LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0,
-                new LinkStats(0, WifiUsabilityStatsEntry.LINK_STATE_NOT_IN_USE, 0, -50, 300,
-                        200,
-                        188, 2, 2, 100, 300, 100, 100, 200,
-                        contentionTimeStats, rateStats));
+                new LinkStats(0, WifiUsabilityStatsEntry.LINK_STATE_NOT_IN_USE, 0, -50, 2412,
+                        -50, 0, 0, 0, 300, 200, 188, 2, 2, 100, 300, 100, 100, 200,
+                        contentionTimeStats, rateStats, packetStats, peerInfo));
         linkStats.put(1,
-                new LinkStats(0, WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -40, 860, 600,
-                        388, 2, 2, 200, 400, 100, 100, 200,
-                        contentionTimeStats, rateStats));
+                new LinkStats(0, WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -40, 5500,
+                        -40, 1, 0, 0, 860, 600, 388, 2, 2, 200, 400, 100, 100, 200,
+                        contentionTimeStats, rateStats, packetStats, peerInfo));
         callbackCaptor.getValue().onWifiUsabilityStats(1, true,
                 new WifiUsabilityStatsEntry(System.currentTimeMillis(), -50, 100, 10, 0, 5, 5,
                         100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 1, 100, 10,
                         100, 27, contentionTimeStats, rateStats, radioStats, 101, true, true, true,
-                        0, 10, 10, true, linkStats));
+                        0, 10, 10, true, linkStats, 1, 0, 10, 20, 1));
         verify(mOnWifiUsabilityStatsListener).onWifiUsabilityStats(anyInt(), anyBoolean(),
                 any(WifiUsabilityStatsEntry.class));
     }
