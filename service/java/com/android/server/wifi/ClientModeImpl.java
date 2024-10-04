@@ -42,6 +42,7 @@ import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_LONG_LIVED;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_TRANSIENT;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__SUPPLICANT_DISCONNECTED;
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -182,6 +183,7 @@ import java.net.URL;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -1646,14 +1648,14 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     }
 
     private boolean isLinkLayerStatsSupported() {
-        return (getSupportedFeatures() & WIFI_FEATURE_LINK_LAYER_STATS) != 0;
+        return getSupportedFeatures().get(getCapabilityIndex(WIFI_FEATURE_LINK_LAYER_STATS));
     }
 
     /**
      * @return true if this device supports WPA3_SAE
      */
     private boolean isWpa3SaeSupported() {
-        return (getSupportedFeatures() & WIFI_FEATURE_WPA3_SAE) != 0;
+        return getSupportedFeatures().get(getCapabilityIndex(WIFI_FEATURE_WPA3_SAE));
     }
 
     /**
@@ -1978,7 +1980,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     /**
      * Get the supported feature set synchronously
      */
-    public long getSupportedFeatures() {
+    public @NonNull BitSet getSupportedFeatures() {
         return mWifiNative.getSupportedFeatureSet(mInterfaceName);
     }
 
@@ -2042,8 +2044,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      *  Check if a TDLS session can be established
      */
     public boolean isTdlsOperationCurrentlyAvailable() {
-        return (getSupportedFeatures() & WIFI_FEATURE_TDLS) != 0 && isConnected()
-                && canEnableTdls();
+        boolean hasTdlsCapability =
+                getSupportedFeatures().get(getCapabilityIndex(WIFI_FEATURE_TDLS));
+        return hasTdlsCapability && isConnected() && canEnableTdls();
     }
 
     /**
@@ -8085,21 +8088,21 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      * @return true if this device supports FILS-SHA256
      */
     private boolean isFilsSha256Supported() {
-        return (getSupportedFeatures() & WIFI_FEATURE_FILS_SHA256) != 0;
+        return getSupportedFeatures().get(getCapabilityIndex(WIFI_FEATURE_FILS_SHA256));
     }
 
     /**
      * @return true if this device supports FILS-SHA384
      */
     private boolean isFilsSha384Supported() {
-        return (getSupportedFeatures() & WIFI_FEATURE_FILS_SHA384) != 0;
+        return getSupportedFeatures().get(getCapabilityIndex(WIFI_FEATURE_FILS_SHA384));
     }
 
     /**
      * @return true if this device supports Trust On First Use
      */
     private boolean isTrustOnFirstUseSupported() {
-        return (getSupportedFeatures() & WIFI_FEATURE_TRUST_ON_FIRST_USE) != 0;
+        return getSupportedFeatures().get(getCapabilityIndex(WIFI_FEATURE_TRUST_ON_FIRST_USE));
     }
 
     /**

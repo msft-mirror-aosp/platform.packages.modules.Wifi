@@ -21,6 +21,7 @@ import static android.net.wifi.WifiManager.WIFI_AP_STATE_FAILED;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLING;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
 
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_LOCAL_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SCAN_ONLY;
@@ -30,6 +31,7 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_LOCAL_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_TETHERED;
 import static com.android.server.wifi.ActiveModeWarden.INTERNAL_REQUESTOR_WS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_STA_BANDS;
+import static com.android.server.wifi.util.GeneralUtil.longToBitset;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -96,6 +98,7 @@ import android.util.Log;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.dx.mockito.inline.extended.StaticMockitoSession;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.ActiveModeManager.ClientConnectivityRole;
 import com.android.server.wifi.ActiveModeManager.Listener;
@@ -206,6 +209,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
     private BroadcastReceiver mEmergencyCallbackModeChangedBr;
     private BroadcastReceiver mEmergencyCallStateChangedBr;
+    private StaticMockitoSession mStaticMockSession;
 
     /**
      * Set up the test environment.
@@ -215,8 +219,12 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         Log.d(TAG, "Setting up ...");
 
         MockitoAnnotations.initMocks(this);
+        mStaticMockSession = mockitoSession()
+                .mockStatic(WifiInjector.class)
+                .startMocking();
         mLooper = new TestLooper();
 
+        when(WifiInjector.getInstance()).thenReturn(mWifiInjector);
         when(mWifiInjector.getScanRequestProxy()).thenReturn(mScanRequestProxy);
         when(mWifiInjector.getSarManager()).thenReturn(mSarManager);
         when(mWifiInjector.getHalDeviceManager()).thenReturn(mHalDeviceManager);
@@ -341,6 +349,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
     @After
     public void cleanUp() throws Exception {
         mActiveModeWarden = null;
+        mStaticMockSession.finishMocking();
         mLooper.dispatchAll();
     }
 
@@ -385,7 +394,8 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         when(mClientModeManager.getRole()).thenReturn(ROLE_CLIENT_PRIMARY);
         when(mClientModeManager.getCurrentNetwork()).thenReturn(mNetwork);
-        when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(testFeatureSet);
+        when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME))
+                .thenReturn(longToBitset(testFeatureSet));
         // ClientModeManager starts in SCAN_ONLY role.
         mClientListener.onRoleChanged(mClientModeManager);
         mLooper.dispatchAll();
@@ -431,7 +441,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         when(mClientModeManager.getRole()).thenReturn(ROLE_CLIENT_SCAN_ONLY);
         when(mClientModeManager.getInterfaceName()).thenReturn(WIFI_IFACE_NAME);
         when(mClientModeManager.getCurrentNetwork()).thenReturn(null);
-        when(mWifiNative.getSupportedFeatureSet(null)).thenReturn(TEST_FEATURE_SET);
+        when(mWifiNative.getSupportedFeatureSet(null)).thenReturn(longToBitset(TEST_FEATURE_SET));
         if (!isClientModeSwitch) {
             mClientListener.onStarted(mClientModeManager);
             mLooper.dispatchAll();
@@ -4866,7 +4876,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         enterScanOnlyModeActiveState();
         long supportedFeaturesFromWifiNative = WifiManager.WIFI_FEATURE_OWE;
         when(mWifiNative.getSupportedFeatureSet(null)).thenReturn(
-                supportedFeaturesFromWifiNative);
+                longToBitset(supportedFeaturesFromWifiNative));
         when(mWifiNative.isStaApConcurrencySupported()).thenReturn(false);
         mClientListener.onStarted(mClientModeManager);
 
@@ -4890,7 +4900,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         enterScanOnlyModeActiveState();
         long supportedFeaturesFromWifiNative = WifiManager.WIFI_FEATURE_OWE;
         when(mWifiNative.getSupportedFeatureSet(null)).thenReturn(
-                supportedFeaturesFromWifiNative);
+                longToBitset(supportedFeaturesFromWifiNative));
 
         mClientListener.onStarted(mClientModeManager);
         assertEquals(supportedFeaturesFromWifiNative, mActiveModeWarden.getSupportedFeatureSet());
@@ -4938,7 +4948,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 R.bool.config_wifi_p2p_mac_randomization_supported))
                 .thenReturn(p2pMacRandomizationEnabled);
         when(mWifiNative.getSupportedFeatureSet(anyString()))
-                .thenReturn(supportedFeaturesFromWifiNative);
+                .thenReturn(longToBitset(supportedFeaturesFromWifiNative));
         mClientListener.onStarted(mClientModeManager);
         mLooper.dispatchAll();
         return mActiveModeWarden.getSupportedFeatureSet();
@@ -4972,7 +4982,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_WIFI_RTT)).thenReturn(
                 !rttDisabled);
         when(mWifiNative.getSupportedFeatureSet(anyString())).thenReturn(
-                supportedFeaturesFromWifiNative);
+                longToBitset(supportedFeaturesFromWifiNative));
         mClientListener.onStarted(mClientModeManager);
         mLooper.dispatchAll();
         return mActiveModeWarden.getSupportedFeatureSet();

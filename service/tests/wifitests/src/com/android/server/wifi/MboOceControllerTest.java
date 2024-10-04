@@ -16,6 +16,8 @@
 
 package com.android.server.wifi;
 
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
+
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.*;
 
@@ -34,6 +36,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.BitSet;
 
 /**
  * unit tests for {@link com.android.server.wifi.MboOceController}.
@@ -75,14 +78,14 @@ public class MboOceControllerTest extends WifiBaseTest {
      * Helper function to initialize mboOceController
      */
     private PhoneStateListener enableMboOceController(boolean isMboEnabled, boolean isOceEnabled) {
-        long featureSet = 0;
+        BitSet featureSet = new BitSet();
         PhoneStateListener dataConnectionStateListener = null;
 
         if (isMboEnabled) {
-            featureSet |= WifiManager.WIFI_FEATURE_MBO;
+            featureSet.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_MBO));
         }
         if (isOceEnabled) {
-            featureSet |= WifiManager.WIFI_FEATURE_OCE;
+            featureSet.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_OCE));
         }
         when(mClientModeManager.getSupportedFeatures()).thenReturn(featureSet);
 
