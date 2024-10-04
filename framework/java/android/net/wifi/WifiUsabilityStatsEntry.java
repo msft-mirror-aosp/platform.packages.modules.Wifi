@@ -152,6 +152,16 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @see #getTimeSliceDutyCycleInPercent() */
     private final int mTimeSliceDutyCycleInPercent;
 
+    private final int mWifiLinkCount;
+    /** Refer to WifiManager.MloMode */
+    private @WifiManager.MloMode int mMloMode;
+    /** The number of tx bytes transmitted on current interface */
+    private final long mTxTransmittedBytes;
+    /** The number of rx bytes transmitted on current interface */
+    private final long mRxTransmittedBytes;
+    /** The total number of LABEL_BAD event happens */
+    private final int mLabelBadEventCount;
+
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"WME_ACCESS_CATEGORY_"}, value = {
@@ -264,6 +274,83 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         }
     }
     private final ContentionTimeStats[] mContentionTimeStats;
+
+    /**
+     * Packet statistics.
+     */
+    /** @hide */
+    public static final class PacketStats implements Parcelable {
+        private long mTxSuccess;
+        private long mTxRetries;
+        private long mTxBad;
+        private long mRxSuccess;
+
+        public PacketStats() {
+        }
+
+        /**
+         * Constructor function
+         * @param txSuccess Number of successfully transmitted unicast data pkts (ACK rcvd)
+         * @param txRetries Number of transmitted unicast data retry pkts
+         * @param txBad Number of transmitted unicast data pkt losses (no ACK)
+         * @param rxSuccess Number of received unicast data packets
+         */
+        public PacketStats(long txSuccess, long txRetries, long txBad, long rxSuccess) {
+            this.mTxSuccess = txSuccess;
+            this.mTxRetries = txRetries;
+            this.mTxBad = txBad;
+            this.mRxSuccess = rxSuccess;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(@NonNull Parcel dest, int flags) {
+            dest.writeLong(mTxSuccess);
+            dest.writeLong(mTxRetries);
+            dest.writeLong(mTxBad);
+            dest.writeLong(mRxSuccess);
+        }
+
+        /** Implement the Parcelable interface */
+        public static final @NonNull Creator<PacketStats> CREATOR =
+                new Creator<PacketStats>() {
+                    public PacketStats createFromParcel(Parcel in) {
+                        PacketStats stats = new PacketStats();
+                        stats.mTxSuccess = in.readLong();
+                        stats.mTxRetries = in.readLong();
+                        stats.mTxBad = in.readLong();
+                        stats.mRxSuccess = in.readLong();
+                        return stats;
+                    }
+                    public PacketStats[] newArray(int size) {
+                        return new PacketStats[size];
+                    }
+                };
+
+        /** Number of successfully transmitted unicast data pkts (ACK rcvd) */
+        public long getTxSuccess() {
+            return mTxSuccess;
+        }
+
+        /** Number of transmitted unicast data retry pkts */
+        public long getTxRetries() {
+            return mTxRetries;
+        }
+
+        /** Number of transmitted unicast data pkt losses (no ACK) */
+        public long getTxBad() {
+            return mTxBad;
+        }
+
+        /** Number of received unicast data packets */
+        public long getRxSuccess() {
+            return mRxSuccess;
+        }
+    }
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -481,6 +568,75 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final RateStats[] mRateStats;
 
     /**
+     * Per peer statistics for WiFi the link
+     */
+    /** @hide */
+    public static final class PeerInfo implements Parcelable {
+        private int mStaCount;
+        private int mChanUtil;
+        private RateStats[] mRateStats;
+
+        public PeerInfo() {
+        }
+
+        /**
+         * Constructor function.
+         * @param staCount Station count
+         * @param chanUtil Channel utilization
+         * @param rateStats Per rate statistics on this WiFi peer
+         */
+        public PeerInfo(int staCount, int chanUtil, RateStats[] rateStats) {
+            this.mStaCount = staCount;
+            this.mChanUtil = chanUtil;
+            this.mRateStats = rateStats;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(@NonNull Parcel dest, int flags) {
+            dest.writeInt(mStaCount);
+            dest.writeInt(mChanUtil);
+            dest.writeTypedArray(mRateStats, flags);
+        }
+
+        /** Implement the Parcelable interface */
+        public static final @NonNull Creator<PeerInfo> CREATOR = new Creator<PeerInfo>() {
+            public PeerInfo createFromParcel(Parcel in) {
+                PeerInfo stats = new PeerInfo();
+                stats.mStaCount = in.readInt();
+                stats.mChanUtil = in.readInt();
+                stats.mRateStats = in.createTypedArray(RateStats.CREATOR);
+                return stats;
+            }
+            public PeerInfo[] newArray(int size) {
+                return new PeerInfo[size];
+            }
+        };
+
+        /** Station count */
+        public int getStaCount() {
+            return mStaCount;
+        }
+
+        /** Channel utilization */
+        public int getChanUtil() {
+            return mChanUtil;
+        }
+
+        /** Per rate statistics */
+        public List<RateStats> getRateStats() {
+            if (mRateStats != null) {
+                return Arrays.asList(mRateStats);
+            }
+            return Collections.emptyList();
+        }
+    }
+
+    /**
      * Wifi link layer radio stats.
      */
     public static final class RadioStats implements Parcelable {
@@ -499,6 +655,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         private long mTotalRoamScanTimeMillis;
         private long mTotalPnoScanTimeMillis;
         private long mTotalHotspot2ScanTimeMillis;
+        private int[] mTxTimeMsPerLevel;
 
         /** @hide */
         public RadioStats() {
@@ -542,6 +699,47 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             this.mTotalHotspot2ScanTimeMillis = onTimeHs20Scan;
         }
 
+        /**
+         * Constructor function
+         * @param radioId Firmware/Hardware implementation specific persistent value for this
+         *                device, identifying the radio interface for which the stats are produced.
+         * @param onTime The total time the wifi radio is on in ms counted from the last radio
+         *               chip reset
+         * @param txTime The total time the wifi radio is transmitting in ms counted from the last
+         *               radio chip reset
+         * @param rxTime The total time the wifi radio is receiving in ms counted from the last
+         *               radio chip reset
+         * @param onTimeScan The total time spent on all types of scans in ms counted from the
+         *                   last radio chip reset
+         * @param onTimeNanScan The total time spent on nan scans in ms counted from the last radio
+         *                      chip reset
+         * @param onTimeBackgroundScan The total time spent on background scans in ms counted from
+         *                             the last radio chip reset
+         * @param onTimeRoamScan The total time spent on roam scans in ms counted from the last
+         *                       radio chip reset
+         * @param onTimePnoScan The total time spent on pno scans in ms counted from the last radio
+         *                      chip reset
+         * @param onTimeHs20Scan The total time spent on hotspot2.0 scans and GAS exchange in ms
+         *                       counted from the last radio chip reset
+         * @param txTimeMsPerLevel Time for which the radio is in active tranmission per tx level
+         */
+        /** @hide */
+        public RadioStats(int radioId, long onTime, long txTime, long rxTime, long onTimeScan,
+                long onTimeNanScan, long onTimeBackgroundScan, long onTimeRoamScan,
+                long onTimePnoScan, long onTimeHs20Scan, int[] txTimeMsPerLevel) {
+            this.mRadioId = radioId;
+            this.mTotalRadioOnTimeMillis = onTime;
+            this.mTotalRadioTxTimeMillis = txTime;
+            this.mTotalRadioRxTimeMillis = rxTime;
+            this.mTotalScanTimeMillis = onTimeScan;
+            this.mTotalNanScanTimeMillis = onTimeNanScan;
+            this.mTotalBackgroundScanTimeMillis = onTimeBackgroundScan;
+            this.mTotalRoamScanTimeMillis = onTimeRoamScan;
+            this.mTotalPnoScanTimeMillis = onTimePnoScan;
+            this.mTotalHotspot2ScanTimeMillis = onTimeHs20Scan;
+            this.mTxTimeMsPerLevel = txTimeMsPerLevel;
+        }
+
         @Override
         public int describeContents() {
             return 0;
@@ -559,6 +757,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             dest.writeLong(mTotalRoamScanTimeMillis);
             dest.writeLong(mTotalPnoScanTimeMillis);
             dest.writeLong(mTotalHotspot2ScanTimeMillis);
+            dest.writeIntArray(mTxTimeMsPerLevel);
         }
 
         /** Implement the Parcelable interface */
@@ -576,6 +775,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                         stats.mTotalRoamScanTimeMillis = in.readLong();
                         stats.mTotalPnoScanTimeMillis = in.readLong();
                         stats.mTotalHotspot2ScanTimeMillis = in.readLong();
+                        stats.mTxTimeMsPerLevel = in.createIntArray();
                         return stats;
                     }
                     public RadioStats[] newArray(int size) {
@@ -645,6 +845,13 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         public long getTotalHotspot2ScanTimeMillis() {
             return mTotalHotspot2ScanTimeMillis;
         }
+        /**
+         * Time for which the radio is in active tranmission per tx level
+         */
+        /** @hide */
+        public int[] getTxTimeMsPerLevel() {
+            return mTxTimeMsPerLevel;
+        }
     }
     private final RadioStats[] mRadioStats;
     private final int mChannelUtilizationRatio;
@@ -670,6 +877,16 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         private final int mRadioId;
         /** The RSSI (in dBm) at the sample time */
         private final int mRssi;
+        /** Frequency of the link in MHz */
+        private final int mFrequencyMhz;
+        /** RSSI of management frames on this WiFi link */
+        private final int mRssiMgmt;
+        /** Channel bandwidth on this WiFi link */
+        @WifiChannelBandwidth private int mChannelWidth;
+        /** Center frequency (MHz) first segment on this WiFi link */
+        private final int mCenterFreqFirstSegment;
+        /** Center frequency (MHz) second segment on this WiFi link */
+        private final int mCenterFreqSecondSegment;
         /** Tx Link speed at the sample time in Mbps */
         private final int mTxLinkSpeedMbps;
         /** Rx link speed at the sample time in Mbps */
@@ -697,6 +914,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         private final ContentionTimeStats[] mContentionTimeStats;
         /** Rate information and statistics */
         private final RateStats[] mRateStats;
+        /** Packet statistics */
+        private final PacketStats[] mPacketStats;
+        /** Peer statistics */
+        private final PeerInfo[] mPeerInfo;
 
         /** @hide */
         public LinkStats() {
@@ -704,6 +925,11 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             mState = LINK_STATE_UNKNOWN;
             mRssi = WifiInfo.INVALID_RSSI;
             mRadioId = RadioStats.INVALID_RADIO_ID;
+            mFrequencyMhz = 0;
+            mRssiMgmt = 0;
+            mChannelWidth = WIFI_BANDWIDTH_20_MHZ;
+            mCenterFreqFirstSegment = 0;
+            mCenterFreqSecondSegment = 0;
             mTxLinkSpeedMbps = WifiInfo.LINK_SPEED_UNKNOWN;
             mRxLinkSpeedMbps = WifiInfo.LINK_SPEED_UNKNOWN;
             mTotalTxSuccess = 0;
@@ -716,6 +942,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             mTotalRadioOnFreqTimeMillis = 0;
             mContentionTimeStats = null;
             mRateStats = null;
+            mPacketStats = null;
+            mPeerInfo = null;
         }
 
         /** @hide
@@ -725,6 +953,11 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
          * @param radioId                     Identifier of the radio on which the link is operating
          *                                    currently.
          * @param rssi                        Link Rssi (in dBm) at sample time.
+         * @param frequencyMhz                Frequency of the link in MHz
+         * @param rssiMgmt                    RSSI of management frames on this WiFi link
+         * @param channelWidth                channel width of WiFi link
+         * @param centerFreqFirstSegment      Center frequency (MHz) of first segment
+         * @param centerFreqSecondSegment     Center frequency (MHz) of second segment
          * @param txLinkSpeedMpbs             Transmit link speed in Mpbs at sample time.
          * @param rxLinkSpeedMpbs             Receive link speed in Mbps at sample time.
          * @param totalTxSuccess              Total number of Tx success.
@@ -739,16 +972,26 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
          *                                    last radio chip reset.
          * @param contentionTimeStats         Data packet contention time statistics.
          * @param rateStats                   Rate information.
+         * @param packetStats                 Packet statistics.
+         * @param peerInfo                    Peer statistics.
          */
-        public LinkStats(int linkId, int state, int radioId, int rssi, int txLinkSpeedMpbs,
-                int rxLinkSpeedMpbs, long totalTxSuccess, long totalTxRetries, long totalTxBad,
-                long totalRxSuccess, long totalBeaconRx, int timeSliceDutyCycleInPercent,
-                long totalCcaBusyFreqTimeMillis, long  totalRadioOnFreqTimeMillis,
-                ContentionTimeStats[] contentionTimeStats, RateStats[] rateStats) {
+        public LinkStats(int linkId, int state, int radioId, int rssi, int frequencyMhz,
+                int rssiMgmt, @WifiChannelBandwidth int channelWidth, int centerFreqFirstSegment,
+                int centerFreqSecondSegment, int txLinkSpeedMpbs, int rxLinkSpeedMpbs,
+                long totalTxSuccess, long totalTxRetries, long totalTxBad, long totalRxSuccess,
+                long totalBeaconRx, int timeSliceDutyCycleInPercent,
+                long totalCcaBusyFreqTimeMillis, long totalRadioOnFreqTimeMillis,
+                ContentionTimeStats[] contentionTimeStats, RateStats[] rateStats,
+                PacketStats[] packetStats, PeerInfo[] peerInfo) {
             this.mLinkId = linkId;
             this.mState = state;
             this.mRadioId = radioId;
             this.mRssi = rssi;
+            this.mFrequencyMhz = frequencyMhz;
+            this.mRssiMgmt = rssiMgmt;
+            this.mChannelWidth = channelWidth;
+            this.mCenterFreqFirstSegment = centerFreqFirstSegment;
+            this.mCenterFreqSecondSegment = centerFreqSecondSegment;
             this.mTxLinkSpeedMbps = txLinkSpeedMpbs;
             this.mRxLinkSpeedMbps = rxLinkSpeedMpbs;
             this.mTotalTxSuccess = totalTxSuccess;
@@ -761,6 +1004,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             this.mTotalRadioOnFreqTimeMillis = totalRadioOnFreqTimeMillis;
             this.mContentionTimeStats = contentionTimeStats;
             this.mRateStats = rateStats;
+            this.mPacketStats = packetStats;
+            this.mPeerInfo = peerInfo;
         }
 
         @Override
@@ -774,6 +1019,11 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             dest.writeInt(mState);
             dest.writeInt(mRadioId);
             dest.writeInt(mRssi);
+            dest.writeInt(mFrequencyMhz);
+            dest.writeInt(mRssiMgmt);
+            dest.writeInt(mChannelWidth);
+            dest.writeInt(mCenterFreqFirstSegment);
+            dest.writeInt(mCenterFreqSecondSegment);
             dest.writeInt(mTxLinkSpeedMbps);
             dest.writeInt(mRxLinkSpeedMbps);
             dest.writeLong(mTotalTxSuccess);
@@ -786,6 +1036,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             dest.writeLong(mTotalRadioOnFreqTimeMillis);
             dest.writeTypedArray(mContentionTimeStats, flags);
             dest.writeTypedArray(mRateStats, flags);
+            dest.writeTypedArray(mPacketStats, flags);
+            dest.writeTypedArray(mPeerInfo, flags);
         }
 
         /** Implement the Parcelable interface */
@@ -794,11 +1046,14 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                 new Creator<>() {
                     public LinkStats createFromParcel(Parcel in) {
                         return new LinkStats(in.readInt(), in.readInt(), in.readInt(), in.readInt(),
-                                in.readInt(), in.readInt(), in.readLong(), in.readLong(),
-                                in.readLong(), in.readLong(), in.readLong(), in.readInt(),
-                                in.readLong(), in.readLong(),
+                                in.readInt(), in.readInt(), in.readInt(), in.readInt(),
+                                in.readInt(), in.readInt(), in.readInt(), in.readLong(),
+                                in.readLong(), in.readLong(), in.readLong(), in.readLong(),
+                                in.readInt(), in.readLong(), in.readLong(),
                                 in.createTypedArray(ContentionTimeStats.CREATOR),
-                                in.createTypedArray(RateStats.CREATOR));
+                                in.createTypedArray(RateStats.CREATOR),
+                                in.createTypedArray(PacketStats.CREATOR),
+                                in.createTypedArray(PeerInfo.CREATOR));
                     }
 
                     public LinkStats[] newArray(int size) {
@@ -826,7 +1081,9 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             boolean isThroughputSufficient, boolean isWifiScoringEnabled,
             boolean isCellularDataAvailable, @NetworkType int cellularDataNetworkType,
             int cellularSignalStrengthDbm, int cellularSignalStrengthDb,
-            boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats) {
+            boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats,
+            int wifiLinkCount, @WifiManager.MloMode int mloMode,
+            long txTransmittedBytes, long rxTransmittedBytes, int labelBadEventCount) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -863,6 +1120,11 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mCellularSignalStrengthDb = cellularSignalStrengthDb;
         mIsSameRegisteredCell = isSameRegisteredCell;
         mLinkStats = linkStats;
+        mWifiLinkCount = wifiLinkCount;
+        mMloMode = mloMode;
+        mTxTransmittedBytes = txTransmittedBytes;
+        mRxTransmittedBytes = rxTransmittedBytes;
+        mLabelBadEventCount = labelBadEventCount;
     }
 
     /** Implement the Parcelable interface */
@@ -908,6 +1170,11 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeInt(mCellularSignalStrengthDb);
         dest.writeBoolean(mIsSameRegisteredCell);
         dest.writeSparseArray(mLinkStats);
+        dest.writeInt(mWifiLinkCount);
+        dest.writeInt(mMloMode);
+        dest.writeLong(mTxTransmittedBytes);
+        dest.writeLong(mRxTransmittedBytes);
+        dest.writeInt(mLabelBadEventCount);
     }
 
     /** Implement the Parcelable interface */
@@ -929,7 +1196,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readInt(), in.readBoolean(), in.readBoolean(),
                     in.readBoolean(), in.readInt(), in.readInt(),
                     in.readInt(), in.readBoolean(),
-                    in.readSparseArray(LinkStats.class.getClassLoader())
+                    in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
+                    in.readInt(), in.readLong(), in.readLong(), in.readInt()
             );
         }
 
@@ -1000,6 +1268,77 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
      */
     public long getRadioId(int linkId) {
         if (mLinkStats.contains(linkId)) return mLinkStats.get(linkId).mRadioId;
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Get frequency of specific WiFi link
+     *
+     * @param linkId Identifier of the link.
+     * @return Frequency in Mhz
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    public int getFrequencyMhz(int linkId) {
+        if (mLinkStats.contains(linkId)) return mLinkStats.get(linkId).mFrequencyMhz;
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Get RSSI of management frames on this WiFi link
+     *
+     * @param linkId Identifier of the link.
+     * @return RSSI of management frames on this WiFi link
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    public int getRssiMgmt(int linkId) {
+        if (mLinkStats.contains(linkId)) return mLinkStats.get(linkId).mRssiMgmt;
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Get channel width of this WiFi link
+     *
+     * @param linkId Identifier of the link.
+     * @return channel width of this WiFi link
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    public int getChannelWidth(int linkId) {
+        if (mLinkStats.contains(linkId)) {
+            return mLinkStats.get(linkId).mChannelWidth;
+        }
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Get center frequency (MHz) of first segment of this WiFi link
+     *
+     * @param linkId Identifier of the link.
+     * @return center frequency (MHz) of first segment of this WiFi link
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    public int getCenterFreqFirstSegment(int linkId) {
+        if (mLinkStats.contains(linkId)) {
+            return mLinkStats.get(linkId).mCenterFreqFirstSegment;
+        }
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Get center frequency (MHz) of second segment of this WiFi link
+     *
+     * @param linkId Identifier of the link.
+     * @return center frequency (MHz) of second segment of this WiFi link
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    public int getCenterFreqSecondSegment(int linkId) {
+        if (mLinkStats.contains(linkId)) {
+            return mLinkStats.get(linkId).mCenterFreqSecondSegment;
+        }
         throw new NoSuchElementException("linkId is invalid - " + linkId);
     }
 
@@ -1356,6 +1695,30 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     }
 
     /**
+     * Packet statistics of a WiFi link for Access Category.
+     *
+     * @param linkId Identifier of the link.
+     * @param ac The access category, see {@link WmeAccessCategory}.
+     * @return The packet statistics, see {@link PacketStats}.
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    @NonNull
+    public PacketStats getPacketStats(int linkId, @WmeAccessCategory int ac) {
+        if (!mLinkStats.contains(linkId)) {
+            throw new NoSuchElementException("linkId is invalid - " + linkId);
+        }
+        PacketStats[] linkPacketStats = mLinkStats.get(
+                linkId).mPacketStats;
+        if (linkPacketStats != null
+                && linkPacketStats.length == NUM_WME_ACCESS_CATEGORIES) {
+            return linkPacketStats[ac];
+        }
+        Log.e(TAG, "The PacketStats is not filled out correctly");
+        return new PacketStats();
+    }
+
+    /**
      * Rate information and statistics, which are ordered by preamble, modulation and coding scheme
      * (MCS), and number of spatial streams (NSS). In case of Multi Link Operation (MLO), the
      * returned rate information is that of the associated link with the highest RSSI.
@@ -1401,6 +1764,55 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         if (mLinkStats.contains(linkId)) {
             RateStats[] rateStats = mLinkStats.get(linkId).mRateStats;
             if (rateStats != null) return Arrays.asList(rateStats);
+            return Collections.emptyList();
+        }
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Rate information and statistics, which are ordered by preamble, modulation and coding scheme
+     * (MCS), and number of spatial streams (NSS) for WiFi peer.
+     *
+     * @param linkId Identifier of the link.
+     * @param peerIndex Identifier of PeerInfo.
+     * @return A list of rate statistics in the form of a list of {@link RateStats} objects.
+     *         Depending on the link type, the list is created following the order of:
+     *         - HT (IEEE Std 802.11-2020, Section 19): LEGACY rates (1Mbps, ..., 54Mbps),
+     *           HT MCS0, ..., MCS15;
+     *         - VHT (IEEE Std 802.11-2020, Section 21): LEGACY rates (1Mbps, ..., 54Mbps),
+     *           VHT MCS0/NSS1, ..., VHT MCS11/NSS1, VHT MCSO/NSS2, ..., VHT MCS11/NSS2;
+     *         - HE (IEEE Std 802.11ax-2020, Section 27): LEGACY rates (1Mbps, ..., 54Mbps),
+     *           HE MCS0/NSS1, ..., HE MCS11/NSS1, HE MCSO/NSS2, ..., HE MCS11/NSS2.
+     *         - EHT (IEEE std 802.11be-2021, Section 36): Legacy rates (1Mbps, ..., 54Mbps),
+     *           EHT MSC0/NSS1, ..., EHT MCS14/NSS1, EHT MCS0/NSS2, ..., EHT MCS14/NSS2.
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    @NonNull
+    public List<RateStats> getRateStats(int linkId, int peerIndex) {
+        if (mLinkStats.contains(linkId)) {
+            if (getPeerInfo(linkId).size() > 0 && peerIndex < getPeerInfo(linkId).size()) {
+                RateStats[] rateStats = mLinkStats.get(linkId).mPeerInfo[peerIndex].mRateStats;
+                if (rateStats != null) return Arrays.asList(rateStats);
+            }
+            return Collections.emptyList();
+        }
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Peer information and statistics
+     *
+     * @param linkId Identifier of the link.
+     * @return A list of peer statistics in the form of a list of {@link PeerInfo} objects.
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    @NonNull
+    public List<PeerInfo> getPeerInfo(int linkId) {
+        if (mLinkStats.contains(linkId)) {
+            PeerInfo[] peerInfo = mLinkStats.get(linkId).mPeerInfo;
+            if (peerInfo != null) return Arrays.asList(peerInfo);
             return Collections.emptyList();
         }
         throw new NoSuchElementException("linkId is invalid - " + linkId);
@@ -1484,5 +1896,30 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** Whether the primary registered cell of current entry is same as that of previous entry */
     public boolean isSameRegisteredCell() {
         return mIsSameRegisteredCell;
+    }
+
+    /** @hide */
+    public int getWifiLinkCount() {
+        return mWifiLinkCount;
+    }
+
+    /** @hide */
+    public int getMloMode() {
+        return mMloMode;
+    }
+
+    /** @hide */
+    public long getTxTransmittedBytes() {
+        return mTxTransmittedBytes;
+    }
+
+    /** @hide */
+    public long getRxTransmittedBytes() {
+        return mRxTransmittedBytes;
+    }
+
+    /** @hide */
+    public long getLabelBadEventCount() {
+        return mLabelBadEventCount;
     }
 }

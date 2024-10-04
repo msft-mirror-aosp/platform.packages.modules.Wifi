@@ -127,12 +127,15 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkProbeStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkProbeStats.ExperimentProbeCounts;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkProbeStats.LinkProbeFailureReasonCount;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkSpeedCount;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.LinkStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.MeteredNetworkStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.NetworkDisableReason;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.NetworkSelectionExperimentDecisions;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.PacketStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PasspointProfileTypeCount;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PasspointProvisionStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PasspointProvisionStats.ProvisionFailureCount;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.PeerInfo;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PnoScanMetrics;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.RadioStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.RateStats;
@@ -315,6 +318,7 @@ public class WifiMetrics {
     private int mProbeElapsedTimeSinceLastUpdateMs = -1;
     private int mProbeMcsRateSinceLastUpdate = -1;
     private long mScoreBreachLowTimeMillis = -1;
+    private int mAccumulatedLabelBadCount = 0;
 
     public static final int MAX_STA_EVENTS = 768;
     @VisibleForTesting static final int MAX_USER_ACTION_EVENTS = 200;
@@ -5146,6 +5150,11 @@ public class WifiMetrics {
                 line.append(",roam_scan_time_ms=" + radioStat.totalRoamScanTimeMs);
                 line.append(",pno_scan_time_ms=" + radioStat.totalPnoScanTimeMs);
                 line.append(",hotspot_2_scan_time_ms=" + radioStat.totalHotspot2ScanTimeMs);
+                if (radioStat.txTimeMsPerLevel != null && radioStat.txTimeMsPerLevel.length > 0) {
+                    for (int i = 0; i < radioStat.txTimeMsPerLevel.length; ++i) {
+                        line.append(",tx_time_ms_per_level=" + radioStat.txTimeMsPerLevel[i]);
+                    }
+                }
             }
         }
         line.append(",total_radio_on_time_ms=" + entry.totalRadioOnTimeMs);
@@ -5201,6 +5210,68 @@ public class WifiMetrics {
                 line.append(",retries=" + rateStat.retries);
             }
         }
+        line.append(",wifi_link_count=" + entry.wifiLinkCount);
+        for (LinkStats linkStat : entry.linkStats) {
+            line.append(",Link Stats from link_id=" + linkStat.linkId);
+            line.append(",state=" + linkStat.state);
+            line.append(",radio_id=" + linkStat.radioId);
+            line.append(",frequency_mhz=" + linkStat.frequencyMhz);
+            line.append(",beacon_rx=" + linkStat.beaconRx);
+            line.append(",rssi_mgmt=" + linkStat.rssiMgmt);
+            line.append(",time_slice_duty_cycle_in_percent="
+                    + linkStat.timeSliceDutyCycleInPercent);
+            line.append(",rssi=" + linkStat.rssi);
+            line.append(",channel_width=" + linkStat.channelWidth);
+            line.append(",center_freq_first_seg=" + linkStat.centerFreqFirstSeg);
+            line.append(",center_freq_second_seg=" + linkStat.centerFreqSecondSeg);
+            line.append(",on_time_in_ms=" + linkStat.onTimeInMs);
+            line.append(",cca_busy_time_in_ms=" + linkStat.ccaBusyTimeInMs);
+            if (linkStat.contentionTimeStats != null) {
+                for (ContentionTimeStats contentionTimeStat : linkStat.contentionTimeStats) {
+                    line.append(",access_category=" + contentionTimeStat.accessCategory);
+                    line.append(",contention_time_min_micros="
+                            + contentionTimeStat.contentionTimeMinMicros);
+                    line.append(",contention_time_max_micros="
+                            + contentionTimeStat.contentionTimeMaxMicros);
+                    line.append(",contention_time_avg_micros="
+                            + contentionTimeStat.contentionTimeAvgMicros);
+                    line.append(",contention_num_samples="
+                            + contentionTimeStat.contentionNumSamples);
+                }
+            }
+            if (linkStat.packetStats != null) {
+                for (PacketStats packetStats : linkStat.packetStats) {
+                    line.append(",access_category=" + packetStats.accessCategory);
+                    line.append(",tx_success=" + packetStats.txSuccess);
+                    line.append(",tx_retries=" + packetStats.txRetries);
+                    line.append(",tx_bad=" + packetStats.txBad);
+                    line.append(",rx_success=" + packetStats.rxSuccess);
+                }
+            }
+            if (linkStat.peerInfo != null) {
+                for (PeerInfo peerInfo : linkStat.peerInfo) {
+                    line.append(",sta_count=" + peerInfo.staCount);
+                    line.append(",chan_util=" + peerInfo.chanUtil);
+                    if (peerInfo.rateStats != null) {
+                        for (RateStats rateStat : peerInfo.rateStats) {
+                            line.append(",preamble=" + rateStat.preamble);
+                            line.append(",nss=" + rateStat.nss);
+                            line.append(",bw=" + rateStat.bw);
+                            line.append(",rate_mcs_idx=" + rateStat.rateMcsIdx);
+                            line.append(",bit_rate_in_kbps=" + rateStat.bitRateInKbps);
+                            line.append(",tx_mpdu=" + rateStat.txMpdu);
+                            line.append(",rx_mpdu=" + rateStat.rxMpdu);
+                            line.append(",mpdu_lost=" + rateStat.mpduLost);
+                            line.append(",retries=" + rateStat.retries);
+                        }
+                    }
+                }
+            }
+        }
+        line.append(",mlo_mode=" + entry.mloMode);
+        line.append(",tx_transmitted_bytes" + entry.txTransmittedBytes);
+        line.append(",rx_transmitted_bytes" + entry.rxTransmittedBytes);
+        line.append(",label_bad_event_count" + entry.labelBadEventCount);
         pw.println(line.toString());
     }
 
@@ -6044,6 +6115,7 @@ public class WifiMetrics {
             mProbeElapsedTimeSinceLastUpdateMs = -1;
             mProbeMcsRateSinceLastUpdate = -1;
             mScoreBreachLowTimeMillis = -1;
+            mAccumulatedLabelBadCount = 0;
             mMeteredNetworkStatsBuilder.clear();
             mWifiConfigStoreReadDurationHistogram.clear();
             mWifiConfigStoreWriteDurationHistogram.clear();
@@ -7086,6 +7158,160 @@ public class WifiMetrics {
                     mWifiUsabilityStatsEntriesRingBuffer.size()
                     < MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE
                     ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove();
+            if (isWiFiScorerNewStatsCollected()) {
+                SparseArray<MloLink> mloLinks = new SparseArray<>();
+                for (MloLink link: info.getAffiliatedMloLinks()) {
+                    mloLinks.put(link.getLinkId(), link);
+                }
+                if (stats.links != null && stats.links.length > 0) {
+                    int numLinks = stats.links.length;
+                    wifiUsabilityStatsEntry.wifiLinkCount = numLinks;
+                    wifiUsabilityStatsEntry.linkStats = new LinkStats[numLinks];
+                    for (int i = 0; i < numLinks; ++i) {
+                        LinkStats linkStats = new LinkStats();
+                        WifiLinkLayerStats.LinkSpecificStats link = stats.links[i];
+                        linkStats.linkId = link.link_id;
+                        linkStats.state = link.state;
+                        linkStats.radioId = link.radio_id;
+                        linkStats.frequencyMhz = link.frequencyMhz;
+                        linkStats.beaconRx = link.beacon_rx;
+                        linkStats.rssiMgmt = link.rssi_mgmt;
+                        linkStats.timeSliceDutyCycleInPercent = link.timeSliceDutyCycleInPercent;
+                        linkStats.rssi = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
+                                new MloLink()).getRssi() : info.getRssi();
+                        WifiLinkLayerStats.ChannelStats channlStatsEntryOnFreq =
+                                stats.channelStatsMap.get(link.frequencyMhz);
+                        if (channlStatsEntryOnFreq != null) {
+                            linkStats.channelWidth = channlStatsEntryOnFreq.channelWidth;
+                            linkStats.centerFreqFirstSeg =
+                                channlStatsEntryOnFreq.frequencyFirstSegment;
+                            linkStats.centerFreqSecondSeg =
+                                channlStatsEntryOnFreq.frequencySecondSegment;
+                            linkStats.onTimeInMs = channlStatsEntryOnFreq.radioOnTimeMs;
+                            linkStats.ccaBusyTimeInMs = channlStatsEntryOnFreq.ccaBusyTimeMs;
+                        }
+                        linkStats.contentionTimeStats =
+                                new ContentionTimeStats[NUM_WME_ACCESS_CATEGORIES];
+                        linkStats.packetStats = new PacketStats[NUM_WME_ACCESS_CATEGORIES];
+                        for (int ac = 0; ac < NUM_WME_ACCESS_CATEGORIES; ac++) {
+                            ContentionTimeStats contentionTimeStats = new ContentionTimeStats();
+                            PacketStats packetStats = new PacketStats();
+                            switch (ac) {
+                                case ContentionTimeStats.WME_ACCESS_CATEGORY_BE:
+                                    contentionTimeStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_BE;
+                                    contentionTimeStats.contentionTimeMinMicros =
+                                            stats.contentionTimeMinBeInUsec;
+                                    contentionTimeStats.contentionTimeMaxMicros =
+                                            stats.contentionTimeMaxBeInUsec;
+                                    contentionTimeStats.contentionTimeAvgMicros =
+                                            stats.contentionTimeAvgBeInUsec;
+                                    contentionTimeStats.contentionNumSamples =
+                                            stats.contentionNumSamplesBe;
+                                    packetStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_BE;
+                                    packetStats.txSuccess = link.txmpdu_be;
+                                    packetStats.txRetries = link.retries_be;
+                                    packetStats.txBad = link.lostmpdu_be;
+                                    packetStats.rxSuccess = link.rxmpdu_be;
+                                    break;
+                                case ContentionTimeStats.WME_ACCESS_CATEGORY_BK:
+                                    contentionTimeStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_BK;
+                                    contentionTimeStats.contentionTimeMinMicros =
+                                            stats.contentionTimeMinBkInUsec;
+                                    contentionTimeStats.contentionTimeMaxMicros =
+                                            stats.contentionTimeMaxBkInUsec;
+                                    contentionTimeStats.contentionTimeAvgMicros =
+                                            stats.contentionTimeAvgBkInUsec;
+                                    contentionTimeStats.contentionNumSamples =
+                                            stats.contentionNumSamplesBk;
+                                    packetStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_BK;
+                                    packetStats.txSuccess = link.txmpdu_bk;
+                                    packetStats.txRetries = link.retries_bk;
+                                    packetStats.txBad = link.lostmpdu_bk;
+                                    packetStats.rxSuccess = link.rxmpdu_bk;
+                                    break;
+                                case ContentionTimeStats.WME_ACCESS_CATEGORY_VI:
+                                    contentionTimeStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_VI;
+                                    contentionTimeStats.contentionTimeMinMicros =
+                                            stats.contentionTimeMinViInUsec;
+                                    contentionTimeStats.contentionTimeMaxMicros =
+                                            stats.contentionTimeMaxViInUsec;
+                                    contentionTimeStats.contentionTimeAvgMicros =
+                                            stats.contentionTimeAvgViInUsec;
+                                    contentionTimeStats.contentionNumSamples =
+                                            stats.contentionNumSamplesVi;
+                                    packetStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_VI;
+                                    packetStats.txSuccess = link.txmpdu_vi;
+                                    packetStats.txRetries = link.retries_vi;
+                                    packetStats.txBad = link.lostmpdu_vi;
+                                    packetStats.rxSuccess = link.rxmpdu_vi;
+                                    break;
+                                case ContentionTimeStats.WME_ACCESS_CATEGORY_VO:
+                                    contentionTimeStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_VO;
+                                    contentionTimeStats.contentionTimeMinMicros =
+                                            stats.contentionTimeMinVoInUsec;
+                                    contentionTimeStats.contentionTimeMaxMicros =
+                                            stats.contentionTimeMaxVoInUsec;
+                                    contentionTimeStats.contentionTimeAvgMicros =
+                                            stats.contentionTimeAvgVoInUsec;
+                                    contentionTimeStats.contentionNumSamples =
+                                            stats.contentionNumSamplesVo;
+                                    packetStats.accessCategory =
+                                            ContentionTimeStats.WME_ACCESS_CATEGORY_VO;
+                                    packetStats.txSuccess = link.txmpdu_vo;
+                                    packetStats.txRetries = link.retries_vo;
+                                    packetStats.txBad = link.lostmpdu_vo;
+                                    packetStats.rxSuccess = link.rxmpdu_vo;
+                                    break;
+                                default:
+                                    Log.e(TAG, "Unknown WME Access Category: " + ac);
+                            }
+                            linkStats.contentionTimeStats[ac] = contentionTimeStats;
+                            linkStats.packetStats[ac] = packetStats;
+                        }
+                        if (link.peerInfo != null && link.peerInfo.length > 0) {
+                            int numPeers = link.peerInfo.length;
+                            linkStats.peerInfo = new PeerInfo[numPeers];
+                            for (int peerIndex = 0; peerIndex < numPeers; ++peerIndex) {
+                                PeerInfo peerInfo = new PeerInfo();
+                                WifiLinkLayerStats.PeerInfo curPeer = link.peerInfo[peerIndex];
+                                peerInfo.staCount = curPeer.staCount;
+                                peerInfo.chanUtil = curPeer.chanUtil;
+                                if (curPeer.rateStats != null && curPeer.rateStats.length > 0) {
+                                    int numRates = curPeer.rateStats.length;
+                                    peerInfo.rateStats = new RateStats[numRates];
+                                    for (int rateIndex = 0; rateIndex < numRates; rateIndex++) {
+                                        RateStats rateStats = new RateStats();
+                                        WifiLinkLayerStats.RateStat curRate =
+                                                curPeer.rateStats[rateIndex];
+                                        rateStats.preamble = curRate.preamble;
+                                        rateStats.nss = curRate.nss;
+                                        rateStats.bw = curRate.bw;
+                                        rateStats.rateMcsIdx = curRate.rateMcsIdx;
+                                        rateStats.bitRateInKbps = curRate.bitRateInKbps;
+                                        rateStats.txMpdu = curRate.txMpdu;
+                                        rateStats.rxMpdu = curRate.rxMpdu;
+                                        rateStats.mpduLost = curRate.mpduLost;
+                                        rateStats.retries = curRate.retries;
+                                        peerInfo.rateStats[rateIndex] = rateStats;
+                                    }
+                                }
+                                linkStats.peerInfo[peerIndex] = peerInfo;
+                            }
+                        }
+                        wifiUsabilityStatsEntry.linkStats[i] = linkStats;
+                    }
+                }
+                wifiUsabilityStatsEntry.mloMode = stats.wifiMloMode;
+                wifiUsabilityStatsEntry.labelBadEventCount = mAccumulatedLabelBadCount;
+            }
+
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
             wifiUsabilityStatsEntry.totalTxSuccess = stats.txmpdu_be + stats.txmpdu_bk
                     + stats.txmpdu_vi + stats.txmpdu_vo;
@@ -7113,6 +7339,19 @@ public class WifiMetrics {
                     radioStats.totalRoamScanTimeMs = radio.on_time_roam_scan;
                     radioStats.totalPnoScanTimeMs = radio.on_time_pno_scan;
                     radioStats.totalHotspot2ScanTimeMs = radio.on_time_hs20_scan;
+                    if (isWiFiScorerNewStatsCollected()) {
+                        if (radio.tx_time_in_ms_per_level != null
+                                && radio.tx_time_in_ms_per_level.length > 0) {
+                            int txTimePerLevelLength = radio.tx_time_in_ms_per_level.length;
+                            radioStats.txTimeMsPerLevel = new int[txTimePerLevelLength];
+                            for (int txTimePerLevelIndex = 0;
+                                    txTimePerLevelIndex < txTimePerLevelLength;
+                                    ++txTimePerLevelIndex) {
+                                radioStats.txTimeMsPerLevel[txTimePerLevelIndex] =
+                                    radio.tx_time_in_ms_per_level[txTimePerLevelIndex];
+                            }
+                        }
+                    }
                     wifiUsabilityStatsEntry.radioStats[i] = radioStats;
                 }
             }
@@ -7239,6 +7478,12 @@ public class WifiMetrics {
                         mWifiDataStall.isThroughputSufficient();
                 wifiUsabilityStatsEntry.isCellularDataAvailable =
                         mWifiDataStall.isCellularDataAvailable();
+                if (isWiFiScorerNewStatsCollected()) {
+                    wifiUsabilityStatsEntry.txTransmittedBytes =
+                        mWifiDataStall.getTxTransmittedBytes();
+                    wifiUsabilityStatsEntry.rxTransmittedBytes =
+                        mWifiDataStall.getRxTransmittedBytes();
+                }
             }
             if (mWifiSettingsStore != null) {
                 wifiUsabilityStatsEntry.isWifiScoringEnabled =
@@ -7377,6 +7622,60 @@ public class WifiMetrics {
         return contentionTimeStatsArray;
     }
 
+    private android.net.wifi.WifiUsabilityStatsEntry.PacketStats[]
+            convertPacketStats(WifiLinkLayerStats.LinkSpecificStats stats) {
+        android.net.wifi.WifiUsabilityStatsEntry.PacketStats[] packetStatsArray =
+                new android.net.wifi.WifiUsabilityStatsEntry.PacketStats[
+                        android.net.wifi.WifiUsabilityStatsEntry.NUM_WME_ACCESS_CATEGORIES];
+        for (int ac = 0; ac < android.net.wifi.WifiUsabilityStatsEntry.NUM_WME_ACCESS_CATEGORIES;
+                ac++) {
+            android.net.wifi.WifiUsabilityStatsEntry.PacketStats packetStats = null;
+            switch (ac) {
+                case android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE:
+                    packetStats =
+                            new android.net.wifi.WifiUsabilityStatsEntry.PacketStats(
+                                    stats.txmpdu_be,
+                                    stats.retries_be,
+                                    stats.lostmpdu_be,
+                                    stats.rxmpdu_be
+                            );
+                    break;
+                case android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK:
+                    packetStats =
+                            new android.net.wifi.WifiUsabilityStatsEntry.PacketStats(
+                                    stats.txmpdu_bk,
+                                    stats.retries_bk,
+                                    stats.lostmpdu_bk,
+                                    stats.rxmpdu_bk
+                            );
+                    break;
+                case android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO:
+                    packetStats =
+                            new android.net.wifi.WifiUsabilityStatsEntry.PacketStats(
+                                    stats.txmpdu_vo,
+                                    stats.retries_vo,
+                                    stats.lostmpdu_vo,
+                                    stats.rxmpdu_vo
+                            );
+                    break;
+                case android.net.wifi.WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI:
+                    packetStats =
+                            new android.net.wifi.WifiUsabilityStatsEntry.PacketStats(
+                                    stats.txmpdu_vi,
+                                    stats.retries_vi,
+                                    stats.lostmpdu_vi,
+                                    stats.rxmpdu_vi
+                            );
+                    break;
+                default:
+                    Log.d(TAG, "Unknown WME Access Category: " + ac);
+                    packetStats = null;
+            }
+            packetStatsArray[ac] = packetStats;
+        }
+        return packetStatsArray;
+    }
+
     private android.net.wifi.WifiUsabilityStatsEntry.RateStats[] convertRateStats(
             WifiLinkLayerStats.LinkSpecificStats stats) {
         android.net.wifi.WifiUsabilityStatsEntry.RateStats[] rateStats = null;
@@ -7398,6 +7697,43 @@ public class WifiMetrics {
             }
         }
         return rateStats;
+    }
+
+    private android.net.wifi.WifiUsabilityStatsEntry.PeerInfo[] convertPeerInfo(
+            WifiLinkLayerStats.LinkSpecificStats stats) {
+        android.net.wifi.WifiUsabilityStatsEntry.PeerInfo[] peerInfos = null;
+        if (stats.peerInfo != null && stats.peerInfo.length > 0) {
+            int numPeers = stats.peerInfo.length;
+            peerInfos = new android.net.wifi.WifiUsabilityStatsEntry.PeerInfo[numPeers];
+            for (int i = 0; i < numPeers; i++) {
+                WifiLinkLayerStats.PeerInfo curPeer = stats.peerInfo[i];
+                android.net.wifi.WifiUsabilityStatsEntry.RateStats[] rateStats = null;
+                if (curPeer.rateStats != null && curPeer.rateStats.length > 0) {
+                    int numRates = curPeer.rateStats.length;
+                    rateStats = new android.net.wifi.WifiUsabilityStatsEntry.RateStats[numRates];
+                    for (int rateIndex = 0; rateIndex < numRates; ++rateIndex) {
+                        WifiLinkLayerStats.RateStat curRate = curPeer.rateStats[rateIndex];
+                        rateStats[rateIndex] =
+                                new android.net.wifi.WifiUsabilityStatsEntry.RateStats(
+                                        convertPreambleTypeEnumToUsabilityStatsType(
+                                                curRate.preamble),
+                                        convertSpatialStreamEnumToUsabilityStatsType(curRate.nss),
+                                        convertBandwidthEnumToUsabilityStatsType(curRate.bw),
+                                        curRate.rateMcsIdx,
+                                        curRate.bitRateInKbps,
+                                        curRate.txMpdu,
+                                        curRate.rxMpdu,
+                                        curRate.mpduLost,
+                                        curRate.retries);
+                    }
+                }
+                android.net.wifi.WifiUsabilityStatsEntry.PeerInfo peerInfo =
+                        new android.net.wifi.WifiUsabilityStatsEntry.PeerInfo(
+                                curPeer.staCount, curPeer.chanUtil, rateStats);
+                peerInfos[i] = peerInfo;
+            }
+        }
+        return peerInfos;
     }
 
     private SparseArray<android.net.wifi.WifiUsabilityStatsEntry.LinkStats> convertLinkStats(
@@ -7427,6 +7763,10 @@ public class WifiMetrics {
                             inStat.state, inStat.radio_id,
                             (mloLinks.size() > 0) ? mloLinks.get(inStat.link_id,
                                     new MloLink()).getRssi() : info.getRssi(),
+                            inStat.frequencyMhz, inStat.rssi_mgmt,
+                            (channelStatsMap != null) ? channelStatsMap.channelWidth : 0,
+                            (channelStatsMap != null) ? channelStatsMap.frequencyFirstSegment : 0,
+                            (channelStatsMap != null) ? channelStatsMap.frequencySecondSegment : 0,
                             (mloLinks.size() > 0) ? mloLinks.get(inStat.link_id,
                                     new MloLink()).getTxLinkSpeedMbps() : info.getTxLinkSpeedMbps(),
                             (mloLinks.size() > 0) ? mloLinks.get(inStat.link_id,
@@ -7442,8 +7782,8 @@ public class WifiMetrics {
                             inStat.beacon_rx, inStat.timeSliceDutyCycleInPercent,
                             (channelStatsMap != null) ? channelStatsMap.ccaBusyTimeMs : 0 ,
                             (channelStatsMap != null) ? channelStatsMap.radioOnTimeMs : 0,
-                            convertContentionTimeStats(inStat),
-                            convertRateStats(inStat));
+                            convertContentionTimeStats(inStat), convertRateStats(inStat),
+                            convertPacketStats(inStat), convertPeerInfo(inStat));
             linkStats.put(inStat.link_id, outStat);
         }
 
@@ -7491,7 +7831,8 @@ public class WifiMetrics {
                 s.rxLinkSpeedMbps, s.timeSliceDutyCycleInPercent, contentionTimeStats, rateStats,
                 radioStats, s.channelUtilizationRatio, s.isThroughputSufficient,
                 s.isWifiScoringEnabled, s.isCellularDataAvailable, 0, 0, 0, false,
-                convertLinkStats(stats, info)
+                convertLinkStats(stats, info), s.wifiLinkCount, s.mloMode,
+                s.txTransmittedBytes, s.rxTransmittedBytes, s.labelBadEventCount
         );
     }
 
@@ -7623,6 +7964,14 @@ public class WifiMetrics {
             return;
         }
         for (int i = 0; i < stats.length; i++) {
+            int[] txTimeMsPerLevel = null;
+            if (stats[i].txTimeMsPerLevel != null && stats[i].txTimeMsPerLevel.length > 0) {
+                int txTimeMsPerLevelLength = stats[i].txTimeMsPerLevel.length;
+                txTimeMsPerLevel = new int[txTimeMsPerLevelLength];
+                for (int j = 0; j < txTimeMsPerLevelLength; ++j) {
+                    txTimeMsPerLevel[j] = stats[i].txTimeMsPerLevel[j];
+                }
+            }
             statsParcelable[i] =
                     new android.net.wifi.WifiUsabilityStatsEntry.RadioStats(
                             stats[i].radioId,
@@ -7634,7 +7983,8 @@ public class WifiMetrics {
                             stats[i].totalBackgroundScanTimeMs,
                             stats[i].totalRoamScanTimeMs,
                             stats[i].totalPnoScanTimeMs,
-                            stats[i].totalHotspot2ScanTimeMs);
+                            stats[i].totalHotspot2ScanTimeMs,
+                            txTimeMsPerLevel);
         }
     }
 
@@ -7680,6 +8030,12 @@ public class WifiMetrics {
         out.staCount = s.staCount;
         out.channelUtilization = s.channelUtilization;
         out.radioStats = s.radioStats;
+        out.wifiLinkCount = s.wifiLinkCount;
+        out.linkStats = s.linkStats;
+        out.mloMode = s.mloMode;
+        out.txTransmittedBytes = s.txTransmittedBytes;
+        out.rxTransmittedBytes = s.rxTransmittedBytes;
+        out.labelBadEventCount = s.labelBadEventCount;
         return out;
     }
 
@@ -7752,6 +8108,7 @@ public class WifiMetrics {
                             createWifiUsabilityStatsWithLabel(label, triggerType,
                                     firmwareAlertCode));
                 }
+                mAccumulatedLabelBadCount++;
             }
             mWifiUsabilityStatsEntryCounter = 0;
             mWifiUsabilityStatsEntriesRingBuffer.clear();
