@@ -18,8 +18,6 @@ package com.android.server.wifi;
 
 import static android.net.wifi.WifiManager.WIFI_FEATURE_CONTROL_ROAMING;
 
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
-
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -69,7 +67,7 @@ public class WifiConnectivityHelper {
         BitSet fwFeatureSet = primaryManager.getSupportedFeatures();
         Log.d(TAG, "Firmware supported feature set: " + fwFeatureSet);
 
-        if (!fwFeatureSet.get(getCapabilityIndex(WIFI_FEATURE_CONTROL_ROAMING))) {
+        if (!fwFeatureSet.get(WIFI_FEATURE_CONTROL_ROAMING)) {
             Log.d(TAG, "Firmware roaming is not supported");
             return true;
         }

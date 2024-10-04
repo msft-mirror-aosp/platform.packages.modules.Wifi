@@ -19,8 +19,6 @@ package com.android.server.wifi;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_MBO;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_OCE;
 
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
-
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.util.Log;
@@ -65,8 +63,8 @@ public class MboOceController {
             return;
         }
         BitSet supportedFeatures = clientModeManager.getSupportedFeatures();
-        mIsMboSupported = supportedFeatures.get(getCapabilityIndex(WIFI_FEATURE_MBO));
-        mIsOceSupported = supportedFeatures.get(getCapabilityIndex(WIFI_FEATURE_OCE));
+        mIsMboSupported = supportedFeatures.get(WIFI_FEATURE_MBO);
+        mIsOceSupported = supportedFeatures.get(WIFI_FEATURE_OCE);
         mEnabled = true;
         if (mVerboseLoggingEnabled) {
             Log.d(TAG, "Enable MBO-OCE MBO support: " + mIsMboSupported
