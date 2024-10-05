@@ -20,8 +20,6 @@ import static android.net.wifi.WifiEnterpriseConfig.OCSP_NONE;
 import static android.net.wifi.WifiEnterpriseConfig.OCSP_REQUIRE_CERT_STATUS;
 import static android.net.wifi.hotspot2.PasspointConfiguration.MAX_URL_BYTES;
 
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -1506,7 +1504,7 @@ public class WifiConfigurationUtilTest extends WifiBaseTest {
     @Test
     public void testValidateSecurityTypeDppAkm() {
         BitSet supportedFeatures = SUPPORTED_FEATURES_ALL;
-        supportedFeatures.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_DPP_AKM), false);
+        supportedFeatures.set(WifiManager.WIFI_FEATURE_DPP_AKM, false);
         WifiConfiguration config = WifiConfigurationTestUtil.createOpenNetwork();
         config.setSecurityParams(WifiInfo.SECURITY_TYPE_DPP);
 
@@ -1515,7 +1513,7 @@ public class WifiConfigurationUtilTest extends WifiBaseTest {
         assertFalse(WifiConfigurationUtil.validate(config, supportedFeatures,
                   WifiConfigurationUtil.VALIDATE_FOR_UPDATE));
 
-        supportedFeatures.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_DPP_AKM), true);
+        supportedFeatures.set(WifiManager.WIFI_FEATURE_DPP_AKM, true);
         assertTrue(WifiConfigurationUtil.validate(config, supportedFeatures,
                   WifiConfigurationUtil.VALIDATE_FOR_ADD));
         assertTrue(WifiConfigurationUtil.validate(config, supportedFeatures,

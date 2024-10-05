@@ -22,7 +22,6 @@ import static android.net.wifi.hotspot2.PasspointConfiguration.MAX_NUMBER_OF_OI;
 import static android.net.wifi.hotspot2.PasspointConfiguration.MAX_OI_VALUE;
 import static android.net.wifi.hotspot2.PasspointConfiguration.MAX_URL_BYTES;
 
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 import static com.android.server.wifi.util.NativeUtil.addEnclosingQuotes;
 
 import android.annotation.SuppressLint;
@@ -800,7 +799,7 @@ public class WifiConfigurationUtil {
             return false;
         }
         if (config.isSecurityType(WifiConfiguration.SECURITY_TYPE_DPP)
-                && !supportedFeatureSet.get(getCapabilityIndex(WifiManager.WIFI_FEATURE_DPP_AKM))) {
+                && !supportedFeatureSet.get(WifiManager.WIFI_FEATURE_DPP_AKM)) {
             Log.e(TAG, "DPP AKM is not supported");
             return false;
         }
@@ -1188,9 +1187,9 @@ public class WifiConfigurationUtil {
                 .getSupportedFeatures();
         switch (params.getSecurityType()) {
             case WifiConfiguration.SECURITY_TYPE_SAE:
-                return wifiFeatures.get(getCapabilityIndex(WifiManager.WIFI_FEATURE_WPA3_SAE));
+                return wifiFeatures.get(WifiManager.WIFI_FEATURE_WPA3_SAE);
             case WifiConfiguration.SECURITY_TYPE_OWE:
-                return wifiFeatures.get(getCapabilityIndex(WifiManager.WIFI_FEATURE_OWE));
+                return wifiFeatures.get(WifiManager.WIFI_FEATURE_OWE);
         }
         return true;
     }
