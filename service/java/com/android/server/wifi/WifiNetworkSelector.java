@@ -22,7 +22,6 @@ import static android.net.wifi.WifiNetworkSelectionConfig.ASSOCIATED_NETWORK_SEL
 import static android.net.wifi.WifiNetworkSelectionConfig.ASSOCIATED_NETWORK_SELECTION_OVERRIDE_NONE;
 
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -709,8 +708,7 @@ public class WifiNetworkSelector {
         mIsEnhancedOpenSupportedInitialized = true;
         ClientModeManager primaryManager =
                 mWifiInjector.getActiveModeWarden().getPrimaryClientModeManager();
-        mIsEnhancedOpenSupported = primaryManager.getSupportedFeatures()
-                .get(getCapabilityIndex(WIFI_FEATURE_OWE));
+        mIsEnhancedOpenSupported = primaryManager.getSupportedFeatures().get(WIFI_FEATURE_OWE);
         return mIsEnhancedOpenSupported;
     }
 

@@ -17,7 +17,6 @@
 package com.android.server.wifi.hal;
 
 import static com.android.server.wifi.hal.WifiHalAidlImpl.isServiceVersionAtLeast;
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -1271,56 +1270,55 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
         BitSet features = new BitSet();
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.HOTSPOT)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_PASSPOINT));
+            features.set(WifiManager.WIFI_FEATURE_PASSPOINT);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.BACKGROUND_SCAN)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_SCANNER));
+            features.set(WifiManager.WIFI_FEATURE_SCANNER);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.PNO)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_PNO));
+            features.set(WifiManager.WIFI_FEATURE_PNO);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.TDLS)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_TDLS));
+            features.set(WifiManager.WIFI_FEATURE_TDLS);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.TDLS_OFFCHANNEL)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_TDLS_OFFCHANNEL));
+            features.set(WifiManager.WIFI_FEATURE_TDLS_OFFCHANNEL);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.LINK_LAYER_STATS)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
+            features.set(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.RSSI_MONITOR)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_RSSI_MONITOR));
+            features.set(WifiManager.WIFI_FEATURE_RSSI_MONITOR);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.KEEP_ALIVE)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_MKEEP_ALIVE));
+            features.set(WifiManager.WIFI_FEATURE_MKEEP_ALIVE);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.ND_OFFLOAD)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_CONFIG_NDO));
+            features.set(WifiManager.WIFI_FEATURE_CONFIG_NDO);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.CONTROL_ROAMING)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_CONTROL_ROAMING));
+            features.set(WifiManager.WIFI_FEATURE_CONTROL_ROAMING);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.PROBE_IE_ALLOWLIST)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_IE_WHITELIST));
+            features.set(WifiManager.WIFI_FEATURE_IE_WHITELIST);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.SCAN_RAND)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_SCAN_RAND));
+            features.set(WifiManager.WIFI_FEATURE_SCAN_RAND);
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.ROAMING_MODE_CONTROL)) {
-            features.set(
-                    getCapabilityIndex(WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT));
+            features.set(WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT);
         }
         return features;
     }
