@@ -23,8 +23,6 @@ import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_NO_PERMISSION
 import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_SUCCESS;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
 
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
-
 import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -1592,7 +1590,7 @@ public class WifiConfigManager {
 
         // Validate an Enterprise network with Trust On First Use.
         if (config.isEnterprise() && config.enterpriseConfig.isTrustOnFirstUseEnabled()) {
-            if (!supportedFeatures.get(getCapabilityIndex(WIFI_FEATURE_TRUST_ON_FIRST_USE))) {
+            if (!supportedFeatures.get(WIFI_FEATURE_TRUST_ON_FIRST_USE)) {
                 Log.e(TAG, "Trust On First Use could not be set "
                         + "when Trust On First Use is not supported.");
                 return new Pair<>(

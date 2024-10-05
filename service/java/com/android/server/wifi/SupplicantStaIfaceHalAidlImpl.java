@@ -35,8 +35,6 @@ import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SUITE_B;
 import static android.os.Build.VERSION.SDK_INT;
 
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
-
 import android.annotation.NonNull;
 import android.content.Context;
 import android.hardware.wifi.WifiChannelWidthInMhz;
@@ -2593,16 +2591,15 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             BitSet advancedCapabilities = new BitSet();
             int keyMgmtCapabilities = getKeyMgmtCapabilities(ifaceName);
 
-            advancedCapabilities.set(
-                    getCapabilityIndex(WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS));
-            advancedCapabilities.set(getCapabilityIndex(WIFI_FEATURE_DECORATED_IDENTITY));
+            advancedCapabilities.set(WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS);
+            advancedCapabilities.set(WIFI_FEATURE_DECORATED_IDENTITY);
             if (mVerboseLoggingEnabled) {
                 Log.v(TAG, methodStr + ": Passpoint T&C supported");
                 Log.v(TAG, methodStr + ": RFC 7542 decorated identity supported");
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.SAE) != 0) {
-                advancedCapabilities.set(getCapabilityIndex(WIFI_FEATURE_WPA3_SAE));
+                advancedCapabilities.set(WIFI_FEATURE_WPA3_SAE);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": SAE supported");
@@ -2610,7 +2607,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.SUITE_B_192) != 0) {
-                advancedCapabilities.set(getCapabilityIndex(WIFI_FEATURE_WPA3_SUITE_B));
+                advancedCapabilities.set(WIFI_FEATURE_WPA3_SUITE_B);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": SUITE_B supported");
@@ -2618,7 +2615,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.OWE) != 0) {
-                advancedCapabilities.set(getCapabilityIndex(WIFI_FEATURE_OWE));
+                advancedCapabilities.set(WIFI_FEATURE_OWE);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": OWE supported");
@@ -2626,8 +2623,8 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.DPP) != 0) {
-                advancedCapabilities.set(getCapabilityIndex(WIFI_FEATURE_DPP));
-                advancedCapabilities.set(getCapabilityIndex(WIFI_FEATURE_DPP_ENROLLEE_RESPONDER));
+                advancedCapabilities.set(WIFI_FEATURE_DPP);
+                advancedCapabilities.set(WIFI_FEATURE_DPP_ENROLLEE_RESPONDER);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": DPP supported");
@@ -2636,7 +2633,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.WAPI_PSK) != 0) {
-                advancedCapabilities.set(getCapabilityIndex(WIFI_FEATURE_WAPI));
+                advancedCapabilities.set(WIFI_FEATURE_WAPI);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": WAPI supported");
@@ -2644,7 +2641,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.FILS_SHA256) != 0) {
-                advancedCapabilities.set(getCapabilityIndex(WIFI_FEATURE_FILS_SHA256));
+                advancedCapabilities.set(WIFI_FEATURE_FILS_SHA256);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": FILS_SHA256 supported");
@@ -2652,7 +2649,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.FILS_SHA384) != 0) {
-                advancedCapabilities.set(getCapabilityIndex(WIFI_FEATURE_FILS_SHA384));
+                advancedCapabilities.set(WIFI_FEATURE_FILS_SHA384);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": FILS_SHA384 supported");
@@ -2696,14 +2693,14 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
         BitSet featureSet = new BitSet();
 
         if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.SET_TLS_MINIMUM_VERSION) != 0) {
-            featureSet.set(getCapabilityIndex(WIFI_FEATURE_SET_TLS_MINIMUM_VERSION));
+            featureSet.set(WIFI_FEATURE_SET_TLS_MINIMUM_VERSION);
             if (mVerboseLoggingEnabled) {
                 Log.v(TAG, methodStr + ": EAP-TLS minimum version supported");
             }
         }
 
         if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.TLS_V1_3) != 0) {
-            featureSet.set(getCapabilityIndex(WIFI_FEATURE_TLS_V1_3));
+            featureSet.set(WIFI_FEATURE_TLS_V1_3);
             if (mVerboseLoggingEnabled) {
                 Log.v(TAG, methodStr + ": EAP-TLS v1.3 supported");
             }
@@ -2721,12 +2718,12 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             BitSet featureSet = new BitSet();
 
             if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.MBO) != 0) {
-                featureSet.set(getCapabilityIndex(WIFI_FEATURE_MBO));
+                featureSet.set(WIFI_FEATURE_MBO);
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": MBO supported");
                 }
                 if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.OCE) != 0) {
-                    featureSet.set(getCapabilityIndex(WIFI_FEATURE_OCE));
+                    featureSet.set(WIFI_FEATURE_OCE);
                     if (mVerboseLoggingEnabled) {
                         Log.v(TAG, methodStr + ": OCE supported");
                     }
@@ -2734,14 +2731,14 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.SAE_PK) != 0) {
-                featureSet.set(getCapabilityIndex(WIFI_FEATURE_SAE_PK));
+                featureSet.set(WIFI_FEATURE_SAE_PK);
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": SAE-PK supported");
                 }
             }
 
             if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.WFD_R2) != 0) {
-                featureSet.set(getCapabilityIndex(WIFI_FEATURE_WFD_R2));
+                featureSet.set(WIFI_FEATURE_WFD_R2);
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": WFD-R2 supported");
                 }
@@ -2749,7 +2746,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
 
             if ((drvCapabilitiesMask
                     & WpaDriverCapabilitiesMask.TRUST_ON_FIRST_USE) != 0) {
-                featureSet.set(getCapabilityIndex(WIFI_FEATURE_TRUST_ON_FIRST_USE));
+                featureSet.set(WIFI_FEATURE_TRUST_ON_FIRST_USE);
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": Trust-On-First-Use supported");
                 }
