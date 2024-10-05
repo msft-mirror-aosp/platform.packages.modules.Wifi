@@ -18,6 +18,7 @@ package com.android.server.wifi;
 
 import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_INVALID_CONFIGURATION_ENTERPRISE;
 
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 import static com.android.server.wifi.WifiConfigManager.BUFFERED_WRITE_ALARM_TAG;
 
 import static org.junit.Assert.assertEquals;
@@ -115,6 +116,7 @@ import java.io.StringWriter;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -364,7 +366,8 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         when(mWifiInjector.getSsidTranslator()).thenReturn(mSsidTranslator);
         when(mActiveModeWarden.getPrimaryClientModeManager()).thenReturn(mPrimaryClientModeManager);
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                WifiManager.WIFI_FEATURE_WPA3_SAE | WifiManager.WIFI_FEATURE_OWE);
+                createCapabilityBitset(
+                        WifiManager.WIFI_FEATURE_WPA3_SAE, WifiManager.WIFI_FEATURE_OWE));
         when(mWifiGlobals.isWpa3SaeUpgradeEnabled()).thenReturn(true);
         when(mWifiGlobals.isOweUpgradeEnabled()).thenReturn(true);
         when(mWifiGlobals.isWpa3SaeUpgradeOffloadEnabled()).thenReturn(true);
@@ -2030,8 +2033,8 @@ public class WifiConfigManagerTest extends WifiBaseTest {
      */
     @Test
     public void testEnterpriseConfigTofuStateMerge() {
-        long featureSet = WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
-        when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(featureSet);
+        when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
 
         // If the configuration has never connected, the merged TOFU connection state
         // should be set based on the latest external configuration.
@@ -7976,7 +7979,10 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     }
 
     private void verifyAddTofuEnterpriseConfig(boolean isTofuSupported) {
-        long featureSet = isTofuSupported ? WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE : 0L;
+        BitSet featureSet = new BitSet();
+        if (isTofuSupported) {
+            featureSet.set(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+        }
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(featureSet);
 
         WifiConfiguration config = prepareTofuEapConfig(
@@ -8098,7 +8104,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     @Test
     public void testUpdateCaCertificateSuccess() throws Exception {
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
 
         int eapPeapNetId = verifyAddNetwork(prepareTofuEapConfig(
                 WifiEnterpriseConfig.Eap.PEAP, WifiEnterpriseConfig.Phase2.NONE), true);
@@ -8113,7 +8119,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     @Test
     public void testUpdateCaCertificatePathSuccess() throws Exception {
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
 
         int eapPeapNetId = verifyAddNetwork(prepareTofuEapConfig(
                 WifiEnterpriseConfig.Eap.PEAP, WifiEnterpriseConfig.Phase2.NONE), true);
@@ -8131,7 +8137,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     @Test
     public void testUpdateCaCertificateWithoutAltSubjectNames() throws Exception {
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
 
         verifyAddNetwork(WifiConfigurationTestUtil.createOpenNetwork(), true);
         int eapPeapNetId = verifyAddNetwork(prepareTofuEapConfig(
@@ -8157,7 +8163,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     @Test
     public void testUpdateCaCertificateWithAltSubjectNames() throws Exception {
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
 
         verifyAddNetwork(WifiConfigurationTestUtil.createOpenNetwork(), true);
         int eapPeapNetId = verifyAddNetwork(prepareTofuEapConfig(
@@ -8197,7 +8203,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     @Test
     public void testUpdateCaCertificateFaiulreInvalidArgument() throws Exception {
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
 
         int openNetId = verifyAddNetwork(WifiConfigurationTestUtil.createOpenNetwork(), true);
         int eapPeapNetId = verifyAddNetwork(prepareTofuEapConfig(
@@ -8233,7 +8239,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     @Test
     public void testUpdateCaCertificateSuccessWithSelfSignedCertificate() throws Exception {
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
         int eapPeapNetId = verifyAddNetwork(prepareTofuEapConfig(
                 WifiEnterpriseConfig.Eap.PEAP, WifiEnterpriseConfig.Phase2.NONE), true);
         X509Certificate mockCaCert = mock(X509Certificate.class);
@@ -8249,7 +8255,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     @Test
     public void testUpdateServerCertificateHashSuccess() throws Exception {
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
         int eapPeapNetId = verifyAddNetwork(prepareTofuEapConfig(
                 WifiEnterpriseConfig.Eap.PEAP, WifiEnterpriseConfig.Phase2.NONE), true);
         assertTrue(mWifiConfigManager.updateCaCertificate(eapPeapNetId, FakeKeys.CA_CERT1,
@@ -8264,7 +8270,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     public void testUpdateCaCertificateFailureWithSelfSignedCertificateAndTofuNotEnabled()
             throws Exception {
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
         int eapPeapNetId = verifyAddNetwork(WifiConfigurationTestUtil.createEapNetwork(
                 WifiEnterpriseConfig.Eap.PEAP, WifiEnterpriseConfig.Phase2.NONE), true);
         X509Certificate mockCaCert = mock(X509Certificate.class);

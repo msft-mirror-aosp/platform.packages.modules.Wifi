@@ -48,6 +48,7 @@ public abstract class RunnerState extends State {
     private final int mRunningTimeThresholdInMilliseconds;
     // TODO: b/246623192 Add Wifi metric for Runner state overruns.
     private final LocalLog mLocalLog;
+    private final WifiInjector mWifiInjector;
 
     /**
      * The Runner state Constructor
@@ -56,20 +57,29 @@ public abstract class RunnerState extends State {
     public RunnerState(int threshold, @NonNull LocalLog localLog) {
         mRunningTimeThresholdInMilliseconds = threshold;
         mLocalLog = localLog;
+        mWifiInjector = WifiInjector.getInstance();
+    }
+
+    private boolean isVerboseLoggingEnabled() {
+        return mWifiInjector.isVerboseLoggingEnabled();
     }
 
     @Override
     public boolean processMessage(Message message) {
-        long startTime = System.currentTimeMillis();
-
         String signatureToLog = getMessageLogRec(message);
         if (signatureToLog == null) {
             signatureToLog = getMessageLogRec(message.what);
         }
-        Trace.traceBegin(Trace.TRACE_TAG_NETWORK, signatureToLog);
+        boolean traceEvent = isVerboseLoggingEnabled();
+        if (traceEvent) {
+            Trace.traceBegin(Trace.TRACE_TAG_NETWORK, signatureToLog);
+        }
+        long startTime = System.currentTimeMillis();
         boolean ret = processMessageImpl(message);
-        Trace.traceEnd(Trace.TRACE_TAG_NETWORK);
         long runTime = System.currentTimeMillis() - startTime;
+        if (traceEvent) {
+            Trace.traceEnd(Trace.TRACE_TAG_NETWORK);
+        }
         if (runTime > mRunningTimeThresholdInMilliseconds) {
             mLocalLog.log(signatureToLog + " was running for " + runTime + " ms");
         }
@@ -81,12 +91,17 @@ public abstract class RunnerState extends State {
 
     @Override
     public void enter() {
-        long startTime = System.currentTimeMillis();
         String signatureToLog = getMessageLogRec(STATE_ENTER_CMD);
-        Trace.traceBegin(Trace.TRACE_TAG_NETWORK, signatureToLog);
+        boolean traceEvent = isVerboseLoggingEnabled();
+        if (traceEvent) {
+            Trace.traceBegin(Trace.TRACE_TAG_NETWORK, signatureToLog);
+        }
+        long startTime = System.currentTimeMillis();
         enterImpl();
-        Trace.traceEnd(Trace.TRACE_TAG_NETWORK);
         long runTime = System.currentTimeMillis() - startTime;
+        if (traceEvent) {
+            Trace.traceEnd(Trace.TRACE_TAG_NETWORK);
+        }
         if (runTime > mRunningTimeThresholdInMilliseconds) {
             mLocalLog.log(signatureToLog + " was running for " + runTime + " ms");
         }
@@ -97,12 +112,18 @@ public abstract class RunnerState extends State {
 
     @Override
     public void exit() {
-        long startTime = System.currentTimeMillis();
         String signatureToLog = getMessageLogRec(STATE_EXIT_CMD);
-        Trace.traceBegin(Trace.TRACE_TAG_NETWORK, signatureToLog);
+        boolean traceEvent = isVerboseLoggingEnabled();
+        if (traceEvent) {
+            Trace.traceBegin(Trace.TRACE_TAG_NETWORK, signatureToLog);
+        }
+        long startTime = System.currentTimeMillis();
         exitImpl();
-        Trace.traceEnd(Trace.TRACE_TAG_NETWORK);
         long runTime = System.currentTimeMillis() - startTime;
+        if (traceEvent) {
+            Trace.traceEnd(Trace.TRACE_TAG_NETWORK);
+        }
+
         if (runTime > mRunningTimeThresholdInMilliseconds) {
             mLocalLog.log(signatureToLog + " was running for " + runTime + " ms");
         }

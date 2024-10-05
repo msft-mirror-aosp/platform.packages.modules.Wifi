@@ -98,6 +98,7 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -105,7 +106,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -171,7 +171,6 @@ public class ActiveModeWarden {
     private WorkSource mLastPrimaryClientModeManagerRequestorWs = null;
     @Nullable
     private WorkSource mLastScanOnlyClientModeManagerRequestorWs = null;
-    private AtomicLong mSupportedFeatureSet = new AtomicLong(0);
     private AtomicInteger mBandsSupported = new AtomicInteger(0);
     // Mutex lock between service Api binder thread and Wifi main thread
     private final Object mServiceApiLock = new Object();
@@ -179,6 +178,8 @@ public class ActiveModeWarden {
     private Network mCurrentNetwork;
     @GuardedBy("mServiceApiLock")
     private WifiInfo mCurrentConnectionInfo = new WifiInfo();
+    @GuardedBy("mServiceApiLock")
+    private BitSet mSupportedFeatureSet = new BitSet();
 
     @GuardedBy("mServiceApiLock")
     private final ArraySet<WorkSource> mRequestWs = new ArraySet<>();
@@ -2734,86 +2735,85 @@ public class ActiveModeWarden {
 
     /**
      * Set the current supported Wifi feature set, called from primary client mode manager.
-     * @param supportedFeatureSet supported Wifi feature set
+     * @param wifiNativeFeatureSet feature set retrieved from WifiNative
      * @param isStaApConcurrencySupported true if Sta+Ap concurrency supported
      * @param isStaStaConcurrencySupported true if Sta+Sta concurrency supported
      */
-    private void setSupportedFeatureSet(long supportedFeatureSet,
+    private void setSupportedFeatureSet(BitSet wifiNativeFeatureSet,
             boolean isStaApConcurrencySupported,
             boolean isStaStaConcurrencySupported) {
-        long concurrencyFeatureSet = 0L;
+        BitSet featureSet = (BitSet) wifiNativeFeatureSet.clone();
+
+        // Concurrency features
         if (isStaApConcurrencySupported) {
-            concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_AP_STA;
+            featureSet.set(WifiManager.WIFI_FEATURE_AP_STA);
         }
         if (isStaStaConcurrencySupported) {
             if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaLocalOnlyConcurrencyEnabled)) {
-                concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY;
+                featureSet.set(WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY);
             }
             if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaNetworkSwitchingMakeBeforeBreakEnabled)) {
-                concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MBB;
+                featureSet.set(WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MBB);
             }
             if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaRestrictedConcurrencyEnabled)) {
-                concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_ADDITIONAL_STA_RESTRICTED;
+                featureSet.set(WifiManager.WIFI_FEATURE_ADDITIONAL_STA_RESTRICTED);
             }
             if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaMultiInternetConcurrencyEnabled)) {
-                concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MULTI_INTERNET;
+                featureSet.set(WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MULTI_INTERNET);
             }
         }
-        long additionalFeatureSet = 0L;
-        long excludedFeatureSet = 0L;
-        // Mask the feature set against system properties.
-        if (!mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_RTT)) {
-            // flags filled in by vendor HAL, remove if overlay disables it.
-            excludedFeatureSet |=
-                    (WifiManager.WIFI_FEATURE_D2D_RTT | WifiManager.WIFI_FEATURE_D2AP_RTT);
-        }
 
-        if (!mResourceCache.getBoolean(
-                R.bool.config_wifi_p2p_mac_randomization_supported)) {
-            // flags filled in by vendor HAL, remove if overlay disables it.
-            excludedFeatureSet |= WifiManager.WIFI_FEATURE_P2P_RAND_MAC;
-        }
-
+        // Additional features
         if (mResourceCache.getBoolean(
                 R.bool.config_wifi_connected_mac_randomization_supported)) {
             // no corresponding flags in vendor HAL, set if overlay enables it.
-            additionalFeatureSet |= WifiManager.WIFI_FEATURE_CONNECTED_RAND_MAC;
+            featureSet.set(WifiManager.WIFI_FEATURE_CONNECTED_RAND_MAC);
         }
         if (ApConfigUtil.isApMacRandomizationSupported(mContext)) {
             // no corresponding flags in vendor HAL, set if overlay enables it.
-            additionalFeatureSet |= WifiManager.WIFI_FEATURE_AP_RAND_MAC;
+            featureSet.set(WifiManager.WIFI_FEATURE_AP_RAND_MAC);
         }
-
         if (ApConfigUtil.isBridgedModeSupported(mContext, mWifiNative)) {
             // The bridged mode requires the kernel network modules support.
             // It doesn't relate the vendor HAL, set if overlay enables it.
-            additionalFeatureSet |= WifiManager.WIFI_FEATURE_BRIDGED_AP;
+            featureSet.set(WifiManager.WIFI_FEATURE_BRIDGED_AP);
         }
         if (ApConfigUtil.isStaWithBridgedModeSupported(mContext, mWifiNative)) {
             // The bridged mode requires the kernel network modules support.
             // It doesn't relate the vendor HAL, set if overlay enables it.
-            additionalFeatureSet |= WifiManager.WIFI_FEATURE_STA_BRIDGED_AP;
+            featureSet.set(WifiManager.WIFI_FEATURE_STA_BRIDGED_AP);
         }
         if (mWifiGlobals.isWepSupported()) {
-            additionalFeatureSet |= WifiManager.WIFI_FEATURE_WEP;
+            featureSet.set(WifiManager.WIFI_FEATURE_WEP);
         }
 
         if (!mWifiGlobals.isWpaPersonalDeprecated()) {
             // The WPA didn't be deprecated, set it.
-            additionalFeatureSet |= WifiManager.WIFI_FEATURE_WPA_PERSONAL;
+            featureSet.set(WifiManager.WIFI_FEATURE_WPA_PERSONAL);
         }
         if (mWifiGlobals.isD2dSupportedWhenInfraStaDisabled()) {
-            additionalFeatureSet |= WifiManager.WIFI_FEATURE_D2D_WHEN_INFRA_STA_DISABLED;
+            featureSet.set(WifiManager.WIFI_FEATURE_D2D_WHEN_INFRA_STA_DISABLED);
         }
-        mSupportedFeatureSet.set(
-                (supportedFeatureSet | concurrencyFeatureSet | additionalFeatureSet)
-                        & ~excludedFeatureSet);
-        if (mVerboseLoggingEnabled) {
-            Log.d(TAG, "setSupportedFeatureSet 0x" + Long.toHexString(mSupportedFeatureSet.get()));
+
+        // Remove capabilities that are disabled by the system properties
+        if (!mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_RTT)) {
+            featureSet.clear(WifiManager.WIFI_FEATURE_D2D_RTT);
+            featureSet.clear(WifiManager.WIFI_FEATURE_D2AP_RTT);
+        }
+        if (!mResourceCache.getBoolean(
+                R.bool.config_wifi_p2p_mac_randomization_supported)) {
+            featureSet.clear(WifiManager.WIFI_FEATURE_P2P_RAND_MAC);
+        }
+
+        synchronized (mServiceApiLock) {
+            mSupportedFeatureSet = featureSet;
+            if (mVerboseLoggingEnabled) {
+                Log.d(TAG, "setSupportedFeatureSet to " + mSupportedFeatureSet);
+            }
         }
     }
 
@@ -2821,8 +2821,10 @@ public class ActiveModeWarden {
      * Get the current supported Wifi feature set.
      * @return supported Wifi feature set
      */
-    public long getSupportedFeatureSet() {
-        return mSupportedFeatureSet.get();
+    public @NonNull BitSet getSupportedFeatureSet() {
+        synchronized (mServiceApiLock) {
+            return mSupportedFeatureSet;
+        }
     }
 
     /**
