@@ -23,6 +23,8 @@ import static org.junit.Assert.fail;
 import static org.mockito.Mockito.validateMockitoUsage;
 
 import android.net.wifi.WifiUsabilityStatsEntry.ContentionTimeStats;
+import android.net.wifi.WifiUsabilityStatsEntry.PacketStats;
+import android.net.wifi.WifiUsabilityStatsEntry.PeerInfo;
 import android.net.wifi.WifiUsabilityStatsEntry.RadioStats;
 import android.net.wifi.WifiUsabilityStatsEntry.RateStats;
 import android.os.Parcel;
@@ -80,37 +82,42 @@ public class WifiUsabilityStatsEntryTest {
         contentionTimeStats[1] = new ContentionTimeStats(5, 6, 7, 8);
         contentionTimeStats[2] = new ContentionTimeStats(9, 10, 11, 12);
         contentionTimeStats[3] = new ContentionTimeStats(13, 14, 15, 16);
+        PacketStats[] packetStats = new PacketStats[4];
+        packetStats[0] = new PacketStats(1, 2, 3, 4);
+        packetStats[1] = new PacketStats(5, 6, 7, 8);
+        packetStats[2] = new PacketStats(9, 10, 11, 12);
+        packetStats[3] = new PacketStats(13, 14, 15, 16);
         RateStats[] rateStats = new RateStats[2];
         rateStats[0] = new RateStats(1, 3, 4, 7, 9, 11, 13, 15, 17);
         rateStats[1] = new RateStats(2, 2, 3, 8, 10, 12, 14, 16, 18);
 
         RadioStats[] radioStats = new RadioStats[2];
         radioStats[0] = new RadioStats(0, 10, 11, 12, 13, 14, 15, 16, 17, 18);
-        radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28);
+        radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28, new int[] {1, 2, 3});
+        PeerInfo[] peerInfo = new PeerInfo[1];
+        peerInfo[0] = new PeerInfo(1, 50, rateStats);
 
         SparseArray<WifiUsabilityStatsEntry.LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(0,
-                WifiUsabilityStatsEntry.LINK_STATE_UNKNOWN, 0, -50, 300, 200, 188, 2, 2,
-                100,
-                300, 100, 100, 200,
-                contentionTimeStats, rateStats));
+                WifiUsabilityStatsEntry.LINK_STATE_UNKNOWN, 0, -50, 2412, -50, 0, 0, 0,
+                300, 200, 188, 2, 2, 100, 300, 100, 100, 200,
+                contentionTimeStats, rateStats, packetStats, peerInfo));
         linkStats.put(1, new WifiUsabilityStatsEntry.LinkStats(1,
-                WifiUsabilityStatsEntry.LINK_STATE_UNKNOWN, 0, -40, 860, 600, 388, 2, 2,
-                200,
-                400, 100, 150, 300,
-                contentionTimeStats, rateStats));
+                WifiUsabilityStatsEntry.LINK_STATE_UNKNOWN, 0, -40, 5500, -40, 1, 0, 0,
+                860, 600, 388, 2, 2, 200, 400, 100, 150, 300,
+                contentionTimeStats, rateStats, packetStats, peerInfo));
 
         WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 32, contentionTimeStats, rateStats, radioStats, 100, true,
-                true, true, 23, 24, 25, true, linkStats);
+                true, true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1);
         assertEquals(32, usabilityStatsEntry.getTimeSliceDutyCycleInPercent());
 
         WifiUsabilityStatsEntry usabilityStatsEntryWithInvalidDutyCycleValue =
                 new WifiUsabilityStatsEntry(
                         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
                         21, 22, -1, contentionTimeStats, rateStats, radioStats, 101, true, true,
-                        true, 23, 24, 25, true, linkStats);
+                        true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1);
         try {
             usabilityStatsEntryWithInvalidDutyCycleValue.getTimeSliceDutyCycleInPercent();
             fail();
@@ -136,27 +143,34 @@ public class WifiUsabilityStatsEntryTest {
         contentionTimeStats[1] = new ContentionTimeStats(5, 6, 7, 8);
         contentionTimeStats[2] = new ContentionTimeStats(9, 10, 11, 12);
         contentionTimeStats[3] = new ContentionTimeStats(13, 14, 15, 16);
+        PacketStats[] packetStats = new PacketStats[4];
+        packetStats[0] = new PacketStats(1, 2, 3, 4);
+        packetStats[1] = new PacketStats(5, 6, 7, 8);
+        packetStats[2] = new PacketStats(9, 10, 11, 12);
+        packetStats[3] = new PacketStats(13, 14, 15, 16);
         RateStats[] rateStats = new RateStats[2];
         rateStats[0] = new RateStats(1, 3, 4, 7, 9, 11, 13, 15, 17);
         rateStats[1] = new RateStats(2, 2, 3, 8, 10, 12, 14, 16, 18);
 
         RadioStats[] radioStats = new RadioStats[2];
         radioStats[0] = new RadioStats(0, 10, 11, 12, 13, 14, 15, 16, 17, 18);
-        radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28);
+        radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28, new int[] {1, 2, 3});
+        PeerInfo[] peerInfo = new PeerInfo[1];
+        peerInfo[0] = new PeerInfo(1, 50, rateStats);
         SparseArray<WifiUsabilityStatsEntry.LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(3,
-                WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -50, 300, 200, 188, 2, 2, 100,
-                300, 100, 100, 200,
-                contentionTimeStats, rateStats));
+                WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -50, 2412, -50, 0, 0, 0, 300,
+                200, 188, 2, 2, 100, 300, 100, 100, 200,
+                contentionTimeStats, rateStats, packetStats, peerInfo));
         linkStats.put(1, new WifiUsabilityStatsEntry.LinkStats(8,
-                WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -40, 860, 600, 388, 2, 2, 200,
-                400, 100, 150, 300,
-                contentionTimeStats, rateStats));
+                WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -40, 5500, -40, 1, 0, 0, 860,
+                600, 388, 2, 2, 200, 400, 100, 150, 300,
+                contentionTimeStats, rateStats, packetStats, peerInfo));
 
         return new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 50, contentionTimeStats, rateStats, radioStats, 102, true,
-                true, true, 23, 24, 25, true, linkStats
+                true, true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1
         );
     }
 
@@ -336,6 +350,13 @@ public class WifiUsabilityStatsEntryTest {
             for (int link : links) {
                 assertEquals(expected.getRssi(link), actual.getRssi(link));
                 assertEquals(expected.getRadioId(link), actual.getRadioId(link));
+                assertEquals(expected.getFrequencyMhz(link), actual.getFrequencyMhz(link));
+                assertEquals(expected.getRssiMgmt(link), actual.getRssiMgmt(link));
+                assertEquals(expected.getChannelWidth(link), actual.getChannelWidth(link));
+                assertEquals(expected.getCenterFreqFirstSegment(link),
+                        actual.getCenterFreqFirstSegment(link));
+                assertEquals(expected.getCenterFreqSecondSegment(link),
+                        actual.getCenterFreqSecondSegment(link));
                 assertEquals(expected.getTxLinkSpeedMbps(link),
                         actual.getTxLinkSpeedMbps(link));
                 assertEquals(expected.getRxLinkSpeedMbps(link),
@@ -467,6 +488,118 @@ public class WifiUsabilityStatsEntryTest {
                         actual.getContentionTimeStats(link,
                                         WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO)
                                 .getContentionNumSamples());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE)
+                                .getTxSuccess(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE)
+                                .getTxSuccess());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE)
+                                .getTxRetries(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE)
+                                .getTxRetries());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE)
+                                .getTxBad(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE)
+                                .getTxBad());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE)
+                                .getRxSuccess(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BE)
+                                .getRxSuccess());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK)
+                                .getTxSuccess(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK)
+                                .getTxSuccess());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK)
+                                .getTxRetries(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK)
+                                .getTxRetries());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK)
+                                .getTxBad(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK)
+                                .getTxBad());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK)
+                                .getRxSuccess(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_BK)
+                                .getRxSuccess());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI)
+                                .getTxSuccess(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI)
+                                .getTxSuccess());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI)
+                                .getTxRetries(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI)
+                                .getTxRetries());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI)
+                                .getTxBad(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI)
+                                .getTxBad());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI)
+                                .getRxSuccess(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VI)
+                                .getRxSuccess());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO)
+                                .getTxSuccess(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO)
+                                .getTxSuccess());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO)
+                                .getTxRetries(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO)
+                                .getTxRetries());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO)
+                                .getTxBad(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO)
+                                .getTxBad());
+                assertEquals(
+                        expected.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO)
+                                .getRxSuccess(),
+                        actual.getPacketStats(link,
+                                        WifiUsabilityStatsEntry.WME_ACCESS_CATEGORY_VO)
+                                .getRxSuccess());
 
                 for (int j = 0; j < expected.getRateStats(link).size(); j++) {
                     RateStats expectedStats = expected.getRateStats(link).get(j);
@@ -483,9 +616,15 @@ public class WifiUsabilityStatsEntryTest {
                     assertEquals(expectedStats.getMpduLost(), actualStats.getMpduLost());
                     assertEquals(expectedStats.getRetries(), actualStats.getRetries());
                 }
-
+                for (int j = 0; j < expected.getPeerInfo(link).size(); j++) {
+                    PeerInfo expectedStats = expected.getPeerInfo(link).get(j);
+                    PeerInfo actualStats = actual.getPeerInfo(link).get(j);
+                    assertEquals(expectedStats.getStaCount(), actualStats.getStaCount());
+                    assertEquals(expectedStats.getChanUtil(), actualStats.getChanUtil());
+                }
             }
         }
+        assertEquals(expected.getWifiLinkCount(), actual.getWifiLinkCount());
     }
 
     /**
@@ -496,14 +635,14 @@ public class WifiUsabilityStatsEntryTest {
 
         SparseArray<WifiUsabilityStatsEntry.LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0, new WifiUsabilityStatsEntry.LinkStats(0,
-                WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -50, 300, 200, 188, 2, 2, 100,
-                300, 100, 100, 200,
-                null, null));
+                WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -50, 2412, -50, 0, 0, 0, 300,
+                200, 188, 2, 2, 100, 300, 100, 100, 200,
+                null, null, null, null));
 
         WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 32, null, null, null, 100, true,
-                true, true, 23, 24, 25, true, linkStats);
+                true, true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1);
 
         assertThrows("linkId is invalid - " + MloLink.INVALID_MLO_LINK_ID,
                 NoSuchElementException.class,

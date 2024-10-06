@@ -46,6 +46,7 @@ import static com.android.server.wifi.ClientModeImpl.CMD_UNWANTED_NETWORK;
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
 import static com.android.server.wifi.WifiSettingsConfigStore.SECONDARY_WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STA_FACTORY_MAC_ADDRESS;
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -641,6 +642,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         when(mWifiNative.connectToNetwork(any(), any())).thenReturn(true);
         when(mWifiNative.getApfCapabilities(anyString())).thenReturn(APF_CAP);
         when(mWifiNative.isQosPolicyFeatureEnabled()).thenReturn(true);
+        when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(new BitSet());
     }
 
     /** Reset verify() counters on WifiNative, and restore when() mocks on mWifiNative */
@@ -733,7 +735,8 @@ public class ClientModeImplTest extends WifiBaseTest {
         when(mWifiInjector.getActiveModeWarden()).thenReturn(mActiveModeWarden);
         when(mActiveModeWarden.getPrimaryClientModeManager()).thenReturn(mPrimaryClientModeManager);
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                WifiManager.WIFI_FEATURE_WPA3_SAE | WifiManager.WIFI_FEATURE_OWE);
+                createCapabilityBitset(
+                        WifiManager.WIFI_FEATURE_WPA3_SAE, WifiManager.WIFI_FEATURE_OWE));
         when(mWifiInjector.getWifiGlobals()).thenReturn(mWifiGlobals);
         when(mWifiInjector.getWifiHandlerThread()).thenReturn(mWifiHandlerThread);
         when(mWifiInjector.getSsidTranslator()).thenReturn(mSsidTranslator);
@@ -4023,7 +4026,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         WifiSignalPollResults signalPollResults = new WifiSignalPollResults();
         signalPollResults.addEntry(0, -42, 65, 54, sFreq);
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(llStats);
         when(mWifiNative.signalPoll(any())).thenReturn(signalPollResults);
         when(mClock.getWallClockMillis()).thenReturn(startMillis + 0);
@@ -4058,7 +4061,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         WifiSignalPollResults signalPollResults = new WifiSignalPollResults();
         signalPollResults.addEntry(0, -42, 65, 54, sFreq);
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(llStats);
         when(mWifiNative.signalPoll(any())).thenReturn(signalPollResults);
         when(mClock.getWallClockMillis()).thenReturn(startMillis + 0);
@@ -4112,7 +4115,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         WifiSignalPollResults signalPollResults = new WifiSignalPollResults();
         signalPollResults.addEntry(0, -42, 65, 54, sFreq);
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(llStats);
         when(mWifiNative.signalPoll(any())).thenReturn(signalPollResults);
         when(mClock.getWallClockMillis()).thenReturn(startMillis + 0);
@@ -4172,7 +4175,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         WifiSignalPollResults signalPollResults = new WifiSignalPollResults();
         signalPollResults.addEntry(0, -42, 65, 54, sFreq);
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(llStats);
         when(mWifiNative.signalPoll(any())).thenReturn(signalPollResults);
         when(mClock.getWallClockMillis()).thenReturn(startMillis + 0);
@@ -4713,7 +4716,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         WifiSignalPollResults signalPollResults = new WifiSignalPollResults();
         signalPollResults.addEntry(0, TEST_RSSI, 65, 54, sFreq);
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(llStats);
         when(mWifiNative.signalPoll(any())).thenReturn(signalPollResults);
 
@@ -4740,7 +4743,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         WifiSignalPollResults signalPollResults = new WifiSignalPollResults();
         signalPollResults.addEntry(0, TEST_RSSI, 65, 54, sFreq);
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(llStats);
         when(mWifiNative.signalPoll(any())).thenReturn(signalPollResults);
 
@@ -5460,7 +5463,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         WifiSignalPollResults signalPollResults = new WifiSignalPollResults();
         signalPollResults.addEntry(0, RSSI_THRESHOLD_BREACH_MIN, 65, 54, sFreq);
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(llStats);
         when(mWifiNative.signalPoll(any())).thenReturn(signalPollResults);
 
@@ -6081,7 +6084,7 @@ public class ClientModeImplTest extends WifiBaseTest {
 
         failOnRssiChangeBroadcast();
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         WifiLinkLayerStats oldLLStats = new WifiLinkLayerStats();
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(oldLLStats);
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
@@ -6108,7 +6111,7 @@ public class ClientModeImplTest extends WifiBaseTest {
 
         failOnRssiChangeBroadcast();
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         WifiLinkLayerStats stats = new WifiLinkLayerStats();
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(stats);
         when(mWifiDataStall.checkDataStallAndThroughputSufficiency(any(),
@@ -6944,9 +6947,10 @@ public class ClientModeImplTest extends WifiBaseTest {
         when(mWifiConfigManager.getConfiguredNetworkWithoutMasking(anyInt())).thenReturn(config);
         if (isDriverSupportFils) {
             when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                    WifiManager.WIFI_FEATURE_FILS_SHA256 | WifiManager.WIFI_FEATURE_FILS_SHA384);
+                    createCapabilityBitset(WifiManager.WIFI_FEATURE_FILS_SHA256,
+                            WifiManager.WIFI_FEATURE_FILS_SHA384));
         } else {
-            when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn((long) 0);
+            when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(new BitSet());
         }
 
         return config;
@@ -8038,7 +8042,7 @@ public class ClientModeImplTest extends WifiBaseTest {
     @Test
     public void testWifiScoreReportDump() throws Exception {
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         InOrder inOrder = inOrder(mWifiNative, mWifiScoreReport);
         inOrder.verify(mWifiNative, never()).getWifiLinkLayerStats(any());
         connect();
@@ -9051,7 +9055,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         clearInvocations(mWifiNative, mWifiMetrics, mWifiDataStall);
 
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         WifiLinkLayerStats oldLLStats = new WifiLinkLayerStats();
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(oldLLStats);
         mLooper.moveTimeForward(mWifiGlobals.getPollRssiIntervalMillis());
@@ -9095,7 +9099,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         verifyNoMoreInteractions(mWifiNative, mWifiMetrics, mWifiDataStall);
 
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(new WifiLinkLayerStats());
 
         // No link layer stats collection on secondary CMM.
@@ -9114,7 +9118,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         clearInvocations(mWifiNative, mWifiMetrics, mWifiDataStall);
 
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(new WifiLinkLayerStats());
 
         // No link layer stats collection on secondary CMM.
@@ -9147,7 +9151,7 @@ public class ClientModeImplTest extends WifiBaseTest {
 
         // RSSI polling is enabled on primary.
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         WifiLinkLayerStats oldLLStats = new WifiLinkLayerStats();
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(oldLLStats);
         mLooper.moveTimeForward(mWifiGlobals.getPollRssiIntervalMillis());
@@ -9176,7 +9180,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         connect();
         clearInvocations(mWifiNative, mWifiMetrics, mWifiDataStall);
 
-        when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(0L);
+        when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(new BitSet());
         WifiLinkLayerStats stats = new WifiLinkLayerStats();
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(stats);
         mLooper.moveTimeForward(mWifiGlobals.getPollRssiIntervalMillis());
@@ -9799,7 +9803,7 @@ public class ClientModeImplTest extends WifiBaseTest {
             throws Exception {
         if (isTrustOnFirstUseSupported) {
             when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                    WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+                    createCapabilityBitset(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE));
         }
         mCmi.mInsecureEapNetworkHandler = mInsecureEapNetworkHandler;
 
@@ -10876,7 +10880,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         connect();
         when(mWifiNative.getMaxSupportedConcurrentTdlsSessions(WIFI_IFACE_NAME)).thenReturn(1);
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME))
-                .thenReturn(WifiManager.WIFI_FEATURE_TDLS);
+                .thenReturn(createCapabilityBitset(WifiManager.WIFI_FEATURE_TDLS));
         when(mWifiNative.startTdls(eq(WIFI_IFACE_NAME), eq(TEST_TDLS_PEER_ADDR_STR), anyBoolean()))
                 .thenReturn(true);
         assertEquals(1, mCmi.getMaxSupportedConcurrentTdlsSessions());
@@ -10970,7 +10974,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         WifiSignalPollResults signalPollResults = new WifiSignalPollResults();
         signalPollResults.addEntry(TEST_MLO_LINK_ID, -42, 65, 54, sFreq);
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         when(mWifiNative.getWifiLinkLayerStats(any())).thenReturn(llStats);
         when(mWifiNative.signalPoll(any())).thenReturn(signalPollResults);
         when(mClock.getWallClockMillis()).thenReturn(startMillis + 0);
@@ -11210,7 +11214,7 @@ public class ClientModeImplTest extends WifiBaseTest {
     public void testSaeH2eSetEvenThoughConfigForSaeH2eIsNotTrue() throws Exception {
         when(mWifiNative.isSupplicantAidlServiceVersionAtLeast(3)).thenReturn(true);
         when(mWifiNative.getSupportedFeatureSet(WIFI_IFACE_NAME)).thenReturn(
-                WifiManager.WIFI_FEATURE_WPA3_SAE);
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_WPA3_SAE));
         initializeCmi();
         if (SdkLevel.isAtLeastV()) {
             verify(mWifiGlobals).enableWpa3SaeH2eSupport();

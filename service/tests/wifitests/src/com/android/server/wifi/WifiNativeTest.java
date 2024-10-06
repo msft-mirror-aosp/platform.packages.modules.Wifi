@@ -21,7 +21,8 @@ import static android.net.wifi.WifiScanner.WIFI_BAND_5_GHZ;
 
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_FEATURES;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_EXTENDED_SUPPORTED_FEATURES;
-import static com.android.server.wifi.util.GeneralUtil.longToBitset;
+import static com.android.server.wifi.util.GeneralUtil.bitsetToLong;
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -257,8 +258,8 @@ public class WifiNativeTest extends WifiBaseTest {
         return result;
     }
 
-    private static final BitSet WIFI_TEST_FEATURE = longToBitset(0x800000000L);
-
+    private static final BitSet WIFI_TEST_FEATURE =
+            createCapabilityBitset(WifiManager.WIFI_FEATURE_OWE);
     private static final RadioChainInfo MOCK_NATIVE_RADIO_CHAIN_INFO_1 = new RadioChainInfo(1, -89);
     private static final RadioChainInfo MOCK_NATIVE_RADIO_CHAIN_INFO_2 = new RadioChainInfo(0, -78);
     private static final WorkSource TEST_WORKSOURCE = new WorkSource();
@@ -1614,7 +1615,7 @@ public class WifiNativeTest extends WifiBaseTest {
                 .thenReturn(legacyFeatures);
         when(mSettingsConfigStore.get(eq(WIFI_NATIVE_EXTENDED_SUPPORTED_FEATURES)))
                 .thenReturn(WIFI_TEST_FEATURE.toLongArray());
-        BitSet featureSet = longToBitset(mWifiNative.getSupportedFeatureSet(null));
+        BitSet featureSet = mWifiNative.getSupportedFeatureSet(null);
         assertTrue(featureSet.equals(WIFI_TEST_FEATURE));
     }
 
@@ -1625,13 +1626,13 @@ public class WifiNativeTest extends WifiBaseTest {
      */
     @Test
     public void testGetLegacyFeaturesWhenInterfaceDoesntExist() throws Exception {
-        long legacyFeatures = 0x321;
+        long legacyFeatures = bitsetToLong(WIFI_TEST_FEATURE);
         when(mSettingsConfigStore.get(eq(WIFI_NATIVE_SUPPORTED_FEATURES)))
                 .thenReturn(legacyFeatures);
         when(mSettingsConfigStore.get(eq(WIFI_NATIVE_EXTENDED_SUPPORTED_FEATURES)))
                 .thenReturn(new long[0]); // no extended features
-        BitSet featureSet = longToBitset(mWifiNative.getSupportedFeatureSet(null));
-        assertTrue(featureSet.equals(longToBitset(legacyFeatures)));
+        BitSet featureSet = mWifiNative.getSupportedFeatureSet(null);
+        assertTrue(featureSet.equals(WIFI_TEST_FEATURE));
     }
 
     /**
