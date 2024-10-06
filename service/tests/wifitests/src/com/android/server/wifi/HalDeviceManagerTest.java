@@ -23,7 +23,7 @@ import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP_BRIDG
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_NAN;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_P2P;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_STA;
-import static com.android.server.wifi.util.GeneralUtil.longToBitset;
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
 import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNotNull;
@@ -1020,6 +1020,24 @@ public class HalDeviceManagerTest extends WifiBaseTest {
                 .thenReturn(WorkSourceHelper.PRIORITY_FG_APP);
         assertFalse(mDut.creatingIfaceWillDeletePrivilegedIface(
                 HDM_CREATE_IFACE_AP, TEST_WORKSOURCE_1));
+    }
+
+    /**
+     * Test that BitSet comparisons are performed correctly in
+     * {@link HalDeviceManager#areChipCapabilitiesSupported(BitSet, BitSet)}
+     */
+    @Test
+    public void testRequiredCapabilitiesComparison() {
+        BitSet capabilitySubset = createCapabilityBitset(WifiManager.WIFI_FEATURE_INFRA_60G);
+        BitSet capabilitySuperset = (BitSet) capabilitySubset.clone();
+        capabilitySuperset.set(WifiManager.WIFI_FEATURE_BRIDGED_AP);
+
+        assertTrue(HalDeviceManager.areChipCapabilitiesSupported(
+                capabilitySuperset /* current caps */, new BitSet() /* no desired caps */));
+        assertTrue(HalDeviceManager.areChipCapabilitiesSupported(
+                capabilitySuperset /* current caps */, capabilitySubset /* desired caps */));
+        assertFalse(HalDeviceManager.areChipCapabilitiesSupported(
+                capabilitySubset /* current caps */, capabilitySuperset /* desired caps */));
     }
 
     //////////////////////////////////////////////////////////////////////////////////////
@@ -3288,7 +3306,8 @@ public class HalDeviceManagerTest extends WifiBaseTest {
     public void verify60GhzIfaceCreation(
             ChipMockBase chipMock, int chipModeId, int finalChipModeId, boolean isWigigSupported)
             throws Exception {
-        long requiredChipCapabilities = WifiManager.WIFI_FEATURE_INFRA_60G;
+        BitSet requiredChipCapabilities =
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_INFRA_60G);
         chipMock.initialize();
         mInOrder = inOrder(mWifiMock, chipMock.chip, mManagerStatusListenerMock);
         executeAndValidateStartupSequence();
@@ -3350,7 +3369,7 @@ public class HalDeviceManagerTest extends WifiBaseTest {
             when(mWorkSourceHelper1.getRequestorWsPriority())
                     .thenReturn(WorkSourceHelper.PRIORITY_PRIVILEGED);
             assertThat(mDut.isItPossibleToCreateIface(HDM_CREATE_IFACE_P2P,
-                    WifiManager.WIFI_FEATURE_INFRA_60G,
+                    createCapabilityBitset(WifiManager.WIFI_FEATURE_INFRA_60G),
                     TEST_WORKSOURCE_1), is(isWigigSupported));
         }
     }
@@ -4294,7 +4313,7 @@ public class HalDeviceManagerTest extends WifiBaseTest {
     private WifiInterface validateInterfaceSequence(ChipMockBase chipMock,
             boolean chipModeValid, int chipModeId,
             int createIfaceType, String ifaceName, int finalChipMode,
-            long requiredChipCapabilities,
+            BitSet requiredChipCapabilities,
             WifiInterface[] tearDownList,
             InterfaceDestroyedListener destroyedListener,
             WorkSource requestorWs,
@@ -4493,7 +4512,7 @@ public class HalDeviceManagerTest extends WifiBaseTest {
 
         public WifiChip.Response<BitSet> answer() {
             WifiChip.Response<BitSet> response =
-                    new WifiChip.Response<>(longToBitset(mChipMockBase.chipCapabilities));
+                    new WifiChip.Response<>(mChipMockBase.chipCapabilities);
             response.setStatusCode(mChipMockBase.allowGetCapsBeforeIfaceCreated
                     ? WifiHal.WIFI_STATUS_SUCCESS : WifiHal.WIFI_STATUS_ERROR_UNKNOWN);
             return response;
@@ -4809,7 +4828,7 @@ public class HalDeviceManagerTest extends WifiBaseTest {
         public boolean chipModeValid = false;
         public int chipModeId = -1000;
         public int chipModeIdValidForRtt = -1; // single chip mode ID where RTT can be created
-        public long chipCapabilities = 0L;
+        public BitSet chipCapabilities = new BitSet();
         public boolean allowGetCapsBeforeIfaceCreated = true;
         public List<WifiChip.WifiRadioCombination> chipSupportedRadioCombinations = null;
         public Map<Integer, ArrayList<String>> interfaceNames = new HashMap<>();
@@ -5112,7 +5131,7 @@ public class HalDeviceManagerTest extends WifiBaseTest {
             super.initialize();
             chipMockId = CHIP_MOCK_V5;
 
-            chipCapabilities |= WifiManager.WIFI_FEATURE_INFRA_60G;
+            chipCapabilities.set(WifiManager.WIFI_FEATURE_INFRA_60G);
 
             // chip Id configuration
             ArrayList<Integer> chipIds;

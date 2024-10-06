@@ -27,7 +27,6 @@ import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_EXTEND
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_FEATURES;
 import static com.android.server.wifi.p2p.WifiP2pNative.P2P_IFACE_NAME;
 import static com.android.server.wifi.p2p.WifiP2pNative.P2P_INTERFACE_PROPERTY;
-import static com.android.server.wifi.util.GeneralUtil.bitsetToLong;
 import static com.android.server.wifi.util.GeneralUtil.longToBitset;
 import static com.android.wifi.flags.Flags.rsnOverriding;
 
@@ -396,7 +395,7 @@ public class WifiNative {
         /** Network observer registered for this interface */
         public NetworkObserverInternal networkObserver;
         /** Interface feature set / capabilities */
-        public long featureSet;
+        public BitSet featureSet;
         public int bandsSupported;
         public DeviceWiphyCapabilities phyCapabilities;
         public WifiHal.WifiInterface iface;
@@ -419,6 +418,12 @@ public class WifiNative {
                     break;
                 case IFACE_TYPE_AP:
                     typeString = "AP";
+                    break;
+                case IFACE_TYPE_P2P:
+                    typeString = "P2P";
+                    break;
+                case IFACE_TYPE_NAN:
+                    typeString = "NAN";
                     break;
                 default:
                     typeString = "<UNKNOWN>";
@@ -1316,8 +1321,12 @@ public class WifiNative {
                         nanInterfaceDestroyedListener, handler, requestorWs);
                 if (nanIface != null) {
                     iface.iface = nanIface;
-                    return iface;
+                    iface.name = nanIface.getName();
+                    if (!TextUtils.isEmpty(iface.name)) {
+                        return iface;
+                    }
                 }
+                mIfaceMgr.removeIface(iface.id);
             }
             Log.e(TAG, "Failed to allocate new Nan iface");
             stopHalAndWificondIfNecessary();
@@ -1762,7 +1771,7 @@ public class WifiNative {
             iface.featureSet = getSupportedFeatureSetInternal(iface.name);
             saveCompleteFeatureSetInConfigStoreIfNecessary(iface.featureSet);
             updateSupportedBandForStaInternal(iface);
-            mIsEnhancedOpenSupported = (iface.featureSet & WIFI_FEATURE_OWE) != 0;
+            mIsEnhancedOpenSupported = iface.featureSet.get(WIFI_FEATURE_OWE);
             if (rsnOverriding()) {
                 mIsRsnOverridingSupported = isSupplicantAidlServiceVersionAtLeast(4)
                         ? mSupplicantStaIfaceHal.isRsnOverridingSupported(iface.name)
@@ -3768,6 +3777,7 @@ public class WifiNative {
         WifiLinkLayerStats stats = mWifiVendorHal.getWifiLinkLayerStats(ifaceName);
         if (stats != null) {
             stats.aggregateLinkLayerStats();
+            stats.wifiMloMode = getMloMode();
         }
         return stats;
     }
@@ -3948,19 +3958,18 @@ public class WifiNative {
      * @param ifaceName Name of the interface.
      * @return bitmask defined by WifiManager.WIFI_FEATURE_*
      */
-    public long getSupportedFeatureSet(String ifaceName) {
+    public @NonNull BitSet getSupportedFeatureSet(String ifaceName) {
         synchronized (mLock) {
-            long featureSet = 0;
             // First get the complete feature set stored in config store when supplicant was
             // started
-            featureSet = bitsetToLong(getCompleteFeatureSetFromConfigStore());
+            BitSet featureSet = getCompleteFeatureSetFromConfigStore();
             // Include the feature set saved in interface class. This is to make sure that
             // framework is returning the feature set for SoftAp only products and multi-chip
             // products.
             if (ifaceName != null) {
                 Iface iface = mIfaceMgr.getIface(ifaceName);
                 if (iface != null) {
-                    featureSet |= iface.featureSet;
+                    featureSet.or(iface.featureSet);
                 }
             }
             return featureSet;
@@ -3989,16 +3998,15 @@ public class WifiNative {
      * @param ifaceName Name of the interface.
      * @return bitmask defined by WifiManager.WIFI_FEATURE_*
      */
-    private long getSupportedFeatureSetInternal(@NonNull String ifaceName) {
-        BitSet featureBitset = mSupplicantStaIfaceHal.getAdvancedCapabilities(ifaceName);
-        featureBitset.or(mSupplicantStaIfaceHal.getWpaDriverFeatureSet(ifaceName));
-        featureBitset.or(mWifiVendorHal.getSupportedFeatureSet(ifaceName));
-        long featureSet = bitsetToLong(featureBitset);
+    private BitSet getSupportedFeatureSetInternal(@NonNull String ifaceName) {
+        BitSet featureSet = mSupplicantStaIfaceHal.getAdvancedCapabilities(ifaceName);
+        featureSet.or(mSupplicantStaIfaceHal.getWpaDriverFeatureSet(ifaceName));
+        featureSet.or(mWifiVendorHal.getSupportedFeatureSet(ifaceName));
         if (SdkLevel.isAtLeastT()) {
-            if (((featureSet & WifiManager.WIFI_FEATURE_DPP) != 0)
+            if (featureSet.get(WifiManager.WIFI_FEATURE_DPP)
                     && mContext.getResources().getBoolean(R.bool.config_wifiDppAkmSupported)) {
                 // Set if DPP is filled by supplicant and DPP AKM is enabled by overlay.
-                featureSet |= WifiManager.WIFI_FEATURE_DPP_AKM;
+                featureSet.set(WifiManager.WIFI_FEATURE_DPP_AKM);
                 Log.v(TAG, ": DPP AKM supported");
             }
         }
@@ -5177,8 +5185,7 @@ public class WifiNative {
      * Save the complete list of features retrieved from WiFi HAL and Supplicant HAL in
      * config store.
      */
-    private void saveCompleteFeatureSetInConfigStoreIfNecessary(long featureSetLong) {
-        BitSet featureSet = longToBitset(featureSetLong);
+    private void saveCompleteFeatureSetInConfigStoreIfNecessary(BitSet featureSet) {
         BitSet cachedFeatureSet = getCompleteFeatureSetFromConfigStore();
         if (!cachedFeatureSet.equals(featureSet)) {
             mCachedFeatureSet = featureSet;

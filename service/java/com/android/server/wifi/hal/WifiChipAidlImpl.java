@@ -23,8 +23,6 @@ import static android.hardware.wifi.WifiChannelWidthInMhz.WIDTH_80;
 import static android.hardware.wifi.WifiChannelWidthInMhz.WIDTH_80P80;
 import static android.net.wifi.CoexUnsafeChannel.POWER_CAP_NONE;
 
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
@@ -1596,25 +1594,25 @@ public class WifiChipAidlImpl implements IWifiChip {
     protected static BitSet halToFrameworkChipFeatureSet(long halFeatureSet) {
         BitSet features = new BitSet();
         if (bitmapContains(halFeatureSet, FeatureSetMask.SET_TX_POWER_LIMIT)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_TX_POWER_LIMIT));
+            features.set(WifiManager.WIFI_FEATURE_TX_POWER_LIMIT);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.D2D_RTT)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_D2D_RTT));
+            features.set(WifiManager.WIFI_FEATURE_D2D_RTT);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.D2AP_RTT)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_D2AP_RTT));
+            features.set(WifiManager.WIFI_FEATURE_D2AP_RTT);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.SET_LATENCY_MODE)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_LOW_LATENCY));
+            features.set(WifiManager.WIFI_FEATURE_LOW_LATENCY);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.P2P_RAND_MAC)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_P2P_RAND_MAC));
+            features.set(WifiManager.WIFI_FEATURE_P2P_RAND_MAC);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.WIGIG)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_INFRA_60G));
+            features.set(WifiManager.WIFI_FEATURE_INFRA_60G);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.T2LM_NEGOTIATION)) {
-            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_T2LM_NEGOTIATION));
+            features.set(WifiManager.WIFI_FEATURE_T2LM_NEGOTIATION);
         }
         return features;
     }

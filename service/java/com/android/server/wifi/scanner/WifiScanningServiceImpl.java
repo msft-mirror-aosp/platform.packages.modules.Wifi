@@ -244,7 +244,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
                 return;
             }
             final ExternalClientInfo client = new ExternalClientInfo(uid, packageName,
-                    listener);
+                    listener, featureId);
             client.register();
             localLog("register scan listener: " + client + " AttributionTag " + featureId);
             logScanRequest("registerScanListener", client, null, null, null);
@@ -298,13 +298,13 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
         mWifiThreadRunner.post(() -> {
             ExternalClientInfo client = (ExternalClientInfo) mClients.get(listener);
             if (client == null) {
-                client = new ExternalClientInfo(uid, packageName, listener);
+                client = new ExternalClientInfo(uid, packageName, listener, featureId);
                 client.register();
             }
             localLog("start background scan: " + client + " package " + packageName);
             Message msg = Message.obtain();
             msg.what = WifiScanner.CMD_START_BACKGROUND_SCAN;
-            msg.obj = new ScanParams(listener, settings, workSource);
+            msg.obj = new ScanParams(listener, settings, workSource, featureId);
             msg.sendingUid = uid;
             mBackgroundScanStateMachine.sendMessage(msg);
         }, TAG + "#startBackgroundScan");
@@ -332,7 +332,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
         localLog("stop background scan: " + client);
         Message msg = Message.obtain();
         msg.what = WifiScanner.CMD_STOP_BACKGROUND_SCAN;
-        msg.obj = new ScanParams(listener, null, null);
+        msg.obj = new ScanParams(listener, null, null, featureId);
         msg.sendingUid = uid;
         mBackgroundScanStateMachine.sendMessage(msg);
     }
@@ -363,8 +363,8 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
         public String featureId;
 
         ScanParams(IWifiScannerListener listener, WifiScanner.ScanSettings settings,
-                WorkSource workSource) {
-            this(listener, settings, null, workSource, null, null);
+                WorkSource workSource, String featureId) {
+            this(listener, settings, null, workSource, null, featureId);
         }
 
         ScanParams(IWifiScannerListener listener, WifiScanner.ScanSettings settings,
@@ -399,14 +399,14 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
         mWifiThreadRunner.post(() -> {
             ExternalClientInfo client = (ExternalClientInfo) mClients.get(listener);
             if (client == null) {
-                client = new ExternalClientInfo(uid, packageName, listener);
+                client = new ExternalClientInfo(uid, packageName, listener, featureId);
                 client.register();
             }
             localLog("start scan: " + client + " package " + packageName + " AttributionTag "
                     + featureId);
             Message msg = Message.obtain();
             msg.what = WifiScanner.CMD_START_SINGLE_SCAN;
-            msg.obj = new ScanParams(listener, settings, workSource);
+            msg.obj = new ScanParams(listener, settings, workSource, featureId);
             msg.sendingUid = uid;
             mSingleScanStateMachine.sendMessage(msg);
         }, TAG + "#startScan");
@@ -434,7 +434,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             localLog("stop scan: " + client + " AttributionTag " + featureId);
             Message msg = Message.obtain();
             msg.what = WifiScanner.CMD_STOP_SINGLE_SCAN;
-            msg.obj = new ScanParams(listener, null, null);
+            msg.obj = new ScanParams(listener, null, null, featureId);
             msg.sendingUid = uid;
             mSingleScanStateMachine.sendMessage(msg);
         }, TAG + "#stopScan");
@@ -504,7 +504,8 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             localLog("start pno scan: " + clientInfoLog + " AttributionTag " + featureId);
             Message msg = Message.obtain();
             msg.what = WifiScanner.CMD_START_PNO_SCAN;
-            msg.obj = new ScanParams(listener, scanSettings, pnoSettings, null, packageName, null);
+            msg.obj = new ScanParams(listener, scanSettings, pnoSettings, null, packageName,
+                    featureId);
             msg.sendingUid = uid;
             mPnoScanStateMachine.sendMessage(msg);
         }, TAG + "#startPnoScan");
@@ -531,7 +532,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             localLog("stop pno scan: " + packageName + " AttributionTag " + featureId);
             Message msg = Message.obtain();
             msg.what = WifiScanner.CMD_STOP_PNO_SCAN;
-            msg.obj = new ScanParams(listener, null, null);
+            msg.obj = new ScanParams(listener, null, null, featureId);
             msg.sendingUid = uid;
             mPnoScanStateMachine.sendMessage(msg);
         }, TAG + "#stopPnoScan");
@@ -1784,7 +1785,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             }
 
             for (RequestInfo<Void> entry : mSingleScanListeners) {
-                logCallback("singleScanResults", entry.clientInfo,
+                logCallback("singleScanResults listener", entry.clientInfo,
                         describeForLog(allResults));
                 entry.clientInfo.reportEvent((listener) -> {
                     try {
@@ -2655,7 +2656,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
                         ClientInfo ci = mClients.get(scanParams.listener);
                         if (ci == null) {
                             ci = new ExternalClientInfo(msg.sendingUid, scanParams.packageName,
-                                    scanParams.listener);
+                                    scanParams.listener, scanParams.featureId);
                             ci.register();
                         }
                         if (scanParams.pnoSettings == null || scanParams.settings == null) {
@@ -2715,7 +2716,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
                         ClientInfo ci = mClients.get(scanParams.listener);
                         if (ci == null) {
                             ci = new ExternalClientInfo(msg.sendingUid, scanParams.packageName,
-                                    scanParams.listener);
+                                    scanParams.listener, scanParams.featureId);
                             ci.register();
                         }
                         if (scanParams.pnoSettings == null || scanParams.settings == null) {
@@ -3029,7 +3030,8 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
                         ClientInfo clientInfo = mClients.get(scanParams.listener);
                         if (clientInfo == null) {
                             clientInfo = new ExternalClientInfo(msg.sendingUid,
-                                    scanParams.packageName, scanParams.listener);
+                                    scanParams.packageName, scanParams.listener,
+                                    scanParams.featureId);
                             clientInfo.register();
                         }
 
@@ -3168,7 +3170,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
         private void addInternalClient(ClientInfo ci) {
             if (mInternalClientInfo == null) {
                 mInternalClientInfo = new InternalClientInfo(ci.getUid(), "internal",
-                        new InternalListener());
+                        new InternalListener(), ci.mAttributionTag);
                 mInternalClientInfo.register();
             } else {
                 Log.w(TAG, "Internal client for PNO already exists");
@@ -3253,7 +3255,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
                 Message msg = Message.obtain();
                 msg.what = WifiScanner.CMD_START_SINGLE_SCAN;
                 msg.obj = new ScanParams(mInternalClientInfo.mListener, settings,
-                        ClientModeImpl.WIFI_WORK_SOURCE);
+                        ClientModeImpl.WIFI_WORK_SOURCE, "WIFI_INTERNAL");
                 mSingleScanStateMachine.sendMessage(msg);
             }
             mWifiMetrics.getScanMetrics().setWorkSource(ClientModeImpl.WIFI_WORK_SOURCE);
@@ -3282,6 +3284,7 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
     private abstract class ClientInfo {
         private final int mUid;
         private final String mPackageName;
+        private final String mAttributionTag;
         private final WorkSource mWorkSource;
         private boolean mScanWorkReported = false;
         protected final IWifiScannerListener mListener;
@@ -3298,11 +3301,13 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             }
         };
 
-        ClientInfo(int uid, String packageName, IWifiScannerListener listener) {
+        ClientInfo(int uid, String packageName, IWifiScannerListener listener,
+                String attributionTag) {
             mUid = uid;
             mPackageName = packageName;
             mListener = listener;
             mWorkSource = new WorkSource(uid);
+            mAttributionTag = attributionTag;
         }
 
         /**
@@ -3424,8 +3429,8 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
 
         @Override
         public String toString() {
-            return "ClientInfo[uid=" + mUid + ", package=" + mPackageName + ", " + mListener
-                    + "]";
+            return "ClientInfo[uid=" + mUid + ", package=" + mPackageName + ", attributionTag="
+                    + mAttributionTag + ", " + mListener + "]";
         }
     }
 
@@ -3439,8 +3444,9 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
          */
         private boolean mDisconnected = false;
 
-        ExternalClientInfo(int uid, String packageName, IWifiScannerListener listener) {
-            super(uid, packageName, listener);
+        ExternalClientInfo(int uid, String packageName, IWifiScannerListener listener,
+                String attributionTag) {
+            super(uid, packageName, listener, attributionTag);
             if (DBG) localLog("New client, listener: " + listener);
             try {
                 listener.asBinder().linkToDeath(mDeathRecipient, 0);
@@ -3473,8 +3479,9 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
         /**
          * The UID here is used to proxy the original external requester UID.
          */
-        InternalClientInfo(int requesterUid, String packageName, IWifiScannerListener listener) {
-            super(requesterUid, packageName, listener);
+        InternalClientInfo(int requesterUid, String packageName, IWifiScannerListener listener,
+                String attributionTag) {
+            super(requesterUid, packageName, listener, attributionTag);
         }
 
         @Override
