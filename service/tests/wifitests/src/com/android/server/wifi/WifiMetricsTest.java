@@ -4509,16 +4509,16 @@ public class WifiMetricsTest extends WifiBaseTest {
     public void testWifiUsabilityStatsBufferSizeIsCapped() throws Exception {
         // simulate adding LABEL_GOOD WifiUsabilityStats 1 time over the max limit
         WifiLinkLayerStats stats = new WifiLinkLayerStats();
-        for (int j = 0; j < WifiMetrics.MAX_WIFI_USABILITY_STATS_LIST_SIZE_PER_TYPE + 1; j++) {
+        for (int j = 0; j < WifiMetrics.MAX_WIFI_USABILITY_STATS_RECORDS_PER_TYPE + 1; j++) {
             stats = addGoodWifiUsabilityStats(stats);
             stats = addBadWifiUsabilityStats(stats);
             stats.timeStampInMs += WifiMetrics.MIN_WIFI_GOOD_USABILITY_STATS_PERIOD_MS;
         }
         dumpProtoAndDeserialize();
-        assertEquals(2 * WifiMetrics.MAX_WIFI_USABILITY_STATS_PER_TYPE_TO_UPLOAD,
+        assertEquals(2 * WifiMetrics.MAX_WIFI_USABILITY_STATS_RECORDS_PER_TYPE_TO_UPLOAD,
                 mDecodedProto.wifiUsabilityStatsList.length);
-        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_PER_TYPE_TO_UPLOAD; i++) {
-            assertEquals(WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_LIST_SIZE,
+        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_RECORDS_PER_TYPE_TO_UPLOAD; i++) {
+            assertEquals(WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE,
                     mDecodedProto.wifiUsabilityStatsList[2 * i].stats.length);
             assertEquals(2, mDecodedProto.wifiUsabilityStatsList[2 * i + 1].stats.length);
         }
@@ -4560,14 +4560,16 @@ public class WifiMetricsTest extends WifiBaseTest {
 
         WifiLinkLayerStats stats3 = new WifiLinkLayerStats();
         WifiLinkLayerStats stats4 = new WifiLinkLayerStats();
-        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_LIST_SIZE - 1; i++) {
+        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE - 1;
+                i++) {
             mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats3);
             stats3 = nextRandomStats(stats3);
         }
         mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats3);
         mWifiMetrics.addToWifiUsabilityStatsList(TEST_IFACE_NAME, WifiUsabilityStats.LABEL_BAD,
                 WifiUsabilityStats.TYPE_DATA_STALL_BAD_TX, -1);
-        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_LIST_SIZE - 1; i++) {
+        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE - 1;
+                i++) {
             mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats4);
             stats4 = nextRandomStats(stats4);
         }
@@ -4599,14 +4601,16 @@ public class WifiMetricsTest extends WifiBaseTest {
 
         WifiLinkLayerStats stats3 = new WifiLinkLayerStats();
         WifiLinkLayerStats stats4 = new WifiLinkLayerStats();
-        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_LIST_SIZE - 1; i++) {
+        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE - 1;
+                i++) {
             mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats3);
             stats3 = nextRandomStats(stats3);
         }
         mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats3);
         mWifiMetrics.addToWifiUsabilityStatsList(TEST_IFACE_NAME, WifiUsabilityStats.LABEL_BAD,
                 WifiUsabilityStats.TYPE_DATA_STALL_BAD_TX, -1);
-        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_LIST_SIZE - 1; i++) {
+        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE - 1;
+                i++) {
             mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats4);
             stats4 = nextRandomStats(stats4);
         }

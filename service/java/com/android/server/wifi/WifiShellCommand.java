@@ -25,13 +25,13 @@ import static android.net.wifi.WifiConfiguration.METERED_OVERRIDE_METERED;
 import static android.net.wifi.WifiManager.ACTION_REMOVE_SUGGESTION_DISCONNECT;
 import static android.net.wifi.WifiManager.ACTION_REMOVE_SUGGESTION_LINGER;
 import static android.net.wifi.WifiManager.LocalOnlyHotspotCallback.REQUEST_REGISTERED;
+import static android.net.wifi.WifiManager.ROAMING_MODE_AGGRESSIVE;
+import static android.net.wifi.WifiManager.ROAMING_MODE_NONE;
+import static android.net.wifi.WifiManager.ROAMING_MODE_NORMAL;
 import static android.net.wifi.WifiManager.VERBOSE_LOGGING_LEVEL_DISABLED;
 import static android.net.wifi.WifiManager.VERBOSE_LOGGING_LEVEL_WIFI_AWARE_ENABLED_ONLY;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLED;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
-import static android.net.wifi.WifiManager.ROAMING_MODE_NONE;
-import static android.net.wifi.WifiManager.ROAMING_MODE_NORMAL;
-import static android.net.wifi.WifiManager.ROAMING_MODE_AGGRESSIVE;
 
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP_BRIDGE;
@@ -122,6 +122,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -1002,14 +1003,11 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     if (ApConfigUtil.isWpa3SaeSupported(mContext)) {
                         pw.println("wifi_softap_wpa3_sae_supported");
                     }
-                    if ((mWifiService.getSupportedFeatures()
-                            & WifiManager.WIFI_FEATURE_BRIDGED_AP)
-                            == WifiManager.WIFI_FEATURE_BRIDGED_AP) {
+                    BitSet featureSet = mWifiService.getSupportedFeaturesIfAllowed();
+                    if (featureSet.get(WifiManager.WIFI_FEATURE_BRIDGED_AP)) {
                         pw.println("wifi_softap_bridged_ap_supported");
                     }
-                    if ((mWifiService.getSupportedFeatures()
-                            & WifiManager.WIFI_FEATURE_STA_BRIDGED_AP)
-                            == WifiManager.WIFI_FEATURE_STA_BRIDGED_AP) {
+                    if (featureSet.get(WifiManager.WIFI_FEATURE_STA_BRIDGED_AP)) {
                         pw.println("wifi_softap_bridged_ap_with_sta_supported");
                     }
                     return 0;
