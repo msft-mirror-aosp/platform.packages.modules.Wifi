@@ -65,6 +65,11 @@ public class BaseWifiService extends IWifiManager.Stub {
     }
 
     @Override
+    public boolean isFeatureSupported(int feature) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void getWifiActivityEnergyInfoAsync(IOnWifiActivityEnergyInfoListener listener) {
         throw new UnsupportedOperationException();
     }
@@ -1218,6 +1223,16 @@ public class BaseWifiService extends IWifiManager.Stub {
 
     @Override
     public boolean isPnoSupported() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void setAutojoinRestrictionSecurityTypes(int restrictions, Bundle extras) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void getAutojoinRestrictionSecurityTypes(IIntegerListener listener, Bundle extras) {
         throw new UnsupportedOperationException();
     }
 }

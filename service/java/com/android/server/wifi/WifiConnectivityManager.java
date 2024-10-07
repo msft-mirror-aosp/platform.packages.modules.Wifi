@@ -25,6 +25,7 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_LO
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TRANSIENT;
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
 import static com.android.server.wifi.WifiMetrics.ConnectionEvent.FAILURE_AUTHENTICATION_FAILURE;
+import static com.android.server.wifi.WifiMetrics.ConnectionEvent.FAILURE_NO_RESPONSE;
 import static com.android.server.wifi.proto.nano.WifiMetricsProto.ConnectionEvent.AUTH_FAILURE_EAP_FAILURE;
 
 import android.annotation.NonNull;
@@ -52,6 +53,7 @@ import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.WorkSource;
+import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.ArrayMap;
@@ -67,7 +69,6 @@ import com.android.server.wifi.hotspot2.PasspointManager;
 import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.scanner.WifiScannerInternal;
 import com.android.server.wifi.util.WifiPermissionsUtil;
-import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
 import java.io.FileDescriptor;
@@ -182,7 +183,6 @@ public class WifiConnectivityManager {
     private final WifiChannelUtilization mWifiChannelUtilization;
     private final PowerManager mPowerManager;
     private final DeviceConfigFacade mDeviceConfigFacade;
-    private final FeatureFlags mFeatureFlags;
     private final ActiveModeWarden mActiveModeWarden;
     private final FrameworkFacade mFrameworkFacade;
     private final WifiPermissionsUtil mWifiPermissionsUtil;
@@ -201,6 +201,7 @@ public class WifiConnectivityManager {
     private int mInitialScanState = INITIAL_SCAN_STATE_COMPLETE;
     private boolean mAutoJoinEnabledExternal = true; // enabled by default
     private boolean mAutoJoinEnabledExternalSetByDeviceAdmin = false;
+    private int mAutojoinRestrictionSecurityTypes = 0; // restrict none by default
     private boolean mUntrustedConnectionAllowed = false;
     private Set<Integer> mRestrictedConnectionAllowedUids = new ArraySet<>();
     private boolean mOemPaidConnectionAllowed = false;
@@ -682,13 +683,11 @@ public class WifiConnectivityManager {
         List<WifiCandidates.Candidate> candidates = mNetworkSelector.getCandidatesFromScan(
                 scanDetails, bssidBlocklist, cmmStates, mUntrustedConnectionAllowed,
                 mOemPaidConnectionAllowed, mOemPrivateConnectionAllowed,
-                mRestrictedConnectionAllowedUids, skipSufficiencyCheck);
-
+                mRestrictedConnectionAllowedUids, skipSufficiencyCheck,
+                mAutojoinRestrictionSecurityTypes);
         // Filter candidates before caching to avoid reconnecting on failure
-        if (mFeatureFlags.delayedCarrierNetworkSelection()) {
-            candidates = filterDelayedCarrierSelectionCandidates(candidates, listenerName,
-                    isFullScan);
-        }
+        candidates = filterDelayedCarrierSelectionCandidates(candidates, listenerName,
+                isFullScan);
         mLatestCandidates = candidates;
         mLatestCandidatesTimestampMs = mClock.getElapsedSinceBootMillis();
 
@@ -1505,7 +1504,6 @@ public class WifiConnectivityManager {
         mPasspointManager = passpointManager;
         mMultiInternetManager = multiInternetManager;
         mDeviceConfigFacade = deviceConfigFacade;
-        mFeatureFlags = mDeviceConfigFacade.getFeatureFlags();
         mActiveModeWarden = activeModeWarden;
         mFrameworkFacade = frameworkFacade;
         mWifiGlobals = wifiGlobals;
@@ -1958,8 +1956,10 @@ public class WifiConnectivityManager {
         // Need to connect to a different network id
         // Framework specifies the connection target BSSID if firmware doesn't support
         // {@link android.net.wifi.WifiManager#WIFI_FEATURE_CONTROL_ROAMING} or the
-        // candidate configuration contains a specified BSSID.
+        // candidate configuration contains a specified BSSID, or the feature to set target BSSID
+        // is enabled.
         if (mConnectivityHelper.isFirmwareRoamingSupported()
+                && !mWifiGlobals.isNetworkSelectionSetTargetBssid()
                 && (targetNetwork.BSSID == null
                 || targetNetwork.BSSID.equals(ClientModeImpl.SUPPLICANT_BSSID_ANY))) {
             targetBssid = ClientModeImpl.SUPPLICANT_BSSID_ANY;
@@ -2681,9 +2681,12 @@ public class WifiConnectivityManager {
                         config.isPasspoint() ? config.FQDN : config.SSID)
                 || (config.enterpriseConfig != null
                 && config.enterpriseConfig.isAuthenticationSimBased()
-                && config.carrierId != TelephonyManager.UNKNOWN_CARRIER_ID)
+                && config.carrierId != TelephonyManager.UNKNOWN_CARRIER_ID
                 && !mWifiCarrierInfoManager.isSimReady(
-                        mWifiCarrierInfoManager.getBestMatchSubscriptionId(config)));
+                        mWifiCarrierInfoManager.getBestMatchSubscriptionId(config)))
+                || (config.subscriptionId != SubscriptionManager.INVALID_SUBSCRIPTION_ID
+                && !mWifiCarrierInfoManager.isCarrierNetworkOffloadEnabled(
+                        config.subscriptionId, config.carrierMerged)));
         return networks;
     }
 
@@ -3302,6 +3305,7 @@ public class WifiConnectivityManager {
             // Only attempt to reconnect when connection on the primary CMM fails, since MBB
             // CMM will be destroyed after the connection failure.
             if (clientModeManager.getRole() == ROLE_CLIENT_PRIMARY
+                    && failureCode != FAILURE_NO_RESPONSE // Do not retry since this is a timeout
                     && !mWifiPermissionsUtil.isAdminRestrictedNetwork(config)) {
                 retryConnectionOnLatestCandidates(clientModeManager, bssid, config,
                         failureCode == FAILURE_AUTHENTICATION_FAILURE
@@ -3658,6 +3662,22 @@ public class WifiConnectivityManager {
      */
     public boolean getAutoJoinEnabledExternal() {
         return mAutoJoinEnabledExternal;
+    }
+
+    /**
+     * Set auto join restriction on select security types
+     */
+    public void setAutojoinRestrictionSecurityTypes(int restrictions) {
+        localLog("Set auto join restriction on select security types - restrictions: "
+                + restrictions);
+        mAutojoinRestrictionSecurityTypes = restrictions;
+    }
+
+    /**
+     * Return auto join restriction on select security types
+     */
+    public int getAutojoinRestrictionSecurityTypes() {
+        return mAutojoinRestrictionSecurityTypes;
     }
 
     /**

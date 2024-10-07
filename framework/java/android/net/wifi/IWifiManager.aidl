@@ -89,6 +89,7 @@ import com.android.modules.utils.StringParceledListSlice;
 interface IWifiManager
 {
     long getSupportedFeatures();
+    boolean isFeatureSupported(int feature);
 
     oneway void getWifiActivityEnergyInfoAsync(in IOnWifiActivityEnergyInfoListener listener);
 
@@ -519,4 +520,8 @@ interface IWifiManager
     void restoreWifiBackupData(in byte[] data);
 
     boolean isPnoSupported();
+
+    void setAutojoinRestrictionSecurityTypes(int restrictions, in Bundle extras);
+
+    void getAutojoinRestrictionSecurityTypes(in IIntegerListener listener, in Bundle extras);
 }

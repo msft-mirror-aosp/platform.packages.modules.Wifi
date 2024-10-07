@@ -26,6 +26,8 @@ import static android.net.wifi.WifiManager.WIFI_FEATURE_WAPI;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SUITE_B;
 
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
+
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -107,6 +109,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -2187,7 +2190,7 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
     }
 
     /**
-     * Test get advanced capabilities API on old HAL, should return 0 (not supported)
+     * Test get advanced capabilities API on old HAL, should return an empty BitSet (not supported)
      */
     @Test
     public void testGetKeyMgmtCapabilitiesOldHal() throws Exception {
@@ -2195,7 +2198,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
 
         executeAndValidateInitializationSequenceV1_1(false, false);
 
-        assertTrue(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME) == 0);
+        assertTrue(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME).equals(new BitSet()));
+
     }
 
     /**
@@ -2213,7 +2217,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_2.ISupplicantStaIface
                         .getKeyMgmtCapabilitiesCallback.class));
 
-        assertEquals(WIFI_FEATURE_WPA3_SAE, mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_WPA3_SAE)
+                .equals(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -2231,8 +2236,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_2.ISupplicantStaIface
                         .getKeyMgmtCapabilitiesCallback.class));
 
-        assertEquals(WIFI_FEATURE_WPA3_SUITE_B,
-                mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_WPA3_SUITE_B)
+                .equals(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -2250,7 +2255,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_2.ISupplicantStaIface
                         .getKeyMgmtCapabilitiesCallback.class));
 
-        assertEquals(WIFI_FEATURE_OWE, mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_OWE)
+                .equals(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -2269,8 +2275,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_2.ISupplicantStaIface
                         .getKeyMgmtCapabilitiesCallback.class));
 
-        assertEquals(WIFI_FEATURE_OWE | WIFI_FEATURE_WPA3_SAE,
-                mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_OWE, WIFI_FEATURE_WPA3_SAE)
+                .equals(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -2288,7 +2294,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_2.ISupplicantStaIface
                         .getKeyMgmtCapabilitiesCallback.class));
 
-        assertEquals(WIFI_FEATURE_DPP, mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_DPP)
+                .equals(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -2305,9 +2312,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_3.ISupplicantStaIface
                         .getKeyMgmtCapabilities_1_3Callback.class));
 
-        assertTrue((WIFI_FEATURE_DPP_ENROLLEE_RESPONDER
-                & mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME))
-                == WIFI_FEATURE_DPP_ENROLLEE_RESPONDER);
+        assertTrue(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)
+                .get(WIFI_FEATURE_DPP_ENROLLEE_RESPONDER));
     }
 
     /**
@@ -2325,9 +2331,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_3.ISupplicantStaIface
                         .getKeyMgmtCapabilities_1_3Callback.class));
 
-        assertFalse((WIFI_FEATURE_DPP_ENROLLEE_RESPONDER
-                & mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME))
-                == WIFI_FEATURE_DPP_ENROLLEE_RESPONDER);
+        assertFalse(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)
+                .get(WIFI_FEATURE_DPP_ENROLLEE_RESPONDER));
     }
 
     /**
@@ -2345,7 +2350,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_3.ISupplicantStaIface
                         .getKeyMgmtCapabilities_1_3Callback.class));
 
-        assertEquals(WIFI_FEATURE_WAPI, mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_WAPI)
+                .equals(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -2363,8 +2369,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_3.ISupplicantStaIface
                         .getKeyMgmtCapabilities_1_3Callback.class));
 
-        assertEquals(WIFI_FEATURE_FILS_SHA256,
-                mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_FILS_SHA256)
+                .equals(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -2382,8 +2388,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_3.ISupplicantStaIface
                         .getKeyMgmtCapabilities_1_3Callback.class));
 
-        assertEquals(WIFI_FEATURE_FILS_SHA384,
-                mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_FILS_SHA384)
+                .equals(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -3514,15 +3520,15 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
 
     /**
      * Test To get wpa driver capabilities API on old HAL, should
-     * return 0 (not supported)
+     * return an empty BitSet (not supported)
      */
     @Test
-    public void tetGetWpaDriverCapabilitiesOldHal() throws Exception {
+    public void testGetWpaDriverCapabilitiesOldHal() throws Exception {
         setupMocksForHalV1_2();
 
         executeAndValidateInitializationSequenceV1_2();
 
-        assertEquals(0, mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME));
+        assertTrue(mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME).equals(new BitSet()));
     }
 
     /**
@@ -3540,7 +3546,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_3.ISupplicantStaIface
                         .getWpaDriverCapabilitiesCallback.class));
 
-        assertEquals(WIFI_FEATURE_MBO, mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_MBO)
+                .equals(mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -3560,8 +3567,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_3.ISupplicantStaIface
                         .getWpaDriverCapabilitiesCallback.class));
 
-        assertEquals(WIFI_FEATURE_MBO | WIFI_FEATURE_OCE,
-                mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_MBO, WIFI_FEATURE_OCE)
+                .equals(mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -3581,8 +3588,8 @@ public class SupplicantStaIfaceHalHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.supplicant.V1_4.ISupplicantStaIface
                         .getWpaDriverCapabilities_1_4Callback.class));
 
-        assertEquals(WIFI_FEATURE_MBO | WIFI_FEATURE_OCE,
-                mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_MBO, WIFI_FEATURE_OCE)
+                .equals(mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME)));
     }
 
     /**

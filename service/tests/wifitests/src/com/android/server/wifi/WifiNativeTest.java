@@ -20,6 +20,9 @@ import static android.net.wifi.WifiScanner.WIFI_BAND_24_GHZ;
 import static android.net.wifi.WifiScanner.WIFI_BAND_5_GHZ;
 
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_FEATURES;
+import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_EXTENDED_SUPPORTED_FEATURES;
+import static com.android.server.wifi.util.GeneralUtil.bitsetToLong;
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -72,6 +75,7 @@ import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.coex.CoexManager;
 import com.android.server.wifi.hal.WifiChip;
+import com.android.server.wifi.p2p.WifiP2pNative;
 import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.util.NativeUtil;
 import com.android.server.wifi.util.NetdWrapper;
@@ -92,6 +96,7 @@ import org.mockito.stubbing.Answer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -253,8 +258,8 @@ public class WifiNativeTest extends WifiBaseTest {
         return result;
     }
 
-    public static final long WIFI_TEST_FEATURE = 0x800000000L;
-
+    private static final BitSet WIFI_TEST_FEATURE =
+            createCapabilityBitset(WifiManager.WIFI_FEATURE_OWE);
     private static final RadioChainInfo MOCK_NATIVE_RADIO_CHAIN_INFO_1 = new RadioChainInfo(1, -89);
     private static final RadioChainInfo MOCK_NATIVE_RADIO_CHAIN_INFO_2 = new RadioChainInfo(0, -78);
     private static final WorkSource TEST_WORKSOURCE = new WorkSource();
@@ -286,6 +291,7 @@ public class WifiNativeTest extends WifiBaseTest {
     @Mock private WifiGlobals mWifiGlobals;
     @Mock DeviceConfigFacade mDeviceConfigFacade;
     @Mock WifiChip.AfcChannelAllowance mAfcChannelAllowance;
+    @Mock private WifiP2pNative mWifiP2pNative;
 
     private MockitoSession mSession;
     ArgumentCaptor<WifiNl80211Manager.ScanEventCallback> mScanCallbackCaptor =
@@ -305,6 +311,9 @@ public class WifiNativeTest extends WifiBaseTest {
                 .thenReturn(WIFI_IFACE_NAME);
         when(mWifiVendorHal.createApIface(any(), any(), anyInt(), anyBoolean(), any(), anyList()))
                 .thenReturn(WIFI_IFACE_NAME);
+        when(mWifiVendorHal.getSupportedFeatureSet(anyString())).thenReturn(new BitSet());
+        when(mWifiVendorHal.replaceStaIfaceRequestorWs(WIFI_IFACE_NAME, TEST_WORKSOURCE))
+                .thenReturn(true);
 
         when(mBuildProperties.isEngBuild()).thenReturn(false);
         when(mBuildProperties.isUserdebugBuild()).thenReturn(false);
@@ -319,6 +328,8 @@ public class WifiNativeTest extends WifiBaseTest {
         when(mStaIfaceHal.initialize()).thenReturn(true);
         when(mStaIfaceHal.startDaemon()).thenReturn(true);
         when(mStaIfaceHal.setupIface(any())).thenReturn(true);
+        when(mStaIfaceHal.getAdvancedCapabilities(anyString())).thenReturn(new BitSet());
+        when(mStaIfaceHal.getWpaDriverFeatureSet(anyString())).thenReturn(new BitSet());
 
         when(mHostapdHal.isInitializationStarted()).thenReturn(true);
         when(mHostapdHal.startDaemon()).thenReturn(true);
@@ -332,11 +343,12 @@ public class WifiNativeTest extends WifiBaseTest {
         when(mWifiInjector.getContext()).thenReturn(mContext);
         when(mWifiInjector.getSsidTranslator()).thenReturn(mSsidTranslator);
         when(mWifiInjector.getWifiGlobals()).thenReturn(mWifiGlobals);
+        when(mWifiInjector.getWifiP2pNative()).thenReturn(mWifiP2pNative);
         mResources = getMockResources();
         mResources.setBoolean(R.bool.config_wifiNetworkCentricQosPolicyFeatureEnabled, false);
         when(mContext.getResources()).thenReturn(mResources);
-        when(mSettingsConfigStore.get(eq(WIFI_NATIVE_SUPPORTED_FEATURES)))
-                .thenReturn(WIFI_TEST_FEATURE);
+        when(mSettingsConfigStore.get(eq(WIFI_NATIVE_EXTENDED_SUPPORTED_FEATURES)))
+                .thenReturn(WIFI_TEST_FEATURE.toLongArray());
         when(mSsidTranslator.getTranslatedSsidAndRecordBssidCharset(any(), any()))
                 .thenAnswer((Answer<WifiSsid>) invocation ->
                         getTranslatedSsid(invocation.getArgument(0)));
@@ -351,7 +363,7 @@ public class WifiNativeTest extends WifiBaseTest {
                 .mockStatic(WifiMigration.class, withSettings().lenient())
                 .startMocking();
 
-        when(Flags.rsnOverriding()).thenReturn(false);
+        when(Flags.rsnOverriding()).thenReturn(true);
 
         mWifiNative = new WifiNative(
                 mWifiVendorHal, mStaIfaceHal, mHostapdHal, mWificondControl,
@@ -1593,13 +1605,34 @@ public class WifiNativeTest extends WifiBaseTest {
 
     /**
      * Tests that getSupportedFeatureSet() guaranteed to include the feature set stored in config
-     * store even when interface doesn't exist.
-     *
+     * store even when interface doesn't exist. If both legacy and extended features are stored in
+     * the config store, then the extended features should be returned.
      */
     @Test
-    public void testGetSupportedFeatureSetWhenInterfaceDoesntExist() throws Exception {
-        long featureSet = mWifiNative.getSupportedFeatureSet(null);
-        assertEquals(featureSet, WIFI_TEST_FEATURE);
+    public void testGetExtendedFeaturesWhenInterfaceDoesntExist() throws Exception {
+        long legacyFeatures = 0x321;
+        when(mSettingsConfigStore.get(eq(WIFI_NATIVE_SUPPORTED_FEATURES)))
+                .thenReturn(legacyFeatures);
+        when(mSettingsConfigStore.get(eq(WIFI_NATIVE_EXTENDED_SUPPORTED_FEATURES)))
+                .thenReturn(WIFI_TEST_FEATURE.toLongArray());
+        BitSet featureSet = mWifiNative.getSupportedFeatureSet(null);
+        assertTrue(featureSet.equals(WIFI_TEST_FEATURE));
+    }
+
+    /**
+     * Tests that getSupportedFeatureSet() guaranteed to include the feature set stored in config
+     * store even when interface doesn't exist. If only legacy features are stored in the
+     * config store, then they should be returned.
+     */
+    @Test
+    public void testGetLegacyFeaturesWhenInterfaceDoesntExist() throws Exception {
+        long legacyFeatures = bitsetToLong(WIFI_TEST_FEATURE);
+        when(mSettingsConfigStore.get(eq(WIFI_NATIVE_SUPPORTED_FEATURES)))
+                .thenReturn(legacyFeatures);
+        when(mSettingsConfigStore.get(eq(WIFI_NATIVE_EXTENDED_SUPPORTED_FEATURES)))
+                .thenReturn(new long[0]); // no extended features
+        BitSet featureSet = mWifiNative.getSupportedFeatureSet(null);
+        assertTrue(featureSet.equals(WIFI_TEST_FEATURE));
     }
 
     /**
@@ -1640,8 +1673,8 @@ public class WifiNativeTest extends WifiBaseTest {
         mWifiNative.setupInterfaceForClientInScanMode(null, TEST_WORKSOURCE,
                 mConcreteClientModeManager);
         mWifiNative.switchClientInterfaceToConnectivityMode(WIFI_IFACE_NAME, TEST_WORKSOURCE);
-        verify(mWificondControl).getChannelsMhzForBand(WifiScanner.WIFI_BAND_24_GHZ);
-        verify(mWificondControl).getChannelsMhzForBand(WifiScanner.WIFI_BAND_5_GHZ);
+        verify(mWificondControl, times(2)).getChannelsMhzForBand(WifiScanner.WIFI_BAND_24_GHZ);
+        verify(mWificondControl, times(2)).getChannelsMhzForBand(WifiScanner.WIFI_BAND_5_GHZ);
         assertEquals(3, mWifiNative.getSupportedBandsForSta(WIFI_IFACE_NAME));
     }
 
@@ -1829,16 +1862,47 @@ public class WifiNativeTest extends WifiBaseTest {
     }
 
     @Test
-    public void testRsnOverridingFeatureFlag() throws Exception {
+    public void testRsnOverridingFeatureSupportOnOlderHals() throws Exception {
+        when(mStaIfaceHal.isAidlServiceVersionAtLeast(4)).thenReturn(false);
+
+        /* RSN Overriding feature is enabled when overlay config item is set to true */
         mResources.setBoolean(R.bool.config_wifiRsnOverridingEnabled, true);
-        when(Flags.rsnOverriding()).thenReturn(false);
         mWifiNative.setupInterfaceForClientInScanMode(null, TEST_WORKSOURCE,
                 mConcreteClientModeManager);
+        mWifiNative.switchClientInterfaceToConnectivityMode(WIFI_IFACE_NAME, TEST_WORKSOURCE);
+        assertTrue(mWifiNative.mIsRsnOverridingSupported);
+        mWifiNative.teardownAllInterfaces();
+
+        /* RSN Overriding feature is disabled when overlay config item is set to false */
+        mResources.setBoolean(R.bool.config_wifiRsnOverridingEnabled, false);
+        mWifiNative.setupInterfaceForClientInScanMode(null, TEST_WORKSOURCE,
+                mConcreteClientModeManager);
+        mWifiNative.switchClientInterfaceToConnectivityMode(WIFI_IFACE_NAME, TEST_WORKSOURCE);
         assertFalse(mWifiNative.mIsRsnOverridingSupported);
         mWifiNative.teardownAllInterfaces();
-        when(Flags.rsnOverriding()).thenReturn(true);
+    }
+
+    @Test
+    public void testRsnOverridingFeatureSupportOnNewerHals() throws Exception {
+        when(mStaIfaceHal.isAidlServiceVersionAtLeast(4)).thenReturn(true);
+
+        /* RSN Overriding feature is enabled based on chip capability */
+        mResources.setBoolean(R.bool.config_wifiRsnOverridingEnabled, false);
+        when(mStaIfaceHal.isRsnOverridingSupported(WIFI_IFACE_NAME)).thenReturn(true);
         mWifiNative.setupInterfaceForClientInScanMode(null, TEST_WORKSOURCE,
                 mConcreteClientModeManager);
+        mWifiNative.switchClientInterfaceToConnectivityMode(WIFI_IFACE_NAME, TEST_WORKSOURCE);
         assertTrue(mWifiNative.mIsRsnOverridingSupported);
+        mWifiNative.teardownAllInterfaces();
+
+        /* Overlay config has no effect on newer HALs */
+        mResources.setBoolean(R.bool.config_wifiRsnOverridingEnabled, true);
+
+        when(mStaIfaceHal.isRsnOverridingSupported(WIFI_IFACE_NAME)).thenReturn(false);
+        mWifiNative.setupInterfaceForClientInScanMode(null, TEST_WORKSOURCE,
+                mConcreteClientModeManager);
+        mWifiNative.switchClientInterfaceToConnectivityMode(WIFI_IFACE_NAME, TEST_WORKSOURCE);
+        assertFalse(mWifiNative.mIsRsnOverridingSupported);
+        mWifiNative.teardownAllInterfaces();
     }
 }

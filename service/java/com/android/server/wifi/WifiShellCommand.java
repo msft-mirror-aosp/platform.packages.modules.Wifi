@@ -25,13 +25,13 @@ import static android.net.wifi.WifiConfiguration.METERED_OVERRIDE_METERED;
 import static android.net.wifi.WifiManager.ACTION_REMOVE_SUGGESTION_DISCONNECT;
 import static android.net.wifi.WifiManager.ACTION_REMOVE_SUGGESTION_LINGER;
 import static android.net.wifi.WifiManager.LocalOnlyHotspotCallback.REQUEST_REGISTERED;
+import static android.net.wifi.WifiManager.ROAMING_MODE_AGGRESSIVE;
+import static android.net.wifi.WifiManager.ROAMING_MODE_NONE;
+import static android.net.wifi.WifiManager.ROAMING_MODE_NORMAL;
 import static android.net.wifi.WifiManager.VERBOSE_LOGGING_LEVEL_DISABLED;
 import static android.net.wifi.WifiManager.VERBOSE_LOGGING_LEVEL_WIFI_AWARE_ENABLED_ONLY;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLED;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
-import static android.net.wifi.WifiManager.ROAMING_MODE_NONE;
-import static android.net.wifi.WifiManager.ROAMING_MODE_NORMAL;
-import static android.net.wifi.WifiManager.ROAMING_MODE_AGGRESSIVE;
 
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP_BRIDGE;
@@ -122,6 +122,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -864,6 +865,12 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     mWifiService.clearExternalPnoScanRequest();
                     return 0;
                 }
+                case "set-pno-scan": {
+                    boolean enabled = getNextArgRequiredTrueOrFalse("enabled", "disabled");
+                    mWifiService.setPnoScanEnabled(enabled, true /*enablePnoScanAfterWifiToggle*/,
+                            mContext.getOpPackageName());
+                    return 0;
+                }
                 case "start-lohs": {
                     CountDownLatch countDownLatch = new CountDownLatch(2);
                     SoftApConfiguration config = buildSoftApConfiguration(pw);
@@ -996,14 +1003,11 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     if (ApConfigUtil.isWpa3SaeSupported(mContext)) {
                         pw.println("wifi_softap_wpa3_sae_supported");
                     }
-                    if ((mWifiService.getSupportedFeatures()
-                            & WifiManager.WIFI_FEATURE_BRIDGED_AP)
-                            == WifiManager.WIFI_FEATURE_BRIDGED_AP) {
+                    BitSet featureSet = mWifiService.getSupportedFeaturesIfAllowed();
+                    if (featureSet.get(WifiManager.WIFI_FEATURE_BRIDGED_AP)) {
                         pw.println("wifi_softap_bridged_ap_supported");
                     }
-                    if ((mWifiService.getSupportedFeatures()
-                            & WifiManager.WIFI_FEATURE_STA_BRIDGED_AP)
-                            == WifiManager.WIFI_FEATURE_STA_BRIDGED_AP) {
+                    if (featureSet.get(WifiManager.WIFI_FEATURE_STA_BRIDGED_AP)) {
                         pw.println("wifi_softap_bridged_ap_with_sta_supported");
                     }
                     return 0;
@@ -2240,6 +2244,38 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                                 resourceCache.restoreIntegerValue(overlayName);
                             }
                         }
+                        case "string" -> {
+                            String value;
+                            if (isEnabled) {
+                                value = getNextArgRequired();
+                                resourceCache.overrideStringValue(overlayName, value);
+                            } else {
+                                resourceCache.restoreStringValue(overlayName);
+                            }
+                        }
+                        case "string-array" -> {
+                            String[] value;
+                            if (isEnabled) {
+                                value = peekRemainingArgs();
+                                resourceCache.overrideStringArrayValue(overlayName, value);
+                            } else {
+                                resourceCache.restoreStringArrayValue(overlayName);
+                            }
+                        }
+                        case "integer-array" -> {
+                            String[] input;
+                            if (isEnabled) {
+                                input = peekRemainingArgs();
+                                int[] value = new int[input.length];
+                                for (int i = 0; i < input.length; i++) {
+                                    value[i] = Integer.parseInt(input[i]);
+                                }
+
+                                resourceCache.overrideIntArrayValue(overlayName, value);
+                            } else {
+                                resourceCache.restoreIntArrayValue(overlayName);
+                            }
+                        }
                         default -> {
                             pw.print("require a valid type of the overlay");
                             return -1;
@@ -3071,10 +3107,11 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("       '31' - band 2.4, 5, 6 and 60 GHz with DFS channels");
         pw.println("  get-cached-scan-data");
         pw.println("    Gets scan data cached by the firmware");
-        pw.println("  force-overlay-config-value bool|integer <overlayName> enabled|disabled"
-                + "<configValue>");
+        pw.println("  force-overlay-config-value bool|integer|string|integer-array|string-array "
+                + "<overlayName> enabled|disabled <configValue>");
         pw.println("    Force overlay to a specified value.");
-        pw.println("    bool|integer   - specified the type of the overlay");
+        pw.println("    bool|integer|string|integer-array|string-array - specified the type of the "
+                + "overlay");
         pw.println("    <overlayName> - name of the overlay whose value is overridden.");
         pw.println("    enabled|disabled: enable the override or disable it and revert to using "
                 + "the built-in value.");
@@ -3315,6 +3352,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Requests to include a non-quoted UTF-8 SSID in PNO scans");
         pw.println("  clear-pno-request");
         pw.println("    Clear the PNO scan request.");
+        pw.println("  set-pno-scan enabled|disabled");
+        pw.println("    Set the PNO scan enabled or disabled.");
         pw.println("  start-dpp-enrollee-responder [-i <info>] [-c <curve>]");
         pw.println("    Start DPP Enrollee responder mode.");
         pw.println("    -i - Device Info to be used in DPP Bootstrapping URI");
