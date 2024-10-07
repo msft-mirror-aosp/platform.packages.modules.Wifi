@@ -395,7 +395,7 @@ public class WifiNative {
         /** Network observer registered for this interface */
         public NetworkObserverInternal networkObserver;
         /** Interface feature set / capabilities */
-        public BitSet featureSet;
+        public BitSet featureSet = new BitSet();
         public int bandsSupported;
         public DeviceWiphyCapabilities phyCapabilities;
         public WifiHal.WifiInterface iface;
