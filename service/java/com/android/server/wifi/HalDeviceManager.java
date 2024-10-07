@@ -19,7 +19,6 @@ package com.android.server.wifi;
 import static com.android.server.wifi.HalDeviceManagerUtil.jsonToStaticChipInfo;
 import static com.android.server.wifi.HalDeviceManagerUtil.staticChipInfoToJson;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STATIC_CHIP_INFO;
-import static com.android.server.wifi.util.GeneralUtil.bitsetToLong;
 import static com.android.server.wifi.util.GeneralUtil.longToBitset;
 
 import android.annotation.IntDef;
@@ -1395,7 +1394,6 @@ public class HalDeviceManager {
             WifiChipInfo chipInfo = chipInfos[i];
             staticChipInfos[i] = new StaticChipInfo(
                     chipInfo.chipId,
-                    bitsetToLong(chipInfo.chipCapabilities),
                     chipInfo.availableModes);
         }
         return staticChipInfos;
