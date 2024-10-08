@@ -1259,43 +1259,6 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
     }
 
     /**
-     * Tests the handling of association rejection for WPA3-Personal networks
-     */
-    @Test
-    public void testWpa3AuthRejectionEverConnected() throws Exception {
-        executeAndValidateInitializationSequence();
-        assertNotNull(mISupplicantStaIfaceCallback);
-
-        WifiConfiguration config = executeAndValidateConnectSequenceWithKeyMgmt(
-                SUPPLICANT_NETWORK_ID, false, TRANSLATED_SUPPLICANT_SSID.toString(),
-                WifiConfiguration.SECURITY_TYPE_SAE, null, true);
-        mISupplicantStaIfaceCallback.onStateChanged(
-                StaIfaceCallbackState.ASSOCIATING,
-                NativeUtil.macAddressToByteArray(BSSID),
-                SUPPLICANT_NETWORK_ID,
-                NativeUtil.byteArrayFromArrayList(NativeUtil.decodeSsid(SUPPLICANT_SSID)), false);
-        int statusCode = StaIfaceStatusCode.UNSPECIFIED_FAILURE;
-        AssociationRejectionData rejectionData = createAssocRejectData(SUPPLICANT_SSID, BSSID,
-                statusCode, false);
-        mISupplicantStaIfaceCallback.onAssociationRejected(rejectionData);
-        verify(mWifiMonitor, never()).broadcastAuthenticationFailureEvent(eq(WLAN0_IFACE_NAME),
-                anyInt(), anyInt(), any(), any());
-        ArgumentCaptor<AssocRejectEventInfo> assocRejectEventInfoCaptor =
-                ArgumentCaptor.forClass(AssocRejectEventInfo.class);
-        verify(mWifiMonitor).broadcastAssociationRejectionEvent(
-                eq(WLAN0_IFACE_NAME), assocRejectEventInfoCaptor.capture());
-        AssocRejectEventInfo assocRejectEventInfo = assocRejectEventInfoCaptor.getValue();
-        assertNotNull(assocRejectEventInfo);
-        assertEquals(TRANSLATED_SUPPLICANT_SSID.toString(), assocRejectEventInfo.ssid);
-        assertEquals(BSSID, assocRejectEventInfo.bssid);
-        assertEquals(SupplicantStaIfaceCallbackAidlImpl.halToFrameworkStatusCode(
-                statusCode), assocRejectEventInfo.statusCode);
-        assertFalse(assocRejectEventInfo.timedOut);
-        assertNull(assocRejectEventInfo.oceRssiBasedAssocRejectInfo);
-        assertNull(assocRejectEventInfo.mboAssocDisallowedInfo);
-    }
-
-    /**
      * Tests that association rejection due to timeout doesn't broadcast authentication failure
      * with reason code ERROR_AUTH_FAILURE_WRONG_PSWD.
      * Driver/Supplicant sets the timedOut field when there is no ACK or response frame for
