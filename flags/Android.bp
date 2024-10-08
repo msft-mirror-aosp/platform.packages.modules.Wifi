@@ -54,3 +54,8 @@ java_defaults {
         "aconfig_storage_reader_java",
     ],
 }
+
+cc_aconfig_library {
+    name: "wifi_aconfig_flags_c_lib",
+    aconfig_declarations: "wifi_aconfig_flags",
+}
