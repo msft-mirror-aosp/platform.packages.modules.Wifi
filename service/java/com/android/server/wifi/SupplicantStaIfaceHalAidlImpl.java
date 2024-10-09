@@ -102,6 +102,7 @@ import android.util.Log;
 import android.util.Pair;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.modules.utils.HandlerExecutor;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.mockwifi.MockWifiServiceUtil;
 import com.android.server.wifi.util.HalAidlUtil;
@@ -118,6 +119,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -184,6 +186,8 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
 
     @VisibleForTesting
     protected boolean mHasMigratedLegacyKeystoreAliases = false;
+    @VisibleForTesting
+    protected KeystoreMigrationStatusConsumer mKeystoreMigrationStatusConsumer;
 
     private class SupplicantDeathRecipient implements DeathRecipient {
         @Override
@@ -208,6 +212,26 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
                 }
                 Log.w(TAG, "Handle supplicant death");
                 supplicantServiceDiedHandler();
+            }
+        }
+    }
+
+    @VisibleForTesting
+    protected class KeystoreMigrationStatusConsumer implements IntConsumer {
+        @Override
+        public void accept(int statusCode) {
+            synchronized (mLock) {
+                if (statusCode == WifiMigration.KEYSTORE_MIGRATION_SUCCESS_MIGRATION_NOT_NEEDED
+                        || statusCode
+                                == WifiMigration.KEYSTORE_MIGRATION_SUCCESS_MIGRATION_COMPLETE) {
+                    mHasMigratedLegacyKeystoreAliases = true;
+                } else {
+                    mHasMigratedLegacyKeystoreAliases = false;
+                }
+                Log.i(TAG, "Keystore migration returned with success="
+                        + mHasMigratedLegacyKeystoreAliases + ", statusCode=" + statusCode);
+                // Consumer is no longer needed, since the callback has been received
+                mKeystoreMigrationStatusConsumer = null;
             }
         }
     }
@@ -4093,8 +4117,12 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             // TODO: Use SdkLevel API when it exists, rather than the SDK_INT
             if (!mHasMigratedLegacyKeystoreAliases && SDK_INT >= 36
                     && Flags.legacyKeystoreToWifiBlobstoreMigrationReadOnly()) {
-                WifiMigration.migrateLegacyKeystoreToWifiBlobstore();
-                mHasMigratedLegacyKeystoreAliases = true;
+                if (mKeystoreMigrationStatusConsumer == null) {
+                    // Create global callback temporarily for access in the unit tests
+                    mKeystoreMigrationStatusConsumer = new KeystoreMigrationStatusConsumer();
+                }
+                WifiMigration.migrateLegacyKeystoreToWifiBlobstore(
+                        new HandlerExecutor(mEventHandler), mKeystoreMigrationStatusConsumer);
             }
 
             try {

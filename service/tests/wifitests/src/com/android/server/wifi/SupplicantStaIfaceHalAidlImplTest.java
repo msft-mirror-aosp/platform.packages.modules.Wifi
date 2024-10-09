@@ -3452,8 +3452,12 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
     @Test
     public void testLegacyKeystoreMigration() throws Exception {
         assumeTrue(SDK_INT >= 36);
-        assertFalse(mDut.mHasMigratedLegacyKeystoreAliases);
         executeAndValidateInitializationSequence();
+        assertFalse(mDut.mHasMigratedLegacyKeystoreAliases);
+
+        // Migration is complete when the consumer receives a success code
+        mDut.mKeystoreMigrationStatusConsumer.accept(
+                WifiMigration.KEYSTORE_MIGRATION_SUCCESS_MIGRATION_COMPLETE);
         assertTrue(mDut.mHasMigratedLegacyKeystoreAliases);
     }
 }
