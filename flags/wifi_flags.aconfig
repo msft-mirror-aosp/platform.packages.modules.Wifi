@@ -188,3 +188,11 @@ flag {
     bug: "361651437"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "mainline_supplicant"
+    namespace: "wifi"
+    description: "Use the secondary supplicant binary stored in the mainline module"
+    bug: "365585450"
+    is_fixed_read_only: true
+}
