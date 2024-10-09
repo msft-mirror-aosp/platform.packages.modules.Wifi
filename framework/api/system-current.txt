@@ -594,6 +594,7 @@ package android.net.wifi {
 
   public final class WifiClient implements android.os.Parcelable {
     method public int describeContents();
+    method @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public int getDisconnectReason();
     method @NonNull public android.net.MacAddress getMacAddress();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.WifiClient> CREATOR;
