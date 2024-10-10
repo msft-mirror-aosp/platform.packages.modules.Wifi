@@ -855,6 +855,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         assertNotNull(mOffloadDisabledListenerArgumentCaptor.getValue());
 
         mCmi.enableVerboseLogging(true);
+        mCmi.disconnect();
         mLooper.dispatchAll();
 
         verify(mWifiLastResortWatchdog, atLeastOnce()).clearAllFailureCounts();
@@ -3350,7 +3351,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         // "normal" commands.
         mCmi.sendMessage(ClientModeImpl.CMD_DISCONNECT);
         mLooper.dispatchAll();
-        assertEquals(1, mCmi.copyLogRecs()
+        assertEquals(2, mCmi.copyLogRecs()
                 .stream()
                 .filter(logRec -> logRec.getWhat() == ClientModeImpl.CMD_DISCONNECT)
                 .count());

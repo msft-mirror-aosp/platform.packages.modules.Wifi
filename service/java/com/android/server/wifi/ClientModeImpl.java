@@ -1949,7 +1949,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     public void disconnect() {
         mFrameworkDisconnectReasonOverride =
                 WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_GENERAL;
-        sendMessageAtFrontOfQueue(CMD_DISCONNECT, StaEvent.DISCONNECT_GENERIC);
+        sendMessage(CMD_DISCONNECT, StaEvent.DISCONNECT_GENERIC);
     }
 
     /**
