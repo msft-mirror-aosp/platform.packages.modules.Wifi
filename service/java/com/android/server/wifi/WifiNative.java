@@ -27,7 +27,6 @@ import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_EXTEND
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_FEATURES;
 import static com.android.server.wifi.p2p.WifiP2pNative.P2P_IFACE_NAME;
 import static com.android.server.wifi.p2p.WifiP2pNative.P2P_INTERFACE_PROPERTY;
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 import static com.android.server.wifi.util.GeneralUtil.longToBitset;
 import static com.android.wifi.flags.Flags.rsnOverriding;
 
@@ -396,7 +395,7 @@ public class WifiNative {
         /** Network observer registered for this interface */
         public NetworkObserverInternal networkObserver;
         /** Interface feature set / capabilities */
-        public BitSet featureSet;
+        public BitSet featureSet = new BitSet();
         public int bandsSupported;
         public DeviceWiphyCapabilities phyCapabilities;
         public WifiHal.WifiInterface iface;
@@ -1772,7 +1771,7 @@ public class WifiNative {
             iface.featureSet = getSupportedFeatureSetInternal(iface.name);
             saveCompleteFeatureSetInConfigStoreIfNecessary(iface.featureSet);
             updateSupportedBandForStaInternal(iface);
-            mIsEnhancedOpenSupported = iface.featureSet.get(getCapabilityIndex(WIFI_FEATURE_OWE));
+            mIsEnhancedOpenSupported = iface.featureSet.get(WIFI_FEATURE_OWE);
             if (rsnOverriding()) {
                 mIsRsnOverridingSupported = isSupplicantAidlServiceVersionAtLeast(4)
                         ? mSupplicantStaIfaceHal.isRsnOverridingSupported(iface.name)
@@ -4004,10 +4003,10 @@ public class WifiNative {
         featureSet.or(mSupplicantStaIfaceHal.getWpaDriverFeatureSet(ifaceName));
         featureSet.or(mWifiVendorHal.getSupportedFeatureSet(ifaceName));
         if (SdkLevel.isAtLeastT()) {
-            if (featureSet.get(getCapabilityIndex(WifiManager.WIFI_FEATURE_DPP))
+            if (featureSet.get(WifiManager.WIFI_FEATURE_DPP)
                     && mContext.getResources().getBoolean(R.bool.config_wifiDppAkmSupported)) {
                 // Set if DPP is filled by supplicant and DPP AKM is enabled by overlay.
-                featureSet.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_DPP_AKM));
+                featureSet.set(WifiManager.WIFI_FEATURE_DPP_AKM);
                 Log.v(TAG, ": DPP AKM supported");
             }
         }

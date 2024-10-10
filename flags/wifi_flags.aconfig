@@ -179,3 +179,20 @@ flag {
     description: "Gate WiFi Scorer new stats collection"
     bug: "367362809"
 }
+
+flag {
+    name: "softap_disconnect_reason"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add SoftAP disconnect reason code"
+    bug: "361651437"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "mainline_supplicant"
+    namespace: "wifi"
+    description: "Use the secondary supplicant binary stored in the mainline module"
+    bug: "365585450"
+    is_fixed_read_only: true
+}

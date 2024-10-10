@@ -19,7 +19,7 @@ package com.android.server.wifi;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
 import static com.android.server.wifi.WifiConfigurationTestUtil.SECURITY_NONE;
 import static com.android.server.wifi.WifiConfigurationTestUtil.SECURITY_PSK;
-import static com.android.server.wifi.util.GeneralUtil.longToBitset;
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.*;
@@ -69,7 +69,8 @@ public class SavedNetworkNominatorTest extends WifiBaseTest {
         when(mWifiInjector.getWifiGlobals()).thenReturn(mWifiGlobals);
         when(mActiveModeWarden.getPrimaryClientModeManager()).thenReturn(mPrimaryClientModeManager);
         when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
-                longToBitset(WifiManager.WIFI_FEATURE_WPA3_SAE | WifiManager.WIFI_FEATURE_OWE));
+                createCapabilityBitset(
+                        WifiManager.WIFI_FEATURE_WPA3_SAE, WifiManager.WIFI_FEATURE_OWE));
         when(mWifiGlobals.isWpa3SaeUpgradeEnabled()).thenReturn(true);
         when(mWifiGlobals.isOweUpgradeEnabled()).thenReturn(true);
 

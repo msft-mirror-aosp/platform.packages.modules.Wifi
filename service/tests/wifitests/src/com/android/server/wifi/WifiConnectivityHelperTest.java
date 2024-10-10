@@ -18,8 +18,7 @@ package com.android.server.wifi;
 
 import static android.net.wifi.WifiManager.WIFI_FEATURE_CONTROL_ROAMING;
 
-import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
-import static com.android.server.wifi.util.GeneralUtil.longToBitset;
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -73,7 +72,7 @@ public class WifiConnectivityHelperTest extends WifiBaseTest {
 
         // Return firmware roaming feature as supported by default.
         when(mClientModeManager.getSupportedFeatures())
-                .thenReturn(longToBitset(WIFI_FEATURE_CONTROL_ROAMING));
+                .thenReturn(createCapabilityBitset(WIFI_FEATURE_CONTROL_ROAMING));
 
         WifiNative.RoamingCapabilities roamCap = new WifiNative.RoamingCapabilities();
         roamCap.maxBlocklistSize = MAX_BSSID_BLOCKLIST_SIZE;
@@ -125,7 +124,7 @@ public class WifiConnectivityHelperTest extends WifiBaseTest {
     @Test
     public void returnFirmwareRoamingNotSupported() {
         BitSet supportedFeatures = new BitSet();
-        supportedFeatures.set(getCapabilityIndex(WIFI_FEATURE_CONTROL_ROAMING), false);
+        supportedFeatures.set(WIFI_FEATURE_CONTROL_ROAMING, false);
         when(mClientModeManager.getSupportedFeatures()).thenReturn(supportedFeatures);
         assertTrue(mWifiConnectivityHelper.getFirmwareRoamingInfo());
         assertFalse(mWifiConnectivityHelper.isFirmwareRoamingSupported());

@@ -65,6 +65,11 @@ public class BaseWifiService extends IWifiManager.Stub {
     }
 
     @Override
+    public boolean isFeatureSupported(int feature) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void getWifiActivityEnergyInfoAsync(IOnWifiActivityEnergyInfoListener listener) {
         throw new UnsupportedOperationException();
     }
