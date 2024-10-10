@@ -2762,6 +2762,12 @@ message WifiUsabilityStatsEntry {
 
   // Wifi Low Latency mode state
   optional bool is_low_latency_activated = 58;
+
+  // Maximum supported tx link speed in Mbps
+  optional int32 max_supported_tx_linkspeed = 59;
+
+  // Maximum supported rx link speed in Mbps
+  optional int32 max_supported_rx_linkspeed = 60;
 }
 
 message ContentionTimeStats {

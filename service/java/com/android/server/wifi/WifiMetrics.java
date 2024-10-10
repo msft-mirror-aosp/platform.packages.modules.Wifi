@@ -5304,6 +5304,8 @@ public class WifiMetrics {
         line.append(",is_bluetooth_connected=" + entry.isBluetoothConnected);
         line.append(",uwb_adapter_state=" + entry.uwbAdapterState);
         line.append(",is_low_latency_activated=" + entry.isLowLatencyActivated);
+        line.append(",max_supported_tx_linkspeed=" + entry.maxSupportedTxLinkspeed);
+        line.append(",max_supported_rx_linkspeed=" + entry.maxSupportedRxLinkspeed);
         pw.println(line.toString());
     }
 
@@ -7395,6 +7397,10 @@ public class WifiMetrics {
                         mWifiGlobals.isBluetoothConnected();
                 wifiUsabilityStatsEntry.uwbAdapterState = getLastUwbState();
                 wifiUsabilityStatsEntry.isLowLatencyActivated = getLowLatencyState();
+                wifiUsabilityStatsEntry.maxSupportedTxLinkspeed =
+                        info.getMaxSupportedTxLinkSpeedMbps();
+                wifiUsabilityStatsEntry.maxSupportedRxLinkspeed =
+                        info.getMaxSupportedRxLinkSpeedMbps();
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7949,7 +7955,8 @@ public class WifiMetrics {
                 s.isNetworkCapabilitiesUpstreamSufficient,
                 s.isThroughputPredictorDownstreamSufficient,
                 s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
-                s.uwbAdapterState, s.isLowLatencyActivated
+                s.uwbAdapterState, s.isLowLatencyActivated, s.maxSupportedTxLinkspeed,
+                s.maxSupportedRxLinkspeed
         );
     }
 
@@ -8161,6 +8168,8 @@ public class WifiMetrics {
         out.isBluetoothConnected = s.isBluetoothConnected;
         out.uwbAdapterState = s.uwbAdapterState;
         out.isLowLatencyActivated = s.isLowLatencyActivated;
+        out.maxSupportedTxLinkspeed = s.maxSupportedTxLinkspeed;
+        out.maxSupportedRxLinkspeed = s.maxSupportedRxLinkspeed;
         return out;
     }
 
