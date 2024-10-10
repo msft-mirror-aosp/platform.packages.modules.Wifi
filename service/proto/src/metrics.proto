@@ -2759,6 +2759,9 @@ message WifiUsabilityStatsEntry {
   // State of UWB adapter. Refers to
   // UwbManager#registerAdapterStateCallback(Executor, AdapterStateCallback)
   optional int32 uwb_adapter_state = 57;
+
+  // Wifi Low Latency mode state
+  optional bool is_low_latency_activated = 58;
 }
 
 message ContentionTimeStats {

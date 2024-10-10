@@ -346,6 +346,7 @@ public class WifiMetrics {
     private SpeedSufficient mSpeedSufficientNetworkCapabilities = new SpeedSufficient();
     private SpeedSufficient mSpeedSufficientThroughputPredictor = new SpeedSufficient();
     private int mLastUwbState = -1;
+    private boolean mIsLowLatencyActivated = false;
 
     /**
      * Wi-Fi usability state per interface as predicted by the network scorer.
@@ -5302,6 +5303,7 @@ public class WifiMetrics {
                 + entry.isThroughputPredictorUpstreamSufficient);
         line.append(",is_bluetooth_connected=" + entry.isBluetoothConnected);
         line.append(",uwb_adapter_state=" + entry.uwbAdapterState);
+        line.append(",is_low_latency_activated=" + entry.isLowLatencyActivated);
         pw.println(line.toString());
     }
 
@@ -7392,6 +7394,7 @@ public class WifiMetrics {
                 wifiUsabilityStatsEntry.isBluetoothConnected =
                         mWifiGlobals.isBluetoothConnected();
                 wifiUsabilityStatsEntry.uwbAdapterState = getLastUwbState();
+                wifiUsabilityStatsEntry.isLowLatencyActivated = getLowLatencyState();
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7946,7 +7949,7 @@ public class WifiMetrics {
                 s.isNetworkCapabilitiesUpstreamSufficient,
                 s.isThroughputPredictorDownstreamSufficient,
                 s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
-                s.uwbAdapterState
+                s.uwbAdapterState, s.isLowLatencyActivated
         );
     }
 
@@ -8157,6 +8160,7 @@ public class WifiMetrics {
         out.isThroughputPredictorUpstreamSufficient = s.isThroughputPredictorUpstreamSufficient;
         out.isBluetoothConnected = s.isBluetoothConnected;
         out.uwbAdapterState = s.uwbAdapterState;
+        out.isLowLatencyActivated = s.isLowLatencyActivated;
         return out;
     }
 
@@ -10440,5 +10444,13 @@ public class WifiMetrics {
 
     public void setLastUwbState(int state) {
         mLastUwbState = state;
+    }
+
+    public boolean getLowLatencyState() {
+        return mIsLowLatencyActivated;
+    }
+
+    public void setLowLatencyState(boolean state) {
+        mIsLowLatencyActivated = state;
     }
 }

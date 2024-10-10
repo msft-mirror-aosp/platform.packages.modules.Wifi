@@ -175,6 +175,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final boolean mIsBluetoothConnected;
     /** UWB Adapter state */
     private final int mUwbAdapterState;
+    /** Low Latency mode state */
+    private final boolean mIsLowLatencyActivated;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -1181,7 +1183,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             int isNetworkCapabilitiesUpstreamSufficient,
             int isThroughputPredictorDownstreamSufficient,
             int isThroughputPredictorUpstreamSufficient, boolean isBluetoothConnected,
-            int uwbAdapterState) {
+            int uwbAdapterState, boolean isLowLatencyActivated) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -1230,6 +1232,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mIsThroughputPredictorUpstreamSufficient = isThroughputPredictorUpstreamSufficient;
         mIsBluetoothConnected = isBluetoothConnected;
         mUwbAdapterState = uwbAdapterState;
+        mIsLowLatencyActivated = isLowLatencyActivated;
     }
 
     /** Implement the Parcelable interface */
@@ -1287,6 +1290,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeInt(mIsThroughputPredictorUpstreamSufficient);
         dest.writeBoolean(mIsBluetoothConnected);
         dest.writeInt(mUwbAdapterState);
+        dest.writeBoolean(mIsLowLatencyActivated);
     }
 
     /** Implement the Parcelable interface */
@@ -1311,7 +1315,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
                     in.readInt(), in.readLong(), in.readLong(), in.readInt(), in.readInt(),
                     in.readInt(), in.readInt(), in.readInt(), in.readInt(), in.readBoolean(),
-                    in.readInt()
+                    in.readInt(), in.readBoolean()
             );
         }
 
@@ -2088,5 +2092,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public int getUwbAdapterState() {
         return mUwbAdapterState;
+    }
+
+    /** @hide */
+    public boolean getLowLatencyModeState() {
+        return mIsLowLatencyActivated;
     }
 }
