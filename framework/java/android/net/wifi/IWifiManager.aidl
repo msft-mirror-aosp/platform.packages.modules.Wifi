@@ -224,7 +224,7 @@ interface IWifiManager
 
     void acquireMulticastLock(IBinder binder, String tag);
 
-    void releaseMulticastLock(String tag);
+    void releaseMulticastLock(IBinder binder, String tag);
 
     void updateInterfaceIpState(String ifaceName, int mode);
 
