@@ -5748,7 +5748,7 @@ public class WifiServiceImpl extends BaseWifiService {
     public void initializeMulticastFiltering() {
         enforceMulticastChangePermission();
         mLog.info("initializeMulticastFiltering uid=%").c(Binder.getCallingUid()).flush();
-        mWifiMulticastLockManager.initializeFiltering();
+        mWifiMulticastLockManager.startFilteringMulticastPackets();
     }
 
     @Override

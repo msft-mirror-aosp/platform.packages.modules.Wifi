@@ -30,7 +30,9 @@ import com.android.server.wifi.proto.WifiStatsLog;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * WifiMulticastLockManager tracks holders of multicast locks and
@@ -39,9 +41,11 @@ import java.util.List;
 public class WifiMulticastLockManager {
     private static final String TAG = "WifiMulticastLockManager";
     private final List<Multicaster> mMulticasters = new ArrayList<>();
+    private final Map<Integer, Integer> mNumLocksPerActiveOwner = new HashMap<>();
     private int mMulticastEnabled = 0;
     private int mMulticastDisabled = 0;
     private final Handler mHandler;
+    private final Object mLock = new Object();
     private boolean mVerboseLoggingEnabled = false;
     private final BatteryStatsManager mBatteryStats;
     private final ActiveModeWarden mActiveModeWarden;
@@ -87,7 +91,7 @@ public class WifiMulticastLockManager {
         public void binderDied() {
             mHandler.post(() -> {
                 Log.e(TAG, "Multicaster binderDied");
-                synchronized (mMulticasters) {
+                synchronized (mLock) {
                     int i = mMulticasters.indexOf(this);
                     if (i != -1) {
                         removeMulticasterLocked(i, mUid, mTag);
@@ -121,7 +125,7 @@ public class WifiMulticastLockManager {
         pw.println("mMulticastEnabled " + mMulticastEnabled);
         pw.println("mMulticastDisabled " + mMulticastDisabled);
         pw.println("Multicast Locks held:");
-        synchronized (mMulticasters) {
+        synchronized (mLock) {
             for (Multicaster l : mMulticasters) {
                 pw.print("    ");
                 pw.println(l);
@@ -133,11 +137,10 @@ public class WifiMulticastLockManager {
         mVerboseLoggingEnabled = verboseEnabled;
     }
 
-    /** Start filtering if  no multicasters exist. */
-    public void initializeFiltering() {
-        synchronized (mMulticasters) {
-            // if anybody had requested filters be off, leave off
-            if (mMulticasters.size() == 0) {
+    /** Start filtering multicast packets if no locks are actively held */
+    public void startFilteringMulticastPackets() {
+        synchronized (mLock) {
+            if (!isMulticastEnabled()) {
                 mActiveModeWarden.getPrimaryClientModeManager()
                         .getMcastLockManagerFilterController()
                         .startFilteringMulticastPackets();
@@ -151,8 +154,11 @@ public class WifiMulticastLockManager {
      * @param tag string name of the caller.
      */
     public void acquireLock(IBinder binder, String tag) {
-        synchronized (mMulticasters) {
+        int uid = Binder.getCallingUid();
+        synchronized (mLock) {
             mMulticastEnabled++;
+            int numLocksHeldByUid = mNumLocksPerActiveOwner.getOrDefault(uid, 0);
+            mNumLocksPerActiveOwner.put(uid, numLocksHeldByUid + 1);
             mMulticasters.add(new Multicaster(tag, binder));
             // Note that we could call stopFilteringMulticastPackets only when
             // our new size == 1 (first call), but this function won't
@@ -163,7 +169,6 @@ public class WifiMulticastLockManager {
                     .stopFilteringMulticastPackets();
         }
 
-        int uid = Binder.getCallingUid();
         final long ident = Binder.clearCallingIdentity();
         mBatteryStats.reportWifiMulticastEnabled(new WorkSource(uid));
         WifiStatsLog.write_non_chained(
@@ -175,7 +180,7 @@ public class WifiMulticastLockManager {
     /** Releases a multicast lock */
     public void releaseLock(IBinder binder, String tag) {
         int uid = Binder.getCallingUid();
-        synchronized (mMulticasters) {
+        synchronized (mLock) {
             mMulticastDisabled++;
             int size = mMulticasters.size();
             for (int i = size - 1; i >= 0; i--) {
@@ -189,13 +194,26 @@ public class WifiMulticastLockManager {
         }
     }
 
+    private void decrementNumLocksForUid(int uid) {
+        int numLocksHeldByUid = mNumLocksPerActiveOwner.get(uid) - 1;
+        if (numLocksHeldByUid == 0) {
+            mNumLocksPerActiveOwner.remove(uid);
+        } else {
+            mNumLocksPerActiveOwner.put(uid, numLocksHeldByUid);
+        }
+    }
+
     private void removeMulticasterLocked(int i, int uid, String tag) {
         Multicaster removed = mMulticasters.remove(i);
-
         if (removed != null) {
             removed.unlinkDeathRecipient();
         }
-        if (mMulticasters.size() == 0) {
+
+        if (mNumLocksPerActiveOwner.containsKey(uid)) {
+            decrementNumLocksForUid(uid);
+        }
+
+        if (!isMulticastEnabled()) {
             mActiveModeWarden.getPrimaryClientModeManager()
                     .getMcastLockManagerFilterController()
                     .startFilteringMulticastPackets();
@@ -211,8 +229,9 @@ public class WifiMulticastLockManager {
 
     /** Returns whether multicast should be allowed (filtering disabled). */
     public boolean isMulticastEnabled() {
-        synchronized (mMulticasters) {
-            return mMulticasters.size() > 0;
+        synchronized (mLock) {
+            // Multicast is enabled if any active lock owners exist
+            return !mNumLocksPerActiveOwner.isEmpty();
         }
     }
 

@@ -91,7 +91,7 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
     @Test
     public void noLocks() {
         assertFalse(mManager.isMulticastEnabled());
-        mManager.initializeFiltering();
+        mManager.startFilteringMulticastPackets();
         verify(mFilterController, times(1)).startFilteringMulticastPackets();
     }
 
@@ -104,7 +104,7 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         mManager.acquireLock(binder, WL_1_TAG);
         assertTrue(mManager.isMulticastEnabled());
         verify(mFilterController).stopFilteringMulticastPackets();
-        mManager.initializeFiltering();
+        mManager.startFilteringMulticastPackets();
         verify(mFilterController, times(0)).startFilteringMulticastPackets();
         ArgumentCaptor<WorkSource> wsCaptor = ArgumentCaptor.forClass(WorkSource.class);
         verify(mBatteryStats).reportWifiMulticastEnabled(wsCaptor.capture());
@@ -189,7 +189,7 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         mManager.acquireLock(binder, WL_1_TAG);
         assertTrue(mManager.isMulticastEnabled());
         verify(mFilterController).stopFilteringMulticastPackets();
-        mManager.initializeFiltering();
+        mManager.startFilteringMulticastPackets();
         verify(mFilterController, never()).startFilteringMulticastPackets();
         verify(mBatteryStats).reportWifiMulticastEnabled(any());
         verify(mBatteryStats, never()).reportWifiMulticastDisabled(any());
@@ -219,7 +219,7 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         inOrderBatteryStats.verify(mBatteryStats).reportWifiMulticastEnabled(any());
         assertTrue(mManager.isMulticastEnabled());
 
-        mManager.initializeFiltering();
+        mManager.startFilteringMulticastPackets();
         inOrderHandler.verify(mFilterController, never()).startFilteringMulticastPackets();
 
         mManager.releaseLock(binder, WL_2_TAG);
@@ -253,7 +253,7 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         inOrderBatteryStats.verify(mBatteryStats).reportWifiMulticastEnabled(any());
         assertTrue(mManager.isMulticastEnabled());
 
-        mManager.initializeFiltering();
+        mManager.startFilteringMulticastPackets();
         inOrderHandler.verify(mFilterController, never()).startFilteringMulticastPackets();
 
         mManager.releaseLock(binder, WL_1_TAG);
