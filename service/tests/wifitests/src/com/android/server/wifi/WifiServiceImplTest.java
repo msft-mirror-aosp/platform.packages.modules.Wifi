@@ -9233,20 +9233,20 @@ public class WifiServiceImplTest extends WifiBaseTest {
     }
 
     @Test
-    public void getSupportedFeaturesVerboseLoggingThrottled() {
+    public void supportedFeaturesVerboseLoggingThrottled() {
         mWifiServiceImpl.enableVerboseLogging(
                 WifiManager.VERBOSE_LOGGING_LEVEL_ENABLED); // this logs
         when(mClock.getElapsedSinceBootMillis()).thenReturn(1000L);
         when(mActiveModeWarden.getSupportedFeatureSet()).thenReturn(
                 createCapabilityBitset(WifiManager.WIFI_FEATURE_P2P));
-        mWifiServiceImpl.getSupportedFeaturesIfAllowed();
+        mWifiServiceImpl.isFeatureSupported(WifiManager.WIFI_FEATURE_P2P);
         when(mClock.getElapsedSinceBootMillis()).thenReturn(1001L);
-        mWifiServiceImpl.getSupportedFeaturesIfAllowed(); // should not log
+        mWifiServiceImpl.isFeatureSupported(WifiManager.WIFI_FEATURE_P2P); // should not log
         when(mClock.getElapsedSinceBootMillis()).thenReturn(5000L);
-        mWifiServiceImpl.getSupportedFeaturesIfAllowed();
+        mWifiServiceImpl.isFeatureSupported(WifiManager.WIFI_FEATURE_P2P);
         when(mActiveModeWarden.getSupportedFeatureSet()).thenReturn(createCapabilityBitset(
                 WifiManager.WIFI_FEATURE_P2P, WifiManager.WIFI_FEATURE_PASSPOINT));
-        mWifiServiceImpl.getSupportedFeaturesIfAllowed();
+        mWifiServiceImpl.isFeatureSupported(WifiManager.WIFI_FEATURE_P2P);
         verify(mLog, times(4)).info(any());
     }
 
