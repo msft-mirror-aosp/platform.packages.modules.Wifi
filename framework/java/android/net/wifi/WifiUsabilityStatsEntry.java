@@ -181,6 +181,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final int mMaxSupportedTxLinkSpeed;
     /** Maximum supported rx link speed in Mbps  */
     private final int mMaxSupportedRxLinkSpeed;
+    /** WiFi Voip mode state */
+    private final int mVoipMode;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -1188,7 +1190,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             int isThroughputPredictorDownstreamSufficient,
             int isThroughputPredictorUpstreamSufficient, boolean isBluetoothConnected,
             int uwbAdapterState, boolean isLowLatencyActivated, int maxSupportedTxLinkSpeed,
-            int maxSupportedRxLinkSpeed) {
+            int maxSupportedRxLinkSpeed, int voipMode) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -1240,6 +1242,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mIsLowLatencyActivated = isLowLatencyActivated;
         mMaxSupportedTxLinkSpeed = maxSupportedTxLinkSpeed;
         mMaxSupportedRxLinkSpeed = maxSupportedRxLinkSpeed;
+        mVoipMode = voipMode;
     }
 
     /** Implement the Parcelable interface */
@@ -1300,6 +1303,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeBoolean(mIsLowLatencyActivated);
         dest.writeInt(mMaxSupportedTxLinkSpeed);
         dest.writeInt(mMaxSupportedRxLinkSpeed);
+        dest.writeInt(mVoipMode);
     }
 
     /** Implement the Parcelable interface */
@@ -1324,7 +1328,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
                     in.readInt(), in.readLong(), in.readLong(), in.readInt(), in.readInt(),
                     in.readInt(), in.readInt(), in.readInt(), in.readInt(), in.readBoolean(),
-                    in.readInt(), in.readBoolean(), in.readInt(), in.readInt()
+                    in.readInt(), in.readBoolean(), in.readInt(), in.readInt(), in.readInt()
             );
         }
 
@@ -2116,5 +2120,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public int getMaxSupportedRxLinkSpeed() {
         return mMaxSupportedRxLinkSpeed;
+    }
+
+    /** @hide */
+    public int getVoipMode() {
+        return mVoipMode;
     }
 }

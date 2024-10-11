@@ -2768,6 +2768,9 @@ message WifiUsabilityStatsEntry {
 
   // Maximum supported rx link speed in Mbps
   optional int32 max_supported_rx_linkspeed = 60;
+
+  // Wifi Voip mode state
+  optional int32 voip_mode = 61;
 }
 
 message ContentionTimeStats {

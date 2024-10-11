@@ -347,6 +347,7 @@ public class WifiMetrics {
     private SpeedSufficient mSpeedSufficientThroughputPredictor = new SpeedSufficient();
     private int mLastUwbState = -1;
     private boolean mIsLowLatencyActivated = false;
+    private int mVoipMode = -1;
 
     /**
      * Wi-Fi usability state per interface as predicted by the network scorer.
@@ -5306,6 +5307,7 @@ public class WifiMetrics {
         line.append(",is_low_latency_activated=" + entry.isLowLatencyActivated);
         line.append(",max_supported_tx_linkspeed=" + entry.maxSupportedTxLinkspeed);
         line.append(",max_supported_rx_linkspeed=" + entry.maxSupportedRxLinkspeed);
+        line.append(",voip_mode=" + entry.voipMode);
         pw.println(line.toString());
     }
 
@@ -7401,6 +7403,7 @@ public class WifiMetrics {
                         info.getMaxSupportedTxLinkSpeedMbps();
                 wifiUsabilityStatsEntry.maxSupportedRxLinkspeed =
                         info.getMaxSupportedRxLinkSpeedMbps();
+                wifiUsabilityStatsEntry.voipMode = getVoipMode();
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7956,7 +7959,7 @@ public class WifiMetrics {
                 s.isThroughputPredictorDownstreamSufficient,
                 s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
                 s.uwbAdapterState, s.isLowLatencyActivated, s.maxSupportedTxLinkspeed,
-                s.maxSupportedRxLinkspeed
+                s.maxSupportedRxLinkspeed, s.voipMode
         );
     }
 
@@ -8170,6 +8173,7 @@ public class WifiMetrics {
         out.isLowLatencyActivated = s.isLowLatencyActivated;
         out.maxSupportedTxLinkspeed = s.maxSupportedTxLinkspeed;
         out.maxSupportedRxLinkspeed = s.maxSupportedRxLinkspeed;
+        out.voipMode = s.voipMode;
         return out;
     }
 
@@ -10461,5 +10465,13 @@ public class WifiMetrics {
 
     public void setLowLatencyState(boolean state) {
         mIsLowLatencyActivated = state;
+    }
+
+    public int getVoipMode() {
+        return mVoipMode;
+    }
+
+    public void setVoipMode(int mode) {
+        mVoipMode = mode;
     }
 }
