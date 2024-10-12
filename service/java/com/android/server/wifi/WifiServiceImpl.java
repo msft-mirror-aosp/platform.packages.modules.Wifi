@@ -3218,9 +3218,9 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     /**
-     * Returns true if we should log the call to getSupportedFeatures.
+     * Returns true if we should log the call to isFeatureSupported.
      *
-     * Because of the way getSupportedFeatures is used in WifiManager, there are
+     * Because of the way isFeatureSupported is used in WifiManager, there are
      * often clusters of several back-to-back calls; avoid repeated logging if
      * the feature set has not changed and the time interval is short.
      */
@@ -3242,21 +3242,16 @@ public class WifiServiceImpl extends BaseWifiService {
     private BitSet mLastLoggedSupportedFeatures = new BitSet();
     private long mLastLoggedSupportedFeaturesTimestamp = 0;
 
-    protected BitSet getSupportedFeaturesIfAllowed() {
-        enforceAccessPermission();
-        BitSet features = getSupportedFeaturesInternal();
-        if (needToLogSupportedFeatures(features)) {
-            mLog.info("getSupportedFeatures uid=% returns %")
-                    .c(Binder.getCallingUid())
-                    .c(features.toString())
-                    .flush();
-        }
-        return features;
-    }
-
     @Override
     public boolean isFeatureSupported(int feature) {
-        BitSet supportedFeatures = getSupportedFeaturesIfAllowed();
+        enforceAccessPermission();
+        BitSet supportedFeatures = getSupportedFeaturesInternal();
+        if (needToLogSupportedFeatures(supportedFeatures)) {
+            mLog.info("isFeatureSupported uid=% returns %")
+                    .c(Binder.getCallingUid())
+                    .c(supportedFeatures.toString())
+                    .flush();
+        }
         return supportedFeatures.get(feature);
     }
 
@@ -3272,7 +3267,7 @@ public class WifiServiceImpl extends BaseWifiService {
                     .c(Binder.getCallingUid())
                     .flush();
         }
-        if (!getSupportedFeaturesIfAllowed().get(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS)) {
+        if (!isFeatureSupported(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS)) {
             try {
                 listener.onWifiActivityEnergyInfo(null);
             } catch (RemoteException e) {
@@ -7739,22 +7734,20 @@ public class WifiServiceImpl extends BaseWifiService {
      */
     @Override
     public boolean isPnoSupported() {
-        boolean featureSetSupportsPno =
-                getSupportedFeaturesIfAllowed().get(WifiManager.WIFI_FEATURE_PNO);
+        boolean featureSetSupportsPno = isFeatureSupported(WifiManager.WIFI_FEATURE_PNO);
         return mWifiGlobals.isSwPnoEnabled()
                 || (mWifiGlobals.isBackgroundScanSupported() && featureSetSupportsPno);
     }
 
     private boolean isAggressiveRoamingModeSupported() {
-        return getSupportedFeaturesIfAllowed()
-                .get(WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT);
+        return isFeatureSupported(WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT);
     }
 
     /**
      * @return true if this device supports Trust On First Use
      */
     private boolean isTrustOnFirstUseSupported() {
-        return getSupportedFeaturesIfAllowed().get(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
+        return isFeatureSupported(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
     }
 
     /**
@@ -8862,14 +8855,14 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     /**
-     * See {@link WifiManager#setAutoJoinRestrictionSecurityTypes(int)}
+     * See {@link WifiManager#setAutojoinDisallowedSecurityTypes(int)}
      * @param restrictions The autojoin restriction security types to be set.
      * @throws SecurityException if the caller does not have permission.
      * @throws IllegalArgumentException if the arguments are null or invalid
      */
     @Override
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    public void setAutojoinRestrictionSecurityTypes(int restrictions, @NonNull Bundle extras) {
+    public void setAutojoinDisallowedSecurityTypes(int restrictions, @NonNull Bundle extras) {
         // SDK check.
         if (!SdkLevel.isAtLeastT()) {
             throw new UnsupportedOperationException("SDK level too old");
@@ -8900,20 +8893,20 @@ public class WifiServiceImpl extends BaseWifiService {
                     "Uid=" + uid + " is not allowed to set AutoJoinRestrictionSecurityTypes");
         }
         if (mVerboseLoggingEnabled) {
-            mLog.info("setAutoJoinRestrictionSecurityTypes uid=% Package Name=% restrictions=%")
+            mLog.info("setAutojoinDisallowedSecurityTypes uid=% Package Name=% restrictions=%")
                     .c(uid).c(getPackageName(extras)).c(restrictions).flush();
         }
         mWifiThreadRunner.post(() -> {
-            mWifiConnectivityManager.setAutojoinRestrictionSecurityTypes(restrictions);
-        }, TAG + "#setAutoJoinRestrictionSecurityTypes");
+            mWifiConnectivityManager.setAutojoinDisallowedSecurityTypes(restrictions);
+        }, TAG + "#setAutojoinDisallowedSecurityTypes");
     }
 
     /**
-     * See {@link WifiManager#getAutojoinRestrictionSecurityTypes(Executor, Consumer)}
+     * See {@link WifiManager#getAutojoinDisallowedSecurityTypes(Executor, Consumer)}
      */
     @Override
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    public void getAutojoinRestrictionSecurityTypes(@NonNull IIntegerListener listener,
+    public void getAutojoinDisallowedSecurityTypes(@NonNull IIntegerListener listener,
             @NonNull Bundle extras) {
         // SDK check.
         if (!SdkLevel.isAtLeastT()) {
@@ -8934,16 +8927,16 @@ public class WifiServiceImpl extends BaseWifiService {
                     "Uid=" + uid + " is not allowed to get AutoJoinRestrictionSecurityTypes");
         }
         if (mVerboseLoggingEnabled) {
-            mLog.info("getAutojoinRestrictionSecurityTypes:  Uid=% Package Name=%").c(
+            mLog.info("getAutojoinDisallowedSecurityTypes:  Uid=% Package Name=%").c(
                     Binder.getCallingUid()).c(getPackageName(extras)).flush();
         }
 
         mWifiThreadRunner.post(() -> {
             try {
-                listener.onResult(mWifiConnectivityManager.getAutojoinRestrictionSecurityTypes());
+                listener.onResult(mWifiConnectivityManager.getAutojoinDisallowedSecurityTypes());
             } catch (RemoteException e) {
                 Log.e(TAG, e.getMessage(), e);
             }
-        }, TAG + "#getAutojoinRestrictionSecurityTypes");
+        }, TAG + "#getAutojoinDisallowedSecurityTypes");
     }
 }

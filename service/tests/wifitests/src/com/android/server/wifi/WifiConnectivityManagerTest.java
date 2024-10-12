@@ -4920,27 +4920,27 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
     }
 
     /**
-     * Verify if setAutojoinRestrictionSecurityTypes method is working correctly.
-     * Also verify getAutojoinRestrictionSecurityTypes method is working correctly.
+     * Verify if setAutojoinDisallowedSecurityTypes method is working correctly.
+     * Also verify getAutojoinDisallowedSecurityTypes method is working correctly.
      */
     @Test
-    public void testSetAndGetAutojoinRestrictionSecurityTypes() {
+    public void testSetAndGetAutojoinDisallowedSecurityTypes() {
         // test default value of auto-join restriction secirity types (NONE)
         assertEquals(0/*restrict none by default*/,
-                mWifiConnectivityManager.getAutojoinRestrictionSecurityTypes());
+                mWifiConnectivityManager.getAutojoinDisallowedSecurityTypes());
 
         // test setting auto-join restriction on secirity types OPEN, WEP, and OWE
         int restrictOpenWepOwe = (0x1 << WifiInfo.SECURITY_TYPE_OPEN)
                 | (0x1 << WifiInfo.SECURITY_TYPE_WEP)
                 | (0x1 << WifiInfo.SECURITY_TYPE_OWE);
-        mWifiConnectivityManager.setAutojoinRestrictionSecurityTypes(restrictOpenWepOwe);
+        mWifiConnectivityManager.setAutojoinDisallowedSecurityTypes(restrictOpenWepOwe);
         assertEquals(restrictOpenWepOwe, mWifiConnectivityManager
-                .getAutojoinRestrictionSecurityTypes());
+                .getAutojoinDisallowedSecurityTypes());
 
         // test resetting auto-join restriction on all secirity types
-        mWifiConnectivityManager.setAutojoinRestrictionSecurityTypes(0/*restrict none*/);
+        mWifiConnectivityManager.setAutojoinDisallowedSecurityTypes(0/*restrict none*/);
         assertEquals(0/*restrict none*/, mWifiConnectivityManager
-                .getAutojoinRestrictionSecurityTypes());
+                .getAutojoinDisallowedSecurityTypes());
     }
 
     /*
