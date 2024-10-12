@@ -122,7 +122,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -1003,11 +1002,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     if (ApConfigUtil.isWpa3SaeSupported(mContext)) {
                         pw.println("wifi_softap_wpa3_sae_supported");
                     }
-                    BitSet featureSet = mWifiService.getSupportedFeaturesIfAllowed();
-                    if (featureSet.get(WifiManager.WIFI_FEATURE_BRIDGED_AP)) {
+                    if (mWifiService.isFeatureSupported(WifiManager.WIFI_FEATURE_BRIDGED_AP)) {
                         pw.println("wifi_softap_bridged_ap_supported");
                     }
-                    if (featureSet.get(WifiManager.WIFI_FEATURE_STA_BRIDGED_AP)) {
+                    if (mWifiService.isFeatureSupported(WifiManager.WIFI_FEATURE_STA_BRIDGED_AP)) {
                         pw.println("wifi_softap_bridged_ap_with_sta_supported");
                     }
                     return 0;
