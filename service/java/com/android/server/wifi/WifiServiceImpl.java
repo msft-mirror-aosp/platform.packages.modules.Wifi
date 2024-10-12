@@ -8855,14 +8855,14 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     /**
-     * See {@link WifiManager#setAutoJoinRestrictionSecurityTypes(int)}
+     * See {@link WifiManager#setAutojoinDisallowedSecurityTypes(int)}
      * @param restrictions The autojoin restriction security types to be set.
      * @throws SecurityException if the caller does not have permission.
      * @throws IllegalArgumentException if the arguments are null or invalid
      */
     @Override
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    public void setAutojoinRestrictionSecurityTypes(int restrictions, @NonNull Bundle extras) {
+    public void setAutojoinDisallowedSecurityTypes(int restrictions, @NonNull Bundle extras) {
         // SDK check.
         if (!SdkLevel.isAtLeastT()) {
             throw new UnsupportedOperationException("SDK level too old");
@@ -8893,20 +8893,20 @@ public class WifiServiceImpl extends BaseWifiService {
                     "Uid=" + uid + " is not allowed to set AutoJoinRestrictionSecurityTypes");
         }
         if (mVerboseLoggingEnabled) {
-            mLog.info("setAutoJoinRestrictionSecurityTypes uid=% Package Name=% restrictions=%")
+            mLog.info("setAutojoinDisallowedSecurityTypes uid=% Package Name=% restrictions=%")
                     .c(uid).c(getPackageName(extras)).c(restrictions).flush();
         }
         mWifiThreadRunner.post(() -> {
-            mWifiConnectivityManager.setAutojoinRestrictionSecurityTypes(restrictions);
-        }, TAG + "#setAutoJoinRestrictionSecurityTypes");
+            mWifiConnectivityManager.setAutojoinDisallowedSecurityTypes(restrictions);
+        }, TAG + "#setAutojoinDisallowedSecurityTypes");
     }
 
     /**
-     * See {@link WifiManager#getAutojoinRestrictionSecurityTypes(Executor, Consumer)}
+     * See {@link WifiManager#getAutojoinDisallowedSecurityTypes(Executor, Consumer)}
      */
     @Override
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    public void getAutojoinRestrictionSecurityTypes(@NonNull IIntegerListener listener,
+    public void getAutojoinDisallowedSecurityTypes(@NonNull IIntegerListener listener,
             @NonNull Bundle extras) {
         // SDK check.
         if (!SdkLevel.isAtLeastT()) {
@@ -8927,16 +8927,16 @@ public class WifiServiceImpl extends BaseWifiService {
                     "Uid=" + uid + " is not allowed to get AutoJoinRestrictionSecurityTypes");
         }
         if (mVerboseLoggingEnabled) {
-            mLog.info("getAutojoinRestrictionSecurityTypes:  Uid=% Package Name=%").c(
+            mLog.info("getAutojoinDisallowedSecurityTypes:  Uid=% Package Name=%").c(
                     Binder.getCallingUid()).c(getPackageName(extras)).flush();
         }
 
         mWifiThreadRunner.post(() -> {
             try {
-                listener.onResult(mWifiConnectivityManager.getAutojoinRestrictionSecurityTypes());
+                listener.onResult(mWifiConnectivityManager.getAutojoinDisallowedSecurityTypes());
             } catch (RemoteException e) {
                 Log.e(TAG, e.getMessage(), e);
             }
-        }, TAG + "#getAutojoinRestrictionSecurityTypes");
+        }, TAG + "#getAutojoinDisallowedSecurityTypes");
     }
 }
