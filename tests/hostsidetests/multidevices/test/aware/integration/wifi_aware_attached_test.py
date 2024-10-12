@@ -16,9 +16,8 @@
 """ACTS Wi-Fi Aware Attached test reimplemented in Mobly."""
 import sys
 
+from aware import aware_lib_utils as autils
 from aware import constants
-
-import aware_lib_utils as autils
 from mobly import asserts
 from mobly import base_test
 from mobly import records

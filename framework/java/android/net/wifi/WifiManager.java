@@ -12866,17 +12866,12 @@ public class WifiManager {
     }
 
     /**
-     * Restrict Wi-Fi autojoin on ScanResults matching the selected security types.
+     * Disallow Wi-Fi autojoin on ScanResults matching the selected security types.
      * This does not restrict manual connections.
      *
-     * @param restrictions The autojoin restriction types to be set. It should be a Set of Integers.
-     *                     If null value is provided, an IllegalArgumentException will be thrown.
-     *                     Set of {@link WifiAnnotations.SecurityType} constants specifying the
-     *                     autojoin restrictions on the device. If any restrictions are set, then
-     *                     the autojoin to the network should be skipped for the specified security
-     *                     types.
-     *                     However, certain combinations of restricted security types are not
-     *                     allowed.
+     * @param restrictions An array of {@code WifiInfo.SECURITY_TYPE_*} values to disallow autojoin.
+     *                     An empty array will clear all restrictions. Note, certain combinations of
+     *                     restricted security types are not valid.
      *                     1. restrictions contains WifiInfo.SECURITY_TYPE_OWE,
      *                        but not WifiInfo.SECURITY_TYPE_OPEN.
      *                     2. restrictions contains WifiInfo.SECURITY_TYPE_SAE,
@@ -12886,30 +12881,25 @@ public class WifiManager {
      *
      * Usage example:
      * <pre>
-     *                     To restrict autojoin to Wi-Fi networks with security type, OPEN, WEP
+     *                     To disallow autojoin to Wi-Fi networks with security type, OPEN, WEP
      *                     or OWE, use following argument.
      *
      *                     {@code
-     *                         Set<Integer> restrictions = new ArraySet<>(
-     *                                 Set.of(WifiInfo.SECURITY_TYPE_OPEN,
-     *                                         WifiInfo.SECURITY_TYPE_WEP,
-     *                                         WifiInfo.SECURITY_TYPE_OWE));
-     *                         wifiManager.setAutojoinRestrictionSecurityTypes(restrictions);
+     *                         int[] restrictions = {
+     *                                 WifiInfo.SECURITY_TYPE_OPEN,
+     *                                 WifiInfo.SECURITY_TYPE_WEP,
+     *                                 WifiInfo.SECURITY_TYPE_OWE };
+     *                         wifiManager.setAutojoinDisallowedSecurityTypes(restrictions);
      *                     }
      *
      *                     To clear autojoin restriction on all security types, use following
      *                     argument.
      *
      *                     {@code
-     *                         wifiManager.setAutojoinRestrictionSecurityTypes(
-     *                                 Collections.emptySet());
+     *                         wifiManager.setAutojoinDisallowedSecurityTypes(new int[0]);
      *                     }
      * </pre>
-     *
-     * @throws IllegalArgumentException if restrictions is null.
-     * @throws IllegalArgumentException if restrictions contains
-     *         Integer element out of [0, Integer.SIZE) range.
-     * @throws RemoteException if there is an error communicating with the system server.
+     * @throws UnsupportedOperationException if the API is not supported.
      * @hide
      */
     @SystemApi
@@ -12919,42 +12909,32 @@ public class WifiManager {
             android.Manifest.permission.NETWORK_SETTINGS,
             MANAGE_WIFI_NETWORK_SELECTION
     })
-    public void setAutojoinRestrictionSecurityTypes(
-            @NonNull @WifiAnnotations.SecurityType Set<Integer> restrictions) {
-        if (restrictions == null) {
-            throw new IllegalArgumentException("restrictions cannot be null");
+    public void setAutojoinDisallowedSecurityTypes(@NonNull int[] restrictions) {
+        if (!SdkLevel.isAtLeastT()) {
+            throw new UnsupportedOperationException();
         }
-        for (int securityType : restrictions) {
-            if (securityType < 0 || securityType >= Integer.SIZE) {
-                throw new IllegalArgumentException("restrictions include invalid value.");
-            }
-        }
+        Objects.requireNonNull(restrictions, "restrictions cannot be null");
         try {
             Bundle extras = new Bundle();
-            if (SdkLevel.isAtLeastS()) {
-                extras.putParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE,
-                        mContext.getAttributionSource());
-            }
+            extras.putParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE,
+                    mContext.getAttributionSource());
             int restrictionBitmap = 0;
             for (int securityType : restrictions) {
                 restrictionBitmap |= 0x1 << securityType;
             }
-            mService.setAutojoinRestrictionSecurityTypes(restrictionBitmap, extras);
+            mService.setAutojoinDisallowedSecurityTypes(restrictionBitmap, extras);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }
 
     /**
-     * Retrieves the autojoin restricted Wi-Fi security types, currently set for the device.
+     * Retrieves the autojoin disallowed Wi-Fi security types currently set for the device.
      *
      * @param executor The executor to run the callback on.
      * @param resultsCallback The callback to receive the result. It will be called with the
-     *                        retrieved autojoin restriction type as a Set of Integers.
-     *
-     * @throws NullPointerException if either executor or resultsCallback is null.
-     * @throws RemoteException if there is an error communicating with the system server.
-     *
+     *                        retrieved autojoin disallowed types as a array of int.
+     * @throws UnsupportedOperationException if the API is not supported.
      * @hide
      */
     @SystemApi
@@ -12964,28 +12944,33 @@ public class WifiManager {
             android.Manifest.permission.NETWORK_SETTINGS,
             MANAGE_WIFI_NETWORK_SELECTION
     })
-    public void getAutojoinRestrictionSecurityTypes(@NonNull @CallbackExecutor Executor executor,
-            @NonNull Consumer<Set<Integer>> resultsCallback) {
+    public void getAutojoinDisallowedSecurityTypes(@NonNull @CallbackExecutor Executor executor,
+            @NonNull Consumer<int[]> resultsCallback) {
+        if (!SdkLevel.isAtLeastT()) {
+            throw new UnsupportedOperationException();
+        }
         Objects.requireNonNull(executor, "executor cannot be null");
         Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
         try {
             Bundle extras = new Bundle();
-            if (SdkLevel.isAtLeastS()) {
-                extras.putParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE,
-                        mContext.getAttributionSource());
-            }
-            mService.getAutojoinRestrictionSecurityTypes(new IIntegerListener.Stub() {
+            extras.putParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE,
+                    mContext.getAttributionSource());
+            mService.getAutojoinDisallowedSecurityTypes(new IIntegerListener.Stub() {
                 @Override
                 public void onResult(int value) {
                     Binder.clearCallingIdentity();
                     executor.execute(() -> {
-                        Set<Integer> restrictions = new ArraySet<>();
+                        List<Integer> restrictions = new ArrayList<>();
                         for (int i = 0; i < Integer.SIZE; i++) {
                             if (((0x1 << i) & value) != 0) {
                                 restrictions.add(i);
                             }
                         }
-                        resultsCallback.accept(restrictions);
+                        int[] results = new int[restrictions.size()];
+                        for (int i = 0; i < restrictions.size(); i++) {
+                            results[i] = restrictions.get(i);
+                        }
+                        resultsCallback.accept(results);
                     });
                 }
             }, extras);
