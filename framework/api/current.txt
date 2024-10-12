@@ -55,6 +55,8 @@ package android.net.wifi {
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") public boolean is80211azNtbResponder();
     method public boolean is80211mcResponder();
     method public boolean isPasspointNetwork();
+    method @FlaggedApi("com.android.wifi.flags.secure_ranging") public boolean isRangingFrameProtectionRequired();
+    method @FlaggedApi("com.android.wifi.flags.secure_ranging") public boolean isSecureHeLtfSupported();
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") public boolean isTwtResponder();
     method public void writeToParcel(android.os.Parcel, int);
     field public String BSSID;
