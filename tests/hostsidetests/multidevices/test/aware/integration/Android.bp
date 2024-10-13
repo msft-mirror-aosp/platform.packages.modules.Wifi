@@ -17,16 +17,29 @@ package {
     default_applicable_licenses: ["Android-Apache-2.0"],
 }
 
-python_library_host {
-    name: "aware_lib_utils",
-    srcs: ["aware_lib_utils.py"],
-    libs: ["wifi_aware_constants"],
-}
-
 python_test_host {
     name: "WifiAwareAttachTestCases",
     main: "wifi_aware_attached_test.py",
     srcs: ["wifi_aware_attached_test.py"],
+    data: [":wifi_aware_snippet_new"],
+    libs: [
+        "aware_lib_utils",
+        "mobly",
+        "wifi_aware_constants",
+    ],
+    test_suites: [
+        "general-tests",
+    ],
+    test_options: {
+        unit_test: false,
+        tags: ["mobly"],
+    },
+}
+
+python_test_host {
+    name: "WifiAwareDiscoveryCases",
+    main: "wifi_aware_discovery_test.py",
+    srcs: ["wifi_aware_discovery_test.py"],
     data: [":wifi_aware_snippet_new"],
     libs: [
         "aware_lib_utils",
