@@ -201,7 +201,7 @@ public class WifiConnectivityManager {
     private int mInitialScanState = INITIAL_SCAN_STATE_COMPLETE;
     private boolean mAutoJoinEnabledExternal = true; // enabled by default
     private boolean mAutoJoinEnabledExternalSetByDeviceAdmin = false;
-    private int mAutojoinRestrictionSecurityTypes = 0; // restrict none by default
+    private int mAutojoinDisallowedSecurityTypes = 0; // restrict none by default
     private boolean mUntrustedConnectionAllowed = false;
     private Set<Integer> mRestrictedConnectionAllowedUids = new ArraySet<>();
     private boolean mOemPaidConnectionAllowed = false;
@@ -684,7 +684,7 @@ public class WifiConnectivityManager {
                 scanDetails, bssidBlocklist, cmmStates, mUntrustedConnectionAllowed,
                 mOemPaidConnectionAllowed, mOemPrivateConnectionAllowed,
                 mRestrictedConnectionAllowedUids, skipSufficiencyCheck,
-                mAutojoinRestrictionSecurityTypes);
+                mAutojoinDisallowedSecurityTypes);
         // Filter candidates before caching to avoid reconnecting on failure
         candidates = filterDelayedCarrierSelectionCandidates(candidates, listenerName,
                 isFullScan);
@@ -3667,17 +3667,17 @@ public class WifiConnectivityManager {
     /**
      * Set auto join restriction on select security types
      */
-    public void setAutojoinRestrictionSecurityTypes(int restrictions) {
+    public void setAutojoinDisallowedSecurityTypes(int restrictions) {
         localLog("Set auto join restriction on select security types - restrictions: "
                 + restrictions);
-        mAutojoinRestrictionSecurityTypes = restrictions;
+        mAutojoinDisallowedSecurityTypes = restrictions;
     }
 
     /**
      * Return auto join restriction on select security types
      */
-    public int getAutojoinRestrictionSecurityTypes() {
-        return mAutojoinRestrictionSecurityTypes;
+    public int getAutojoinDisallowedSecurityTypes() {
+        return mAutojoinDisallowedSecurityTypes;
     }
 
     /**

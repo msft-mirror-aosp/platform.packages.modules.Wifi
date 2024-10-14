@@ -4376,72 +4376,58 @@ public class WifiManagerTest {
     }
 
     @Test
-    public void testSetAutoJoinRestrictionSecurityTypesToWifiServiceImpl() throws Exception {
+    public void testSetAutojoinDisallowedSecurityTypesToWifiServiceImpl() throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
-        Set<Integer> restrictions = new ArraySet<>(
-                Set.of(WifiInfo.SECURITY_TYPE_OPEN,
-                        WifiInfo.SECURITY_TYPE_WEP,
-                        WifiInfo.SECURITY_TYPE_OWE));
+        int[] restrictions = {
+                WifiInfo.SECURITY_TYPE_OPEN,
+                WifiInfo.SECURITY_TYPE_WEP,
+                WifiInfo.SECURITY_TYPE_OWE };
         int restrictionBitmap = (0x1 << WifiInfo.SECURITY_TYPE_OPEN)
                 | (0x1 << WifiInfo.SECURITY_TYPE_WEP)
                 | (0x1 << WifiInfo.SECURITY_TYPE_OWE);
         ArgumentCaptor<Bundle> bundleCaptor = ArgumentCaptor.forClass(Bundle.class);
-        mWifiManager.setAutojoinRestrictionSecurityTypes(restrictions);
-        verify(mWifiService).setAutojoinRestrictionSecurityTypes(eq(restrictionBitmap),
+        mWifiManager.setAutojoinDisallowedSecurityTypes(restrictions);
+        verify(mWifiService).setAutojoinDisallowedSecurityTypes(eq(restrictionBitmap),
                 bundleCaptor.capture());
         assertEquals(mContext.getAttributionSource(),
                 bundleCaptor.getValue().getParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE));
 
         // Null argument
-        assertThrows(IllegalArgumentException.class,
-                () -> mWifiManager.setAutojoinRestrictionSecurityTypes(null));
-        // Argument with negative integer element, Valid integer range is [0, Integer.SIZE(32)).
-        assertThrows(IllegalArgumentException.class,
-                () -> mWifiManager.setAutojoinRestrictionSecurityTypes(new ArraySet<>(
-                        Set.of(WifiInfo.SECURITY_TYPE_OPEN,
-                                WifiInfo.SECURITY_TYPE_WEP,
-                                WifiInfo.SECURITY_TYPE_OWE,
-                                -1))));
-        // Argument with integer element, 32. Valid integer range is [0, Integer.SIZE(32)).
-        assertThrows(IllegalArgumentException.class,
-                () -> mWifiManager.setAutojoinRestrictionSecurityTypes(new ArraySet<>(
-                        Set.of(WifiInfo.SECURITY_TYPE_OPEN,
-                                WifiInfo.SECURITY_TYPE_WEP,
-                                WifiInfo.SECURITY_TYPE_OWE,
-                                Integer.SIZE))));
+        assertThrows(NullPointerException.class,
+                () -> mWifiManager.setAutojoinDisallowedSecurityTypes(null));
     }
 
     @Test
-    public void testGetAutoJoinRestrictionSecurityTypesToWifiServiceImpl() throws Exception {
+    public void testGetAutojoinDisallowedSecurityTypesToWifiServiceImpl() throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
-        final Set<Integer> restrictionToSet = new ArraySet<>(
-                Set.of(WifiInfo.SECURITY_TYPE_OPEN,
-                        WifiInfo.SECURITY_TYPE_WEP,
-                        WifiInfo.SECURITY_TYPE_OWE));
+        final int[] restrictionToSet = {
+                WifiInfo.SECURITY_TYPE_OPEN,
+                WifiInfo.SECURITY_TYPE_WEP,
+                WifiInfo.SECURITY_TYPE_OWE };
 
         final int restrictionBitmap = (0x1 << WifiInfo.SECURITY_TYPE_OPEN)
                 | (0x1 << WifiInfo.SECURITY_TYPE_WEP)
                 | (0x1 << WifiInfo.SECURITY_TYPE_OWE);
 
         SynchronousExecutor executor = mock(SynchronousExecutor.class);
-        Consumer<Set<Integer>> mockResultsCallback = mock(Consumer.class);
+        Consumer<int[]> mockResultsCallback = mock(Consumer.class);
 
         // null executor
         assertThrows(NullPointerException.class,
-                () -> mWifiManager.getAutojoinRestrictionSecurityTypes(null, mockResultsCallback));
+                () -> mWifiManager.getAutojoinDisallowedSecurityTypes(null, mockResultsCallback));
         // null resultsCallback
         assertThrows(NullPointerException.class,
-                () -> mWifiManager.getAutojoinRestrictionSecurityTypes(executor, null));
+                () -> mWifiManager.getAutojoinDisallowedSecurityTypes(executor, null));
 
         ArgumentCaptor<Bundle> bundleCaptor = ArgumentCaptor.forClass(Bundle.class);
         ArgumentCaptor<IIntegerListener.Stub> cbCaptor = ArgumentCaptor.forClass(
                 IIntegerListener.Stub.class);
 
-        ArgumentCaptor<Set<Integer>> resultCaptor = ArgumentCaptor.forClass(Set.class);
+        ArgumentCaptor<int[]> resultCaptor = ArgumentCaptor.forClass(int[].class);
 
-        mWifiManager.getAutojoinRestrictionSecurityTypes(new SynchronousExecutor(),
+        mWifiManager.getAutojoinDisallowedSecurityTypes(new SynchronousExecutor(),
                 mockResultsCallback);
-        verify(mWifiService).getAutojoinRestrictionSecurityTypes(cbCaptor.capture(),
+        verify(mWifiService).getAutojoinDisallowedSecurityTypes(cbCaptor.capture(),
                 bundleCaptor.capture());
         assertEquals(mContext.getAttributionSource(),
                 bundleCaptor.getValue().getParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE));
@@ -4449,6 +4435,6 @@ public class WifiManagerTest {
         cbCaptor.getValue().onResult(restrictionBitmap);
 
         verify(mockResultsCallback).accept(resultCaptor.capture());
-        assertEquals(restrictionToSet, resultCaptor.getValue());
+        assertArrayEquals(restrictionToSet, resultCaptor.getValue());
     }
 }
