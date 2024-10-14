@@ -100,7 +100,6 @@ import android.net.NetworkStack;
 import android.net.TetheringManager;
 import android.net.Uri;
 import android.net.ip.IpClientUtil;
-import android.net.wifi.BaseWifiService;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -133,6 +132,7 @@ import android.net.wifi.ITwtStatsListener;
 import android.net.wifi.IWifiBandsListener;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiLowLatencyLockListener;
+import android.net.wifi.IWifiManager;
 import android.net.wifi.IWifiNetworkSelectionConfigListener;
 import android.net.wifi.IWifiNetworkStateChangedListener;
 import android.net.wifi.IWifiVerboseLoggingStatusChangedListener;
@@ -265,7 +265,7 @@ import java.util.function.IntConsumer;
  * WifiService handles remote WiFi operation requests by implementing
  * the IWifiManager interface.
  */
-public class WifiServiceImpl extends BaseWifiService {
+public class WifiServiceImpl extends IWifiManager.Stub {
     private static final String TAG = "WifiService";
     private static final boolean VDBG = false;
 
@@ -1700,6 +1700,7 @@ public class WifiServiceImpl extends BaseWifiService {
     /**
      * See {@link WifiManager#registerCoexCallback(WifiManager.CoexCallback)}
      */
+    @Override
     @RequiresApi(Build.VERSION_CODES.S)
     public void registerCoexCallback(@NonNull ICoexCallback callback) {
         if (!SdkLevel.isAtLeastS()) {
@@ -1738,6 +1739,7 @@ public class WifiServiceImpl extends BaseWifiService {
     /**
      * See {@link WifiManager#unregisterCoexCallback(WifiManager.CoexCallback)}
      */
+    @Override
     @RequiresApi(Build.VERSION_CODES.S)
     public void unregisterCoexCallback(@NonNull ICoexCallback callback) {
         if (!SdkLevel.isAtLeastS()) {
@@ -3466,6 +3468,7 @@ public class WifiServiceImpl extends BaseWifiService {
     /**
      * See {@link WifiManager#getPrivilegedConnectedNetwork()}
      */
+    @Override
     public WifiConfiguration getPrivilegedConnectedNetwork(String packageName, String featureId,
             Bundle extras) {
         enforceReadCredentialPermission();
@@ -7058,6 +7061,7 @@ public class WifiServiceImpl extends BaseWifiService {
     /**
      * See {@link WifiManager#registerScanResultsCallback(WifiManager.ScanResultsCallback)}
      */
+    @Override
     public void registerScanResultsCallback(@NonNull IScanResultsCallback callback) {
         if (callback == null) {
             throw new IllegalArgumentException("callback must not be null");
@@ -8334,6 +8338,7 @@ public class WifiServiceImpl extends BaseWifiService {
      * See {@link WifiManager#removeWifiLowLatencyLockListener(
      * WifiManager.WifiLowLatencyLockListener)}
      */
+    @Override
     public void removeWifiLowLatencyLockListener(IWifiLowLatencyLockListener listener) {
         if (listener == null) {
             throw new IllegalArgumentException();
@@ -8363,6 +8368,7 @@ public class WifiServiceImpl extends BaseWifiService {
      * See {@link WifiManager#getMaxMloAssociationLinkCount(Executor, Consumer)}
      */
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @Override
     public void getMaxMloAssociationLinkCount(@NonNull IIntegerListener listener, Bundle extras) {
         // SDK check.
         if (!SdkLevel.isAtLeastU()) {
@@ -8394,6 +8400,7 @@ public class WifiServiceImpl extends BaseWifiService {
     /**
      * See {@link WifiManager#getMaxMloStrLinkCount(Executor, Consumer)}
      */
+    @Override
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     public void getMaxMloStrLinkCount(@NonNull IIntegerListener listener, Bundle extras) {
         // SDK check.
@@ -8426,6 +8433,7 @@ public class WifiServiceImpl extends BaseWifiService {
     /**
      * See {@link WifiManager#getSupportedSimultaneousBandCombinations(Executor, Consumer)}.
      */
+    @Override
     public void getSupportedSimultaneousBandCombinations(@NonNull IWifiBandsListener listener,
             Bundle extras) {
         // SDK check.

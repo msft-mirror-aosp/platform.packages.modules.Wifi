@@ -88,7 +88,6 @@ import com.android.modules.utils.StringParceledListSlice;
  */
 interface IWifiManager
 {
-    long getSupportedFeatures();
     boolean isFeatureSupported(int feature);
 
     oneway void getWifiActivityEnergyInfoAsync(in IOnWifiActivityEnergyInfoListener listener);
@@ -110,8 +109,6 @@ interface IWifiManager
     ParceledListSlice getPrivilegedConfiguredNetworks(String packageName, String featureId, in Bundle extras);
 
     WifiConfiguration getPrivilegedConnectedNetwork(String packageName, String featureId, in Bundle extras);
-
-    Map getAllMatchingFqdnsForScanResults(in List<ScanResult> scanResult);
 
     void setSsidsAllowlist(String packageName, in ParceledListSlice<WifiSsid> ssids);
 
@@ -272,8 +269,6 @@ interface IWifiManager
     boolean setWifiApConfiguration(in WifiConfiguration wifiConfig, String packageName);
 
     boolean setSoftApConfiguration(in SoftApConfiguration softApConfig, String packageName);
-
-    void notifyUserOfApBandConversion(String packageName);
 
     void enableTdls(String remoteIPAddress, boolean enable);
 
