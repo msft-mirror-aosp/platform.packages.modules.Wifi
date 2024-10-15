@@ -108,6 +108,10 @@ public class WifiMulticastLockManager {
             return mTag;
         }
 
+        public IBinder getBinder() {
+            return mBinder;
+        }
+
         public String toString() {
             return "Multicaster{" + mTag + " uid=" + mUid  + "}";
         }
@@ -169,14 +173,15 @@ public class WifiMulticastLockManager {
     }
 
     /** Releases a multicast lock */
-    public void releaseLock(String tag) {
+    public void releaseLock(IBinder binder, String tag) {
         int uid = Binder.getCallingUid();
         synchronized (mMulticasters) {
             mMulticastDisabled++;
             int size = mMulticasters.size();
             for (int i = size - 1; i >= 0; i--) {
                 Multicaster m = mMulticasters.get(i);
-                if ((m != null) && (m.getUid() == uid) && (m.getTag().equals(tag))) {
+                if ((m != null) && (m.getUid() == uid) && (m.getTag().equals(tag))
+                        && (m.getBinder() == binder)) {
                     removeMulticasterLocked(i, uid, tag);
                     break;
                 }
