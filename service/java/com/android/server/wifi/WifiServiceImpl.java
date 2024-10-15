@@ -5759,10 +5759,10 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     @Override
-    public void releaseMulticastLock(String tag) {
+    public void releaseMulticastLock(IBinder binder, String tag) {
         enforceMulticastChangePermission();
         mLog.info("releaseMulticastLock uid=% tag=%").c(Binder.getCallingUid()).c(tag).flush();
-        mWifiMulticastLockManager.releaseLock(tag);
+        mWifiMulticastLockManager.releaseLock(binder, tag);
     }
 
     @Override
