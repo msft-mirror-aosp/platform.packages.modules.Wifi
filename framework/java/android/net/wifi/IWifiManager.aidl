@@ -224,7 +224,7 @@ interface IWifiManager
 
     void acquireMulticastLock(IBinder binder, String tag);
 
-    void releaseMulticastLock(String tag);
+    void releaseMulticastLock(IBinder binder, String tag);
 
     void updateInterfaceIpState(String ifaceName, int mode);
 
@@ -521,7 +521,7 @@ interface IWifiManager
 
     boolean isPnoSupported();
 
-    void setAutojoinRestrictionSecurityTypes(int restrictions, in Bundle extras);
+    void setAutojoinDisallowedSecurityTypes(int restrictions, in Bundle extras);
 
-    void getAutojoinRestrictionSecurityTypes(in IIntegerListener listener, in Bundle extras);
+    void getAutojoinDisallowedSecurityTypes(in IIntegerListener listener, in Bundle extras);
 }

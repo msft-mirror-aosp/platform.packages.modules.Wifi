@@ -98,6 +98,7 @@ import com.android.internal.util.StateMachine;
 import com.android.internal.util.WakeupMessage;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.coex.CoexManager;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import com.google.common.collect.ImmutableList;
@@ -330,6 +331,7 @@ public class SoftApManagerTest extends WifiBaseTest {
         MockitoAnnotations.initMocks(this);
         mStaticMockSession = mockitoSession()
                 .mockStatic(WifiInjector.class)
+                .mockStatic(Flags.class)
                 .strictness(Strictness.LENIENT)
                 .startMocking();
         mLooper = new TestLooper();
@@ -4225,6 +4227,65 @@ public class SoftApManagerTest extends WifiBaseTest {
                 mTestSoftApCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
         startSoftApAndVerifyEnabled(apConfig, configBuilder.build(), false);
     }
+
+    /**
+     * Tests that 11BE configuration is disabled if there is existing 11Be SoftApManager.
+     */
+    @Test
+    public void testStartSoftApWith11BEConfigurationWhenExistingOther11BeSoftApManager()
+            throws Exception {
+        assumeTrue(SdkLevel.isAtLeastT());
+        when(Flags.mloSap()).thenReturn(true);
+        when(mResourceCache.getBoolean(R.bool.config_wifiSoftapIeee80211beSupported))
+                .thenReturn(true);
+        when(mResourceCache.getBoolean(R.bool.config_wifiSoftApSingleLinkMloInBridgedModeSupported))
+                .thenReturn(false);
+        when(mDeviceWiphyCapabilities.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
+                .thenReturn(true);
+        when(mActiveModeWarden.getNumberOf11beSoftApManager()).thenReturn(1);
+        mDeviceWiphyCapabilitiesSupports11Be = true;
+        Builder configBuilder = new SoftApConfiguration.Builder();
+        configBuilder.setBand(SoftApConfiguration.BAND_5GHZ);
+        configBuilder.setSsid(TEST_SSID);
+        configBuilder.setIeee80211beEnabled(true);
+        configBuilder.setPassphrase("somepassword",
+                SoftApConfiguration.SECURITY_TYPE_WPA3_SAE);
+        SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
+                WifiManager.IFACE_IP_MODE_TETHERED, configBuilder.build(),
+                mTestSoftApCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
+        SoftApConfiguration expectedConfig = configBuilder.setIeee80211beEnabled(false).build();
+        startSoftApAndVerifyEnabled(apConfig, expectedConfig, false);
+    }
+
+    /**
+     * Tests that 11BE configuration is NOT disabled even if there is existing 11Be SoftApManager
+     * when device support single link MLO in bridged mode. (2 MLDs are allowed case)
+     */
+    @Test
+    public void testStartSoftApWith11BEWhenExistingOther11BeSoftApButDualSingleLinkMLoSupported()
+            throws Exception {
+        assumeTrue(SdkLevel.isAtLeastT());
+        when(Flags.mloSap()).thenReturn(true);
+        when(mResourceCache.getBoolean(R.bool.config_wifiSoftapIeee80211beSupported))
+                .thenReturn(true);
+        when(mResourceCache.getBoolean(R.bool.config_wifiSoftApSingleLinkMloInBridgedModeSupported))
+                .thenReturn(true);
+        when(mDeviceWiphyCapabilities.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
+                .thenReturn(true);
+        when(mActiveModeWarden.getNumberOf11beSoftApManager()).thenReturn(1);
+        mDeviceWiphyCapabilitiesSupports11Be = true;
+        Builder configBuilder = new SoftApConfiguration.Builder();
+        configBuilder.setBand(SoftApConfiguration.BAND_5GHZ);
+        configBuilder.setSsid(TEST_SSID);
+        configBuilder.setIeee80211beEnabled(true);
+        configBuilder.setPassphrase("somepassword",
+                SoftApConfiguration.SECURITY_TYPE_WPA3_SAE);
+        SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
+                WifiManager.IFACE_IP_MODE_TETHERED, configBuilder.build(),
+                mTestSoftApCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
+        startSoftApAndVerifyEnabled(apConfig, configBuilder.build(), false);
+    }
+
 
     @Test
     public void testStartSoftApAutoUpgradeTo2g5gDbs() throws Exception {

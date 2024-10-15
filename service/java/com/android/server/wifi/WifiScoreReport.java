@@ -1125,11 +1125,14 @@ public class WifiScoreReport {
                 || netId != getCurrentNetId()
                 || isLocalOnlyOrRestrictedConnection()
                 || sessionId == INVALID_SESSION_ID) {
-            Log.w(TAG, "Cannot start external scoring"
-                    + " netId=" + netId
-                    + " currentNetId=" + getCurrentNetId()
-                    + " currentNetCapabilities=" + getCurrentNetCapabilities()
-                    + " sessionId=" + sessionId);
+            StringBuilder sb = new StringBuilder();
+            sb.append("Cannot start external scoring netId=").append(netId)
+                    .append(" currentNetId=").append(getCurrentNetId());
+            if (mVerboseLoggingEnabled) {
+                sb.append(" currentNetCapabilities=").append(getCurrentNetCapabilities());
+            }
+            sb.append(" sessionId=").append(sessionId);
+            Log.w(TAG, sb.toString());
             return;
         }
         mCurrentWifiConfiguration = mWifiConfigManager.getConfiguredNetwork(
