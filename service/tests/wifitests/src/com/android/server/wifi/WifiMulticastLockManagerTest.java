@@ -112,7 +112,7 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         assertEquals(Binder.getCallingUid(), wsCaptor.getValue().getAttributionUid());
         verify(mBatteryStats, times(0)).reportWifiMulticastDisabled(any());
 
-        mManager.releaseLock(WL_1_TAG);
+        mManager.releaseLock(binder, WL_1_TAG);
         verify(mBatteryStats).reportWifiMulticastDisabled(wsCaptor.capture());
         assertNotNull(wsCaptor.getValue());
         assertEquals(Binder.getCallingUid(), wsCaptor.getValue().getAttributionUid());
@@ -172,7 +172,7 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         // CMM2 filter stopped
         assertFalse(mFilterController2.isFilteringStarted());
 
-        mManager.releaseLock(WL_1_TAG);
+        mManager.releaseLock(binder, WL_1_TAG);
         assertFalse(mManager.isMulticastEnabled());
         // CMM1 filter started
         assertTrue(mFilterController.isFilteringStarted());
@@ -194,7 +194,7 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         verify(mBatteryStats).reportWifiMulticastEnabled(any());
         verify(mBatteryStats, never()).reportWifiMulticastDisabled(any());
 
-        mManager.releaseLock(WL_2_TAG);
+        mManager.releaseLock(binder, WL_2_TAG);
         verify(mBatteryStats, never()).reportWifiMulticastDisabled(any());
         assertTrue(mManager.isMulticastEnabled());
     }
@@ -222,12 +222,12 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         mManager.initializeFiltering();
         inOrderHandler.verify(mFilterController, never()).startFilteringMulticastPackets();
 
-        mManager.releaseLock(WL_2_TAG);
+        mManager.releaseLock(binder, WL_2_TAG);
         inOrderHandler.verify(mFilterController, never()).startFilteringMulticastPackets();
         inOrderBatteryStats.verify(mBatteryStats).reportWifiMulticastDisabled(any());
         assertTrue(mManager.isMulticastEnabled());
 
-        mManager.releaseLock(WL_1_TAG);
+        mManager.releaseLock(binder, WL_1_TAG);
         inOrderHandler.verify(mFilterController).startFilteringMulticastPackets();
         inOrderBatteryStats.verify(mBatteryStats).reportWifiMulticastDisabled(any());
         assertFalse(mManager.isMulticastEnabled());
@@ -256,14 +256,39 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         mManager.initializeFiltering();
         inOrderHandler.verify(mFilterController, never()).startFilteringMulticastPackets();
 
-        mManager.releaseLock(WL_1_TAG);
+        mManager.releaseLock(binder, WL_1_TAG);
         inOrderHandler.verify(mFilterController, never()).startFilteringMulticastPackets();
         inOrderBatteryStats.verify(mBatteryStats).reportWifiMulticastDisabled(any());
         assertTrue(mManager.isMulticastEnabled());
 
-        mManager.releaseLock(WL_2_TAG);
+        mManager.releaseLock(binder, WL_2_TAG);
         inOrderHandler.verify(mFilterController).startFilteringMulticastPackets();
         inOrderBatteryStats.verify(mBatteryStats).reportWifiMulticastDisabled(any());
+        assertFalse(mManager.isMulticastEnabled());
+    }
+
+    /**
+     * Verify the behavior when two separate locks are created using the same tag.
+     *
+     * Since locks are uniquely identified by (binder, tag), we expect that multicast is
+     * enabled until both locks have been released.
+     */
+    @Test
+    public void testMultipleLocksWithSameTag() throws RemoteException {
+        IBinder binder1 = mock(IBinder.class);
+        IBinder binder2 = mock(IBinder.class);
+
+        // Both acquired locks have the same tag
+        mManager.acquireLock(binder1, WL_1_TAG);
+        mManager.acquireLock(binder2, WL_1_TAG);
+        assertTrue(mManager.isMulticastEnabled());
+
+        mManager.releaseLock(binder1, WL_1_TAG);
+        verify(mBatteryStats, times(1)).reportWifiMulticastDisabled(any());
+        assertTrue(mManager.isMulticastEnabled());
+
+        mManager.releaseLock(binder2, WL_1_TAG);
+        verify(mBatteryStats, times(2)).reportWifiMulticastDisabled(any());
         assertFalse(mManager.isMulticastEnabled());
     }
 }
