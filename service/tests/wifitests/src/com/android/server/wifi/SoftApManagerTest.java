@@ -131,6 +131,7 @@ public class SoftApManagerTest extends WifiBaseTest {
     private static final String TEST_SECOND_INSTANCE_NAME = "testif2";
     private static final String OTHER_INTERFACE_NAME = "otherif";
     private static final String TEST_STA_INTERFACE_NAME = "testif0sta";
+    private static final long TEST_START_TIME_MILLIS = 1234567890;
     private static final long TEST_DEFAULT_SHUTDOWN_TIMEOUT_MILLIS = 600_000;
     private static final long TEST_DEFAULT_SHUTDOWN_IDLE_INSTANCE_IN_BRIDGED_MODE_TIMEOUT_MILLIS =
             300_000;
@@ -218,6 +219,7 @@ public class SoftApManagerTest extends WifiBaseTest {
     @Mock InterfaceConflictManager mInterfaceConflictManager;
     @Mock WifiInjector mWifiInjector;
     @Mock WifiCountryCode mWifiCountryCode;
+    @Mock Clock mClock;
     @Mock LocalLog mLocalLog;
     @Mock DeviceWiphyCapabilities mDeviceWiphyCapabilities;
 
@@ -408,6 +410,8 @@ public class SoftApManagerTest extends WifiBaseTest {
         when(mWifiNative.forceClientDisconnect(any(), any(), anyInt())).thenReturn(true);
         when(mWifiInjector.getWifiHandlerLocalLog()).thenReturn(mLocalLog);
         when(mWifiInjector.getWifiCountryCode()).thenReturn(mWifiCountryCode);
+        when(mWifiInjector.getClock()).thenReturn(mClock);
+        when(mClock.getWallClockMillis()).thenReturn(TEST_START_TIME_MILLIS);
         when(mWifiNative.getDeviceWiphyCapabilities(any(), anyBoolean())).thenReturn(
                 mDeviceWiphyCapabilities);
         when(mDeviceWiphyCapabilities.isWifiStandardSupported(ScanResult.WIFI_STANDARD_11BE))
@@ -1028,9 +1032,13 @@ public class SoftApManagerTest extends WifiBaseTest {
 
         // reset to clear verified Intents for ap state change updates
         reset(mContext);
+        when(mContext.getResourceCache()).thenReturn(mResourceCache);
 
         InOrder order = inOrder(mCallback, mListener, mContext);
 
+        int sessionDurationSeconds = 3000;
+        when(mClock.getWallClockMillis()).thenReturn(
+                TEST_START_TIME_MILLIS + (sessionDurationSeconds * 1000));
         mSoftApManager.stop();
         mLooper.dispatchAll();
 
@@ -1066,6 +1074,10 @@ public class SoftApManagerTest extends WifiBaseTest {
                 softApModeConfig.getTargetMode());
         order.verify(mListener).onStopped(mSoftApManager);
         verify(mCmiMonitor).unregisterListener(mCmiListenerCaptor.getValue());
+        verify(mWifiMetrics).writeSoftApStoppedEvent(eq(SoftApManager.STOP_EVENT_STOPPED),
+                any(), anyInt(), anyBoolean(), anyBoolean(), anyBoolean(), anyInt(), anyBoolean(),
+                eq(sessionDurationSeconds), anyInt(), anyInt(), anyInt(), anyBoolean(), anyInt(),
+                anyInt(), any());
     }
 
     /**

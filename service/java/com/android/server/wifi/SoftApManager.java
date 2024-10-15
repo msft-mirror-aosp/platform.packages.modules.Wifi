@@ -250,7 +250,7 @@ public class SoftApManager implements ActiveModeManager {
 
     private final SarManager mSarManager;
 
-    private String mStartTimestamp;
+    private long mStartTimestampMs;
 
     private long mDefaultShutdownTimeoutMillis;
 
@@ -684,7 +684,7 @@ public class SoftApManager implements ActiveModeManager {
         pw.println("mBridgedModeOpportunisticsShutdownTimeoutEnabled: "
                 + mBridgedModeOpportunisticsShutdownTimeoutEnabled);
         pw.println("mCurrentSoftApInfoMap " + mCurrentSoftApInfoMap);
-        pw.println("mStartTimestamp: " + mStartTimestamp);
+        pw.println("mStartTimestamp: " + FORMATTER.format(new Date(mStartTimestampMs)));
         pw.println("mSafeChannelFrequencyList: " + mSafeChannelFrequencyList.stream()
                 .map(Object::toString)
                 .collect(Collectors.joining(",")));
@@ -889,7 +889,7 @@ public class SoftApManager implements ActiveModeManager {
         }
 
         mWifiDiagnostics.startLogging(mApInterfaceName);
-        mStartTimestamp = FORMATTER.format(new Date(System.currentTimeMillis()));
+        mStartTimestampMs = mWifiInjector.getClock().getWallClockMillis();
         Log.d(getTag(), "Soft AP is started ");
 
         return START_RESULT_SUCCESS;
@@ -2027,6 +2027,7 @@ public class SoftApManager implements ActiveModeManager {
                             updateApState(WifiManager.WIFI_AP_STATE_DISABLING,
                                     WifiManager.WIFI_AP_STATE_ENABLING, 0);
                         }
+                        writeSoftApStoppedEvent(STOP_EVENT_STOPPED);
                         quitNow();
                         break;
                     case CMD_START:
@@ -2350,6 +2351,8 @@ public class SoftApManager implements ActiveModeManager {
         if (mCurrentSoftApConfiguration != null) {
             securityType = mCurrentSoftApConfiguration.getSecurityType();
         }
+        int durationSeconds =
+                (int) ((mWifiInjector.getClock().getWallClockMillis() - mStartTimestampMs) / 1000);
         // TODO(b/245824786): Fill out the rest of the fields
         mWifiMetrics.writeSoftApStoppedEvent(
                 stopEvent,
@@ -2360,7 +2363,7 @@ public class SoftApManager implements ActiveModeManager {
                 ApConfigUtil.isStaWithBridgedModeSupported(mContext, mWifiNative),
                 getCurrentStaFreqMhz(),
                 mDefaultShutdownTimeoutMillis > 0,
-                -1,
+                durationSeconds,
                 securityType,
                 standard,
                 -1,
