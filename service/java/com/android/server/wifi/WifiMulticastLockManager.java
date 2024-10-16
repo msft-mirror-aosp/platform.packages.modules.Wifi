@@ -90,9 +90,9 @@ public class WifiMulticastLockManager {
         int mUid;
         IBinder mBinder;
 
-        Multicaster(String tag, IBinder binder) {
+        Multicaster(int uid, IBinder binder, String tag) {
             mTag = tag;
-            mUid = Binder.getCallingUid();
+            mUid = uid;
             mBinder = binder;
             try {
                 mBinder.linkToDeath(this, 0);
@@ -224,8 +224,7 @@ public class WifiMulticastLockManager {
      * @param binder a binder used to ensure caller is still alive
      * @param tag string name of the caller.
      */
-    public void acquireLock(IBinder binder, String tag) {
-        int uid = Binder.getCallingUid();
+    public void acquireLock(int uid, IBinder binder, String tag) {
         synchronized (mLock) {
             mMulticastEnabled++;
 
@@ -235,7 +234,7 @@ public class WifiMulticastLockManager {
             }
             int numLocksHeldByUid = mNumLocksPerActiveOwner.getOrDefault(uid, 0);
             mNumLocksPerActiveOwner.put(uid, numLocksHeldByUid + 1);
-            mMulticasters.add(new Multicaster(tag, binder));
+            mMulticasters.add(new Multicaster(uid, binder, tag));
 
             // Note that we could call stopFilteringMulticastPackets only when
             // our new size == 1 (first call), but this function won't
@@ -255,8 +254,7 @@ public class WifiMulticastLockManager {
     }
 
     /** Releases a multicast lock */
-    public void releaseLock(IBinder binder, String tag) {
-        int uid = Binder.getCallingUid();
+    public void releaseLock(int uid, IBinder binder, String tag) {
         synchronized (mLock) {
             mMulticastDisabled++;
             int size = mMulticasters.size();
