@@ -17,6 +17,8 @@
 package com.android.server.wifi;
 
 import android.annotation.Nullable;
+import android.app.ActivityManager;
+import android.content.Context;
 import android.os.BatteryStatsManager;
 import android.os.Binder;
 import android.os.Handler;
@@ -40,8 +42,11 @@ import java.util.Map;
  */
 public class WifiMulticastLockManager {
     private static final String TAG = "WifiMulticastLockManager";
+    private static final int IMPORTANCE_THRESHOLD =
+            ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED;
     private final List<Multicaster> mMulticasters = new ArrayList<>();
     private final Map<Integer, Integer> mNumLocksPerActiveOwner = new HashMap<>();
+    private final Map<Integer, Integer> mNumLocksPerInactiveOwner = new HashMap<>();
     private int mMulticastEnabled = 0;
     private int mMulticastDisabled = 0;
     private final Handler mHandler;
@@ -62,13 +67,22 @@ public class WifiMulticastLockManager {
     public WifiMulticastLockManager(
             ActiveModeWarden activeModeWarden,
             BatteryStatsManager batteryStats,
-            Looper looper) {
+            Looper looper,
+            Context context) {
         mBatteryStats = batteryStats;
         mActiveModeWarden = activeModeWarden;
         mHandler = new Handler(looper);
 
         mActiveModeWarden.registerPrimaryClientModeManagerChangedCallback(
                 new PrimaryClientModeManagerChangedCallback());
+
+        ActivityManager activityManager = context.getSystemService(ActivityManager.class);
+        activityManager.addOnUidImportanceListener(new ActivityManager.OnUidImportanceListener() {
+            @Override
+            public void onUidImportance(final int uid, final int importance) {
+                handleImportanceChanged(uid, importance);
+            }
+        }, IMPORTANCE_THRESHOLD);
     }
 
     private class Multicaster implements IBinder.DeathRecipient {
@@ -121,11 +135,62 @@ public class WifiMulticastLockManager {
         }
     }
 
+    private boolean uidIsLockOwner(int uid) {
+        return mNumLocksPerActiveOwner.containsKey(uid)
+                || mNumLocksPerInactiveOwner.containsKey(uid);
+    }
+
+    private void transitionUidToActive(int uid) {
+        if (mNumLocksPerInactiveOwner.containsKey(uid)) {
+            mNumLocksPerActiveOwner.put(uid, mNumLocksPerInactiveOwner.get(uid));
+            mNumLocksPerInactiveOwner.remove(uid);
+        }
+    }
+
+    private void transitionUidToInactive(int uid) {
+        if (mNumLocksPerActiveOwner.containsKey(uid)) {
+            mNumLocksPerInactiveOwner.put(uid, mNumLocksPerActiveOwner.get(uid));
+            mNumLocksPerActiveOwner.remove(uid);
+        }
+    }
+
+    private void handleImportanceChanged(int uid, int importance) {
+        mHandler.post(() -> {
+            synchronized (mLock) {
+                if (!uidIsLockOwner(uid)) {
+                    return;
+                }
+
+                boolean uidIsNowActive = importance < IMPORTANCE_THRESHOLD;
+                boolean prevIsMulticastEnabled = isMulticastEnabled();
+                Log.i(TAG, "Handling importance changed for uid=" + uid
+                        + ", isNowActive=" + uidIsNowActive + ", importance=" + importance);
+                if (uidIsNowActive) {
+                    transitionUidToActive(uid);
+                } else {
+                    transitionUidToInactive(uid);
+                }
+
+                boolean currentIsMulticastEnabled = isMulticastEnabled();
+                if (prevIsMulticastEnabled != currentIsMulticastEnabled) {
+                    if (currentIsMulticastEnabled) {
+                        // Filtering should be stopped if multicast is enabled
+                        stopFilteringMulticastPackets();
+                    } else {
+                        startFilteringMulticastPackets();
+                    }
+                }
+            }
+        });
+    }
+
     protected void dump(PrintWriter pw) {
         pw.println("mMulticastEnabled " + mMulticastEnabled);
         pw.println("mMulticastDisabled " + mMulticastDisabled);
-        pw.println("Multicast Locks held:");
         synchronized (mLock) {
+            pw.println("Active lock owners: " + mNumLocksPerActiveOwner);
+            pw.println("Inactive lock owners: " + mNumLocksPerInactiveOwner);
+            pw.println("Multicast Locks held:");
             for (Multicaster l : mMulticasters) {
                 pw.print("    ");
                 pw.println(l);
@@ -148,6 +213,12 @@ public class WifiMulticastLockManager {
         }
     }
 
+    private void stopFilteringMulticastPackets() {
+        mActiveModeWarden.getPrimaryClientModeManager()
+                .getMcastLockManagerFilterController()
+                .stopFilteringMulticastPackets();
+    }
+
     /**
      * Acquire a multicast lock.
      * @param binder a binder used to ensure caller is still alive
@@ -157,9 +228,15 @@ public class WifiMulticastLockManager {
         int uid = Binder.getCallingUid();
         synchronized (mLock) {
             mMulticastEnabled++;
+
+            // Assume that the application is active if it is requesting a lock
+            if (mNumLocksPerInactiveOwner.containsKey(uid)) {
+                transitionUidToActive(uid);
+            }
             int numLocksHeldByUid = mNumLocksPerActiveOwner.getOrDefault(uid, 0);
             mNumLocksPerActiveOwner.put(uid, numLocksHeldByUid + 1);
             mMulticasters.add(new Multicaster(tag, binder));
+
             // Note that we could call stopFilteringMulticastPackets only when
             // our new size == 1 (first call), but this function won't
             // be called often and by making the stopPacket call each
@@ -194,12 +271,12 @@ public class WifiMulticastLockManager {
         }
     }
 
-    private void decrementNumLocksForUid(int uid) {
-        int numLocksHeldByUid = mNumLocksPerActiveOwner.get(uid) - 1;
+    private void decrementNumLocksForUid(int uid, Map<Integer, Integer> map) {
+        int numLocksHeldByUid = map.get(uid) - 1;
         if (numLocksHeldByUid == 0) {
-            mNumLocksPerActiveOwner.remove(uid);
+            map.remove(uid);
         } else {
-            mNumLocksPerActiveOwner.put(uid, numLocksHeldByUid);
+            map.put(uid, numLocksHeldByUid);
         }
     }
 
@@ -210,7 +287,9 @@ public class WifiMulticastLockManager {
         }
 
         if (mNumLocksPerActiveOwner.containsKey(uid)) {
-            decrementNumLocksForUid(uid);
+            decrementNumLocksForUid(uid, mNumLocksPerActiveOwner);
+        } else if (mNumLocksPerInactiveOwner.containsKey(uid)) {
+            decrementNumLocksForUid(uid, mNumLocksPerInactiveOwner);
         }
 
         if (!isMulticastEnabled()) {

@@ -22,6 +22,8 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TR
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
+import android.app.ActivityManager;
+import android.content.Context;
 import android.os.BatteryStatsManager;
 import android.os.Binder;
 import android.os.IBinder;
@@ -58,7 +60,11 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
     @Spy FakeFilterController mFilterController2 = new FakeFilterController();
     @Mock BatteryStatsManager mBatteryStats;
     @Mock ActiveModeWarden mActiveModeWarden;
+    @Mock Context mContext;
+    @Mock ActivityManager mActivityManager;
     @Captor ArgumentCaptor<PrimaryClientModeManagerChangedCallback> mPrimaryChangedCallbackCaptor;
+    @Captor ArgumentCaptor<ActivityManager.OnUidImportanceListener> mUidImportanceListenerCaptor =
+            ArgumentCaptor.forClass(ActivityManager.OnUidImportanceListener.class);
     WifiMulticastLockManager mManager;
 
     /**
@@ -78,11 +84,14 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         when(mClientModeManager2.getRole()).thenReturn(ROLE_CLIENT_SECONDARY_TRANSIENT);
 
         when(mActiveModeWarden.getPrimaryClientModeManager()).thenReturn(mClientModeManager);
+        when(mContext.getSystemService(ActivityManager.class)).thenReturn(mActivityManager);
         mManager = new WifiMulticastLockManager(mActiveModeWarden, mBatteryStats,
-                mLooper.getLooper());
+                mLooper.getLooper(), mContext);
 
         verify(mActiveModeWarden).registerPrimaryClientModeManagerChangedCallback(
                 mPrimaryChangedCallbackCaptor.capture());
+        verify(mActivityManager).addOnUidImportanceListener(
+                mUidImportanceListenerCaptor.capture(), anyInt());
     }
 
     /**
@@ -290,5 +299,37 @@ public class WifiMulticastLockManagerTest extends WifiBaseTest {
         mManager.releaseLock(binder2, WL_1_TAG);
         verify(mBatteryStats, times(2)).reportWifiMulticastDisabled(any());
         assertFalse(mManager.isMulticastEnabled());
+    }
+
+    /**
+     * Test that mulicast filtering is toggled correctly when the owner of
+     * a single lock transitions between importance levels.
+     */
+    @Test
+    public void testSingleLockActiveStateChange() {
+        int uid = Binder.getCallingUid();
+        IBinder binder = mock(IBinder.class);
+
+        mManager.acquireLock(binder, WL_1_TAG);
+        assertTrue(mManager.isMulticastEnabled());
+        verify(mFilterController).stopFilteringMulticastPackets();
+
+        // Transition UID to low importance
+        mUidImportanceListenerCaptor.getValue().onUidImportance(
+                uid, ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHED);
+        mLooper.dispatchAll();
+        assertFalse(mManager.isMulticastEnabled());
+        verify(mFilterController).startFilteringMulticastPackets();
+
+        // Transition UID to high importance
+        mUidImportanceListenerCaptor.getValue().onUidImportance(
+                uid, ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND);
+        mLooper.dispatchAll();
+        assertTrue(mManager.isMulticastEnabled());
+        verify(mFilterController, times(2)).stopFilteringMulticastPackets();
+
+        mManager.releaseLock(binder, WL_1_TAG);
+        assertFalse(mManager.isMulticastEnabled());
+        verify(mFilterController, times(2)).startFilteringMulticastPackets();
     }
 }
