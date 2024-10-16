@@ -275,6 +275,11 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         @Override
         public void onBlockedClientConnecting(WifiClient client, int reason) {
         }
+
+        @Override
+        public void onClientsDisconnected(SoftApInfo info, List<WifiClient> clients) {
+            mPrintWriter.println("onClientsDisconnected, info: " + info + ", clients: " + clients);
+        }
     }
 
     /**

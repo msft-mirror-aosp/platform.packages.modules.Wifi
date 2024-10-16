@@ -30,10 +30,10 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TR
 import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_LOCAL_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_TETHERED;
 import static com.android.server.wifi.ActiveModeWarden.INTERNAL_REQUESTOR_WS;
-import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_STA_BANDS;
 import static com.android.server.wifi.TestUtil.addCapabilitiesToBitset;
 import static com.android.server.wifi.TestUtil.combineBitsets;
 import static com.android.server.wifi.TestUtil.createCapabilityBitset;
+import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_STA_BANDS;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -126,6 +126,7 @@ import org.mockito.stubbing.Answer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
@@ -1079,6 +1080,21 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         verify(mSoftApStateMachineCallback).onConnectedClientsOrInfoChanged(
                 testInfos, testClients, false);
+    }
+
+    /**
+     * Verifies that ClientsDisconnected event is being passed from SoftApManager
+     * to WifiServiceImpl.
+     */
+    @Test
+    public void callsWifiServiceCallbackOnSoftApClientsDisconnected() throws Exception {
+        List<WifiClient> testClients = new ArrayList<>();
+        enterSoftApActiveMode();
+        mSoftApManagerCallback.onClientsDisconnected(mTestSoftApInfo, testClients);
+        mLooper.dispatchAll();
+
+        verify(mSoftApStateMachineCallback).onClientsDisconnected(
+                mTestSoftApInfo, testClients);
     }
 
     /**
