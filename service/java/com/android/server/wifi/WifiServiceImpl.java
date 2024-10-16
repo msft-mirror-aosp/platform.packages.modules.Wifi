@@ -100,6 +100,8 @@ import android.net.NetworkStack;
 import android.net.TetheringManager;
 import android.net.Uri;
 import android.net.ip.IpClientUtil;
+import android.net.thread.ThreadNetworkController;
+import android.net.thread.ThreadNetworkManager;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -939,6 +941,24 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 if (uwbManager != null) {
                     uwbManager.registerAdapterStateCallback(new HandlerExecutor(new Handler(
                             mWifiHandlerThread.getLooper())), new UwbAdapterStateListener());
+                }
+            }
+
+            if (SdkLevel.isAtLeastV()) {
+                ThreadNetworkManager threadManager =
+                        mContext.getSystemService(ThreadNetworkManager.class);
+                if (threadManager != null) {
+                    List<ThreadNetworkController> threadNetworkControllers =
+                            threadManager.getAllThreadNetworkControllers();
+                    if (threadNetworkControllers.size() > 0) {
+                        ThreadNetworkController threadNetworkController =
+                                threadNetworkControllers.get(0);
+                        if (threadNetworkController != null) {
+                            threadNetworkController.registerStateCallback(
+                                new HandlerExecutor(new Handler(mWifiHandlerThread.getLooper())),
+                                new ThreadStateListener());
+                        }
+                    }
                 }
             }
         }, TAG + "#handleBootCompleted");
@@ -2183,6 +2203,20 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             }
             mWifiMetrics.setLastUwbState(state);
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    class ThreadStateListener implements ThreadNetworkController.StateCallback {
+        @Override
+        public void onDeviceRoleChanged(int mDeviceRole) {
+            if (mVerboseLoggingEnabled) {
+                Log.d(TAG, "ThreadNetworkController.DeviceRole=" + mDeviceRole);
+            }
+            mWifiMetrics.setLastThreadDeviceRole(mDeviceRole);
+        }
+
+        @Override
+        public void onPartitionIdChanged(long mPartitionId) {}
     }
 
     /**
