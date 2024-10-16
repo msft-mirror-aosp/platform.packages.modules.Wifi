@@ -214,8 +214,8 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             config["DiscoveryType"] = ptype
         else:
             config["DiscoveryType"] = stype
-        config["TtlSec"] = ttl
-        config["TerminateNotificationEnabled"] = term_ind_on
+        config[constants.TTL_SEC] = ttl
+        config[constants.TERMINATE_NOTIFICATION_ENABLED] = term_ind_on
         if payload_size == _PAYLOAD_SIZE_MIN:
             config[constants.SERVICE_NAME] = "a"
             config[constants.SERVICE_SPECIFIC_INFO] = None
@@ -425,6 +425,253 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
         self.publisher.wifi_aware_snippet.wifiAwareDetach(pid)
         self.subscriber.wifi_aware_snippet.wifiAwareDetach(sid)
 
+    def verify_discovery_session_term(self, dut, disc_id, config, is_publish,
+                                      term_ind_on):
+        """Utility to verify that the specified discovery session has terminated.
+        (by waiting for the TTL and then attempting to reconfigure).
+
+        Args:
+            dut: device under test
+            disc_id: discovery id for the existing session
+            config: configuration of the existing session
+            is_publish: True if the configuration was publish, False if subscribe
+            term_ind_on: True if a termination indication is expected, False otherwise
+        """
+        # Wait for session termination
+        if term_ind_on:
+            disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.SESSION_TERMINATED,
+                timeout = _DEFAULT_TIMEOUT)
+        else:
+            autils.callback_no_response(
+                disc_id,
+                constants.DiscoverySessionCallbackMethodType.SESSION_TERMINATED,
+                timeout = _DEFAULT_TIMEOUT)
+        config[constants.SERVICE_SPECIFIC_INFO] = "something else"
+        if is_publish:
+            dut.wifi_aware_snippet.wifiAwareUpdatePublish(
+            disc_id.callback_id, config
+            )
+        else:
+            dut.wifi_aware_snippet.wifiAwareUpdateSubscribe(
+            disc_id.callback_id, config
+            )
+        if not term_ind_on:
+            disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.SESSION_CONFIG_FAILED,
+                timeout =_DEFAULT_TIMEOUT
+                )
+
+    def positive_ttl_test_utility(self, is_publish, ptype, stype, term_ind_on):
+        """Utility which runs a positive discovery session TTL configuration test.
+
+        Iteration 1: Verify session started with TTL
+        Iteration 2: Verify session started without TTL and reconfigured with TTL
+        Iteration 3: Verify session started with (long) TTL and reconfigured with
+                 (short) TTL
+
+        Args:
+            is_publish: True if testing publish, False if testing subscribe
+            ptype: Publish discovery type (used if is_publish is True)
+            stype: Subscribe discovery type (used if is_publish is False)
+            term_ind_on: Configuration of termination indication
+        """
+        SHORT_TTL = 5  # 5 seconds
+        LONG_TTL = 100  # 100 seconds
+        dut = self.ads[0]
+        id = self._start_attach(dut)
+        # Iteration 1: Start discovery session with TTL
+        config = self.create_base_config(
+            dut.wifi_aware_snippet.getCharacteristics(),
+            is_publish,
+            ptype, stype,
+            _PAYLOAD_SIZE_TYPICAL,
+            SHORT_TTL,
+            term_ind_on,
+            False)
+        if is_publish:
+            disc_id = dut.wifi_aware_snippet.wifiAwarePublish(
+                id, config
+                )
+            p_discovery = disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+            callback_name = p_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+                callback_name,
+                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                )
+        else:
+            disc_id = dut.wifi_aware_snippet.wifiAwareSubscribe(
+                id, config
+                )
+            s_discovery = disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+            callback_name = s_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+                callback_name,
+                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                )
+        # Wait for session termination & verify
+        self.verify_discovery_session_term(dut, disc_id, config, is_publish,
+                                           term_ind_on)
+        # Iteration 2: Start a discovery session without TTL
+        config = self.create_base_config(
+            dut.wifi_aware_snippet.getCharacteristics(),
+            is_publish,
+            ptype, stype,
+            _PAYLOAD_SIZE_TYPICAL,
+            0,
+            term_ind_on,
+            False)
+        if is_publish:
+            disc_id = dut.wifi_aware_snippet.wifiAwarePublish(
+                id, config
+                )
+            p_discovery = disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+            callback_name = p_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+                callback_name,
+                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                )
+        else:
+            disc_id = dut.wifi_aware_snippet.wifiAwareSubscribe(
+                id, config
+                )
+            s_discovery = disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+            callback_name = s_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+                callback_name,
+                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                )
+        # Update with a TTL
+        config = self.create_base_config(
+            dut.wifi_aware_snippet.getCharacteristics(),
+            is_publish,
+            ptype, stype,
+            _PAYLOAD_SIZE_TYPICAL,
+            SHORT_TTL,
+            term_ind_on,
+            False)
+        if is_publish:
+            disc_id = dut.wifi_aware_snippet.wifiAwarePublish(
+                id, config
+                )
+            p_discovery = disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+            callback_name = p_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+                callback_name,
+                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                )
+        else:
+            disc_id = dut.wifi_aware_snippet.wifiAwareSubscribe(
+                id, config
+                )
+            s_discovery = disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+            callback_name = s_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+                callback_name,
+                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                )
+        # Wait for session termination & verify
+        self.verify_discovery_session_term(dut, disc_id, config, is_publish,
+                                           term_ind_on)
+        # Iteration 3: Start a discovery session with (long) TTL
+        config = self.create_base_config(
+            dut.wifi_aware_snippet.getCharacteristics(),
+            is_publish,
+            ptype, stype,
+            _PAYLOAD_SIZE_TYPICAL,
+            LONG_TTL,
+            term_ind_on,
+            False)
+        if is_publish:
+            disc_id = dut.wifi_aware_snippet.wifiAwarePublish(
+                id, config
+                )
+            p_discovery = disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+            callback_name = p_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+                callback_name,
+                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                )
+        else:
+            disc_id = dut.wifi_aware_snippet.wifiAwareSubscribe(
+                id, config
+                )
+            s_discovery = disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+            callback_name = s_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+                callback_name,
+                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                )
+        # Update with a TTL
+        config = self.create_base_config(
+            dut.wifi_aware_snippet.getCharacteristics(),
+            is_publish,
+            ptype, stype,
+            _PAYLOAD_SIZE_TYPICAL,
+            SHORT_TTL,
+            term_ind_on,
+            False)
+        if is_publish:
+            disc_id = dut.wifi_aware_snippet.wifiAwarePublish(
+                id, config
+                )
+            p_discovery = disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+            callback_name = p_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+                callback_name,
+                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                )
+        else:
+            disc_id = dut.wifi_aware_snippet.wifiAwareSubscribe(
+                id, config
+                )
+            s_discovery = disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+            callback_name = s_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+                callback_name,
+                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                )
+        # Wait for session termination & verify
+        self.verify_discovery_session_term(dut, disc_id, config, is_publish,
+                                           term_ind_on)
+        # verify that forbidden callbacks aren't called
+        if not term_ind_on:
+             autils.validate_forbidden_callbacks(
+                 dut,{
+                    "2": 0,
+                    "3": 0})
+
+
     def test_positive_unsolicited_passive_typical(self)-> None:
         """Functional test case / Discovery test cases / positive test case:
         - Unsolicited publish + passive subscribe
@@ -502,6 +749,105 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
              _SUBSCRIBE_TYPE_ACTIVE,
              _PAYLOAD_SIZE_MAX
             )
+
+    #######################################
+    # TTL tests key:
+    #
+    # names is: test_ttl_<pub_type|sub_type>_<term_ind>
+    # where:
+    #
+    # pub_type: Type of publish discovery session: unsolicited or solicited.
+    # sub_type: Type of subscribe discovery session: passive or active.
+    # term_ind: ind_on or ind_off
+    #######################################
+
+    def test_ttl_unsolicited_ind_on(self)-> None:
+        """Functional test case / Discovery test cases / TTL test case:
+        - Unsolicited publish
+        - Termination indication enabled
+        """
+        self.positive_ttl_test_utility(
+            is_publish=True,
+            ptype=_PUBLISH_TYPE_UNSOLICITED,
+            stype=None,
+            term_ind_on=True)
+
+    def test_ttl_unsolicited_ind_off(self)-> None:
+        """Functional test case / Discovery test cases / TTL test case:
+        - Unsolicited publish
+        - Termination indication disabled
+        """
+        self.positive_ttl_test_utility(
+            is_publish=True,
+            ptype=_PUBLISH_TYPE_UNSOLICITED,
+            stype=None,
+            term_ind_on=False)
+
+    def test_ttl_solicited_ind_on(self)-> None:
+        """Functional test case / Discovery test cases / TTL test case:
+        - Solicited publish
+        - Termination indication enabled
+        """
+        self.positive_ttl_test_utility(
+            is_publish=True,
+            ptype=_PUBLISH_TYPE_SOLICITED,
+            stype=None,
+            term_ind_on=True)
+
+    def test_ttl_solicited_ind_off(self)-> None:
+        """Functional test case / Discovery test cases / TTL test case:
+        - Solicited publish
+        - Termination indication disabled
+        """
+        self.positive_ttl_test_utility(
+            is_publish=True,
+            ptype=_PUBLISH_TYPE_SOLICITED,
+            stype=None,
+            term_ind_on=False)
+
+    def test_ttl_passive_ind_on(self)-> None:
+        """Functional test case / Discovery test cases / TTL test case:
+        - Passive subscribe
+        - Termination indication enabled
+        """
+        self.positive_ttl_test_utility(
+            is_publish=False,
+            ptype=None,
+            stype=_SUBSCRIBE_TYPE_PASSIVE,
+            term_ind_on=True)
+
+    def test_ttl_passive_ind_off(self)-> None:
+        """Functional test case / Discovery test cases / TTL test case:
+        - Passive subscribe
+        - Termination indication disabled
+        """
+        self.positive_ttl_test_utility(
+            is_publish=False,
+            ptype=None,
+            stype=_SUBSCRIBE_TYPE_PASSIVE,
+            term_ind_on=False)
+
+    def test_ttl_active_ind_on(self)-> None:
+        """Functional test case / Discovery test cases / TTL test case:
+        - Active subscribe
+        - Termination indication enabled
+        """
+        self.positive_ttl_test_utility(
+            is_publish=False,
+            ptype=None,
+            stype=_SUBSCRIBE_TYPE_ACTIVE,
+            term_ind_on=True)
+
+    def test_ttl_active_ind_off(self)-> None:
+        """Functional test case / Discovery test cases / TTL test case:
+        - Active subscribe
+        - Termination indication disabled
+        """
+        self.positive_ttl_test_utility(
+            is_publish=False,
+            ptype=None,
+            stype=_SUBSCRIBE_TYPE_ACTIVE,
+            term_ind_on=False)
 
 
 if __name__ == '__main__':
