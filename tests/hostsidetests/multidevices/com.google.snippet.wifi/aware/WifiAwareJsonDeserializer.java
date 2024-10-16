@@ -45,6 +45,7 @@ public class WifiAwareJsonDeserializer {
     private static final String TERMINATE_NOTIFICATION_ENABLED = "terminate_notification_enabled";
     private static final String MAX_DISTANCE_MM = "max_distance_mm";
     private static final String PAIRING_CONFIG = "pairing_config";
+    private static final String TTL_SEC = "TtlSec";
     // PublishConfig special
     private static final String PUBLISH_TYPE = "publish_type";
     private static final String RANGING_ENABLED = "ranging_enabled";
@@ -115,6 +116,9 @@ public class WifiAwareJsonDeserializer {
             JSONObject pairingConfigObject = jsonObject.getJSONObject(PAIRING_CONFIG);
             AwarePairingConfig pairingConfig = jsonToAwarePairingConfig(pairingConfigObject);
             builder.setPairingConfig(pairingConfig);
+        }
+        if (jsonObject.has(TTL_SEC)) {
+            builder.setTtlSec(jsonObject.getInt(TTL_SEC));
         }
         return builder.build();
     }
@@ -190,6 +194,9 @@ public class WifiAwareJsonDeserializer {
             JSONObject pairingConfigObject = jsonObject.getJSONObject(PAIRING_CONFIG);
             AwarePairingConfig pairingConfig = jsonToAwarePairingConfig(pairingConfigObject);
             builder.setPairingConfig(pairingConfig);
+        }
+        if (jsonObject.has(TTL_SEC)) {
+            builder.setTtlSec(jsonObject.getInt(TTL_SEC));
         }
         return builder.build();
     }

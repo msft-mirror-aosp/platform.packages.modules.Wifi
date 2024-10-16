@@ -33,6 +33,7 @@ TERMINATE_NOTIFICATION_ENABLED = "terminate_notification_enabled"
 MAX_DISTANCE_MM = "max_distance_mm"
 PAIRING_CONFIG = "pairing_config"
 AWARE_NETWORK_INFO_CLASS_NAME = "android.net.wifi.aware.WifiAwareNetworkInfo"
+TTL_SEC = "TtlSec"
 
 
 @enum.unique
