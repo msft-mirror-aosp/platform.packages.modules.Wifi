@@ -344,6 +344,7 @@
           <item type="integer" name="config_wifi80211azMaxTimeBetweenNtbMeasurementsMicros"/>
           <item type="bool" name="config_wifiD2dAllowedControlSupportedWhenInfraStaDisabled" />
           <item type="array" name="config_wifiTwtBlockedOuiList" />
+          <item type="integer" name="config_wifiSoftApMaxNumberMLDSupported"/>
           <item type="bool" name="config_wifiSoftApSingleLinkMloInBridgedModeSupported" />
           <item type="bool" name="config_wifiTwtSupported" />
           <item type="bool" name="config_wifiNetworkSelectionSetTargetBssid" />
