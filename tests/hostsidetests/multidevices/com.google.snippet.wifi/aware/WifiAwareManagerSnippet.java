@@ -315,9 +315,7 @@ public class WifiAwareManagerSnippet implements Snippet {
 
         @Override
         public void onSessionConfigFailed() {
-            SnippetEvent snippetEvent = new SnippetEvent(mCallBackId, "discoveryResult");
-            snippetEvent.getData().putString("callbackName", "onSessionConfigFailed");
-            EventCache.getInstance().postEvent(snippetEvent);
+            sendEvent(mCallBackId, "onSessionConfigFailed");
         }
 
         @Override
