@@ -515,7 +515,10 @@ public class WifiConfigurationUtil {
         return true;
     }
 
-    private static boolean validatePassword(String password, boolean isAdd, boolean isSae,
+    /**
+     * Checks that a password is formatted correctly.
+     */
+    public static boolean validatePassword(String password, boolean isAdd, boolean isSae,
             boolean isWapi) {
         if (isAdd) {
             if (password == null) {
