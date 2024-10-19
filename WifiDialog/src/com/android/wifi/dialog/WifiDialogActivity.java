@@ -667,6 +667,9 @@ public class WifiDialogActivity extends Activity  {
                                 (int) millisUntilFinished);
                     }
 
+                    if (!getWifiBoolean("config_p2pInvitationReceivedDialogShowRemainingTime")) {
+                        return;
+                    }
                     int secondsRemaining = (int) millisUntilFinished / 1000;
                     if (millisUntilFinished % 1000 != 0) {
                         // Round up to the nearest whole second.
