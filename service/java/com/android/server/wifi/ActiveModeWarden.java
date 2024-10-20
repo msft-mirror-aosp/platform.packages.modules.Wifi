@@ -2927,4 +2927,21 @@ public class ActiveModeWarden {
         mSettingsStore.updateSatelliteModeTracker();
         mWifiController.sendMessage(WifiController.CMD_SATELLITE_MODE_CHANGED);
     }
+
+    /**
+     * Returns the number of 11be SoftApManagers which are being operated.
+     */
+    public int getNumberOf11beSoftApManager() {
+        if (!SdkLevel.isAtLeastT()) {
+            return 0;
+        }
+        int numberOf11beSoftApManager = 0;
+        for (SoftApManager manager : mSoftApManagers) {
+            if (manager.isStarted() && manager.getSoftApModeConfiguration()
+                    .getSoftApConfiguration().isIeee80211beEnabled()) {
+                numberOf11beSoftApManager++;
+            }
+        }
+        return numberOf11beSoftApManager;
+    }
 }

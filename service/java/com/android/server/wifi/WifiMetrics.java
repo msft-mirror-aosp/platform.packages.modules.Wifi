@@ -341,6 +341,9 @@ public class WifiMetrics {
     private int mScorerUid = Process.WIFI_UID;
     @VisibleForTesting
     int mUnusableEventType = WifiIsUnusableEvent.TYPE_UNKNOWN;
+    private int mWifiFrameworkState = 0;
+    private SpeedSufficient mSpeedSufficientNetworkCapabilities = new SpeedSufficient();
+    private  SpeedSufficient mSpeedSufficientThroughputPredictor = new SpeedSufficient();
 
     /**
      * Wi-Fi usability state per interface as predicted by the network scorer.
@@ -9377,6 +9380,18 @@ public class WifiMetrics {
         return speedSufficient;
     }
 
+    public void updateWiFiEvaluationAndScorerStats(boolean lingering, WifiInfo wifiInfo,
+            ConnectionCapabilities connectionCapabilities) {
+        mWifiFrameworkState = getFrameworkStateForScorer(lingering);
+        Speeds speedsNetworkCapabilities = getNetworkCapabilitiesSpeeds();
+        mSpeedSufficientNetworkCapabilities =
+                calcSpeedSufficientNetworkCapabilities(speedsNetworkCapabilities);
+        WifiDataStall.Speeds speedsThroughputPredictor =
+                mWifiDataStall.getThrouhgputPredictorSpeeds(wifiInfo, connectionCapabilities);
+        mSpeedSufficientThroughputPredictor =
+                calcSpeedSufficientThroughputPredictor(speedsThroughputPredictor);
+    }
+
     /**
      * Log a ScorerPredictionResultReported atom.
      */
@@ -9385,10 +9400,7 @@ public class WifiMetrics {
             boolean isMobileDataEnabled,
             int pollingIntervalMs,
             int aospScorerPrediction,
-            int externalScorerPrediction,
-            boolean lingering,
-            WifiInfo wifiInfo,
-            ConnectionCapabilities connectionCapabilities
+            int externalScorerPrediction
     ) {
         boolean isCellularDataAvailable = mWifiDataStall.isCellularDataAvailable();
         boolean isThroughputSufficient = mWifiDataStall.isThroughputSufficient();
@@ -9397,14 +9409,6 @@ public class WifiMetrics {
                 hasActiveSubInfo, isMobileDataEnabled, isCellularDataAvailable,
                 mAdaptiveConnectivityEnabled);
         int scorerUnusableEvent = convertWifiUnusableTypeForScorer(mUnusableEventType);
-        int wifiFrameworkState = getFrameworkStateForScorer(lingering);
-        Speeds speedsNetworkCapabilities = getNetworkCapabilitiesSpeeds();
-        SpeedSufficient speedSufficientNetworkCapabilities =
-                calcSpeedSufficientNetworkCapabilities(speedsNetworkCapabilities);
-        WifiDataStall.Speeds speedsThroughputPredictor = mWifiDataStall.getThrouhgputPredictorSpeeds(
-                wifiInfo, connectionCapabilities);
-        SpeedSufficient speedSufficientThroughputPredictor =
-                calcSpeedSufficientThroughputPredictor(speedsThroughputPredictor);
 
         WifiStatsLog.write_non_chained(SCORER_PREDICTION_RESULT_REPORTED,
                     Process.WIFI_UID,
@@ -9412,10 +9416,10 @@ public class WifiMetrics {
                     aospScorerPrediction,
                     scorerUnusableEvent,
                     isThroughputSufficient, deviceState, pollingIntervalMs,
-                    wifiFrameworkState, speedSufficientNetworkCapabilities.Downstream,
-                    speedSufficientNetworkCapabilities.Upstream,
-                    speedSufficientThroughputPredictor.Downstream,
-                    speedSufficientThroughputPredictor.Upstream);
+                    mWifiFrameworkState, mSpeedSufficientNetworkCapabilities.Downstream,
+                    mSpeedSufficientNetworkCapabilities.Upstream,
+                    mSpeedSufficientThroughputPredictor.Downstream,
+                    mSpeedSufficientThroughputPredictor.Upstream);
         if (mScorerUid != Process.WIFI_UID) {
             WifiStatsLog.write_non_chained(SCORER_PREDICTION_RESULT_REPORTED,
                     mScorerUid,
@@ -9423,10 +9427,10 @@ public class WifiMetrics {
                     externalScorerPrediction,
                     scorerUnusableEvent,
                     isThroughputSufficient, deviceState, pollingIntervalMs,
-                    wifiFrameworkState, speedSufficientNetworkCapabilities.Downstream,
-                    speedSufficientNetworkCapabilities.Upstream,
-                    speedSufficientThroughputPredictor.Downstream,
-                    speedSufficientThroughputPredictor.Upstream);
+                    mWifiFrameworkState, mSpeedSufficientNetworkCapabilities.Downstream,
+                    mSpeedSufficientNetworkCapabilities.Upstream,
+                    mSpeedSufficientThroughputPredictor.Downstream,
+                    mSpeedSufficientThroughputPredictor.Upstream);
         }
 
         // We'd better reset to TYPE_NONE if it is defined in the future.
