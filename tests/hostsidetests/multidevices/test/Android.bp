@@ -22,6 +22,12 @@ python_library_host {
     srcs: ["aware/constants.py"],
 }
 
+python_library_host {
+    name: "aware_lib_utils",
+    srcs: ["aware/aware_lib_utils.py"],
+    libs: ["wifi_aware_constants"],
+}
+
 python_defaults {
     name: "CtsWifiMultiDevicePythonDefaults",
     libs: [
