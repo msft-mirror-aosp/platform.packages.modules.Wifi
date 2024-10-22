@@ -731,6 +731,51 @@ public class WifiNativeTest extends WifiBaseTest {
     }
 
     /**
+     * Verifies valules of ScanResultWithSameFreq in getWifiLinkLayerStats() call
+     *
+     */
+    @Test
+    public void testGetWifiLinkLayerStatsForScanResultWithSameFreq() {
+        WifiLinkLayerStats testWifiLinkLayerStats = new WifiLinkLayerStats();
+        testWifiLinkLayerStats.links = new WifiLinkLayerStats.LinkSpecificStats[2];
+        // Define 2 test WiFi links, whose frequencyMhz are 0, 1, respectively
+        for (int i = 0; i < 2; ++i) {
+            testWifiLinkLayerStats.links[i] = new WifiLinkLayerStats.LinkSpecificStats();
+            testWifiLinkLayerStats.links[i].frequencyMhz = i;
+        }
+        when(mWifiVendorHal.getWifiLinkLayerStats(WIFI_IFACE_NAME))
+                .thenReturn(testWifiLinkLayerStats);
+
+        // Define 6 test WiFi scan results with unique BSSID
+        // Their frequency are 0, 1, 2, 0, 1, 2, respectively
+        ScanResult[] scanResults = new ScanResult[6];
+        for (int i = 0; i < 6; i++) {
+            ScanResult scanResult = new ScanResult();
+            scanResult.BSSID = Integer.toString(i);
+            scanResult.frequency = i < 3 ? i : (i - 3);
+            // Make sure the timestamp is valid
+            scanResult.timestamp = Long.MAX_VALUE;
+            scanResults[i] = scanResult;
+        }
+        ScanData testScanData = new ScanData(0, 0,
+                0, WifiScanner.WIFI_BAND_UNSPECIFIED, scanResults);
+        when(mWifiVendorHal.getCachedScanData(WIFI_IFACE_NAME)).thenReturn(testScanData);
+        mWifiNative.setLocationModeEnabled(true);
+
+        WifiLinkLayerStats resultWifiLinkLayerStats =
+                mWifiNative.getWifiLinkLayerStats(WIFI_IFACE_NAME);
+        assertEquals(2, resultWifiLinkLayerStats.links.length);
+        // WiFi link 0's frequency is 0, scan results 0 and 3 have the same frequency
+        assertEquals(2, resultWifiLinkLayerStats.links[0].scan_results_same_freq.size());
+        assertEquals("0", resultWifiLinkLayerStats.links[0].scan_results_same_freq.get(0).bssid);
+        assertEquals("3", resultWifiLinkLayerStats.links[0].scan_results_same_freq.get(1).bssid);
+        // WiFi link 1's frequency is 1, scan results 1 and 4 have the same frequency
+        assertEquals(2, resultWifiLinkLayerStats.links[1].scan_results_same_freq.size());
+        assertEquals("1", resultWifiLinkLayerStats.links[1].scan_results_same_freq.get(0).bssid);
+        assertEquals("4", resultWifiLinkLayerStats.links[1].scan_results_same_freq.get(1).bssid);
+    }
+
+    /**
      * Verifies client mode + scan success.
      */
     @Test
