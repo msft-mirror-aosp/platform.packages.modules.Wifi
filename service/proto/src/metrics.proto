@@ -2752,6 +2752,9 @@ message WifiUsabilityStatsEntry {
 
   // Upstream throughput estimation provided by Network Capabilities
   optional int32 is_throughput_predictor_upstream_sufficient = 55;
+
+  // If bluetooth is connected
+  optional bool is_bluetooth_connected = 56;
 }
 
 message ContentionTimeStats {
