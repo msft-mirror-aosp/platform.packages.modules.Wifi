@@ -163,6 +163,14 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final int mLabelBadEventCount;
     /** The current WiFi state in framework */
     private final int mWifiFrameworkState;
+    /** Downstream throughput estimation provided by Network Capabilities */
+    private final int mIsNetworkCapabilitiesDownstreamSufficient;
+    /** Upstream throughput estimation provided by Network Capabilities */
+    private final int mIsNetworkCapabilitiesUpstreamSufficient;
+    /** Downstream throughput estimation used in Network Selection */
+    private final int mIsThroughputPredictorDownstreamSufficient;
+    /** Upstream throughput estimation used in Network Selection */
+    private final int mIsThroughputPredictorUpstreamSufficient;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -1165,7 +1173,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats,
             int wifiLinkCount, @WifiManager.MloMode int mloMode,
             long txTransmittedBytes, long rxTransmittedBytes, int labelBadEventCount,
-            int wifiFrameworkState) {
+            int wifiFrameworkState, int isNetworkCapabilitiesDownstreamSufficient,
+            int isNetworkCapabilitiesUpstreamSufficient,
+            int isThroughputPredictorDownstreamSufficient,
+            int isThroughputPredictorUpstreamSufficient) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -1208,6 +1219,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mRxTransmittedBytes = rxTransmittedBytes;
         mLabelBadEventCount = labelBadEventCount;
         mWifiFrameworkState = wifiFrameworkState;
+        mIsNetworkCapabilitiesDownstreamSufficient = isNetworkCapabilitiesDownstreamSufficient;
+        mIsNetworkCapabilitiesUpstreamSufficient = isNetworkCapabilitiesUpstreamSufficient;
+        mIsThroughputPredictorDownstreamSufficient = isThroughputPredictorDownstreamSufficient;
+        mIsThroughputPredictorUpstreamSufficient = isThroughputPredictorUpstreamSufficient;
     }
 
     /** Implement the Parcelable interface */
@@ -1259,6 +1274,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeLong(mRxTransmittedBytes);
         dest.writeInt(mLabelBadEventCount);
         dest.writeInt(mWifiFrameworkState);
+        dest.writeInt(mIsNetworkCapabilitiesDownstreamSufficient);
+        dest.writeInt(mIsNetworkCapabilitiesUpstreamSufficient);
+        dest.writeInt(mIsThroughputPredictorDownstreamSufficient);
+        dest.writeInt(mIsThroughputPredictorUpstreamSufficient);
     }
 
     /** Implement the Parcelable interface */
@@ -1281,7 +1300,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readBoolean(), in.readInt(), in.readInt(),
                     in.readInt(), in.readBoolean(),
                     in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
-                    in.readInt(), in.readLong(), in.readLong(), in.readInt(), in.readInt()
+                    in.readInt(), in.readLong(), in.readLong(), in.readInt(), in.readInt(),
+                    in.readInt(), in.readInt(), in.readInt(), in.readInt()
             );
         }
 
@@ -2028,5 +2048,25 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public int getWifiFrameworkState() {
         return mWifiFrameworkState;
+    }
+
+    /** @hide */
+    public int isNetworkCapabilitiesDownstreamSufficient() {
+        return mIsNetworkCapabilitiesDownstreamSufficient;
+    }
+
+    /** @hide */
+    public int isNetworkCapabilitiesUpstreamSufficient() {
+        return mIsNetworkCapabilitiesUpstreamSufficient;
+    }
+
+    /** @hide */
+    public int isThroughputPredictorDownstreamSufficient() {
+        return mIsThroughputPredictorDownstreamSufficient;
+    }
+
+    /** @hide */
+    public int isThroughputPredictorUpstreamSufficient() {
+        return mIsThroughputPredictorUpstreamSufficient;
     }
 }
