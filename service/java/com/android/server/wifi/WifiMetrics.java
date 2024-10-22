@@ -5280,6 +5280,8 @@ public class WifiMetrics {
                     line.append(",frequencyMhz=" + scanResultWithSameFreq.frequencyMhz);
                 }
             }
+            line.append(",tx_linkspeed=" + linkStat.txLinkspeed);
+            line.append(",rx_linkspeed=" + linkStat.rxLinkspeed);
         }
         line.append(",mlo_mode=" + entry.mloMode);
         line.append(",tx_transmitted_bytes" + entry.txTransmittedBytes);
@@ -7202,6 +7204,10 @@ public class WifiMetrics {
                         linkStats.timeSliceDutyCycleInPercent = link.timeSliceDutyCycleInPercent;
                         linkStats.rssi = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
                                 new MloLink()).getRssi() : info.getRssi();
+                        linkStats.txLinkspeed = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
+                                new MloLink()).getTxLinkSpeedMbps() : info.getTxLinkSpeedMbps();
+                        linkStats.rxLinkspeed = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
+                                new MloLink()).getRxLinkSpeedMbps() : info.getRxLinkSpeedMbps();
                         WifiLinkLayerStats.ChannelStats channlStatsEntryOnFreq =
                                 stats.channelStatsMap.get(link.frequencyMhz);
                         if (channlStatsEntryOnFreq != null) {

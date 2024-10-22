@@ -2998,6 +2998,12 @@ message LinkStats {
 
   // List of scan results who have the same freq with current WiFi link
   repeated ScanResultWithSameFreq scan_result_with_same_freq = 17;
+
+  // TX linkspeed in this WiFi link
+  optional int32 tx_linkspeed = 18;
+
+  // RX linkspeed in this WiFi link
+  optional int32 rx_linkspeed = 19;
 }
 
 message PeerInfo {
