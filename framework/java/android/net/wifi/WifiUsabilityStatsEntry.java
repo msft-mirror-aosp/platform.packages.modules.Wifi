@@ -637,6 +637,76 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     }
 
     /**
+     * Scan Results who have the same freq with current WiFi link
+     */
+    /** @hide */
+    public static final class ScanResultWithSameFreq implements Parcelable {
+        private long mScanResultTimestampMicros;
+        private int mRssi;
+        private int mFrequencyMhz;
+
+        public ScanResultWithSameFreq() {
+        }
+
+        /**
+         * Constructor function.
+         * @param scanResultTimestampMicros Timestamp in microseconds (since boot) when this result
+         *                                  was last seen.
+         * @param rssi                      The detected signal level in dBm
+         * @param frequencyMhz              The center frequency of the primary 20 MHz frequency
+         *                                  (in MHz) of the channel
+         */
+        public ScanResultWithSameFreq(long scanResultTimestampMicros, int rssi, int frequencyMhz) {
+            this.mScanResultTimestampMicros = scanResultTimestampMicros;
+            this.mRssi = rssi;
+            this.mFrequencyMhz = frequencyMhz;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(@NonNull Parcel dest, int flags) {
+            dest.writeLong(mScanResultTimestampMicros);
+            dest.writeInt(mRssi);
+            dest.writeInt(mFrequencyMhz);
+        }
+
+        /** Implement the Parcelable interface */
+        public static final @NonNull Creator<ScanResultWithSameFreq> CREATOR =
+                new Creator<ScanResultWithSameFreq>() {
+                    public ScanResultWithSameFreq createFromParcel(Parcel in) {
+                        ScanResultWithSameFreq scanResultWithSameFreq =
+                                new ScanResultWithSameFreq();
+                        scanResultWithSameFreq.mScanResultTimestampMicros = in.readLong();
+                        scanResultWithSameFreq.mRssi = in.readInt();
+                        scanResultWithSameFreq.mFrequencyMhz = in.readInt();
+                        return scanResultWithSameFreq;
+                        }
+                    public ScanResultWithSameFreq[] newArray(int size) {
+                        return new ScanResultWithSameFreq[size];
+                    }
+                };
+
+        /** timestamp in microseconds (since boot) when this result was last seen */
+        public long getScanResultTimestampMicros() {
+            return mScanResultTimestampMicros;
+        }
+
+        /** The detected signal level in dBm */
+        public int getRssi() {
+            return mRssi;
+        }
+
+        /** The center frequency of the primary 20 MHz frequency (in MHz) of the channel */
+        public int getFrequency() {
+            return mFrequencyMhz;
+        }
+    }
+
+    /**
      * Wifi link layer radio stats.
      */
     public static final class RadioStats implements Parcelable {
@@ -918,6 +988,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         private final PacketStats[] mPacketStats;
         /** Peer statistics */
         private final PeerInfo[] mPeerInfo;
+        /** Scan results who have the same frequency with this WiFi link */
+        private final ScanResultWithSameFreq[] mScanResultsWithSameFreq;
 
         /** @hide */
         public LinkStats() {
@@ -944,6 +1016,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             mRateStats = null;
             mPacketStats = null;
             mPeerInfo = null;
+            mScanResultsWithSameFreq = null;
         }
 
         /** @hide
@@ -974,6 +1047,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
          * @param rateStats                   Rate information.
          * @param packetStats                 Packet statistics.
          * @param peerInfo                    Peer statistics.
+         * @param scanResultsWithSameFreq     Scan results who have the same frequency with this
+         *                                    WiFi link.
          */
         public LinkStats(int linkId, int state, int radioId, int rssi, int frequencyMhz,
                 int rssiMgmt, @WifiChannelBandwidth int channelWidth, int centerFreqFirstSegment,
@@ -982,7 +1057,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                 long totalBeaconRx, int timeSliceDutyCycleInPercent,
                 long totalCcaBusyFreqTimeMillis, long totalRadioOnFreqTimeMillis,
                 ContentionTimeStats[] contentionTimeStats, RateStats[] rateStats,
-                PacketStats[] packetStats, PeerInfo[] peerInfo) {
+                PacketStats[] packetStats, PeerInfo[] peerInfo,
+                ScanResultWithSameFreq[] scanResultsWithSameFreq) {
             this.mLinkId = linkId;
             this.mState = state;
             this.mRadioId = radioId;
@@ -1006,6 +1082,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             this.mRateStats = rateStats;
             this.mPacketStats = packetStats;
             this.mPeerInfo = peerInfo;
+            this.mScanResultsWithSameFreq = scanResultsWithSameFreq;
         }
 
         @Override
@@ -1038,6 +1115,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             dest.writeTypedArray(mRateStats, flags);
             dest.writeTypedArray(mPacketStats, flags);
             dest.writeTypedArray(mPeerInfo, flags);
+            dest.writeTypedArray(mScanResultsWithSameFreq, flags);
         }
 
         /** Implement the Parcelable interface */
@@ -1053,7 +1131,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                                 in.createTypedArray(ContentionTimeStats.CREATOR),
                                 in.createTypedArray(RateStats.CREATOR),
                                 in.createTypedArray(PacketStats.CREATOR),
-                                in.createTypedArray(PeerInfo.CREATOR));
+                                in.createTypedArray(PeerInfo.CREATOR),
+                                in.createTypedArray(ScanResultWithSameFreq.CREATOR));
                     }
 
                     public LinkStats[] newArray(int size) {
@@ -1814,6 +1893,24 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             PeerInfo[] peerInfo = mLinkStats.get(linkId).mPeerInfo;
             if (peerInfo != null) return Arrays.asList(peerInfo);
             return Collections.emptyList();
+        }
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
+     * Scan results who have the same frequency with this WiFi link
+     *
+     * @param linkId Identifier of the link.
+     * @return An array of Scan results who have the same frequency with this WiFi link
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    @NonNull
+    public ScanResultWithSameFreq[] getScanResultsWithSameFreq(int linkId) {
+        if (mLinkStats.contains(linkId)) {
+            ScanResultWithSameFreq[] scanResultsWithSameFreq =
+                mLinkStats.get(linkId).mScanResultsWithSameFreq;
+            return scanResultsWithSameFreq;
         }
         throw new NoSuchElementException("linkId is invalid - " + linkId);
     }

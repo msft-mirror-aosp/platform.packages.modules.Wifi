@@ -139,6 +139,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto.PeerInfo;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PnoScanMetrics;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.RadioStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.RateStats;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.ScanResultWithSameFreq;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.SoftApConnectedClientsEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent.ConfigInfo;
@@ -5270,6 +5271,17 @@ public class WifiMetrics {
                     }
                 }
             }
+            if (linkStat.scanResultWithSameFreq != null) {
+                for (ScanResultWithSameFreq scanResultWithSameFreq
+                        : linkStat.scanResultWithSameFreq) {
+                    line.append(",scan_result_timestamp_micros="
+                            + scanResultWithSameFreq.scanResultTimestampMicros);
+                    line.append(",rssi=" + scanResultWithSameFreq.rssi);
+                    line.append(",frequencyMhz=" + scanResultWithSameFreq.frequencyMhz);
+                }
+            }
+            line.append(",tx_linkspeed=" + linkStat.txLinkspeed);
+            line.append(",rx_linkspeed=" + linkStat.rxLinkspeed);
         }
         line.append(",mlo_mode=" + entry.mloMode);
         line.append(",tx_transmitted_bytes" + entry.txTransmittedBytes);
@@ -7192,6 +7204,10 @@ public class WifiMetrics {
                         linkStats.timeSliceDutyCycleInPercent = link.timeSliceDutyCycleInPercent;
                         linkStats.rssi = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
                                 new MloLink()).getRssi() : info.getRssi();
+                        linkStats.txLinkspeed = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
+                                new MloLink()).getTxLinkSpeedMbps() : info.getTxLinkSpeedMbps();
+                        linkStats.rxLinkspeed = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
+                                new MloLink()).getRxLinkSpeedMbps() : info.getRxLinkSpeedMbps();
                         WifiLinkLayerStats.ChannelStats channlStatsEntryOnFreq =
                                 stats.channelStatsMap.get(link.frequencyMhz);
                         if (channlStatsEntryOnFreq != null) {
@@ -7318,6 +7334,32 @@ public class WifiMetrics {
                                 linkStats.peerInfo[peerIndex] = peerInfo;
                             }
                         }
+                        List<ScanResultWithSameFreq> scanResultsWithSameFreq = new ArrayList<>();
+                        if (link.scan_results_same_freq != null
+                                && link.scan_results_same_freq.size() > 0) {
+                            for (int scanResultsIndex = 0; scanResultsIndex
+                                    < link.scan_results_same_freq.size(); ++scanResultsIndex) {
+                                WifiLinkLayerStats.ScanResultWithSameFreq linkLayerScanResult =
+                                        link.scan_results_same_freq.get(scanResultsIndex);
+                                if (linkLayerScanResult != null) {
+                                    String wifiLinkBssid = (mloLinks.size() > 0)
+                                            ? mloLinks.get(link.link_id, new MloLink())
+                                            .getApMacAddress().toString() : info.getBSSID();
+                                    if (!linkLayerScanResult.bssid.equals(wifiLinkBssid)) {
+                                        ScanResultWithSameFreq scanResultWithSameFreq =
+                                                new ScanResultWithSameFreq();
+                                        scanResultWithSameFreq.scanResultTimestampMicros =
+                                                linkLayerScanResult.scan_result_timestamp_micros;
+                                        scanResultWithSameFreq.rssi = linkLayerScanResult.rssi;
+                                        scanResultWithSameFreq.frequencyMhz =
+                                                linkLayerScanResult.frequencyMhz;
+                                        scanResultsWithSameFreq.add(scanResultWithSameFreq);
+                                    }
+                                }
+                            }
+                        }
+                        linkStats.scanResultWithSameFreq =
+                            scanResultsWithSameFreq.toArray(new ScanResultWithSameFreq[0]);
                         wifiUsabilityStatsEntry.linkStats[i] = linkStats;
                     }
                 }
@@ -7769,6 +7811,30 @@ public class WifiMetrics {
             mLastLinkMetrics.put(inStat.link_id, linkMetrics);
             WifiLinkLayerStats.ChannelStats channelStatsMap = stats.channelStatsMap.get(
                     inStat.frequencyMhz);
+            List<android.net.wifi.WifiUsabilityStatsEntry.ScanResultWithSameFreq>
+                    scanResultsWithSameFreq = new ArrayList<>();
+
+            if (inStat.scan_results_same_freq != null
+                    && inStat.scan_results_same_freq.size() > 0) {
+                for (int scanResultsIndex = 0; scanResultsIndex
+                        < inStat.scan_results_same_freq.size(); ++scanResultsIndex) {
+                    WifiLinkLayerStats.ScanResultWithSameFreq linkLayerScanResult =
+                            inStat.scan_results_same_freq.get(scanResultsIndex);
+                    if (linkLayerScanResult != null) {
+                        if (!linkLayerScanResult.bssid.equals(info.getBSSID())) {
+                            android.net.wifi.WifiUsabilityStatsEntry.ScanResultWithSameFreq
+                                    scanResultWithSameFreq =
+                                    new android.net.wifi.WifiUsabilityStatsEntry
+                                        .ScanResultWithSameFreq(
+                                    linkLayerScanResult.scan_result_timestamp_micros,
+                                    linkLayerScanResult.rssi,
+                                    linkLayerScanResult.frequencyMhz
+                                );
+                            scanResultsWithSameFreq.add(scanResultWithSameFreq);
+                        }
+                    }
+                }
+            }
             // Note: RSSI, Tx & Rx link speed are derived from signal poll stats which is updated in
             // Mlolink or WifiInfo (non-MLO case).
             android.net.wifi.WifiUsabilityStatsEntry.LinkStats outStat =
@@ -7796,7 +7862,10 @@ public class WifiMetrics {
                             (channelStatsMap != null) ? channelStatsMap.ccaBusyTimeMs : 0 ,
                             (channelStatsMap != null) ? channelStatsMap.radioOnTimeMs : 0,
                             convertContentionTimeStats(inStat), convertRateStats(inStat),
-                            convertPacketStats(inStat), convertPeerInfo(inStat));
+                            convertPacketStats(inStat), convertPeerInfo(inStat),
+                            scanResultsWithSameFreq.toArray(
+                                new android.net.wifi.WifiUsabilityStatsEntry
+                                .ScanResultWithSameFreq[0]));
             linkStats.put(inStat.link_id, outStat);
         }
 
