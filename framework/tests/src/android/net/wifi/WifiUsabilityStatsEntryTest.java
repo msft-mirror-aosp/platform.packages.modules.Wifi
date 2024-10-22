@@ -115,14 +115,14 @@ public class WifiUsabilityStatsEntryTest {
         WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 32, contentionTimeStats, rateStats, radioStats, 100, true,
-                true, true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1);
+                true, true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1, 2);
         assertEquals(32, usabilityStatsEntry.getTimeSliceDutyCycleInPercent());
 
         WifiUsabilityStatsEntry usabilityStatsEntryWithInvalidDutyCycleValue =
                 new WifiUsabilityStatsEntry(
                         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
                         21, 22, -1, contentionTimeStats, rateStats, radioStats, 101, true, true,
-                        true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1);
+                        true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1, 2);
         try {
             usabilityStatsEntryWithInvalidDutyCycleValue.getTimeSliceDutyCycleInPercent();
             fail();
@@ -179,7 +179,7 @@ public class WifiUsabilityStatsEntryTest {
         return new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 50, contentionTimeStats, rateStats, radioStats, 102, true,
-                true, true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1
+                true, true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1, 2
         );
     }
 
@@ -661,7 +661,7 @@ public class WifiUsabilityStatsEntryTest {
         WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 32, null, null, null, 100, true,
-                true, true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1);
+                true, true, 23, 24, 25, true, linkStats, 1, 0, 10, 20, 1, 2);
 
         assertThrows("linkId is invalid - " + MloLink.INVALID_MLO_LINK_ID,
                 NoSuchElementException.class,

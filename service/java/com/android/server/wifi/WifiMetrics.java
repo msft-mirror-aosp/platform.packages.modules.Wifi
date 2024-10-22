@@ -5287,6 +5287,7 @@ public class WifiMetrics {
         line.append(",tx_transmitted_bytes" + entry.txTransmittedBytes);
         line.append(",rx_transmitted_bytes" + entry.rxTransmittedBytes);
         line.append(",label_bad_event_count" + entry.labelBadEventCount);
+        line.append(",wifi_framework_state" + entry.wifiFrameworkState);
         pw.println(line.toString());
     }
 
@@ -7365,6 +7366,7 @@ public class WifiMetrics {
                 }
                 wifiUsabilityStatsEntry.mloMode = stats.wifiMloMode;
                 wifiUsabilityStatsEntry.labelBadEventCount = mAccumulatedLabelBadCount;
+                wifiUsabilityStatsEntry.wifiFrameworkState = mWifiFrameworkState;
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7914,7 +7916,8 @@ public class WifiMetrics {
                 radioStats, s.channelUtilizationRatio, s.isThroughputSufficient,
                 s.isWifiScoringEnabled, s.isCellularDataAvailable, 0, 0, 0, false,
                 convertLinkStats(stats, info), s.wifiLinkCount, s.mloMode,
-                s.txTransmittedBytes, s.rxTransmittedBytes, s.labelBadEventCount
+                s.txTransmittedBytes, s.rxTransmittedBytes, s.labelBadEventCount,
+                s.wifiFrameworkState
         );
     }
 
@@ -8118,6 +8121,7 @@ public class WifiMetrics {
         out.txTransmittedBytes = s.txTransmittedBytes;
         out.rxTransmittedBytes = s.rxTransmittedBytes;
         out.labelBadEventCount = s.labelBadEventCount;
+        out.wifiFrameworkState = s.wifiFrameworkState;
         return out;
     }
 

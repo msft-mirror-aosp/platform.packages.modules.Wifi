@@ -2737,6 +2737,9 @@ message WifiUsabilityStatsEntry {
 
   // The total number of LABEL_BAD event happens
   optional int32 label_bad_event_count = 50;
+
+  // Current WiFi state in framework
+  optional int32 wifi_framework_state = 51;
 }
 
 message ContentionTimeStats {
