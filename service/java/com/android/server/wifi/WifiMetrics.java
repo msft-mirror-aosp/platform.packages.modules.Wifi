@@ -532,6 +532,7 @@ public class WifiMetrics {
 
     private final WifiMonitor mWifiMonitor;
     private ActiveModeWarden mActiveModeWarden;
+    private WifiGlobals mWifiGlobals;
     private final Map<String, ActiveModeManager.ClientRole> mIfaceToRoleMap = new ArrayMap<>();
 
     /** WifiConfigStore read duration histogram. */
@@ -1679,7 +1680,8 @@ public class WifiMetrics {
             WifiP2pMetrics wifiP2pMetrics,
             DppMetrics dppMetrics,
             WifiMonitor wifiMonitor,
-            WifiDeviceStateChangeManager wifiDeviceStateChangeManager) {
+            WifiDeviceStateChangeManager wifiDeviceStateChangeManager,
+            WifiGlobals wifiGlobals) {
         mContext = context;
         mFacade = facade;
         mClock = clock;
@@ -1714,6 +1716,7 @@ public class WifiMetrics {
                         handleScreenStateChanged(screenOn);
                     }
                 });
+        mWifiGlobals = wifiGlobals;
     }
 
     /** Sets internal ScoringParams member */
@@ -5284,9 +5287,19 @@ public class WifiMetrics {
             line.append(",rx_linkspeed=" + linkStat.rxLinkspeed);
         }
         line.append(",mlo_mode=" + entry.mloMode);
-        line.append(",tx_transmitted_bytes" + entry.txTransmittedBytes);
-        line.append(",rx_transmitted_bytes" + entry.rxTransmittedBytes);
-        line.append(",label_bad_event_count" + entry.labelBadEventCount);
+        line.append(",tx_transmitted_bytes=" + entry.txTransmittedBytes);
+        line.append(",rx_transmitted_bytes=" + entry.rxTransmittedBytes);
+        line.append(",label_bad_event_count=" + entry.labelBadEventCount);
+        line.append(",wifi_framework_state=" + entry.wifiFrameworkState);
+        line.append(",is_network_capabilities_downstream_sufficient="
+                + entry.isNetworkCapabilitiesDownstreamSufficient);
+        line.append(",is_network_capabilities_upstream_sufficient="
+                + entry.isNetworkCapabilitiesUpstreamSufficient);
+        line.append(",is_throughput_predictor_downstream_sufficient="
+                + entry.isThroughputPredictorDownstreamSufficient);
+        line.append(",is_throughput_predictor_upstream_sufficient="
+                + entry.isThroughputPredictorUpstreamSufficient);
+        line.append(",is_bluetooth_connected=" + entry.isBluetoothConnected);
         pw.println(line.toString());
     }
 
@@ -7365,6 +7378,17 @@ public class WifiMetrics {
                 }
                 wifiUsabilityStatsEntry.mloMode = stats.wifiMloMode;
                 wifiUsabilityStatsEntry.labelBadEventCount = mAccumulatedLabelBadCount;
+                wifiUsabilityStatsEntry.wifiFrameworkState = mWifiFrameworkState;
+                wifiUsabilityStatsEntry.isNetworkCapabilitiesDownstreamSufficient =
+                        mSpeedSufficientNetworkCapabilities.Downstream;
+                wifiUsabilityStatsEntry.isNetworkCapabilitiesUpstreamSufficient =
+                        mSpeedSufficientNetworkCapabilities.Upstream;
+                wifiUsabilityStatsEntry.isThroughputPredictorDownstreamSufficient =
+                        mSpeedSufficientThroughputPredictor.Downstream;
+                wifiUsabilityStatsEntry.isThroughputPredictorUpstreamSufficient =
+                        mSpeedSufficientThroughputPredictor.Upstream;
+                wifiUsabilityStatsEntry.isBluetoothConnected =
+                        mWifiGlobals.isBluetoothConnected();
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7914,7 +7938,11 @@ public class WifiMetrics {
                 radioStats, s.channelUtilizationRatio, s.isThroughputSufficient,
                 s.isWifiScoringEnabled, s.isCellularDataAvailable, 0, 0, 0, false,
                 convertLinkStats(stats, info), s.wifiLinkCount, s.mloMode,
-                s.txTransmittedBytes, s.rxTransmittedBytes, s.labelBadEventCount
+                s.txTransmittedBytes, s.rxTransmittedBytes, s.labelBadEventCount,
+                s.wifiFrameworkState, s.isNetworkCapabilitiesDownstreamSufficient,
+                s.isNetworkCapabilitiesUpstreamSufficient,
+                s.isThroughputPredictorDownstreamSufficient,
+                s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected
         );
     }
 
@@ -8118,6 +8146,12 @@ public class WifiMetrics {
         out.txTransmittedBytes = s.txTransmittedBytes;
         out.rxTransmittedBytes = s.rxTransmittedBytes;
         out.labelBadEventCount = s.labelBadEventCount;
+        out.wifiFrameworkState = s.wifiFrameworkState;
+        out.isNetworkCapabilitiesDownstreamSufficient = s.isNetworkCapabilitiesDownstreamSufficient;
+        out.isNetworkCapabilitiesUpstreamSufficient = s.isNetworkCapabilitiesUpstreamSufficient;
+        out.isThroughputPredictorDownstreamSufficient = s.isThroughputPredictorDownstreamSufficient;
+        out.isThroughputPredictorUpstreamSufficient = s.isThroughputPredictorUpstreamSufficient;
+        out.isBluetoothConnected = s.isBluetoothConnected;
         return out;
     }
 

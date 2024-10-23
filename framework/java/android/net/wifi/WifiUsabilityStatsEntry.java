@@ -161,6 +161,18 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final long mRxTransmittedBytes;
     /** The total number of LABEL_BAD event happens */
     private final int mLabelBadEventCount;
+    /** The current WiFi state in framework */
+    private final int mWifiFrameworkState;
+    /** Downstream throughput estimation provided by Network Capabilities */
+    private final int mIsNetworkCapabilitiesDownstreamSufficient;
+    /** Upstream throughput estimation provided by Network Capabilities */
+    private final int mIsNetworkCapabilitiesUpstreamSufficient;
+    /** Downstream throughput estimation used in Network Selection */
+    private final int mIsThroughputPredictorDownstreamSufficient;
+    /** Upstream throughput estimation used in Network Selection */
+    private final int mIsThroughputPredictorUpstreamSufficient;
+    /** If bluetooth is connected */
+    private final boolean mIsBluetoothConnected;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -1162,7 +1174,11 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             int cellularSignalStrengthDbm, int cellularSignalStrengthDb,
             boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats,
             int wifiLinkCount, @WifiManager.MloMode int mloMode,
-            long txTransmittedBytes, long rxTransmittedBytes, int labelBadEventCount) {
+            long txTransmittedBytes, long rxTransmittedBytes, int labelBadEventCount,
+            int wifiFrameworkState, int isNetworkCapabilitiesDownstreamSufficient,
+            int isNetworkCapabilitiesUpstreamSufficient,
+            int isThroughputPredictorDownstreamSufficient,
+            int isThroughputPredictorUpstreamSufficient, boolean isBluetoothConnected) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -1204,6 +1220,12 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mTxTransmittedBytes = txTransmittedBytes;
         mRxTransmittedBytes = rxTransmittedBytes;
         mLabelBadEventCount = labelBadEventCount;
+        mWifiFrameworkState = wifiFrameworkState;
+        mIsNetworkCapabilitiesDownstreamSufficient = isNetworkCapabilitiesDownstreamSufficient;
+        mIsNetworkCapabilitiesUpstreamSufficient = isNetworkCapabilitiesUpstreamSufficient;
+        mIsThroughputPredictorDownstreamSufficient = isThroughputPredictorDownstreamSufficient;
+        mIsThroughputPredictorUpstreamSufficient = isThroughputPredictorUpstreamSufficient;
+        mIsBluetoothConnected = isBluetoothConnected;
     }
 
     /** Implement the Parcelable interface */
@@ -1254,6 +1276,12 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeLong(mTxTransmittedBytes);
         dest.writeLong(mRxTransmittedBytes);
         dest.writeInt(mLabelBadEventCount);
+        dest.writeInt(mWifiFrameworkState);
+        dest.writeInt(mIsNetworkCapabilitiesDownstreamSufficient);
+        dest.writeInt(mIsNetworkCapabilitiesUpstreamSufficient);
+        dest.writeInt(mIsThroughputPredictorDownstreamSufficient);
+        dest.writeInt(mIsThroughputPredictorUpstreamSufficient);
+        dest.writeBoolean(mIsBluetoothConnected);
     }
 
     /** Implement the Parcelable interface */
@@ -1276,7 +1304,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readBoolean(), in.readInt(), in.readInt(),
                     in.readInt(), in.readBoolean(),
                     in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
-                    in.readInt(), in.readLong(), in.readLong(), in.readInt()
+                    in.readInt(), in.readLong(), in.readLong(), in.readInt(), in.readInt(),
+                    in.readInt(), in.readInt(), in.readInt(), in.readInt(), in.readBoolean()
             );
         }
 
@@ -2018,5 +2047,35 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public long getLabelBadEventCount() {
         return mLabelBadEventCount;
+    }
+
+    /** @hide */
+    public int getWifiFrameworkState() {
+        return mWifiFrameworkState;
+    }
+
+    /** @hide */
+    public int isNetworkCapabilitiesDownstreamSufficient() {
+        return mIsNetworkCapabilitiesDownstreamSufficient;
+    }
+
+    /** @hide */
+    public int isNetworkCapabilitiesUpstreamSufficient() {
+        return mIsNetworkCapabilitiesUpstreamSufficient;
+    }
+
+    /** @hide */
+    public int isThroughputPredictorDownstreamSufficient() {
+        return mIsThroughputPredictorDownstreamSufficient;
+    }
+
+    /** @hide */
+    public int isThroughputPredictorUpstreamSufficient() {
+        return mIsThroughputPredictorUpstreamSufficient;
+    }
+
+    /** @hide */
+    public boolean isBluetoothConnected() {
+        return mIsBluetoothConnected;
     }
 }

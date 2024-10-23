@@ -1535,20 +1535,24 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
             // * LocationManager.MODE_CHANGED_ACTION          -- always
             // * TetheringManager.ACTION_TETHER_STATE_CHANGED -- <  S
             // * UserManager.ACTION_USER_RESTRICTIONS_CHANGED -- >= T
+            verify(mContext).registerReceiverForAllUsers(
+                    mBcastRxCaptor.capture(),
+                    argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)),
+                    eq(null), any(Handler.class));
             if (SdkLevel.isAtLeastT()) {
-                verify(mContext, times(3)).registerReceiver(mBcastRxCaptor.capture(),
+                verify(mContext, times(2)).registerReceiver(mBcastRxCaptor.capture(),
                         any(IntentFilter.class));
                 mUserRestrictionReceiver = mBcastRxCaptor.getAllValues().get(2);
             } else if (SdkLevel.isAtLeastS()) {
-                verify(mContext, times(2)).registerReceiver(mBcastRxCaptor.capture(),
+                verify(mContext).registerReceiver(mBcastRxCaptor.capture(),
                         any(IntentFilter.class));
             }  else {
-                verify(mContext, times(3)).registerReceiver(mBcastRxCaptor.capture(),
+                verify(mContext, times(2)).registerReceiver(mBcastRxCaptor.capture(),
                         any(IntentFilter.class));
                 mTetherStateReceiver = mBcastRxCaptor.getAllValues().get(2);
             }
-            mWifiStateChangedReceiver = mBcastRxCaptor.getAllValues().get(0);
-            mLocationModeReceiver = mBcastRxCaptor.getAllValues().get(1);
+            mWifiStateChangedReceiver = mBcastRxCaptor.getAllValues().get(1);
+            mLocationModeReceiver = mBcastRxCaptor.getAllValues().get(0);
             verify(mWifiSettingsConfigStore).registerChangeListener(
                     eq(D2D_ALLOWED_WHEN_INFRA_STA_DISABLED),
                     mD2DAllowedSettingsCallbackCaptor.capture(), any());
@@ -1568,9 +1572,11 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         mStaticMockSession = mockitoSession()
                 .mockStatic(NetworkInterface.class)
                 .mockStatic(Process.class)
+                .mockStatic(WifiInjector.class)
                 .startMocking();
         lenient().when(NetworkInterface.getByName(eq(IFACE_NAME_P2P)))
                 .thenReturn(mP2pNetworkInterface);
+        when(WifiInjector.getInstance()).thenReturn(mWifiInjector);
         when(mLayoutInflater.cloneInContext(any())).thenReturn(mLayoutInflater);
         when(mLayoutInflater.inflate(anyInt(), any())).thenReturn(mView);
         when(mLayoutInflater.inflate(anyInt(), any(), anyBoolean())).thenReturn(mView);
