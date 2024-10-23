@@ -89,6 +89,7 @@ import android.net.wifi.WifiScanner;
 import android.net.wifi.util.WifiResourceCache;
 import android.os.BatteryStatsManager;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.Process;
 import android.os.RemoteException;
@@ -1523,9 +1524,13 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         ArgumentCaptor<BroadcastReceiver> bcastRxCaptor =
                 ArgumentCaptor.forClass(BroadcastReceiver.class);
-        verify(mContext).registerReceiver(
+        // Note: Ignore lint warning UnspecifiedRegisterReceiverFlag since here is using
+        // to test receiving for system broadcasts. The lint warning is a false alarm since
+        // here is using argThat and hasAction.
+        verify(mContext).registerReceiverForAllUsers(
                 bcastRxCaptor.capture(),
-                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)));
+                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)),
+                eq(null), any(Handler.class));
         BroadcastReceiver broadcastReceiver = bcastRxCaptor.getValue();
 
         assertInDisabledState();
@@ -1674,9 +1679,10 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         ArgumentCaptor<BroadcastReceiver> bcastRxCaptor =
                 ArgumentCaptor.forClass(BroadcastReceiver.class);
-        verify(mContext).registerReceiver(
+        verify(mContext).registerReceiverForAllUsers(
                 bcastRxCaptor.capture(),
-                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)));
+                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)),
+                eq(null), any(Handler.class));
         BroadcastReceiver broadcastReceiver = bcastRxCaptor.getValue();
 
         assertInEnabledState();
@@ -5371,9 +5377,10 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         // Location state changes
         ArgumentCaptor<BroadcastReceiver> bcastRxCaptor =
                 ArgumentCaptor.forClass(BroadcastReceiver.class);
-        verify(mContext).registerReceiver(
+        verify(mContext).registerReceiverForAllUsers(
                 bcastRxCaptor.capture(),
-                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)));
+                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)),
+                eq(null), any(Handler.class));
         BroadcastReceiver broadcastReceiver = bcastRxCaptor.getValue();
 
         when(mWifiPermissionsUtil.isLocationModeEnabled()).thenReturn(true);
