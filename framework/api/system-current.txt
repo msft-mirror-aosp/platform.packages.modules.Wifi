@@ -550,6 +550,7 @@ package android.net.wifi {
     method public int getBandwidth();
     method @Nullable public android.net.MacAddress getBssid();
     method public int getFrequency();
+    method @FlaggedApi("com.android.wifi.flags.mlo_sap") @Nullable public android.net.MacAddress getMldAddress();
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") @NonNull public java.util.List<android.net.wifi.OuiKeyedData> getVendorData();
     method public int getWifiStandard();
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") public void setVendorData(@NonNull java.util.List<android.net.wifi.OuiKeyedData>);
