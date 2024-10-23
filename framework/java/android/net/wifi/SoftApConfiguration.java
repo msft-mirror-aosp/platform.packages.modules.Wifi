@@ -26,6 +26,7 @@ import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledAfter;
 import android.net.MacAddress;
+import android.net.wifi.util.Environment;
 import android.net.wifi.util.HexEncoding;
 import android.os.Build;
 import android.os.Parcel;
@@ -406,6 +407,11 @@ public final class SoftApConfiguration implements Parcelable {
     private @NonNull List<OuiKeyedData> mVendorData;
 
     /**
+     * Whether connected clients can communicate with each other or not.
+     */
+    private boolean mIsClientIsolationEnabled;
+
+    /**
      * THe definition of security type OPEN.
      */
     public static final int SECURITY_TYPE_OPEN = 0;
@@ -473,7 +479,8 @@ public final class SoftApConfiguration implements Parcelable {
             @NonNull Set<Integer> allowedAcsChannels5g,
             @NonNull Set<Integer> allowedAcsChannels6g,
             @WifiAnnotations.Bandwidth int maxChannelBandwidth,
-            @Nullable List<OuiKeyedData> vendorData) {
+            @Nullable List<OuiKeyedData> vendorData,
+            boolean isClientIsolationEnabled) {
         mWifiSsid = ssid;
         mBssid = bssid;
         mPassphrase = passphrase;
@@ -505,6 +512,7 @@ public final class SoftApConfiguration implements Parcelable {
         mAllowedAcsChannels6g = new HashSet<>(allowedAcsChannels6g);
         mMaxChannelBandwidth = maxChannelBandwidth;
         mVendorData = new ArrayList<>(vendorData);
+        mIsClientIsolationEnabled = isClientIsolationEnabled;
     }
 
     @Override
@@ -543,7 +551,8 @@ public final class SoftApConfiguration implements Parcelable {
                 && Objects.equals(mAllowedAcsChannels5g, other.mAllowedAcsChannels5g)
                 && Objects.equals(mAllowedAcsChannels6g, other.mAllowedAcsChannels6g)
                 && mMaxChannelBandwidth == other.mMaxChannelBandwidth
-                && Objects.equals(mVendorData, other.mVendorData);
+                && Objects.equals(mVendorData, other.mVendorData)
+                && mIsClientIsolationEnabled == other.mIsClientIsolationEnabled;
     }
 
     @Override
@@ -573,7 +582,8 @@ public final class SoftApConfiguration implements Parcelable {
                 mAllowedAcsChannels5g,
                 mAllowedAcsChannels6g,
                 mMaxChannelBandwidth,
-                mVendorData);
+                mVendorData,
+                mIsClientIsolationEnabled);
     }
 
     @Override
@@ -608,6 +618,7 @@ public final class SoftApConfiguration implements Parcelable {
         sbuf.append(" \n mAllowedAcsChannels6g = ").append(mAllowedAcsChannels6g);
         sbuf.append(" \n mMaxChannelBandwidth = ").append(mMaxChannelBandwidth);
         sbuf.append(" \n mVendorData = ").append(mVendorData);
+        sbuf.append(" \n mIsClientIsolationEnabled = ").append(mIsClientIsolationEnabled);
         return sbuf.toString();
     }
 
@@ -638,6 +649,7 @@ public final class SoftApConfiguration implements Parcelable {
         writeHashSetInt(dest, mAllowedAcsChannels6g);
         dest.writeInt(mMaxChannelBandwidth);
         dest.writeList(mVendorData);
+        dest.writeBoolean(mIsClientIsolationEnabled);
     }
 
     /* Reference from frameworks/base/core/java/android/os/Parcel.java */
@@ -749,7 +761,8 @@ public final class SoftApConfiguration implements Parcelable {
                             readHashSetInt(in),
                             readHashSetInt(in),
                             in.readInt(),
-                            readOuiKeyedDataList(in));
+                            readOuiKeyedDataList(in),
+                            in.readBoolean());
                 }
 
                 @Override
@@ -966,6 +979,8 @@ public final class SoftApConfiguration implements Parcelable {
      * Returns a flag indicating whether clients need to be pre-approved by the user.
      * (true: authorization required) or not (false: not required).
      * See also {@link Builder#setClientControlByUserEnabled(Boolean)}.
+     *
+     * @return true when client isolation is enable.
      *
      * @hide
      */
@@ -1218,6 +1233,24 @@ public final class SoftApConfiguration implements Parcelable {
     }
 
     /**
+     * Returns whether client isolation is enabled or not.
+     *
+     * Client isolation is used to disallow a connected Soft AP
+     * client to communicate with other connected clients.
+     *
+     * @hide
+     */
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @FlaggedApi(Flags.FLAG_AP_ISOLATE)
+    @SystemApi
+    public boolean isClientIsolationEnabled() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        return mIsClientIsolationEnabled;
+    }
+
+    /**
      * Returns a {@link WifiConfiguration} representation of this {@link SoftApConfiguration}.
      * Note that SoftApConfiguration may contain configuration which is cannot be represented
      * by the legacy WifiConfiguration, in such cases a null will be returned.
@@ -1312,6 +1345,7 @@ public final class SoftApConfiguration implements Parcelable {
         private Set<Integer> mAllowedAcsChannels6g;
         private @WifiAnnotations.Bandwidth int mMaxChannelBandwidth;
         private @Nullable List<OuiKeyedData> mVendorData;
+        private boolean mIsClientIsolationEnabled;
 
         /**
          * Constructs a Builder with default values (see {@link Builder}).
@@ -1347,6 +1381,7 @@ public final class SoftApConfiguration implements Parcelable {
             mAllowedAcsChannels6g = new HashSet<>();
             mMaxChannelBandwidth = SoftApInfo.CHANNEL_WIDTH_AUTO;
             mVendorData = new ArrayList<>();
+            mIsClientIsolationEnabled = false;
         }
 
         /**
@@ -1391,6 +1426,7 @@ public final class SoftApConfiguration implements Parcelable {
                 mMacRandomizationSetting = RANDOMIZATION_NONE;
             }
             mVendorData = new ArrayList<>(other.mVendorData);
+            mIsClientIsolationEnabled = other.mIsClientIsolationEnabled;
         }
 
         /**
@@ -1443,7 +1479,8 @@ public final class SoftApConfiguration implements Parcelable {
                     mAllowedAcsChannels5g,
                     mAllowedAcsChannels6g,
                     mMaxChannelBandwidth,
-                    mVendorData);
+                    mVendorData,
+                    mIsClientIsolationEnabled);
         }
 
         /**
@@ -2323,6 +2360,26 @@ public final class SoftApConfiguration implements Parcelable {
                 throw new IllegalArgumentException("setVendorData received a null value");
             }
             mVendorData = vendorData;
+            return this;
+        }
+
+        /**
+         * Specifies whether or not client isolation is enabled.
+         *
+         * Client isolation can be used to disallow a connected Soft AP
+         * client to communicate with other connected clients.
+         *
+         * @param isClientIsolationEnabled true when enabling client isolation.
+         * @return Builder for chaining.
+         */
+        @FlaggedApi(Flags.FLAG_AP_ISOLATE)
+        @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+        @NonNull
+        public Builder setClientIsolationEnabled(boolean isClientIsolationEnabled) {
+            if (!Environment.isSdkAtLeastB()) {
+                throw new UnsupportedOperationException();
+            }
+            mIsClientIsolationEnabled = isClientIsolationEnabled;
             return this;
         }
     }

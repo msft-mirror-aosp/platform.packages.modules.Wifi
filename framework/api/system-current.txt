@@ -500,6 +500,7 @@ package android.net.wifi {
     method public boolean isAutoShutdownEnabled();
     method public boolean isBridgedModeOpportunisticShutdownEnabled();
     method public boolean isClientControlByUserEnabled();
+    method @FlaggedApi("com.android.wifi.flags.ap_isolate") public boolean isClientIsolationEnabled();
     method public boolean isIeee80211axEnabled();
     method public boolean isIeee80211beEnabled();
     method public boolean isUserConfiguration();
@@ -531,6 +532,7 @@ package android.net.wifi {
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setChannel(int, int);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setChannels(@NonNull android.util.SparseIntArray);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setClientControlByUserEnabled(boolean);
+    method @FlaggedApi("com.android.wifi.flags.ap_isolate") @NonNull public android.net.wifi.SoftApConfiguration.Builder setClientIsolationEnabled(boolean);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setHiddenSsid(boolean);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setIeee80211axEnabled(boolean);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setIeee80211beEnabled(boolean);
