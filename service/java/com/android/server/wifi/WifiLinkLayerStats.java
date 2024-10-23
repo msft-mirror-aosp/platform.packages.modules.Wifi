@@ -22,6 +22,7 @@ import android.net.wifi.WifiUsabilityStatsEntry.WifiChannelBandwidth;
 import android.util.SparseArray;
 
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * A class representing link layer statistics collected over a Wifi Interface.
@@ -157,9 +158,27 @@ public class WifiLinkLayerStats {
          */
         public PeerInfo[] peerInfo;
 
+        public List<ScanResultWithSameFreq> scan_results_same_freq;
     }
 
     public LinkSpecificStats[] links;
+
+    /**
+     * Scan result who has the same frequency with WiFi Link
+     */
+    public static class ScanResultWithSameFreq {
+        /**
+        * timestamp in microseconds (since boot) when
+        * this result was last seen.
+        */
+        public long scan_result_timestamp_micros;
+        /** The detected signal level in dBm, also known as the RSSI */
+        public int rssi;
+        /** The center frequency of the primary 20 MHz frequency (in MHz) of the channel */
+        public int frequencyMhz;
+        /** BSSID of access point */
+        public String bssid;
+    }
 
     /**
      * The stats below which is already captured in WifiLinkLayerStats#LinkSpecificStats will be
