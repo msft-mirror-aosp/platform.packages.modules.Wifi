@@ -346,7 +346,7 @@ public class RttServiceImpl extends IWifiRttManager.Stub {
 
             intentFilter = new IntentFilter();
             intentFilter.addAction(LocationManager.MODE_CHANGED_ACTION);
-            mContext.registerReceiver(new BroadcastReceiver() {
+            mContext.registerReceiverForAllUsers(new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
                     if (mVerboseLoggingEnabled) {
@@ -358,7 +358,7 @@ public class RttServiceImpl extends IWifiRttManager.Stub {
                         disable();
                     }
                 }
-            }, intentFilter);
+            }, intentFilter, null, mRttServiceSynchronized.mHandler);
 
             mHalDeviceManager.initialize();
             mHalDeviceManager.registerStatusListener(() -> {
