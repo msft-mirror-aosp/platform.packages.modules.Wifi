@@ -251,6 +251,7 @@ public class WifiMetricsTest extends WifiBaseTest {
     @Mock Network mNetwork;
     @Mock WifiInfo mWifiInfo;
     @Mock WifiNative.ConnectionCapabilities mCapabilities;
+    @Mock WifiGlobals mWifiGlobals;
     @Captor ArgumentCaptor<ActiveModeWarden.ModeChangeCallback> mModeChangeCallbackArgumentCaptor;
     @Captor ArgumentCaptor<Handler> mHandlerCaptor;
     @Captor
@@ -284,7 +285,8 @@ public class WifiMetricsTest extends WifiBaseTest {
                         mWifiP2pMetrics,
                         mDppMetrics,
                         mWifiMonitor,
-                        mWifiDeviceStateChangeManager);
+                        mWifiDeviceStateChangeManager,
+                        mWifiGlobals);
         mWifiMetrics.setWifiConfigManager(mWcm);
         mWifiMetrics.setWifiBlocklistMonitor(mWifiBlocklistMonitor);
         mWifiMetrics.setPasspointManager(mPpm);
