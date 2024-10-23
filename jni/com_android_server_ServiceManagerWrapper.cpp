@@ -30,11 +30,7 @@ extern "C" JNIEXPORT jobject JNICALL
     #pragma clang diagnostic push
     #pragma clang diagnostic ignored "-Wunguarded-availability"
     const char* serviceName = env->GetStringUTFChars(serviceNameJni, nullptr);
-    if (AServiceManager_isDeclared(serviceName)) {
-        return AIBinder_toJavaBinder(env, AServiceManager_waitForService(serviceName));
-    } else {
-        return nullptr;
-    }
+    return AIBinder_toJavaBinder(env, AServiceManager_waitForService(serviceName));
     #pragma clang diagnostic pop
 }
 
