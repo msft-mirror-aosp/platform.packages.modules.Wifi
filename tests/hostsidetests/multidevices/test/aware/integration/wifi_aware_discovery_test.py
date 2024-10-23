@@ -211,9 +211,9 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
                            null_match: bool) -> Dict[str, Any]:
         config = {}
         if is_publish:
-            config["DiscoveryType"] = ptype
+            config[constants.PUBLISH_TYPE] = ptype
         else:
-            config["DiscoveryType"] = stype
+            config[constants.SUBSCRIBE_TYPE] = stype
         config[constants.TTL_SEC] = ttl
         config[constants.TERMINATE_NOTIFICATION_ENABLED] = term_ind_on
         if payload_size == _PAYLOAD_SIZE_MIN:
@@ -339,7 +339,9 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             ]).decode("utf-8")
                            for filter in s_filter_list_1]
         s_filter_list_1 = autils.decode_list(s_filter_list_1)
-        asserts.assert_equal(s_filter_list_1, p_filter_list_1,
+        asserts.assert_equal(s_filter_list_1,
+                             p_filter_list_1 if ptype == _PUBLISH_TYPE_UNSOLICITED
+                             else  autils.decode_list(s_config[constants.MATCH_FILTER]),
                              "Discovery mismatch: match filter")
         # Subscriber sends a message to publisher.
         publisher_peer = self._send_msg_and_check_received(
@@ -391,7 +393,9 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             constants.WifiAwareSnippetParams.MATCH_FILTER_VALUE]).decode("utf-8")
                            for filter in s_filter_list_2]
         s_filter_list_2 = autils.decode_list(s_filter_list_2)
-        asserts.assert_equal(s_filter_list_2, p_filter_list_2,
+        asserts.assert_equal(s_filter_list_2,
+                             p_filter_list_2  if ptype == _PUBLISH_TYPE_UNSOLICITED
+                             else  autils.decode_list(s_config[constants.MATCH_FILTER]),
                              "Discovery mismatch: match filter")
         disc_peer_id = discovered_event_1.data[
             constants.WifiAwareSnippetParams.PEER_ID]
@@ -500,7 +504,7 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             asserts.assert_equal(
                 constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
                 callback_name,
-                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                f'{dut} publish failed, got callback: {callback_name}.',
                 )
         else:
             disc_id = dut.wifi_aware_snippet.wifiAwareSubscribe(
@@ -513,7 +517,7 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             asserts.assert_equal(
                 constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
                 callback_name,
-                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                f'{dut} subscribe failed, got callback: {callback_name}.',
                 )
         # Wait for session termination & verify
         self.verify_discovery_session_term(dut, disc_id, config, is_publish,
@@ -538,7 +542,7 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             asserts.assert_equal(
                 constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
                 callback_name,
-                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                f'{dut} publish failed, got callback: {callback_name}.',
                 )
         else:
             disc_id = dut.wifi_aware_snippet.wifiAwareSubscribe(
@@ -551,7 +555,7 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             asserts.assert_equal(
                 constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
                 callback_name,
-                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                f'{dut} subscribe failed, got callback: {callback_name}.',
                 )
         # Update with a TTL
         config = self.create_base_config(
@@ -573,7 +577,7 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             asserts.assert_equal(
                 constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
                 callback_name,
-                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                f'{dut} publish failed, got callback: {callback_name}.',
                 )
         else:
             disc_id = dut.wifi_aware_snippet.wifiAwareSubscribe(
@@ -586,7 +590,7 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             asserts.assert_equal(
                 constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
                 callback_name,
-                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                f'{dut} subscribe failed, got callback: {callback_name}.',
                 )
         # Wait for session termination & verify
         self.verify_discovery_session_term(dut, disc_id, config, is_publish,
@@ -611,7 +615,7 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             asserts.assert_equal(
                 constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
                 callback_name,
-                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                f'{dut} publish failed, got callback: {callback_name}.',
                 )
         else:
             disc_id = dut.wifi_aware_snippet.wifiAwareSubscribe(
@@ -624,7 +628,7 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             asserts.assert_equal(
                 constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
                 callback_name,
-                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                f'{dut} subscribe failed, got callback: {callback_name}.',
                 )
         # Update with a TTL
         config = self.create_base_config(
@@ -646,7 +650,7 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             asserts.assert_equal(
                 constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
                 callback_name,
-                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                f'{dut} publish failed, got callback: {callback_name}.',
                 )
         else:
             disc_id = dut.wifi_aware_snippet.wifiAwareSubscribe(
@@ -659,7 +663,7 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             asserts.assert_equal(
                 constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
                 callback_name,
-                f'{self.publisher} publish failed, got callback: {callback_name}.',
+                f'{dut} subscribe failed, got callback: {callback_name}.',
                 )
         # Wait for session termination & verify
         self.verify_discovery_session_term(dut, disc_id, config, is_publish,
@@ -671,6 +675,87 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
                     "2": 0,
                     "3": 0})
 
+    def discovery_mismatch_test_utility(self,
+                                        is_expected_to_pass,
+                                        p_type,
+                                        s_type,
+                                        p_service_name=None,
+                                        s_service_name=None,
+                                        p_mf_1=None,
+                                        s_mf_1=None):
+        p_dut = self.ads[0]
+        s_dut = self.ads[1]
+        # create configurations
+        p_config = self.create_publish_config(
+            p_dut.wifi_aware_snippet.getCharacteristics(),
+            p_type,
+            _PAYLOAD_SIZE_TYPICAL,
+            ttl=0,
+            term_ind_on=False,
+            null_match=False)
+        if p_service_name is not None:
+            p_config[constants.SERVICE_NAME] = p_service_name
+        if p_mf_1 is not None:
+            # p_config[constants.MATCH_FILTER] = p_mf_1.encode("utf-8")
+            p_config[constants.MATCH_FILTER] = autils.encode_list(
+              [(10).to_bytes(1, byteorder="big"), p_mf_1 , bytes(range(40))])
+        s_config = self.create_subscribe_config(
+            s_dut.wifi_aware_snippet.getCharacteristics(),
+            s_type,
+            _PAYLOAD_SIZE_TYPICAL,
+            ttl=0,
+            term_ind_on=False,
+            null_match=False)
+        if s_service_name is not None:
+            s_config[constants.SERVICE_NAME] = s_service_name
+        if s_mf_1 is not None:
+            s_config[constants.MATCH_FILTER] = autils.encode_list(
+              [(10).to_bytes(1, byteorder="big"), s_mf_1 , bytes(range(40))])
+        p_id = self._start_attach(p_dut)
+        s_id = self._start_attach(s_dut)
+        # Publisher: start publish and wait for confirmation
+        p_disc_id = p_dut.wifi_aware_snippet.wifiAwarePublish(
+                p_id, p_config
+                )
+        p_dut.log.info('Created the publish session.')
+        p_discovery = p_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = p_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+            callback_name,
+            f'{p_dut} publish failed, got callback: {callback_name}.',
+            )
+        s_disc_id = s_dut.wifi_aware_snippet.wifiAwareSubscribe(
+                s_id, s_config
+                )
+        s_discovery = s_disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+        callback_name = s_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+            callback_name,
+            f'{s_dut} subscribe failed, got callback: {callback_name}.',
+            )
+        # Subscriber: fail on service discovery
+        if is_expected_to_pass:
+            s_disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED)
+        else:
+            autils.callback_no_response(
+                s_disc_id,
+                constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED,
+                timeout = _DEFAULT_TIMEOUT)
+        # Publisher+Subscriber: Terminate sessions
+        p_dut.wifi_aware_snippet.wifiAwareCloseDiscoverSession(
+            p_disc_id.callback_id)
+        s_dut.wifi_aware_snippet.wifiAwareCloseDiscoverSession(
+            s_disc_id.callback_id)
+        p_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.SESSION_TERMINATED)
+        s_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.SESSION_TERMINATED)
 
     def test_positive_unsolicited_passive_typical(self)-> None:
         """Functional test case / Discovery test cases / positive test case:
@@ -848,6 +933,104 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             ptype=None,
             stype=_SUBSCRIBE_TYPE_ACTIVE,
             term_ind_on=False)
+
+    #######################################
+    # Mismatched discovery session type tests key:
+    #
+    # names is: test_mismatch_service_type_<pub_type>_<sub_type>
+    # where:
+    #
+    # pub_type: Type of publish discovery session: unsolicited or solicited.
+    # sub_type: Type of subscribe discovery session: passive or active.
+    #######################################
+
+    def test_mismatch_service_type_unsolicited_active(self):
+        """Functional test case / Discovery test cases / Mismatch service name
+    - Unsolicited publish
+    - Active subscribe
+    """
+        self.discovery_mismatch_test_utility(
+            is_expected_to_pass=True,
+            p_type=_PUBLISH_TYPE_UNSOLICITED,
+            s_type=_SUBSCRIBE_TYPE_ACTIVE)
+
+    def test_mismatch_service_type_solicited_passive(self):
+        """Functional test case / Discovery test cases / Mismatch service name
+    - Unsolicited publish
+    - Active subscribe
+    """
+        self.discovery_mismatch_test_utility(
+            is_expected_to_pass=False,
+            p_type = _PUBLISH_TYPE_SOLICITED,
+            s_type = _SUBSCRIBE_TYPE_PASSIVE)
+
+    ######################################
+    # Mismatched service name tests key:
+    #
+    # names is: test_mismatch_service_name_<pub_type>_<sub_type>
+    # where:
+    #
+    # pub_type: Type of publish discovery session: unsolicited or solicited.
+    # sub_type: Type of subscribe discovery session: passive or active.
+    #######################################
+
+    def test_mismatch_service_name_unsolicited_passive(self):
+        """Functional test case / Discovery test cases / Mismatch service name
+    - Unsolicited publish
+    - Passive subscribe
+    """
+        self.discovery_mismatch_test_utility(
+            is_expected_to_pass=False,
+            p_type=_PUBLISH_TYPE_UNSOLICITED,
+            s_type=_SUBSCRIBE_TYPE_PASSIVE,
+            p_service_name="GoogleTestServiceXXX",
+            s_service_name="GoogleTestServiceYYY")
+
+    def test_mismatch_service_name_solicited_active(self):
+        """Functional test case / Discovery test cases / Mismatch service name
+    - Solicited publish
+    - Active subscribe
+    """
+        self.discovery_mismatch_test_utility(
+            is_expected_to_pass=False,
+            p_type=_PUBLISH_TYPE_SOLICITED,
+            s_type=_SUBSCRIBE_TYPE_ACTIVE,
+            p_service_name="GoogleTestServiceXXX",
+            s_service_name="GoogleTestServiceYYY")
+
+    #######################################
+    # Mismatched discovery match filter tests key:
+    #
+    # names is: test_mismatch_match_filter_<pub_type>_<sub_type>
+    # where:
+    #
+    # pub_type: Type of publish discovery session: unsolicited or solicited.
+    # sub_type: Type of subscribe discovery session: passive or active.
+    #######################################
+
+    def test_mismatch_match_filter_unsolicited_passive(self):
+        """Functional test case / Discovery test cases / Mismatch match filter
+    - Unsolicited publish
+    - Passive subscribe
+    """
+        self.discovery_mismatch_test_utility(
+            is_expected_to_pass=False,
+            p_type=_PUBLISH_TYPE_UNSOLICITED,
+            s_type=_SUBSCRIBE_TYPE_PASSIVE,
+            p_mf_1="hello there string",
+            s_mf_1="goodbye there string")
+
+    def test_mismatch_match_filter_solicited_active(self):
+        """Functional test case / Discovery test cases / Mismatch match filter
+    - Solicited publish
+    - Active subscribe
+    """
+        self.discovery_mismatch_test_utility(
+            is_expected_to_pass=False,
+            p_type=_PUBLISH_TYPE_SOLICITED,
+            s_type=_SUBSCRIBE_TYPE_ACTIVE,
+            p_mf_1="hello there string",
+            s_mf_1="goodbye there string")
 
 
 if __name__ == '__main__':

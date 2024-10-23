@@ -874,7 +874,7 @@ public class WifiServiceImpl extends BaseWifiService {
             mWifiInjector.getWifiDeviceStateChangeManager().handleBootCompleted();
             setPulledAtomCallbacks();
             mTwtManager.registerWifiNativeTwtEvents();
-            mContext.registerReceiver(
+            mContext.registerReceiverForAllUsers(
                     new BroadcastReceiver() {
                         @Override
                         public void onReceive(Context context, Intent intent) {

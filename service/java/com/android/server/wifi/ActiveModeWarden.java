@@ -681,14 +681,14 @@ public class ActiveModeWarden {
 
     /** Begin listening to broadcasts and start the internal state machine. */
     public void start() {
-        mContext.registerReceiver(new BroadcastReceiver() {
+        mContext.registerReceiverForAllUsers(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 // Location mode has been toggled...  trigger with the scan change
                 // update to make sure we are in the correct mode
                 scanAlwaysModeChanged();
             }
-        }, new IntentFilter(LocationManager.MODE_CHANGED_ACTION));
+        }, new IntentFilter(LocationManager.MODE_CHANGED_ACTION), null, mHandler);
         mContext.registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
