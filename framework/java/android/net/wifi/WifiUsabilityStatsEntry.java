@@ -173,6 +173,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final int mIsThroughputPredictorUpstreamSufficient;
     /** If bluetooth is connected */
     private final boolean mIsBluetoothConnected;
+    /** UWB Adapter state */
+    private final int mUwbAdapterState;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -1178,7 +1180,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             int wifiFrameworkState, int isNetworkCapabilitiesDownstreamSufficient,
             int isNetworkCapabilitiesUpstreamSufficient,
             int isThroughputPredictorDownstreamSufficient,
-            int isThroughputPredictorUpstreamSufficient, boolean isBluetoothConnected) {
+            int isThroughputPredictorUpstreamSufficient, boolean isBluetoothConnected,
+            int uwbAdapterState) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -1226,6 +1229,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mIsThroughputPredictorDownstreamSufficient = isThroughputPredictorDownstreamSufficient;
         mIsThroughputPredictorUpstreamSufficient = isThroughputPredictorUpstreamSufficient;
         mIsBluetoothConnected = isBluetoothConnected;
+        mUwbAdapterState = uwbAdapterState;
     }
 
     /** Implement the Parcelable interface */
@@ -1282,6 +1286,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeInt(mIsThroughputPredictorDownstreamSufficient);
         dest.writeInt(mIsThroughputPredictorUpstreamSufficient);
         dest.writeBoolean(mIsBluetoothConnected);
+        dest.writeInt(mUwbAdapterState);
     }
 
     /** Implement the Parcelable interface */
@@ -1305,7 +1310,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readInt(), in.readBoolean(),
                     in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
                     in.readInt(), in.readLong(), in.readLong(), in.readInt(), in.readInt(),
-                    in.readInt(), in.readInt(), in.readInt(), in.readInt(), in.readBoolean()
+                    in.readInt(), in.readInt(), in.readInt(), in.readInt(), in.readBoolean(),
+                    in.readInt()
             );
         }
 
@@ -2077,5 +2083,10 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public boolean isBluetoothConnected() {
         return mIsBluetoothConnected;
+    }
+
+    /** @hide */
+    public int getUwbAdapterState() {
+        return mUwbAdapterState;
     }
 }

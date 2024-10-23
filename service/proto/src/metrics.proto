@@ -2755,6 +2755,10 @@ message WifiUsabilityStatsEntry {
 
   // If bluetooth is connected
   optional bool is_bluetooth_connected = 56;
+
+  // State of UWB adapter. Refers to
+  // UwbManager#registerAdapterStateCallback(Executor, AdapterStateCallback)
+  optional int32 uwb_adapter_state = 57;
 }
 
 message ContentionTimeStats {

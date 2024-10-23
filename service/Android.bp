@@ -65,6 +65,7 @@ java_library {
         "framework-location.stubs.module_lib",
         "framework-statsd.stubs.module_lib",
         "framework-tethering.stubs.module_lib",
+        "framework-uwb.stubs.module_lib",
         "unsupportedappusage",
         "app-compat-annotations",
         "auto_value_annotations",

@@ -344,7 +344,8 @@ public class WifiMetrics {
     int mUnusableEventType = WifiIsUnusableEvent.TYPE_UNKNOWN;
     private int mWifiFrameworkState = 0;
     private SpeedSufficient mSpeedSufficientNetworkCapabilities = new SpeedSufficient();
-    private  SpeedSufficient mSpeedSufficientThroughputPredictor = new SpeedSufficient();
+    private SpeedSufficient mSpeedSufficientThroughputPredictor = new SpeedSufficient();
+    private int mLastUwbState = -1;
 
     /**
      * Wi-Fi usability state per interface as predicted by the network scorer.
@@ -5300,6 +5301,7 @@ public class WifiMetrics {
         line.append(",is_throughput_predictor_upstream_sufficient="
                 + entry.isThroughputPredictorUpstreamSufficient);
         line.append(",is_bluetooth_connected=" + entry.isBluetoothConnected);
+        line.append(",uwb_adapter_state=" + entry.uwbAdapterState);
         pw.println(line.toString());
     }
 
@@ -7389,6 +7391,7 @@ public class WifiMetrics {
                         mSpeedSufficientThroughputPredictor.Upstream;
                 wifiUsabilityStatsEntry.isBluetoothConnected =
                         mWifiGlobals.isBluetoothConnected();
+                wifiUsabilityStatsEntry.uwbAdapterState = getLastUwbState();
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7942,7 +7945,8 @@ public class WifiMetrics {
                 s.wifiFrameworkState, s.isNetworkCapabilitiesDownstreamSufficient,
                 s.isNetworkCapabilitiesUpstreamSufficient,
                 s.isThroughputPredictorDownstreamSufficient,
-                s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected
+                s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
+                s.uwbAdapterState
         );
     }
 
@@ -8152,6 +8156,7 @@ public class WifiMetrics {
         out.isThroughputPredictorDownstreamSufficient = s.isThroughputPredictorDownstreamSufficient;
         out.isThroughputPredictorUpstreamSufficient = s.isThroughputPredictorUpstreamSufficient;
         out.isBluetoothConnected = s.isBluetoothConnected;
+        out.uwbAdapterState = s.uwbAdapterState;
         return out;
     }
 
@@ -10427,5 +10432,13 @@ public class WifiMetrics {
                 getSoftApStoppedUpstreamType(upstreamCaps));
         WifiStatsLog.write(WifiStatsLog.SOFT_AP_STATE_CHANGED,
                 WifiStatsLog.SOFT_AP_STATE_CHANGED__HOTSPOT_ON__STATE_OFF);
+    }
+
+    public int getLastUwbState() {
+        return mLastUwbState;
+    }
+
+    public void setLastUwbState(int state) {
+        mLastUwbState = state;
     }
 }
