@@ -731,7 +731,7 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
 
         intentFilter = new IntentFilter();
         intentFilter.addAction(LocationManager.MODE_CHANGED_ACTION);
-        mContext.registerReceiver(
+        mContext.registerReceiverForAllUsers(
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
