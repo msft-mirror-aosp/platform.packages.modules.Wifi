@@ -6812,6 +6812,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     deviceName,
                     false /* isPinRequested */,
                     pin,
+                    0,
                     displayId,
                     new WifiDialogManager.P2pInvitationReceivedDialogCallback() {
                         @Override
@@ -6978,11 +6979,12 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             deviceName,
                             isPinRequested,
                             displayPin,
+                            mContext.getResources().getInteger(
+                                    R.integer.config_p2pInvitationReceivedDialogTimeoutMs),
                             displayId,
                             callback,
                             new WifiThreadRunner(getHandler()));
-            mInvitationDialogHandle.launchDialog(mContext.getResources().getInteger(
-                    R.integer.config_p2pInvitationReceivedDialogTimeoutMs));
+            mInvitationDialogHandle.launchDialog();
         }
 
         private void notifyInvitationReceived(
