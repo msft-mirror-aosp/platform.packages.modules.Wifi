@@ -38,7 +38,6 @@ import static android.net.wifi.WifiManager.WIFI_AP_STATE_DISABLING;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_ENABLED;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_ENABLING;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_FAILED;
-import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
 import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_AP;
 import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_AWARE;
 import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_DIRECT;
@@ -201,6 +200,7 @@ import android.util.Log;
 import android.util.Pair;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
+import android.uwb.UwbManager;
 
 import androidx.annotation.RequiresApi;
 
@@ -245,6 +245,7 @@ import java.security.cert.PKIXParameters;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -874,7 +875,7 @@ public class WifiServiceImpl extends BaseWifiService {
             mWifiInjector.getWifiDeviceStateChangeManager().handleBootCompleted();
             setPulledAtomCallbacks();
             mTwtManager.registerWifiNativeTwtEvents();
-            mContext.registerReceiver(
+            mContext.registerReceiverForAllUsers(
                     new BroadcastReceiver() {
                         @Override
                         public void onReceive(Context context, Intent intent) {
@@ -888,6 +889,15 @@ public class WifiServiceImpl extends BaseWifiService {
                     null,
                     new Handler(mWifiHandlerThread.getLooper()));
             updateLocationMode();
+
+            if (SdkLevel.isAtLeastT()) {
+                UwbManager uwbManager =
+                        mContext.getSystemService(UwbManager.class);
+                if (uwbManager != null) {
+                    uwbManager.registerAdapterStateCallback(new HandlerExecutor(new Handler(
+                            mWifiHandlerThread.getLooper())), new UwbAdapterStateListener());
+                }
+            }
         }, TAG + "#handleBootCompleted");
     }
 
@@ -2118,6 +2128,17 @@ public class WifiServiceImpl extends BaseWifiService {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    class UwbAdapterStateListener implements UwbManager.AdapterStateCallback {
+        @Override
+        public void onStateChanged(int state, int reason) {
+            if (mVerboseLoggingEnabled) {
+                Log.d(TAG, "UwbManager.AdapterState=" + state);
+            }
+            mWifiMetrics.setLastUwbState(state);
+        }
+    }
+
     /**
      * SoftAp callback
      */
@@ -3218,18 +3239,18 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     /**
-     * Returns true if we should log the call to getSupportedFeatures.
+     * Returns true if we should log the call to isFeatureSupported.
      *
-     * Because of the way getSupportedFeatures is used in WifiManager, there are
+     * Because of the way isFeatureSupported is used in WifiManager, there are
      * often clusters of several back-to-back calls; avoid repeated logging if
      * the feature set has not changed and the time interval is short.
      */
-    private boolean needToLogSupportedFeatures(long features) {
+    private boolean needToLogSupportedFeatures(BitSet features) {
         if (mVerboseLoggingEnabled) {
             long now = mClock.getElapsedSinceBootMillis();
             synchronized (this) {
                 if (now > mLastLoggedSupportedFeaturesTimestamp + A_FEW_MILLISECONDS
-                        || features != mLastLoggedSupportedFeatures) {
+                        || !features.equals(mLastLoggedSupportedFeatures)) {
                     mLastLoggedSupportedFeaturesTimestamp = now;
                     mLastLoggedSupportedFeatures = features;
                     return true;
@@ -3239,23 +3260,20 @@ public class WifiServiceImpl extends BaseWifiService {
         return false;
     }
     private static final int A_FEW_MILLISECONDS = 250;
-    private long mLastLoggedSupportedFeatures = -1;
+    private BitSet mLastLoggedSupportedFeatures = new BitSet();
     private long mLastLoggedSupportedFeaturesTimestamp = 0;
 
-    /**
-     * see {@link android.net.wifi.WifiManager#getSupportedFeatures}
-     */
     @Override
-    public long getSupportedFeatures() {
+    public boolean isFeatureSupported(int feature) {
         enforceAccessPermission();
-        long features = getSupportedFeaturesInternal();
-        if (needToLogSupportedFeatures(features)) {
-            mLog.info("getSupportedFeatures uid=% returns %")
+        BitSet supportedFeatures = getSupportedFeaturesInternal();
+        if (needToLogSupportedFeatures(supportedFeatures)) {
+            mLog.info("isFeatureSupported uid=% returns %")
                     .c(Binder.getCallingUid())
-                    .c(Long.toHexString(features))
+                    .c(supportedFeatures.toString())
                     .flush();
         }
-        return features;
+        return supportedFeatures.get(feature);
     }
 
     @Override
@@ -3270,7 +3288,7 @@ public class WifiServiceImpl extends BaseWifiService {
                     .c(Binder.getCallingUid())
                     .flush();
         }
-        if ((getSupportedFeatures() & WifiManager.WIFI_FEATURE_LINK_LAYER_STATS) == 0) {
+        if (!isFeatureSupported(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS)) {
             try {
                 listener.onWifiActivityEnergyInfo(null);
             } catch (RemoteException e) {
@@ -5611,7 +5629,7 @@ public class WifiServiceImpl extends BaseWifiService {
                         mContext, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 0));
                 pw.println("mInIdleMode " + mInIdleMode);
                 pw.println("mScanPending " + mScanPending);
-                pw.println("SupportedFeatures:" + Long.toHexString(getSupportedFeaturesInternal()));
+                pw.println("SupportedFeatures: " + getSupportedFeaturesInternal());
                 pw.println("SettingsStore:");
                 mSettingsStore.dump(fd, pw, args);
                 mActiveModeWarden.dump(fd, pw, args);
@@ -5762,10 +5780,10 @@ public class WifiServiceImpl extends BaseWifiService {
     }
 
     @Override
-    public void releaseMulticastLock(String tag) {
+    public void releaseMulticastLock(IBinder binder, String tag) {
         enforceMulticastChangePermission();
         mLog.info("releaseMulticastLock uid=% tag=%").c(Binder.getCallingUid()).c(tag).flush();
-        mWifiMulticastLockManager.releaseLock(tag);
+        mWifiMulticastLockManager.releaseLock(binder, tag);
     }
 
     @Override
@@ -6242,7 +6260,7 @@ public class WifiServiceImpl extends BaseWifiService {
                 TAG + "#unregisterTrafficStateCallback");
     }
 
-    private long getSupportedFeaturesInternal() {
+    private BitSet getSupportedFeaturesInternal() {
         return mActiveModeWarden.getSupportedFeatureSet();
     }
 
@@ -7737,21 +7755,20 @@ public class WifiServiceImpl extends BaseWifiService {
      */
     @Override
     public boolean isPnoSupported() {
+        boolean featureSetSupportsPno = isFeatureSupported(WifiManager.WIFI_FEATURE_PNO);
         return mWifiGlobals.isSwPnoEnabled()
-                || (mWifiGlobals.isBackgroundScanSupported()
-                        && (getSupportedFeatures() & WifiManager.WIFI_FEATURE_PNO) != 0);
+                || (mWifiGlobals.isBackgroundScanSupported() && featureSetSupportsPno);
     }
 
     private boolean isAggressiveRoamingModeSupported() {
-        return (getSupportedFeatures() & WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT)
-                != 0;
+        return isFeatureSupported(WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT);
     }
 
     /**
      * @return true if this device supports Trust On First Use
      */
     private boolean isTrustOnFirstUseSupported() {
-        return (getSupportedFeatures() & WIFI_FEATURE_TRUST_ON_FIRST_USE) != 0;
+        return isFeatureSupported(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE);
     }
 
     /**
@@ -8856,5 +8873,91 @@ public class WifiServiceImpl extends BaseWifiService {
                 Log.e(TAG, e.getMessage(), e);
             }
         }, TAG + "#queryD2dAllowedWhenInfraStaDisabled");
+    }
+
+    /**
+     * See {@link WifiManager#setAutojoinDisallowedSecurityTypes(int)}
+     * @param restrictions The autojoin restriction security types to be set.
+     * @throws SecurityException if the caller does not have permission.
+     * @throws IllegalArgumentException if the arguments are null or invalid
+     */
+    @Override
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    public void setAutojoinDisallowedSecurityTypes(int restrictions, @NonNull Bundle extras) {
+        // SDK check.
+        if (!SdkLevel.isAtLeastT()) {
+            throw new UnsupportedOperationException("SDK level too old");
+        }
+        // Check null argument
+        if (extras == null) {
+            throw new IllegalArgumentException("extras cannot be null");
+        }
+        // Check invalid argument
+        if ((restrictions & (0x1 << WifiInfo.SECURITY_TYPE_OPEN)) == 0
+                && (restrictions & (0x1 << WifiInfo.SECURITY_TYPE_OWE)) != 0) {
+            throw new IllegalArgumentException("Restricting OWE but not OPEN is not allowed");
+        }
+        if ((restrictions & (0x1 << WifiInfo.SECURITY_TYPE_PSK)) == 0
+                && (restrictions & (0x1 << WifiInfo.SECURITY_TYPE_SAE)) != 0) {
+            throw new IllegalArgumentException("Restricting SAE but not PSK is not allowed");
+        }
+        if ((restrictions & (0x1 << WifiInfo.SECURITY_TYPE_EAP)) == 0
+                && (restrictions & (0x1 << WifiInfo.SECURITY_TYPE_EAP_WPA3_ENTERPRISE)) != 0) {
+            throw new IllegalArgumentException(
+                    "Restricting EAP_WPA3_ENTERPRISE but not EAP is not allowed");
+        }
+        // Permission check.
+        int uid = Binder.getCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)
+                && !mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)) {
+            throw new SecurityException(
+                    "Uid=" + uid + " is not allowed to set AutoJoinRestrictionSecurityTypes");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("setAutojoinDisallowedSecurityTypes uid=% Package Name=% restrictions=%")
+                    .c(uid).c(getPackageName(extras)).c(restrictions).flush();
+        }
+        mWifiThreadRunner.post(() -> {
+            mWifiConnectivityManager.setAutojoinDisallowedSecurityTypes(restrictions);
+        }, TAG + "#setAutojoinDisallowedSecurityTypes");
+    }
+
+    /**
+     * See {@link WifiManager#getAutojoinDisallowedSecurityTypes(Executor, Consumer)}
+     */
+    @Override
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    public void getAutojoinDisallowedSecurityTypes(@NonNull IIntegerListener listener,
+            @NonNull Bundle extras) {
+        // SDK check.
+        if (!SdkLevel.isAtLeastT()) {
+            throw new UnsupportedOperationException("SDK level too old");
+        }
+        // Argument check
+        if (listener == null) {
+            throw new IllegalArgumentException("listener cannot be null");
+        }
+        if (extras == null) {
+            throw new IllegalArgumentException("extras cannot be null");
+        }
+        // Permission check.
+        int uid = Binder.getCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)
+                && !mWifiPermissionsUtil.checkNetworkSettingsPermission(uid)) {
+            throw new SecurityException(
+                    "Uid=" + uid + " is not allowed to get AutoJoinRestrictionSecurityTypes");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("getAutojoinDisallowedSecurityTypes:  Uid=% Package Name=%").c(
+                    Binder.getCallingUid()).c(getPackageName(extras)).flush();
+        }
+
+        mWifiThreadRunner.post(() -> {
+            try {
+                listener.onResult(mWifiConnectivityManager.getAutojoinDisallowedSecurityTypes());
+            } catch (RemoteException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }, TAG + "#getAutojoinDisallowedSecurityTypes");
     }
 }

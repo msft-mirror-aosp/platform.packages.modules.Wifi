@@ -78,6 +78,7 @@ import com.android.server.wifi.util.HalAidlUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.List;
 
 /**
@@ -389,7 +390,7 @@ public class WifiChipAidlImpl implements IWifiChip {
      * See comments for {@link IWifiChip#getCapabilitiesBeforeIfacesExist()}
      */
     @Override
-    public WifiChip.Response<Long> getCapabilitiesBeforeIfacesExist() {
+    public WifiChip.Response<BitSet> getCapabilitiesBeforeIfacesExist() {
         final String methodStr = "getCapabilitiesBeforeIfacesExist";
         return getCapabilitiesInternal(methodStr);
     }
@@ -398,15 +399,15 @@ public class WifiChipAidlImpl implements IWifiChip {
      * See comments for {@link IWifiChip#getCapabilitiesAfterIfacesExist()}
      */
     @Override
-    public WifiChip.Response<Long> getCapabilitiesAfterIfacesExist() {
+    public WifiChip.Response<BitSet> getCapabilitiesAfterIfacesExist() {
         final String methodStr = "getCapabilitiesAfterIfacesExist";
         return getCapabilitiesInternal(methodStr);
     }
 
-    private WifiChip.Response<Long> getCapabilitiesInternal(String methodStr) {
+    private WifiChip.Response<BitSet> getCapabilitiesInternal(String methodStr) {
         // getCapabilities uses the same logic in AIDL, regardless of whether the call
         // happens before or after any interfaces have been created.
-        WifiChip.Response<Long> featuresResp = new WifiChip.Response<>(0L);
+        WifiChip.Response<BitSet> featuresResp = new WifiChip.Response<>(new BitSet());
         synchronized (mLock) {
             try {
                 if (!checkIfaceAndLogFailure(methodStr)) return featuresResp;
@@ -1590,28 +1591,28 @@ public class WifiChipAidlImpl implements IWifiChip {
     }
 
     @VisibleForTesting
-    protected static long halToFrameworkChipFeatureSet(long halFeatureSet) {
-        long features = 0;
+    protected static BitSet halToFrameworkChipFeatureSet(long halFeatureSet) {
+        BitSet features = new BitSet();
         if (bitmapContains(halFeatureSet, FeatureSetMask.SET_TX_POWER_LIMIT)) {
-            features |= WifiManager.WIFI_FEATURE_TX_POWER_LIMIT;
+            features.set(WifiManager.WIFI_FEATURE_TX_POWER_LIMIT);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.D2D_RTT)) {
-            features |= WifiManager.WIFI_FEATURE_D2D_RTT;
+            features.set(WifiManager.WIFI_FEATURE_D2D_RTT);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.D2AP_RTT)) {
-            features |= WifiManager.WIFI_FEATURE_D2AP_RTT;
+            features.set(WifiManager.WIFI_FEATURE_D2AP_RTT);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.SET_LATENCY_MODE)) {
-            features |= WifiManager.WIFI_FEATURE_LOW_LATENCY;
+            features.set(WifiManager.WIFI_FEATURE_LOW_LATENCY);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.P2P_RAND_MAC)) {
-            features |= WifiManager.WIFI_FEATURE_P2P_RAND_MAC;
+            features.set(WifiManager.WIFI_FEATURE_P2P_RAND_MAC);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.WIGIG)) {
-            features |= WifiManager.WIFI_FEATURE_INFRA_60G;
+            features.set(WifiManager.WIFI_FEATURE_INFRA_60G);
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.T2LM_NEGOTIATION)) {
-            features |= WifiManager.WIFI_FEATURE_T2LM_NEGOTIATION;
+            features.set(WifiManager.WIFI_FEATURE_T2LM_NEGOTIATION);
         }
         return features;
     }

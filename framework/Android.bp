@@ -41,7 +41,7 @@ filegroup {
 
 filegroup {
     name: "framework-wifi-updatable-sources",
-    srcs: [
+    device_common_srcs: [
         ":framework-wifi-updatable-java-sources",
         ":framework-wifi-updatable-exported-aidl-sources",
         ":module-utils-os-aidls",
@@ -118,7 +118,7 @@ java_defaults {
         "aconfig-annotations-lib",
         // library for generated flag code read new storage
         "aconfig_storage_reader_java",
-        "framework-configinfrastructure",
+        "framework-configinfrastructure.stubs.module_lib",
     ],
     aidl: {
         generate_get_transaction_name: true,

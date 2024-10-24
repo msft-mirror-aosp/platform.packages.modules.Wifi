@@ -34,6 +34,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyByte;
@@ -215,9 +216,11 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         MockitoAnnotations.initMocks(this);
         mSession = ExtendedMockito.mockitoSession()
                 .strictness(Strictness.LENIENT)
+                .mockStatic(WifiInjector.class)
                 .mockStatic(WifiStatsLog.class)
                 .startMocking();
 
+        when(WifiInjector.getInstance()).thenReturn(mWifiInjector);
         mAlarmManager = new TestAlarmManager();
         when(mMockContext.getSystemService(Context.ALARM_SERVICE))
                 .thenReturn(mAlarmManager.getAlarmManager());
@@ -288,14 +291,20 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
                     callbackArgumentCaptor.capture());
             mActiveCountryCodeChangedCallback = callbackArgumentCaptor.getValue();
         }
-        verify(mMockContext, times(3))
+        verify(mMockContext)
+                .registerReceiverForAllUsers(
+                        bcastRxCaptor.capture(),
+                        argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)),
+                        isNull(),
+                        any(Handler.class));
+        verify(mMockContext, times(2))
                 .registerReceiver(
                         bcastRxCaptor.capture(),
                         any(IntentFilter.class),
                         isNull(),
                         any(Handler.class));
-        mPowerBcastReceiver = bcastRxCaptor.getAllValues().get(0);
-        mLocationModeReceiver = bcastRxCaptor.getAllValues().get(1);
+        mLocationModeReceiver = bcastRxCaptor.getAllValues().get(0);
+        mPowerBcastReceiver = bcastRxCaptor.getAllValues().get(1);
         mWifiStateChangedReceiver = bcastRxCaptor.getAllValues().get(2);
         verify(mWifiSettingsConfigStore).registerChangeListener(
                 eq(D2D_ALLOWED_WHEN_INFRA_STA_DISABLED),
@@ -761,7 +770,7 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         IWifiAwareEventCallback mockCallback1 = mock(IWifiAwareEventCallback.class);
         IWifiAwareEventCallback mockCallback2 = mock(IWifiAwareEventCallback.class);
         ArgumentCaptor<Short> transactionIdCapture = ArgumentCaptor.forClass(Short.class);
-        InOrder inOrder = inOrder(mockCallback1, mockCallback2, mMockNative);
+        InOrder inOrder = inOrder(mockCallback1, mockCallback2, mMockNative, mMockNativeManager);
 
         mDut.enableUsage();
         mMockLooper.dispatchAll();
@@ -827,7 +836,8 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
 
         validateInternalClientInfoCleanedUp(clientId1);
         validateInternalClientInfoCleanedUp(clientId2);
-
+        mMockLooper.dispatchAll();
+        inOrder.verify(mMockNativeManager).releaseAware();
         verifyNoMoreInteractions(mockCallback1, mockCallback2, mMockNative);
     }
 
@@ -4093,6 +4103,7 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         inOrder.verify(mockCallback).onAttachTerminate();
         collector.checkThat("usage enabled", mDut.isUsageEnabled(), equalTo(true));
         assertFalse(mDut.isDeviceAttached());
+        mMockLooper.dispatchAll();
         validateCorrectAwareStatusChangeBroadcast(inOrder);
 
         // (3) try reconnect client
@@ -5796,7 +5807,7 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         IWifiAwareEventCallback mockCallback1 = mock(IWifiAwareEventCallback.class);
         IWifiAwareEventCallback mockCallback2 = mock(IWifiAwareEventCallback.class);
         ArgumentCaptor<Short> transactionIdCapture = ArgumentCaptor.forClass(Short.class);
-        InOrder inOrder = inOrder(mockCallback1, mockCallback2, mMockNative);
+        InOrder inOrder = inOrder(mockCallback1, mockCallback2, mMockNative, mMockNativeManager);
 
         mDut.enableUsage();
         mMockLooper.dispatchAll();
@@ -5835,7 +5846,8 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
 
         validateInternalClientInfoCleanedUp(clientId1);
         validateInternalClientInfoCleanedUp(clientId2);
-
+        mMockLooper.dispatchAll();
+        inOrder.verify(mMockNativeManager).releaseAware();
         verifyNoMoreInteractions(mockCallback1, mockCallback2, mMockNative);
     }
 
@@ -5864,7 +5876,7 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         IWifiAwareEventCallback mockCallback1 = mock(IWifiAwareEventCallback.class);
         IWifiAwareEventCallback mockCallback2 = mock(IWifiAwareEventCallback.class);
         ArgumentCaptor<Short> transactionIdCapture = ArgumentCaptor.forClass(Short.class);
-        InOrder inOrder = inOrder(mockCallback1, mockCallback2, mMockNative);
+        InOrder inOrder = inOrder(mockCallback1, mockCallback2, mMockNative, mMockNativeManager);
 
         mDut.enableUsage();
         mMockLooper.dispatchAll();
@@ -5915,7 +5927,8 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
 
         validateInternalClientInfoCleanedUp(clientId1);
         validateInternalClientInfoCleanedUp(clientId2);
-
+        mMockLooper.dispatchAll();
+        inOrder.verify(mMockNativeManager).releaseAware();
         verifyNoMoreInteractions(mockCallback1, mockCallback2, mMockNative);
     }
 
@@ -5976,7 +5989,8 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         inOrder.verify(mockCallback1).onAttachTerminate();
 
         validateInternalClientInfoCleanedUp(clientId1);
-
+        mMockLooper.dispatchAll();
+        inOrder.verify(mMockNativeManager).releaseAware();
         verifyNoMoreInteractions(mockCallback1, mMockNative);
     }
 }
