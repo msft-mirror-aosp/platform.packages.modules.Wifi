@@ -5769,21 +5769,23 @@ public class WifiServiceImpl extends BaseWifiService {
     public void initializeMulticastFiltering() {
         enforceMulticastChangePermission();
         mLog.info("initializeMulticastFiltering uid=%").c(Binder.getCallingUid()).flush();
-        mWifiMulticastLockManager.initializeFiltering();
+        mWifiMulticastLockManager.startFilteringMulticastPackets();
     }
 
     @Override
     public void acquireMulticastLock(IBinder binder, String tag) {
         enforceMulticastChangePermission();
-        mLog.info("acquireMulticastLock uid=% tag=%").c(Binder.getCallingUid()).c(tag).flush();
-        mWifiMulticastLockManager.acquireLock(binder, tag);
+        int uid = Binder.getCallingUid();
+        mLog.info("acquireMulticastLock uid=% tag=%").c(uid).c(tag).flush();
+        mWifiMulticastLockManager.acquireLock(uid, binder, tag);
     }
 
     @Override
     public void releaseMulticastLock(IBinder binder, String tag) {
         enforceMulticastChangePermission();
-        mLog.info("releaseMulticastLock uid=% tag=%").c(Binder.getCallingUid()).c(tag).flush();
-        mWifiMulticastLockManager.releaseLock(binder, tag);
+        int uid = Binder.getCallingUid();
+        mLog.info("releaseMulticastLock uid=% tag=%").c(uid).c(tag).flush();
+        mWifiMulticastLockManager.releaseLock(uid, binder, tag);
     }
 
     @Override
