@@ -967,6 +967,7 @@ public class WifiLockManager {
             }
         }
         mWifiLowLatencyLockListeners.finishBroadcast();
+        mWifiMetrics.setLowLatencyState(mIsLowLatencyActivated);
     }
 
     private void notifyLowLatencyOwnershipChanged() {

@@ -78,6 +78,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.HexDump;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.SupplicantStaIfaceHal.QosPolicyStatus;
+import com.android.server.wifi.WifiLinkLayerStats.ScanResultWithSameFreq;
 import com.android.server.wifi.hal.WifiChip;
 import com.android.server.wifi.hal.WifiHal;
 import com.android.server.wifi.hal.WifiNanIface;
@@ -3778,6 +3779,29 @@ public class WifiNative {
         if (stats != null) {
             stats.aggregateLinkLayerStats();
             stats.wifiMloMode = getMloMode();
+            ScanData scanData = getCachedScanResults(ifaceName);
+            if (scanData != null && scanData.getResults() != null
+                    && scanData.getResults().length >  0) {
+                for (int linkIndex = 0; linkIndex < stats.links.length; ++linkIndex) {
+                    List<ScanResultWithSameFreq> ScanResultsSameFreq = new ArrayList<>();
+                    for (int scanResultsIndex = 0; scanResultsIndex < scanData.getResults().length;
+                            ++scanResultsIndex) {
+                        if (scanData.getResults()[scanResultsIndex].frequency
+                                != stats.links[linkIndex].frequencyMhz) {
+                            continue;
+                        }
+                        ScanResultWithSameFreq ScanResultSameFreq = new ScanResultWithSameFreq();
+                        ScanResultSameFreq.scan_result_timestamp_micros =
+                            scanData.getResults()[scanResultsIndex].timestamp;
+                        ScanResultSameFreq.rssi = scanData.getResults()[scanResultsIndex].level;
+                        ScanResultSameFreq.frequencyMhz =
+                            scanData.getResults()[scanResultsIndex].frequency;
+                        ScanResultSameFreq.bssid = scanData.getResults()[scanResultsIndex].BSSID;
+                        ScanResultsSameFreq.add(ScanResultSameFreq);
+                    }
+                    stats.links[linkIndex].scan_results_same_freq = ScanResultsSameFreq;
+                }
+            }
         }
         return stats;
     }

@@ -200,6 +200,7 @@ import android.util.Log;
 import android.util.Pair;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
+import android.uwb.UwbManager;
 
 import androidx.annotation.RequiresApi;
 
@@ -874,7 +875,7 @@ public class WifiServiceImpl extends BaseWifiService {
             mWifiInjector.getWifiDeviceStateChangeManager().handleBootCompleted();
             setPulledAtomCallbacks();
             mTwtManager.registerWifiNativeTwtEvents();
-            mContext.registerReceiver(
+            mContext.registerReceiverForAllUsers(
                     new BroadcastReceiver() {
                         @Override
                         public void onReceive(Context context, Intent intent) {
@@ -888,6 +889,15 @@ public class WifiServiceImpl extends BaseWifiService {
                     null,
                     new Handler(mWifiHandlerThread.getLooper()));
             updateLocationMode();
+
+            if (SdkLevel.isAtLeastT()) {
+                UwbManager uwbManager =
+                        mContext.getSystemService(UwbManager.class);
+                if (uwbManager != null) {
+                    uwbManager.registerAdapterStateCallback(new HandlerExecutor(new Handler(
+                            mWifiHandlerThread.getLooper())), new UwbAdapterStateListener());
+                }
+            }
         }, TAG + "#handleBootCompleted");
     }
 
@@ -2115,6 +2125,17 @@ public class WifiServiceImpl extends BaseWifiService {
                 }
                 mAfcManager.onCountryCodeChange(countryCode);
             }, this.getClass().getSimpleName() + "#onCountryCodeChangePending");
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    class UwbAdapterStateListener implements UwbManager.AdapterStateCallback {
+        @Override
+        public void onStateChanged(int state, int reason) {
+            if (mVerboseLoggingEnabled) {
+                Log.d(TAG, "UwbManager.AdapterState=" + state);
+            }
+            mWifiMetrics.setLastUwbState(state);
         }
     }
 
