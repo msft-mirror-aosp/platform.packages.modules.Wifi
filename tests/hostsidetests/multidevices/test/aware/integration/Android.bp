@@ -21,7 +21,7 @@ python_test_host {
     name: "WifiAwareAttachTestCases",
     main: "wifi_aware_attached_test.py",
     srcs: ["wifi_aware_attached_test.py"],
-    data: [":wifi_aware_snippet_new"],
+    device_common_data: [":wifi_aware_snippet_new"],
     libs: [
         "aware_lib_utils",
         "mobly",
@@ -40,7 +40,7 @@ python_test_host {
     name: "WifiAwareDiscoveryCases",
     main: "wifi_aware_discovery_test.py",
     srcs: ["wifi_aware_discovery_test.py"],
-    data: [":wifi_aware_snippet_new"],
+    device_common_data: [":wifi_aware_snippet_new"],
     libs: [
         "aware_lib_utils",
         "mobly",
