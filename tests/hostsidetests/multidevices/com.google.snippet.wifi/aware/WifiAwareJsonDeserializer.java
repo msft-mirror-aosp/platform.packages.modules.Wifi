@@ -23,8 +23,6 @@ import android.net.wifi.aware.AwarePairingConfig;
 import android.net.wifi.aware.PublishConfig;
 import android.net.wifi.aware.SubscribeConfig;
 import android.net.wifi.aware.WifiAwareNetworkSpecifier;
-import android.os.Parcel;
-import android.util.Base64;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -65,7 +63,7 @@ public class WifiAwareJsonDeserializer {
     //NetworkRequest specific
     private static final String TRANSPORT_TYPE = "transport_type";
     private static final String CAPABILITY = "capability";
-    private static final String NETWORK_SPECIFIER = "network_specifier";
+    private static final String NETWORK_SPECIFIER_PARCEL = "network_specifier_parcel";
 
 
     private WifiAwareJsonDeserializer() {
@@ -77,9 +75,12 @@ public class WifiAwareJsonDeserializer {
      * @param jsonObject corresponding to SubscribeConfig in
      *                   tests/hostsidetests/multidevices/test/aware/constants.py
      */
-    public static SubscribeConfig jsonToSubscribeConfig(JSONObject jsonObject) throws
-            JSONException {
+    public static SubscribeConfig jsonToSubscribeConfig(JSONObject jsonObject)
+            throws JSONException {
         SubscribeConfig.Builder builder = new SubscribeConfig.Builder();
+        if (jsonObject == null) {
+            return builder.build();
+        }
         if (jsonObject.has(SERVICE_NAME)) {
             String serviceName = jsonObject.getString(SERVICE_NAME);
             builder.setServiceName(serviceName);
@@ -129,9 +130,12 @@ public class WifiAwareJsonDeserializer {
      * @param jsonObject corresponding to SubscribeConfig in
      *                   tests/hostsidetests/multidevices/test/aware/constants.py
      */
-    private static AwarePairingConfig jsonToAwarePairingConfig(JSONObject jsonObject) throws
-            JSONException {
+    private static AwarePairingConfig jsonToAwarePairingConfig(JSONObject jsonObject)
+            throws JSONException {
         AwarePairingConfig.Builder builder = new AwarePairingConfig.Builder();
+        if (jsonObject == null) {
+            return builder.build();
+        }
         if (jsonObject.has(PAIRING_CACHE_ENABLED)) {
             boolean pairingCacheEnabled = jsonObject.getBoolean(PAIRING_CACHE_ENABLED);
             builder.setPairingCacheEnabled(pairingCacheEnabled);
@@ -160,6 +164,9 @@ public class WifiAwareJsonDeserializer {
      */
     public static PublishConfig jsonToPublishConfig(JSONObject jsonObject) throws JSONException {
         PublishConfig.Builder builder = new PublishConfig.Builder();
+        if (jsonObject == null) {
+            return builder.build();
+        }
         if (jsonObject.has(SERVICE_NAME)) {
             String serviceName = jsonObject.getString(SERVICE_NAME);
             builder.setServiceName(serviceName);
@@ -209,6 +216,9 @@ public class WifiAwareJsonDeserializer {
      */
     public static NetworkRequest jsonToNetworkRequest(JSONObject jsonObject) throws JSONException {
         NetworkRequest.Builder requestBuilder = new NetworkRequest.Builder();
+        if (jsonObject == null) {
+            return requestBuilder.build();
+        }
         int transportType;
         if (jsonObject.has(TRANSPORT_TYPE)) {
             transportType = jsonObject.getInt(TRANSPORT_TYPE);
@@ -218,21 +228,14 @@ public class WifiAwareJsonDeserializer {
         }
         if (transportType == NetworkCapabilities.TRANSPORT_WIFI_AWARE) {
             requestBuilder.addTransportType(transportType);
-            if (jsonObject.has(NETWORK_SPECIFIER)) {
-                String specifierParcelableStr = jsonObject.getString(NETWORK_SPECIFIER);
-                // Convert the Base64 string to a byte array
-                byte[] bytes = Base64.decode(specifierParcelableStr, Base64.DEFAULT);
-                // Use Parcel to read the byte array
-                Parcel parcel = Parcel.obtain();
-                parcel.unmarshall(bytes, 0, bytes.length);
-                parcel.setDataPosition(0);
-                // Use the CREATOR to create WifiAwareNetworkSpecifier from the parcel
-                WifiAwareNetworkSpecifier specifier =
-                        WifiAwareNetworkSpecifier.CREATOR.createFromParcel(parcel);
-                // Release the Parcel object
-                parcel.recycle();
+            if (jsonObject.has(NETWORK_SPECIFIER_PARCEL)) {
+                String specifierParcelableStr = jsonObject.getString(NETWORK_SPECIFIER_PARCEL);
+                WifiAwareNetworkSpecifier wifiAwareNetworkSpecifier =
+                        SerializationUtil.stringToParcelable(specifierParcelableStr,
+                                WifiAwareNetworkSpecifier.CREATOR
+                        );
                 // Set the network specifier in the request builder
-                requestBuilder.setNetworkSpecifier(specifier);
+                requestBuilder.setNetworkSpecifier(wifiAwareNetworkSpecifier);
             }
             if (jsonObject.has(CAPABILITY)) {
                 int capability = jsonObject.getInt(CAPABILITY);
@@ -243,5 +246,30 @@ public class WifiAwareJsonDeserializer {
         return null;
     }
 
+    /**
+     * Converts JSON object to {@link WifiAwareNetworkSpecifier}.
+     *
+     * @param jsonObject corresponding to WifiAwareNetworkSpecifier in
+     * @param builder    builder to build the WifiAwareNetworkSpecifier
+     * @return WifiAwareNetworkSpecifier object
+     */
+    public static WifiAwareNetworkSpecifier jsonToNetworkSpecifier(
+            JSONObject jsonObject, WifiAwareNetworkSpecifier.Builder builder
+    ) throws JSONException {
+        if (jsonObject == null) {
+            return builder.build();
+        }
+        if (jsonObject.has(PSK_PASSPHRASE)) {
+            String pskPassphrase = jsonObject.getString(PSK_PASSPHRASE);
+            builder.setPskPassphrase(pskPassphrase);
+        }
+        if (jsonObject.has(PORT)) {
+            builder.setPort(jsonObject.getInt(PORT));
+        }
+        if (jsonObject.has(TRANSPORT_PROTOCOL)) {
+            builder.setTransportProtocol(jsonObject.getInt(TRANSPORT_PROTOCOL));
+        }
+        return builder.build();
 
+    }
 }
