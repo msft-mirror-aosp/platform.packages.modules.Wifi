@@ -1398,4 +1398,7 @@
          no effect. The feature will be enabled/disabled based on the chip capability for RSN
          Overriding advertised via Supplicant AIDL wpa driver capability interface -->
     <bool translatable="false" name ="config_wifiRsnOverridingEnabled">false</bool>
+
+    <!-- Boolean indicating whether to trigger bugreport for WiFi subsystem restart issue -->
+    <bool translatable="false" name ="config_wifi_subsystem_restart_bugreport_enabled">true</bool>
 </resources>
