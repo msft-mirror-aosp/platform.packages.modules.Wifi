@@ -2700,6 +2700,28 @@ public class ActiveModeWarden {
                         // onStopped will move the state machine to "DisabledState".
                         break;
                     }
+                    case CMD_RECOVERY_RESTART_WIFI_CONTINUE: {
+                        log("received CMD_RECOVERY_RESTART_WIFI_CONTINUE when already in "
+                                + "mEnabledState");
+                        // This could happen when SoftAp is turned on before recovery is complete.
+                        // Simply make sure the primary CMM is on in this case.
+                        if (shouldEnableSta() && !hasPrimaryOrScanOnlyModeManager()) {
+                            startPrimaryOrScanOnlyClientModeManager(
+                                    // Assumes user toggled it on from settings before.
+                                    mFacade.getSettingsWorkSource(mContext));
+                        }
+                        int numCallbacks = mRestartCallbacks.beginBroadcast();
+                        for (int i = 0; i < numCallbacks; i++) {
+                            try {
+                                mRestartCallbacks.getBroadcastItem(i).onSubsystemRestarted();
+                            } catch (RemoteException e) {
+                                Log.e(TAG, "Failure calling onSubsystemRestarted" + e);
+                            }
+                        }
+                        mRestartCallbacks.finishBroadcast();
+                        mWifiInjector.getSelfRecovery().onRecoveryCompleted();
+                        break;
+                    }
                     default:
                         return NOT_HANDLED;
                 }
