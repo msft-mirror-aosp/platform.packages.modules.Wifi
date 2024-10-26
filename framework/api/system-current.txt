@@ -1845,3 +1845,10 @@ package android.net.wifi.twt {
 
 }
 
+package android.net.wifi.usd {
+
+  @FlaggedApi("android.net.wifi.flags.usd") public class UsdManager {
+  }
+
+}
+
