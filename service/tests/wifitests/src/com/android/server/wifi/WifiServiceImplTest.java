@@ -249,6 +249,7 @@ import com.android.modules.utils.StringParceledListSlice;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.WifiServiceImpl.LocalOnlyRequestorCallback;
 import com.android.server.wifi.WifiServiceImpl.SoftApCallbackInternal;
+import com.android.server.wifi.WifiServiceImpl.UwbAdapterStateListener;
 import com.android.server.wifi.b2b.WifiRoamingModeManager;
 import com.android.server.wifi.coex.CoexManager;
 import com.android.server.wifi.entitlement.PseudonymInfo;
@@ -12972,5 +12973,18 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mWifiServiceImpl.getAutojoinDisallowedSecurityTypes(listener, mExtras);
         mLooper.dispatchAll();
         inOrder.verify(listener).onResult(7);
+    }
+    /**
+     * Verify UwbManager.AdapterStateCallback onStateChanged could update mLastUwbState in
+     * WifiMetrics properly
+     */
+    @Test
+    public void testServiceImplAdapterStateCallback() {
+        assumeTrue(SdkLevel.isAtLeastT());
+        UwbAdapterStateListener uwbAdapterStateListener =
+                mWifiServiceImpl.new UwbAdapterStateListener();
+
+        uwbAdapterStateListener.onStateChanged(2, 1);
+        verify(mWifiMetrics).setLastUwbState(2);
     }
 }

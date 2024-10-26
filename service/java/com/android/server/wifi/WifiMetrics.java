@@ -344,7 +344,10 @@ public class WifiMetrics {
     int mUnusableEventType = WifiIsUnusableEvent.TYPE_UNKNOWN;
     private int mWifiFrameworkState = 0;
     private SpeedSufficient mSpeedSufficientNetworkCapabilities = new SpeedSufficient();
-    private  SpeedSufficient mSpeedSufficientThroughputPredictor = new SpeedSufficient();
+    private SpeedSufficient mSpeedSufficientThroughputPredictor = new SpeedSufficient();
+    private int mLastUwbState = -1;
+    private boolean mIsLowLatencyActivated = false;
+    private int mVoipMode = -1;
 
     /**
      * Wi-Fi usability state per interface as predicted by the network scorer.
@@ -5300,6 +5303,11 @@ public class WifiMetrics {
         line.append(",is_throughput_predictor_upstream_sufficient="
                 + entry.isThroughputPredictorUpstreamSufficient);
         line.append(",is_bluetooth_connected=" + entry.isBluetoothConnected);
+        line.append(",uwb_adapter_state=" + entry.uwbAdapterState);
+        line.append(",is_low_latency_activated=" + entry.isLowLatencyActivated);
+        line.append(",max_supported_tx_linkspeed=" + entry.maxSupportedTxLinkspeed);
+        line.append(",max_supported_rx_linkspeed=" + entry.maxSupportedRxLinkspeed);
+        line.append(",voip_mode=" + entry.voipMode);
         pw.println(line.toString());
     }
 
@@ -7389,6 +7397,13 @@ public class WifiMetrics {
                         mSpeedSufficientThroughputPredictor.Upstream;
                 wifiUsabilityStatsEntry.isBluetoothConnected =
                         mWifiGlobals.isBluetoothConnected();
+                wifiUsabilityStatsEntry.uwbAdapterState = getLastUwbState();
+                wifiUsabilityStatsEntry.isLowLatencyActivated = getLowLatencyState();
+                wifiUsabilityStatsEntry.maxSupportedTxLinkspeed =
+                        info.getMaxSupportedTxLinkSpeedMbps();
+                wifiUsabilityStatsEntry.maxSupportedRxLinkspeed =
+                        info.getMaxSupportedRxLinkSpeedMbps();
+                wifiUsabilityStatsEntry.voipMode = getVoipMode();
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7942,7 +7957,9 @@ public class WifiMetrics {
                 s.wifiFrameworkState, s.isNetworkCapabilitiesDownstreamSufficient,
                 s.isNetworkCapabilitiesUpstreamSufficient,
                 s.isThroughputPredictorDownstreamSufficient,
-                s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected
+                s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
+                s.uwbAdapterState, s.isLowLatencyActivated, s.maxSupportedTxLinkspeed,
+                s.maxSupportedRxLinkspeed, s.voipMode
         );
     }
 
@@ -8152,6 +8169,11 @@ public class WifiMetrics {
         out.isThroughputPredictorDownstreamSufficient = s.isThroughputPredictorDownstreamSufficient;
         out.isThroughputPredictorUpstreamSufficient = s.isThroughputPredictorUpstreamSufficient;
         out.isBluetoothConnected = s.isBluetoothConnected;
+        out.uwbAdapterState = s.uwbAdapterState;
+        out.isLowLatencyActivated = s.isLowLatencyActivated;
+        out.maxSupportedTxLinkspeed = s.maxSupportedTxLinkspeed;
+        out.maxSupportedRxLinkspeed = s.maxSupportedRxLinkspeed;
+        out.voipMode = s.voipMode;
         return out;
     }
 
@@ -10427,5 +10449,29 @@ public class WifiMetrics {
                 getSoftApStoppedUpstreamType(upstreamCaps));
         WifiStatsLog.write(WifiStatsLog.SOFT_AP_STATE_CHANGED,
                 WifiStatsLog.SOFT_AP_STATE_CHANGED__HOTSPOT_ON__STATE_OFF);
+    }
+
+    public int getLastUwbState() {
+        return mLastUwbState;
+    }
+
+    public void setLastUwbState(int state) {
+        mLastUwbState = state;
+    }
+
+    public boolean getLowLatencyState() {
+        return mIsLowLatencyActivated;
+    }
+
+    public void setLowLatencyState(boolean state) {
+        mIsLowLatencyActivated = state;
+    }
+
+    public int getVoipMode() {
+        return mVoipMode;
+    }
+
+    public void setVoipMode(int mode) {
+        mVoipMode = mode;
     }
 }
