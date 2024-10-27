@@ -16,10 +16,12 @@
 
 package com.android.server.wifi;
 
+import static android.net.wifi.WifiConfiguration.SECURITY_TYPE_PSK;
 import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_INVALID_CONFIGURATION_ENTERPRISE;
 
 import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 import static com.android.server.wifi.WifiConfigManager.BUFFERED_WRITE_ALARM_TAG;
+import static com.android.server.wifi.WifiConfigurationUtil.validatePassword;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -3338,7 +3340,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         for (WifiConfiguration network : mWifiConfigManager.getLinkedNetworksWithoutMasking(
                 network1.networkId).values()) {
             assertTrue(network.getNetworkSelectionStatus().getCandidateSecurityParams()
-                    .isSecurityType(WifiConfiguration.SECURITY_TYPE_PSK));
+                    .isSecurityType(SECURITY_TYPE_PSK));
         }
     }
 
@@ -4611,7 +4613,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         assertTrue(mWifiConfigManager.setNetworkCandidateScanResult(network2.networkId,
                 createScanDetailForNetwork(network2).getScanResult(), 54,
                 SecurityParams.createSecurityParamsBySecurityType(
-                        WifiConfiguration.SECURITY_TYPE_PSK)));
+                        SECURITY_TYPE_PSK)));
 
         // Retrieve the hidden network list & verify the order of the networks returned.
         List<WifiScanner.ScanSettings.HiddenNetwork> hiddenNetworks =
@@ -4679,7 +4681,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         // successfully.
         WifiConfiguration network1 = new WifiConfiguration();
         network1.SSID = ssid;
-        network1.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
+        network1.setSecurityParams(SECURITY_TYPE_PSK);
         network1.preSharedKey = "\"test_blah\"";
         NetworkUpdateResult result = addNetworkToWifiConfigManager(network1);
         assertTrue(result.getNetworkId() != WifiConfiguration.INVALID_NETWORK_ID);
@@ -6839,7 +6841,13 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         // Two networks should be merged into one.
         assertEquals(1, retrievedNetworks.size());
         WifiConfiguration mergedNetwork = retrievedNetworks.get(0);
-        assertTrue(mergedNetwork.isSecurityType(baseSecurityType));
+        if (baseConfig.isSecurityType(SECURITY_TYPE_PSK)
+                && !validatePassword(upgradableConfig.preSharedKey, false, false, false)) {
+            // PSK should be removed if we saved an SAE-only passphrase over it.
+            assertFalse(mergedNetwork.isSecurityType(SECURITY_TYPE_PSK));
+        } else {
+            assertTrue(mergedNetwork.isSecurityType(baseSecurityType));
+        }
         assertTrue(mergedNetwork.isSecurityType(upgradableSecurityType));
         assertEquals(upgradableConfig.getDefaultSecurityParams().isAddedByAutoUpgrade(),
                 mergedNetwork.getSecurityParams(upgradableSecurityType).isAddedByAutoUpgrade());
@@ -6854,12 +6862,30 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     public void testAddUpgradableNetworkForPskSae() {
         WifiConfiguration baseConfig = new WifiConfiguration();
         baseConfig.SSID = "\"upgradableNetwork\"";
-        baseConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
+        baseConfig.setSecurityParams(SECURITY_TYPE_PSK);
         baseConfig.preSharedKey = "\"Passw0rd\"";
         WifiConfiguration upgradableConfig = new WifiConfiguration();
         upgradableConfig.SSID = "\"upgradableNetwork\"";
         upgradableConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_SAE);
         upgradableConfig.preSharedKey = "\"Passw0rd\"";
+
+        verifyAddUpgradableNetwork(baseConfig, upgradableConfig);
+    }
+
+    /**
+     * Verifies the addition of an SAE network with an SAE-only passphrase over a PSK/SAE network.
+     * {@link WifiConfigManager#addOrUpdateNetwork(WifiConfiguration, int)}
+     */
+    @Test
+    public void testAddUpgradableNetworkForPskSaeIncompatiblePassphrase() {
+        WifiConfiguration baseConfig = new WifiConfiguration();
+        baseConfig.SSID = "\"upgradableNetwork\"";
+        baseConfig.setSecurityParams(SECURITY_TYPE_PSK);
+        baseConfig.preSharedKey = "\"Passw0rd\"";
+        WifiConfiguration upgradableConfig = new WifiConfiguration();
+        upgradableConfig.SSID = "\"upgradableNetwork\"";
+        upgradableConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_SAE);
+        upgradableConfig.preSharedKey = "\"P\"";
 
         verifyAddUpgradableNetwork(baseConfig, upgradableConfig);
     }
@@ -6873,7 +6899,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     public void testUpdateUpgradedNetworkKeepsIsAddedByAutoUpgradeValue() {
         WifiConfiguration baseConfig = new WifiConfiguration();
         baseConfig.SSID = "\"upgradableNetwork\"";
-        baseConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
+        baseConfig.setSecurityParams(SECURITY_TYPE_PSK);
         baseConfig.preSharedKey = "\"Passw0rd\"";
         WifiConfiguration upgradedConfig = new WifiConfiguration();
         upgradedConfig.SSID = "\"upgradableNetwork\"";
@@ -6893,7 +6919,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     public void testAddUnhiddenUpgradedNetworkOverwritesHiddenSsidValue() {
         WifiConfiguration baseConfig = new WifiConfiguration();
         baseConfig.SSID = "\"upgradableNetwork\"";
-        baseConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
+        baseConfig.setSecurityParams(SECURITY_TYPE_PSK);
         baseConfig.preSharedKey = "\"Passw0rd\"";
         baseConfig.hiddenSSID = true;
         WifiConfiguration upgradedConfig = new WifiConfiguration();
@@ -6913,7 +6939,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     public void testAddHiddenUpgradedNetworkOverwritesHiddenSsidValue() {
         WifiConfiguration baseConfig = new WifiConfiguration();
         baseConfig.SSID = "\"upgradableNetwork\"";
-        baseConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
+        baseConfig.setSecurityParams(SECURITY_TYPE_PSK);
         baseConfig.preSharedKey = "\"Passw0rd\"";
         baseConfig.hiddenSSID = false;
         WifiConfiguration upgradedConfig = new WifiConfiguration();
@@ -7014,7 +7040,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         baseConfig.preSharedKey = "\"Passw0rd\"";
         WifiConfiguration downgradableConfig = new WifiConfiguration();
         downgradableConfig.SSID = "\"downgradableNetwork\"";
-        downgradableConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
+        downgradableConfig.setSecurityParams(SECURITY_TYPE_PSK);
         downgradableConfig.preSharedKey = "\"Passw0rd\"";
 
         verifyAddDowngradableNetwork(
@@ -7075,7 +7101,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         baseConfig.hiddenSSID = true;
         WifiConfiguration downgradableConfig = new WifiConfiguration();
         downgradableConfig.SSID = "\"downgradableConfig\"";
-        downgradableConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
+        downgradableConfig.setSecurityParams(SECURITY_TYPE_PSK);
         downgradableConfig.preSharedKey = "\"Passw0rd\"";
         downgradableConfig.hiddenSSID = false;
 
@@ -7095,7 +7121,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         baseConfig.hiddenSSID = false;
         WifiConfiguration downgradableConfig = new WifiConfiguration();
         downgradableConfig.SSID = "\"downgradableConfig\"";
-        downgradableConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
+        downgradableConfig.setSecurityParams(SECURITY_TYPE_PSK);
         downgradableConfig.preSharedKey = "\"Passw0rd\"";
         downgradableConfig.hiddenSSID = true;
 
@@ -7138,7 +7164,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
     public void testLoadFromStoreMergeUpgradableConfigurationsPskSae() {
         WifiConfiguration baseConfig = new WifiConfiguration();
         baseConfig.SSID = "\"upgradableNetwork\"";
-        baseConfig.setSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
+        baseConfig.setSecurityParams(SECURITY_TYPE_PSK);
         baseConfig.preSharedKey = "\"Passw0rd\"";
         WifiConfiguration upgradableConfig = new WifiConfiguration();
         upgradableConfig.SSID = "\"upgradableNetwork\"";
@@ -7439,7 +7465,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         int networkIdBefore = verifyAddNetworkToWifiConfigManager(testNetwork).getNetworkId();
         WifiConfiguration configBefore = mWifiConfigManager.getConfiguredNetwork(networkIdBefore);
         assertFalse(configBefore.isSecurityType(WifiConfiguration.SECURITY_TYPE_OPEN));
-        assertTrue(configBefore.isSecurityType(WifiConfiguration.SECURITY_TYPE_PSK));
+        assertTrue(configBefore.isSecurityType(SECURITY_TYPE_PSK));
 
         // Change the type from PSK to Open.
         testNetwork.networkId = networkIdBefore;
@@ -7449,7 +7475,7 @@ public class WifiConfigManagerTest extends WifiBaseTest {
         assertEquals(networkIdBefore, networkIdAfter);
 
         WifiConfiguration configAfter = mWifiConfigManager.getConfiguredNetwork(networkIdAfter);
-        assertFalse(configAfter.isSecurityType(WifiConfiguration.SECURITY_TYPE_PSK));
+        assertFalse(configAfter.isSecurityType(SECURITY_TYPE_PSK));
         assertTrue(configAfter.isSecurityType(WifiConfiguration.SECURITY_TYPE_OPEN));
     }
 

@@ -89,6 +89,7 @@ import android.net.wifi.WifiScanner;
 import android.net.wifi.util.WifiResourceCache;
 import android.os.BatteryStatsManager;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.Process;
 import android.os.RemoteException;
@@ -507,7 +508,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 any(), any(), any(), eq(TEST_WORKSOURCE), eq(softApRole), anyBoolean());
         mTimesCreatedSoftApManager++;
         if (fromState.equals(DISABLED_STATE_STRING)) {
-            verify(mBatteryStats).reportWifiOn();
+            verify(mBatteryStats, atLeastOnce()).reportWifiOn();
         }
         if (softApRole == ROLE_SOFTAP_TETHERED) {
             assertEquals(mSoftApManager, mActiveModeWarden.getTetheredSoftApManager());
@@ -1523,9 +1524,13 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         ArgumentCaptor<BroadcastReceiver> bcastRxCaptor =
                 ArgumentCaptor.forClass(BroadcastReceiver.class);
-        verify(mContext).registerReceiver(
+        // Note: Ignore lint warning UnspecifiedRegisterReceiverFlag since here is using
+        // to test receiving for system broadcasts. The lint warning is a false alarm since
+        // here is using argThat and hasAction.
+        verify(mContext).registerReceiverForAllUsers(
                 bcastRxCaptor.capture(),
-                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)));
+                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)),
+                eq(null), any(Handler.class));
         BroadcastReceiver broadcastReceiver = bcastRxCaptor.getValue();
 
         assertInDisabledState();
@@ -1674,9 +1679,10 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         ArgumentCaptor<BroadcastReceiver> bcastRxCaptor =
                 ArgumentCaptor.forClass(BroadcastReceiver.class);
-        verify(mContext).registerReceiver(
+        verify(mContext).registerReceiverForAllUsers(
                 bcastRxCaptor.capture(),
-                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)));
+                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)),
+                eq(null), any(Handler.class));
         BroadcastReceiver broadcastReceiver = bcastRxCaptor.getValue();
 
         assertInEnabledState();
@@ -2666,6 +2672,52 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         // still only started once
         verify(mWifiInjector).makeClientModeManager(
                 any(), eq(TEST_WORKSOURCE), eq(ROLE_CLIENT_PRIMARY), anyBoolean());
+
+        mLooper.moveTimeForward(TEST_WIFI_RECOVERY_DELAY_MS);
+        mLooper.dispatchAll();
+
+        // started again
+        verify(mWifiInjector, times(2)).makeClientModeManager(any(), any(), any(), anyBoolean());
+        assertInEnabledState();
+
+        verify(mSubsystemRestartCallback).onSubsystemRestarting();
+        verify(mSubsystemRestartCallback).onSubsystemRestarted();
+    }
+
+    /**
+     * The command to trigger WiFi restart on Bootup.
+     * WiFi is in connect mode, calls to reset the wifi stack due to connection failures
+     * should trigger a supplicant stop, and subsequently, a driver reload. (Reboot)
+     * Create and start WifiController in EnabledState, start softAP and then
+     * send command to restart WiFi
+     * <p>
+     * Expected: Wi-Fi should be restarted successfully on bootup.
+     */
+    @Test
+    public void testRestartWifiStackInStaConnectEnabledStatewithSap() throws Exception {
+        enableWifi();
+        assertInEnabledState();
+        verify(mWifiInjector).makeClientModeManager(
+                any(), eq(TEST_WORKSOURCE), eq(ROLE_CLIENT_PRIMARY), anyBoolean());
+
+        assertWifiShutDown(() -> {
+            mActiveModeWarden.recoveryRestartWifi(SelfRecovery.REASON_WIFINATIVE_FAILURE,
+                    true);
+            mLooper.dispatchAll();
+            // Complete the stop
+            mClientListener.onStopped(mClientModeManager);
+            mLooper.dispatchAll();
+        });
+
+        verify(mModeChangeCallback).onActiveModeManagerRemoved(mClientModeManager);
+
+        // still only started once
+        verify(mWifiInjector).makeClientModeManager(
+                any(), eq(TEST_WORKSOURCE), eq(ROLE_CLIENT_PRIMARY), anyBoolean());
+
+        // start softAp
+        enterSoftApActiveMode();
+        assertInEnabledState();
 
         mLooper.moveTimeForward(TEST_WIFI_RECOVERY_DELAY_MS);
         mLooper.dispatchAll();
@@ -5371,9 +5423,10 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         // Location state changes
         ArgumentCaptor<BroadcastReceiver> bcastRxCaptor =
                 ArgumentCaptor.forClass(BroadcastReceiver.class);
-        verify(mContext).registerReceiver(
+        verify(mContext).registerReceiverForAllUsers(
                 bcastRxCaptor.capture(),
-                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)));
+                argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)),
+                eq(null), any(Handler.class));
         BroadcastReceiver broadcastReceiver = bcastRxCaptor.getValue();
 
         when(mWifiPermissionsUtil.isLocationModeEnabled()).thenReturn(true);

@@ -2737,6 +2737,40 @@ message WifiUsabilityStatsEntry {
 
   // The total number of LABEL_BAD event happens
   optional int32 label_bad_event_count = 50;
+
+  // Current WiFi state in framework
+  optional int32 wifi_framework_state = 51;
+
+  // Downstream throughput estimation provided by Network Capabilities
+  optional int32 is_network_capabilities_downstream_sufficient = 52;
+
+  // Upstream throughput estimation provided by Network Capabilities
+  optional int32 is_network_capabilities_upstream_sufficient = 53;
+
+  // Downstream throughput estimation used in Network Selection
+  optional int32 is_throughput_predictor_downstream_sufficient = 54;
+
+  // Upstream throughput estimation provided by Network Capabilities
+  optional int32 is_throughput_predictor_upstream_sufficient = 55;
+
+  // If bluetooth is connected
+  optional bool is_bluetooth_connected = 56;
+
+  // State of UWB adapter. Refers to
+  // UwbManager#registerAdapterStateCallback(Executor, AdapterStateCallback)
+  optional int32 uwb_adapter_state = 57;
+
+  // Wifi Low Latency mode state
+  optional bool is_low_latency_activated = 58;
+
+  // Maximum supported tx link speed in Mbps
+  optional int32 max_supported_tx_linkspeed = 59;
+
+  // Maximum supported rx link speed in Mbps
+  optional int32 max_supported_rx_linkspeed = 60;
+
+  // Wifi Voip mode state
+  optional int32 voip_mode = 61;
 }
 
 message ContentionTimeStats {
@@ -2995,6 +3029,15 @@ message LinkStats {
 
   // Peer statistics on this WiFi link
   repeated PeerInfo peer_info = 16;
+
+  // List of scan results who have the same freq with current WiFi link
+  repeated ScanResultWithSameFreq scan_result_with_same_freq = 17;
+
+  // TX linkspeed in this WiFi link
+  optional int32 tx_linkspeed = 18;
+
+  // RX linkspeed in this WiFi link
+  optional int32 rx_linkspeed = 19;
 }
 
 message PeerInfo {
@@ -3007,6 +3050,17 @@ message PeerInfo {
   // Rate statistics, including number of successful packets, retries, etc.,
   // indexed by preamble, bandwidth, number of spatial streams, MCS.
   repeated RateStats rate_stats = 3;
+}
+
+message ScanResultWithSameFreq {
+  // timestamp in microseconds (since boot) when this result was last seen.
+  optional int64 scan_result_timestamp_micros = 1;
+
+  // The detected signal level in dBm
+  optional int32 rssi = 2;
+
+  // The center frequency of the primary 20 MHz frequency (in MHz) of the channel
+  optional int32 frequencyMhz = 3;
 }
 
 message WifiUsabilityStats {
