@@ -304,16 +304,16 @@ public class WifiInjector {
                 R.integer.config_wifiConfigurationWifiRunnerThresholdInMs),
                 mWifiHandlerLocalLog);
         mWifiDeviceStateChangeManager = new WifiDeviceStateChangeManager(context, mWifiHandler);
+        mWifiGlobals = new WifiGlobals(mContext);
         mWifiMetrics = new WifiMetrics(mContext, mFrameworkFacade, mClock, wifiLooper,
                 awareMetrics, rttMetrics, new WifiPowerMetrics(mBatteryStats), mWifiP2pMetrics,
-                mDppMetrics, mWifiMonitor, mWifiDeviceStateChangeManager);
+                mDppMetrics, mWifiMonitor, mWifiDeviceStateChangeManager, mWifiGlobals);
 
         mWifiDiagnosticsHandlerThread = new HandlerThread("WifiDiagnostics");
         mWifiDiagnosticsHandlerThread.start();
 
 
         mWifiNotificationManager = new WifiNotificationManager(mContext);
-        mWifiGlobals = new WifiGlobals(mContext);
         mScoringParams = new ScoringParams(mContext);
         mWifiChannelUtilizationScan = new WifiChannelUtilization(mClock, mContext);
         mSettingsMigrationDataHolder = new SettingsMigrationDataHolder(mContext);
@@ -599,7 +599,7 @@ public class WifiInjector {
         mSelfRecovery = new SelfRecovery(mContext, mActiveModeWarden, mClock, mWifiNative,
                 mWifiGlobals);
         mWifiMulticastLockManager = new WifiMulticastLockManager(mActiveModeWarden, mBatteryStats,
-                wifiLooper);
+                wifiLooper, mContext);
         mApplicationQosPolicyRequestHandler = new ApplicationQosPolicyRequestHandler(
                 mActiveModeWarden, mWifiNative, mWifiHandlerThread, mDeviceConfigFacade, mContext);
 
