@@ -65,6 +65,7 @@ java_library {
         "framework-location.stubs.module_lib",
         "framework-statsd.stubs.module_lib",
         "framework-tethering.stubs.module_lib",
+        "framework-uwb.stubs.module_lib",
         "unsupportedappusage",
         "app-compat-annotations",
         "auto_value_annotations",
@@ -76,9 +77,9 @@ java_library {
 
     static_libs: [
         // Types-only package shared across the HALs
-        "android.hardware.wifi.common-V1-java",
+        "android.hardware.wifi.common-V2-java",
         // AIDL vendor hal implementation
-        "android.hardware.wifi-V2-java",
+        "android.hardware.wifi-V3-java",
         // HIDL vendor hal implementation
         "android.hardware.wifi-V1.0-java",
         "android.hardware.wifi-V1.1-java",
@@ -88,7 +89,7 @@ java_library {
         "android.hardware.wifi-V1.5-java",
         "android.hardware.wifi-V1.6-java",
         // AIDL hostapd implementation
-        "android.hardware.wifi.hostapd-V2-java",
+        "android.hardware.wifi.hostapd-V3-java",
         // HIDL hostapd implementation
         "android.hardware.wifi.hostapd-V1.0-java",
         "android.hardware.wifi.hostapd-V1.1-java",

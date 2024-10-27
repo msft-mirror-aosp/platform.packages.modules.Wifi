@@ -13,6 +13,71 @@ package android.net.wifi {
     field public static final int POWER_CAP_NONE = 2147483647; // 0x7fffffff
   }
 
+  @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public final class DeauthenticationReasonCode {
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_AKMP_NOT_VALID = 20; // 0x14
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_AUTHORIZED_ACCESS_LIMIT_REACHED = 46; // 0x2e
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_BAD_CIPHER_OR_AKM = 29; // 0x1d
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_BSS_TRANSITION_DISASSOC = 12; // 0xc
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_CIPHER_SUITE_REJECTED = 24; // 0x18
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_CLASS2_FRAME_FROM_NONAUTH_STA = 6; // 0x6
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_CLASS3_FRAME_FROM_NONASSOC_STA = 7; // 0x7
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_DEAUTH_LEAVING = 3; // 0x3
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_DISASSOC_AP_BUSY = 5; // 0x5
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_DISASSOC_DUE_TO_INACTIVITY = 4; // 0x4
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_DISASSOC_LOW_ACK = 34; // 0x22
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_DISASSOC_STA_HAS_LEFT = 8; // 0x8
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_END_TS_BA_DLS = 37; // 0x25
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_EXCEEDED_TXOP = 35; // 0x23
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_EXTERNAL_SERVICE_REQUIREMENTS = 47; // 0x2f
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_FOURWAY_HANDSHAKE_TIMEOUT = 15; // 0xf
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_GROUP_CIPHER_NOT_VALID = 18; // 0x12
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_GROUP_KEY_UPDATE_TIMEOUT = 16; // 0x10
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_IEEE_802_1X_AUTH_FAILED = 23; // 0x17
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_IE_IN_4WAY_DIFFERS = 17; // 0x11
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_INVALID_FTE = 51; // 0x33
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_INVALID_FT_ACTION_FRAME_COUNT = 48; // 0x30
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_INVALID_IE = 13; // 0xd
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_INVALID_MDE = 50; // 0x32
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_INVALID_PMKID = 49; // 0x31
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_INVALID_RSN_IE_CAPAB = 22; // 0x16
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MAC_ADDRESS_ALREADY_EXISTS_IN_MBSS = 64; // 0x40
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_CHANNEL_SWITCH_REGULATORY_REQ = 65; // 0x41
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_CHANNEL_SWITCH_UNSPECIFIED = 66; // 0x42
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_CLOSE_RCVD = 55; // 0x37
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_CONFIG_POLICY_VIOLATION = 54; // 0x36
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_CONFIRM_TIMEOUT = 57; // 0x39
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_INCONSISTENT_PARAMS = 59; // 0x3b
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_INVALID_GTK = 58; // 0x3a
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_INVALID_SECURITY_CAP = 60; // 0x3c
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_MAX_PEERS = 53; // 0x35
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_MAX_RETRIES = 56; // 0x38
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_PATH_ERROR_DEST_UNREACHABLE = 63; // 0x3f
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_PATH_ERROR_NO_FORWARDING_INFO = 62; // 0x3e
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_PATH_ERROR_NO_PROXY_INFO = 61; // 0x3d
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MESH_PEERING_CANCELLED = 52; // 0x34
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_MICHAEL_MIC_FAILURE = 14; // 0xe
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_NOT_AUTHORIZED_THIS_LOCATION = 30; // 0x1e
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_NOT_ENOUGH_BANDWIDTH = 33; // 0x21
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_NO_SSP_ROAMING_AGREEMENT = 28; // 0x1c
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_PAIRWISE_CIPHER_NOT_VALID = 19; // 0x13
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_PEERKEY_MISMATCH = 45; // 0x2d
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_PREV_AUTH_NOT_VALID = 2; // 0x2
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_PWR_CAPABILITY_NOT_VALID = 10; // 0xa
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_SERVICE_CHANGE_PRECLUDES_TS = 31; // 0x1f
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_SSP_REQUESTED_DISASSOC = 27; // 0x1b
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_STA_LEAVING = 36; // 0x24
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_STA_REQ_ASSOC_WITHOUT_AUTH = 9; // 0x9
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_SUPPORTED_CHANNEL_NOT_VALID = 11; // 0xb
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_TDLS_TEARDOWN_UNREACHABLE = 25; // 0x19
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_TDLS_TEARDOWN_UNSPECIFIED = 26; // 0x1a
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_TIMEOUT = 39; // 0x27
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_UNKNOWN = 0; // 0x0
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_UNKNOWN_TS_BA = 38; // 0x26
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_UNSPECIFIED = 1; // 0x1
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_UNSPECIFIED_QOS_REASON = 32; // 0x20
+    field @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public static final int REASON_UNSUPPORTED_RSN_IE_VERSION = 21; // 0x15
+  }
+
   public abstract class EasyConnectStatusCallback {
     ctor public EasyConnectStatusCallback();
     method public void onBootstrapUriGenerated(@NonNull android.net.Uri);
@@ -529,6 +594,7 @@ package android.net.wifi {
 
   public final class WifiClient implements android.os.Parcelable {
     method public int describeContents();
+    method @FlaggedApi("com.android.wifi.flags.softap_disconnect_reason") public int getDisconnectReason();
     method @NonNull public android.net.MacAddress getMacAddress();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.WifiClient> CREATOR;

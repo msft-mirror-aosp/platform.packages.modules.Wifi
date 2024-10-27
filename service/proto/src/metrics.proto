@@ -2755,6 +2755,22 @@ message WifiUsabilityStatsEntry {
 
   // If bluetooth is connected
   optional bool is_bluetooth_connected = 56;
+
+  // State of UWB adapter. Refers to
+  // UwbManager#registerAdapterStateCallback(Executor, AdapterStateCallback)
+  optional int32 uwb_adapter_state = 57;
+
+  // Wifi Low Latency mode state
+  optional bool is_low_latency_activated = 58;
+
+  // Maximum supported tx link speed in Mbps
+  optional int32 max_supported_tx_linkspeed = 59;
+
+  // Maximum supported rx link speed in Mbps
+  optional int32 max_supported_rx_linkspeed = 60;
+
+  // Wifi Voip mode state
+  optional int32 voip_mode = 61;
 }
 
 message ContentionTimeStats {
