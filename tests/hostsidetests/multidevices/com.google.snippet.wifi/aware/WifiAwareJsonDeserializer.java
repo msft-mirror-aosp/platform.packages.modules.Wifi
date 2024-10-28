@@ -22,7 +22,10 @@ import android.net.NetworkRequest;
 import android.net.wifi.aware.AwarePairingConfig;
 import android.net.wifi.aware.PublishConfig;
 import android.net.wifi.aware.SubscribeConfig;
+import android.net.wifi.aware.WifiAwareDataPathSecurityConfig;
 import android.net.wifi.aware.WifiAwareNetworkSpecifier;
+
+import androidx.annotation.NonNull;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -60,10 +63,14 @@ public class WifiAwareJsonDeserializer {
     private static final String PSK_PASSPHRASE = "psk_passphrase";
     private static final String PORT = "port";
     private static final String TRANSPORT_PROTOCOL = "transport_protocol";
+    private static final String DATA_PATH_SECURITY_CONFIG = "data_path_security_config";
     //NetworkRequest specific
     private static final String TRANSPORT_TYPE = "transport_type";
     private static final String CAPABILITY = "capability";
     private static final String NETWORK_SPECIFIER_PARCEL = "network_specifier_parcel";
+    //WifiAwareDataPathSecurityConfig specific
+    private static final String CIPHER_SUITE = "cipher_suite";
+    private static final String SECURITY_CONFIG_PMK = "pmk";
 
 
     private WifiAwareJsonDeserializer() {
@@ -231,7 +238,8 @@ public class WifiAwareJsonDeserializer {
             if (jsonObject.has(NETWORK_SPECIFIER_PARCEL)) {
                 String specifierParcelableStr = jsonObject.getString(NETWORK_SPECIFIER_PARCEL);
                 WifiAwareNetworkSpecifier wifiAwareNetworkSpecifier =
-                        SerializationUtil.stringToParcelable(specifierParcelableStr,
+                        SerializationUtil.stringToParcelable(
+                                specifierParcelableStr,
                                 WifiAwareNetworkSpecifier.CREATOR
                         );
                 // Set the network specifier in the request builder
@@ -268,6 +276,40 @@ public class WifiAwareJsonDeserializer {
         }
         if (jsonObject.has(TRANSPORT_PROTOCOL)) {
             builder.setTransportProtocol(jsonObject.getInt(TRANSPORT_PROTOCOL));
+        }
+        if (jsonObject.has(PMK)) {
+            builder.setPmk(jsonObject.getString(PMK).getBytes(StandardCharsets.UTF_8));
+        }
+        if (jsonObject.has(DATA_PATH_SECURITY_CONFIG)) {
+            builder.setDataPathSecurityConfig(jsonToDataPathSSecurityConfig(
+                    jsonObject.getJSONObject(DATA_PATH_SECURITY_CONFIG)));
+        }
+
+        return builder.build();
+
+    }
+
+    /**
+     * Converts request from JSON object to {@link WifiAwareDataPathSecurityConfig}.
+     *
+     * @param jsonObject corresponding to WifiAwareNetworkSpecifier in
+     *                   tests/hostsidetests/multidevices/test/aware/constants.py
+     */
+    private static WifiAwareDataPathSecurityConfig jsonToDataPathSSecurityConfig(
+            @NonNull JSONObject jsonObject
+    ) throws JSONException {
+        WifiAwareDataPathSecurityConfig.Builder builder = null;
+
+        if (jsonObject.has(CIPHER_SUITE)) {
+            int cipherSuite = jsonObject.getInt(CIPHER_SUITE);
+            builder = new WifiAwareDataPathSecurityConfig.Builder(cipherSuite);
+        } else {
+            throw new RuntimeException("Missing 'cipher_suite' in data path security jsonObject "
+                    + "config");
+        }
+        if (jsonObject.has(SECURITY_CONFIG_PMK)) {
+            byte[] pmk = jsonObject.getString(SECURITY_CONFIG_PMK).getBytes(StandardCharsets.UTF_8);
+            builder.setPmk(pmk);
         }
         return builder.build();
 
