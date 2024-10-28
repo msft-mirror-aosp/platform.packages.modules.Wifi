@@ -1313,9 +1313,10 @@ public class WifiServiceImpl extends BaseWifiService {
      */
     @Override
     public synchronized boolean setWifiEnabled(String packageName, boolean enable) {
-        if (!isValidCallingUser() || enforceChangePermission(packageName) != MODE_ALLOWED) {
+        if (enforceChangePermission(packageName) != MODE_ALLOWED) {
             return false;
         }
+        enforceValidCallingUser();
         int callingUid = Binder.getCallingUid();
         int callingPid = Binder.getCallingPid();
         boolean isPrivileged = isPrivileged(callingPid, callingUid);
