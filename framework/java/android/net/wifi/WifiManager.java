@@ -12909,7 +12909,8 @@ public class WifiManager {
             android.Manifest.permission.NETWORK_SETTINGS,
             MANAGE_WIFI_NETWORK_SELECTION
     })
-    public void setAutojoinDisallowedSecurityTypes(@NonNull int[] restrictions) {
+    public void setAutojoinDisallowedSecurityTypes(
+            @NonNull @WifiAnnotations.SecurityType int[] restrictions) {
         if (!SdkLevel.isAtLeastT()) {
             throw new UnsupportedOperationException();
         }
@@ -12932,8 +12933,9 @@ public class WifiManager {
      * Retrieves the autojoin disallowed Wi-Fi security types currently set for the device.
      *
      * @param executor The executor to run the callback on.
-     * @param resultsCallback The callback to receive the result. It will be called with the
-     *                        retrieved autojoin disallowed types as a array of int.
+     * @param resultsCallback The callback to receive the result. It will be called with an array
+     *                        of autojoin disallowedse security types from
+     *                        {@code WifiInfo.SECURITY_TYPE_*}.
      * @throws UnsupportedOperationException if the API is not supported.
      * @hide
      */
