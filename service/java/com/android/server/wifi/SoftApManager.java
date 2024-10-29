@@ -339,10 +339,10 @@ public class SoftApManager implements ActiveModeManager {
 
         @Override
         public void onConnectedClientsChanged(String apIfaceInstance, MacAddress clientAddress,
-                boolean isConnected) {
+                boolean isConnected, @WifiAnnotations.SoftApDisconnectReason int disconnectReason) {
             if (clientAddress != null) {
                 WifiClient client = new WifiClient(clientAddress, apIfaceInstance != null
-                        ? apIfaceInstance : mApInterfaceName);
+                        ? apIfaceInstance : mApInterfaceName, disconnectReason);
                 mStateMachine.sendMessage(SoftApStateMachine.CMD_ASSOCIATED_STATIONS_CHANGED,
                         isConnected ? 1 : 0, 0, client);
             } else {
