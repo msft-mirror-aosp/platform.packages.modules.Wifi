@@ -39,6 +39,7 @@ import android.net.MacAddress;
 import android.net.TrafficStats;
 import android.net.apf.ApfCapabilities;
 import android.net.wifi.CoexUnsafeChannel;
+import android.net.wifi.DeauthenticationReasonCode;
 import android.net.wifi.MscsParams;
 import android.net.wifi.OuiKeyedData;
 import android.net.wifi.QosPolicyParams;
@@ -294,7 +295,8 @@ public class WifiNative {
         @Override
         public void onConnectedClientsChanged(NativeWifiClient client, boolean isConnected) {
             mSoftApHalCallback.onConnectedClientsChanged(mIfaceName,
-                    client.getMacAddress(), isConnected);
+                    client.getMacAddress(), isConnected,
+                    DeauthenticationReasonCode.REASON_UNKNOWN);
         }
     }
 
@@ -359,9 +361,11 @@ public class WifiNative {
          * @param clientAddress Macaddress of the client.
          * @param isConnected Indication as to whether the client is connected (true), or
          *                    disconnected (false).
+         * @param disconnectReason The reason for disconnection, if applicable. This
+         *                         parameter is only meaningful when {@code isConnected} is false.
          */
         void onConnectedClientsChanged(String apIfaceInstance, MacAddress clientAddress,
-                boolean isConnected);
+                boolean isConnected, @WifiAnnotations.SoftApDisconnectReason int disconnectReason);
     }
 
     /********************************************************
