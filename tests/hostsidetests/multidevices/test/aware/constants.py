@@ -20,10 +20,13 @@ import dataclasses
 import datetime
 import operator
 
+from mobly import utils
+
 # Package name for the Wi-Fi Aware snippet application
 WIFI_AWARE_SNIPPET_PACKAGE_NAME = "com.google.snippet.wifi.aware"
 # Timeout duration for Wi-Fi state change operations
 WAIT_WIFI_STATE_TIME_OUT = datetime.timedelta(seconds=30)
+AWARE_NETWORK_INFO_CLASS_NAME = "android.net.wifi.aware.WifiAwareNetworkInfo"
 
 SERVICE_NAME = "service_name"
 SERVICE_SPECIFIC_INFO = "service_specific_info"
@@ -35,6 +38,27 @@ MAX_DISTANCE_MM = "max_distance_mm"
 PAIRING_CONFIG = "pairing_config"
 AWARE_NETWORK_INFO_CLASS_NAME = "android.net.wifi.aware.WifiAwareNetworkInfo"
 TTL_SEC = "TtlSec"
+
+
+class WifiAwareTestConstants:
+    """Constants for Wi-Fi Aware test."""
+    SERVICE_NAME = "CtsVerifierTestService"
+    MATCH_FILTER_BYTES = "bytes used for matching".encode("utf-8")
+    PUB_SSI = "Extra bytes in the publisher discovery".encode("utf-8")
+    SUB_SSI = "Arbitrary bytes for the subscribe discovery".encode("utf-8")
+    LARGE_ENOUGH_DISTANCE_MM = 100000
+    PASSWORD = "Some super secret password"
+    ALIAS_PUBLISH = "publisher"
+    ALIAS_SUBSCRIBE = "subscriber"
+    TEST_WAIT_DURATION_MS = 10000
+    TEST_MESSAGE = "test message!"
+    MESSAGE_ID = 1234
+    MSG_CLIENT_TO_SERVER = 'GET SOME BYTES [Random Identifier: %s]' % utils.rand_ascii_str(5)
+    MSG_SERVER_TO_CLIENT = 'PUT SOME OTHER BYTES [Random Identifier: %s]' % utils.rand_ascii_str(5)
+    PMK = "01234567890123456789012345678901"
+    # 6 == TCP
+    TRANSPORT_PROTOCOL_TCP = 6
+
 
 
 @enum.unique
@@ -127,7 +151,6 @@ class WifiAwareSnippetParams(enum.StrEnum):
     PEER_HANDLE = "peerHandle"
     MATCH_FILTER = "matchFilter"
     MATCH_FILTER_VALUE = "value"
-    PAIRED_ALIAS = "pairedAlias"
     PAIRING_CONFIG = "pairingConfig"
     DISTANCE_MM = "distanceMm"
     LAST_MESSAGE_ID = "lastMessageId"
@@ -203,13 +226,13 @@ class SubscribeConfig:
     These configurations correspond to SubscribeConfig in the Android documentation:
     https://developer.android.com/reference/android/net/wifi/aware/SubscribeConfig
     """
-    service_name: str
     service_specific_info: bytes
     match_filter: list[bytes] | None
     subscribe_type: SubscribeType
-    terminate_notification_enabled: bool = False
     max_distance_mm: int | None = None
     pairing_config: AwarePairingConfig | None = None
+    terminate_notification_enabled: bool = True
+    service_name: str = WifiAwareTestConstants.SERVICE_NAME
 
     def to_dict(self) -> dict[str, str | bool | list[str] | int | dict[str, int | bool | None]]:
         result = dataclasses.asdict(self)
@@ -239,22 +262,21 @@ class PublishConfig:
     These configurations correspond to PublishConfig in the Android documentation:
     https://developer.android.com/reference/android/net/wifi/aware/PublishConfig
     """
-    service_name: str
     service_specific_info: bytes
     match_filter: list[bytes] | None
     publish_type: PublishType
-    terminate_notification_enabled: bool
     ranging_enabled: bool
+    terminate_notification_enabled: bool = True
     pairing_config: AwarePairingConfig | None = None
+    service_name: str = WifiAwareTestConstants.SERVICE_NAME
 
     def to_dict(
         self,
-    ) -> dict[str, str | bool | list[str] | int | dict[str, int | bool]]:
+    ) -> dict:
         """Convert PublishConfig to dict."""
         result = dataclasses.asdict(self)
         result["publish_type"] = self.publish_type.value
         result["service_specific_info"] = self.service_specific_info.decode("utf-8")
-
         if self.match_filter is None:
             del result["match_filter"]
         else:
@@ -265,21 +287,6 @@ class PublishConfig:
         else:
             result["pairing_config"] = self.pairing_config.to_dict()
         return result
-
-
-class WifiAwareTestConstants:
-    """Constants for Wi-Fi Aware test."""
-    SERVICE_NAME = "CtsVerifierTestService"
-    MATCH_FILTER_BYTES = "bytes used for matching".encode("utf-8")
-    PUB_SSI = "Extra bytes in the publisher discovery".encode("utf-8")
-    SUB_SSI = "Arbitrary bytes for the subscribe discovery".encode("utf-8")
-    LARGE_ENOUGH_DISTANCE_MM = 100000
-    PASSWORD = "Some super secret password"
-    ALIAS_PUBLISH = "publisher"
-    ALIAS_SUBSCRIBE = "subscriber"
-    TEST_WAIT_DURATION_MS = 10000
-    TEST_MESSAGE = "test message!"
-    MESSAGE_ID = 1234
 
 
 class NetworkCapabilities:
@@ -353,12 +360,83 @@ class NetworkRequest:
     transport_type: NetworkCapabilities.Transport
     network_specifier_parcel: str
 
-    def to_dict(self) -> dict[str, int | str | dict[str, str | int]]:
-        result = {
-            'transport_type': self.transport_type.value,
-            'network_specifier': self.network_specifier_parcel,
-        }
+    def to_dict(self) -> dict:
+        result = dataclasses.asdict(self)
+        if not self.network_specifier_parcel:
+            del result["network_specifier_parcel"]
+        if self.transport_type:
+            result["transport_type"] = self.transport_type.value
         return result
+
+
+class Characteristics(enum.IntEnum):
+    """The characteristics of the Wi-Fi Aware implementation.
+
+    https://developer.android.com/reference/android/net/wifi/aware/Characteristics
+    """
+    WIFI_AWARE_CIPHER_SUITE_NCS_SK_128 = 1
+
+
+@dataclasses.dataclass(frozen=False)
+class WifiAwareDataPathSecurityConfig:
+    """Wi-Fi Aware Network Specifier.
+
+    https://developer.android.com/reference/android/net/wifi/aware/WifiAwareNetworkSpecifier
+    """
+    pmk: str | None = None
+    cipher_suite: Characteristics | None = Characteristics.WIFI_AWARE_CIPHER_SUITE_NCS_SK_128
+
+    def to_dict(self) -> dict:
+        result = dataclasses.asdict(self)
+        if not self.pmk:
+            del result["pmk"]
+        if not self.cipher_suite:
+            del result["cipher_suite"]
+        else:
+            result["cipher_suite"] = self.cipher_suite.value
+        return result
+
+
+@dataclasses.dataclass(frozen=False)
+class WifiAwareNetworkSpecifier:
+    """Wi-Fi Aware Network Specifier.
+
+    https://developer.android.com/reference/android/net/wifi/aware/WifiAwareNetworkSpecifier
+    """
+    psk_passphrase: str | None = None
+    port: int | None = None
+    transport_protocol: int | None = None
+    pmk: str | None = None
+    data_path_security_config: WifiAwareDataPathSecurityConfig | None = None
+
+    def to_dict(self) -> dict:
+        result = dataclasses.asdict(self)
+        if not self.psk_passphrase:
+            del result["psk_passphrase"]
+        if not self.port:
+            del result["port"]
+        if not self.transport_protocol:
+            del result["transport_protocol"]
+        if not self.pmk:
+            del result["pmk"]
+        if not self.data_path_security_config:
+            del result["data_path_security_config"]
+        else:
+            result["data_path_security_config"] = self.data_path_security_config.to_dict()
+        return result
+
+
+class SnippetEventNames:
+    """Represents event names for Wi-Fi Aware snippet operations."""
+
+    SERVER_SOCKET_ACCEPT = "ServerSocketAccept"
+
+
+class SnippetEventParams:
+    """Represents parameters for Wi-Fi Aware snippet events."""
+    IS_ACCEPT = "isAccept"
+    ERROR = "error"
+    LOCAL_PORT = "localPort"
 
 
 @enum.unique
@@ -381,28 +459,26 @@ class WifiAwareBroadcast(enum.StrEnum):
 
 @enum.unique
 class DeviceidleState(enum.StrEnum):
-  ACTIVE = "ACTIVE"
-  IDLE = "IDLE"
-  INACTIVE = "INACTIVE"
-  OVERRIDE = "OVERRIDE"
+    ACTIVE = "ACTIVE"
+    IDLE = "IDLE"
+    INACTIVE = "INACTIVE"
+    OVERRIDE = "OVERRIDE"
 
 
 @enum.unique
 class Operator(enum.Enum):
-  """Operator used in the comparison."""
+    """Operator used in the comparison."""
 
-  GREATER = operator.gt
-  GREATER_EQUAL = operator.ge
-  NOT_EQUAL = operator.ne
-  EQUAL = operator.eq
-  LESS = operator.lt
-  LESS_EQUAL = operator.le
-
+    GREATER = operator.gt
+    GREATER_EQUAL = operator.ge
+    NOT_EQUAL = operator.ne
+    EQUAL = operator.eq
+    LESS = operator.lt
+    LESS_EQUAL = operator.le
 
 @enum.unique
 class AndroidVersion(enum.IntEnum):
   """Android OS version."""
-
   R = 11
   S = 12
   T = 13
