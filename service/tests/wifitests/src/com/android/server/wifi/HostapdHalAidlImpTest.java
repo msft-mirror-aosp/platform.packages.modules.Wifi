@@ -53,6 +53,7 @@ import android.hardware.wifi.hostapd.Ieee80211ReasonCode;
 import android.hardware.wifi.hostapd.IfaceParams;
 import android.hardware.wifi.hostapd.NetworkParams;
 import android.net.MacAddress;
+import android.net.wifi.DeauthenticationReasonCode;
 import android.net.wifi.OuiKeyedData;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SoftApConfiguration.Builder;
@@ -102,6 +103,10 @@ public class HostapdHalAidlImpTest extends WifiBaseTest {
     private static final int TEST_FREQ_5G = 5745;
     private static final int TEST_BANDWIDTH = ChannelBandwidth.BANDWIDTH_20;
     private static final int TEST_GENERATION = Generation.WIFI_STANDARD_11N;
+    private static final int TEST_HAL_DEAUTHENTICATION_REASON_CODE =
+            android.hardware.wifi.common.DeauthenticationReasonCode.GROUP_CIPHER_NOT_VALID;
+    private static final int DEFAULT_DISCONNECT_REASON =
+            DeauthenticationReasonCode.REASON_UNKNOWN;
 
     private final int mBand256G = SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ
             | SoftApConfiguration.BAND_6GHZ;
@@ -869,6 +874,7 @@ public class HostapdHalAidlImpTest extends WifiBaseTest {
      */
     @Test
     public void testHostapdCallbackEvent() throws Exception {
+        when(mIHostapdMock.getInterfaceVersion()).thenReturn(3);
         executeAndValidateInitializationSequence(true);
         Builder configurationBuilder = new SoftApConfiguration.Builder();
         configurationBuilder.setSsid(NETWORK_SSID);
@@ -906,9 +912,25 @@ public class HostapdHalAidlImpTest extends WifiBaseTest {
         clientInfo.isConnected = true;
         mIHostapdCallback.onConnectedClientsChanged(clientInfo);
         verify(mSoftApHalCallback).onConnectedClientsChanged(eq(TEST_AP_INSTANCE),
-                eq(MacAddress.fromString(TEST_CLIENT_MAC)), eq(true));
+                eq(MacAddress.fromString(TEST_CLIENT_MAC)), eq(true),
+                eq(DEFAULT_DISCONNECT_REASON));
         verify(mSoftApHalCallback1, never()).onConnectedClientsChanged(
-                anyString(), any(), anyBoolean());
+                anyString(), any(), anyBoolean(), anyInt());
+
+        // Trigger client disconnect
+        clientInfo = new ClientInfo();
+        clientInfo.ifaceName = IFACE_NAME;
+        clientInfo.apIfaceInstance = TEST_AP_INSTANCE;
+        clientInfo.clientAddress = MacAddress.fromString(TEST_CLIENT_MAC).toByteArray();
+        clientInfo.isConnected = false;
+        clientInfo.disconnectReasonCode = TEST_HAL_DEAUTHENTICATION_REASON_CODE;
+        mIHostapdCallback.onConnectedClientsChanged(clientInfo);
+        verify(mSoftApHalCallback).onConnectedClientsChanged(eq(TEST_AP_INSTANCE),
+                eq(MacAddress.fromString(TEST_CLIENT_MAC)), eq(false),
+                eq(mHostapdHal.mapHalToFrameworkDeauthenticationReasonCode(
+                        TEST_HAL_DEAUTHENTICATION_REASON_CODE)));
+        verify(mSoftApHalCallback1, never()).onConnectedClientsChanged(
+                anyString(), any(), anyBoolean(), anyInt());
     }
 
     /**
