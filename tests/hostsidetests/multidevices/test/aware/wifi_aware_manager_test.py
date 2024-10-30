@@ -131,7 +131,6 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
         5. Establish a socket connection and send messages through it.
         """
 
-        # Call the utility method with password-protected network specifiers
         self._test_wifi_aware(
             pub_config=constants.PublishConfig(
                 service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
@@ -153,12 +152,322 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             )
         )
 
+    def test_data_path_pmk_unsolicited_pub_and_passive_sub(self) -> None:
+        """Test Wi-Fi Aware network using PMK with unsolicited publish and passive subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.UNSOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.PASSIVE,
+            ),
+            network_specifier_on_pub=constants.WifiAwareNetworkSpecifier(
+                transport_protocol=constants.WifiAwareTestConstants.TRANSPORT_PROTOCOL_TCP,
+                pmk=constants.WifiAwareTestConstants.PMK,
+            ),
+            network_specifier_on_sub=constants.WifiAwareNetworkSpecifier(
+                data_path_security_config=constants.WifiAwareDataPathSecurityConfig(
+                    pmk=constants.WifiAwareTestConstants.PMK
+                )
+            )
+        )
+
+    def test_data_path_open_solicited_pub_and_active_sub(self) -> None:
+        """Test OPEN Wi-Fi Aware network with solicited publish and active subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.SOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.ACTIVE,
+            ),
+
+        )
+
+    def test_data_path_passphrase_solicited_pub_and_active_sub(self) -> None:
+        """Test password-protected Wi-Fi Aware network with solicited publish and active subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.SOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.ACTIVE,
+            ),
+            network_specifier_on_pub=constants.WifiAwareNetworkSpecifier(
+                psk_passphrase=constants.WifiAwareTestConstants.PASSWORD,
+                transport_protocol=constants.WifiAwareTestConstants.TRANSPORT_PROTOCOL_TCP,
+            ),
+            network_specifier_on_sub=constants.WifiAwareNetworkSpecifier(
+                psk_passphrase=constants.WifiAwareTestConstants.PASSWORD,
+            )
+        )
+
+    def test_data_path_pmk_solicited_pub_and_active_sub(self) -> None:
+        """Test Wi-Fi Aware network using PMK with solicited publish and active subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.SOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.ACTIVE,
+            ),
+            network_specifier_on_pub=constants.WifiAwareNetworkSpecifier(
+                transport_protocol=constants.WifiAwareTestConstants.TRANSPORT_PROTOCOL_TCP,
+                pmk=constants.WifiAwareTestConstants.PMK,
+            ),
+            network_specifier_on_sub=constants.WifiAwareNetworkSpecifier(
+                data_path_security_config=constants.WifiAwareDataPathSecurityConfig(
+                    pmk=constants.WifiAwareTestConstants.PMK
+                )
+            )
+        )
+
+    def test_data_path_open_unsolicited_pub_accept_any_and_passive_sub(self) -> None:
+        """Test OPEN Wi-Fi Aware with unsolicited publish (accept any peer) and passive subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.UNSOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.PASSIVE,
+            ),
+            is_pub_accept_any_peer=True,
+        )
+
+    def test_data_path_passphrase_unsolicited_pub_accept_any_and_passive_sub(self) -> None:
+        """Test Wi-Fi Aware with passphrase unsolicited publish (accept any), and passive subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.UNSOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.PASSIVE,
+            ),
+            network_specifier_on_pub=constants.WifiAwareNetworkSpecifier(
+                psk_passphrase=constants.WifiAwareTestConstants.PASSWORD,
+                transport_protocol=constants.WifiAwareTestConstants.TRANSPORT_PROTOCOL_TCP,
+            ),
+            network_specifier_on_sub=constants.WifiAwareNetworkSpecifier(
+                psk_passphrase=constants.WifiAwareTestConstants.PASSWORD,
+            ),
+            is_pub_accept_any_peer=True,
+        )
+
+    def test_data_path_pmk_unsolicited_pub_accept_any_and_passive_sub(self) -> None:
+        """Test Wi-Fi Aware with PMK, unsolicited publish (accept any), and passive subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.UNSOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.PASSIVE,
+            ),
+            network_specifier_on_pub=constants.WifiAwareNetworkSpecifier(
+                transport_protocol=constants.WifiAwareTestConstants.TRANSPORT_PROTOCOL_TCP,
+                pmk=constants.WifiAwareTestConstants.PMK,
+            ),
+            network_specifier_on_sub=constants.WifiAwareNetworkSpecifier(
+                data_path_security_config=constants.WifiAwareDataPathSecurityConfig(
+                    pmk=constants.WifiAwareTestConstants.PMK
+                )
+            ),
+            is_pub_accept_any_peer=True,
+        )
+
+    def test_data_path_open_solicited_pub_accept_any_active_sub(self) -> None:
+        """Test Wi-Fi Aware with open network, solicited publish (accept any), and active subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.SOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.ACTIVE,
+            ),
+            is_pub_accept_any_peer=True,
+        )
+
+    def test_data_passphrase_solicited_pub_accept_any_and_active_sub(self) -> None:
+        """Test Wi-Fi Aware with passphrase, solicited publish (accept any), and active subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.SOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.ACTIVE,
+            ),
+            network_specifier_on_pub=constants.WifiAwareNetworkSpecifier(
+                psk_passphrase=constants.WifiAwareTestConstants.PASSWORD,
+                transport_protocol=constants.WifiAwareTestConstants.TRANSPORT_PROTOCOL_TCP,
+            ),
+            network_specifier_on_sub=constants.WifiAwareNetworkSpecifier(
+                psk_passphrase=constants.WifiAwareTestConstants.PASSWORD,
+            ),
+            is_pub_accept_any_peer=True,
+        )
+
+    def test_data_path_pmk_solicited_pub_accept_any_and_active_sub(self) -> None:
+        """Test Wi-Fi Aware with PMK, solicited publish (accept any), and active subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.SOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.ACTIVE,
+            ),
+            network_specifier_on_pub=constants.WifiAwareNetworkSpecifier(
+                transport_protocol=constants.WifiAwareTestConstants.TRANSPORT_PROTOCOL_TCP,
+                pmk=constants.WifiAwareTestConstants.PMK,
+            ),
+            network_specifier_on_sub=constants.WifiAwareNetworkSpecifier(
+                data_path_security_config=constants.WifiAwareDataPathSecurityConfig(
+                    pmk=constants.WifiAwareTestConstants.PMK
+                )
+            ),
+            is_pub_accept_any_peer=True,
+        )
+
     def _test_wifi_aware(
         self,
         pub_config: constants.PublishConfig,
         sub_config: constants.SubscribeConfig,
         network_specifier_on_pub: constants.WifiAwareNetworkSpecifier | None = None,
-        network_specifier_on_sub: constants.WifiAwareNetworkSpecifier | None = None
+        network_specifier_on_sub: constants.WifiAwareNetworkSpecifier | None = None,
+        is_pub_accept_any_peer: bool = False,
     ):
         """Tests Wi-Fi Aware using given publish and subscribe configurations."""
         # 1. Attach Wi-Fi Aware sessions.
@@ -216,7 +525,8 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
         pub_accept_handler = self.publisher.wifi_aware_snippet.connectivityServerSocketAccept()
         network_id = pub_accept_handler.callback_id
         pub_local_port = pub_accept_handler.ret_value
-        if network_specifier_on_pub and network_specifier_on_pub.psk_passphrase:
+        if network_specifier_on_pub and (
+            network_specifier_on_pub.psk_passphrase or network_specifier_on_pub.pmk):
             network_specifier_on_pub.port = pub_local_port
         pub_network_cb_handler = self._request_network(
             ad=self.publisher,
@@ -224,6 +534,7 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             peer=publisher_peer,
             net_work_request_id=network_id,
             network_specifier_params=network_specifier_on_pub,
+            is_accept_any_peer=is_pub_accept_any_peer,
         )
         # 4. Request a Wi-Fi Aware network.
         sub_network_cb_handler = self._request_network(
@@ -485,14 +796,14 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
         peer: int,
         net_work_request_id: str,
         network_specifier_params: constants.WifiAwareNetworkSpecifier | None = None,
-
+        is_accept_any_peer: bool = False,
     ) -> callback_handler_v2.CallbackHandlerV2:
         """Requests and configures a Wi-Fi Aware network connection."""
-
         network_specifier_parcel = (
             ad.wifi_aware_snippet.wifiAwareCreateNetworkSpecifier(
                 discovery_session,
                 peer,
+                is_accept_any_peer,
                 network_specifier_params.to_dict() if network_specifier_params else None,
             )
         )
