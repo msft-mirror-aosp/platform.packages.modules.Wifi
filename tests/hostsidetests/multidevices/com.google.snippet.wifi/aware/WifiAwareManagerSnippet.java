@@ -449,6 +449,15 @@ public class WifiAwareManagerSnippet implements Snippet {
             event.getData().putInt("peerId", peerHandle.hashCode());
             EventCache.getInstance().postEvent(event);
         }
+
+        @Override
+        public void onServiceLost(PeerHandle peerHandle, int reason) {
+            SnippetEvent event = new SnippetEvent(mCallBackId, "WifiAwareSessionOnServiceLost");
+            event.getData().putString("discoverySessionId", mCallBackId);
+            event.getData().putInt("peerId", peerHandle.hashCode());
+            event.getData().putInt("lostReason", reason);
+            EventCache.getInstance().postEvent(event);
+        }
     }
 
     private WifiAwareSession getWifiAwareSession(String sessionId)
