@@ -323,3 +323,52 @@ def reset_device_statistics(ad: android_device.AndroidDevice,):
     ad: device to be reset
   """
   ad.adb.shell("cmd wifiaware native_cb get_cb_count --reset")
+
+def get_aware_capabilities(ad: android_device.AndroidDevice):
+    """Get the Wi-Fi Aware capabilities from the specified device. The
+  capabilities are a dictionary keyed by aware_const.CAP_* keys.
+
+  Args:
+    ad: the Android device
+  Returns: the capability dictionary.
+  """
+    return json.loads(ad.adb.shell('cmd wifiaware state_mgr get_capabilities'))
+
+def create_discovery_config(service_name,
+                            p_type=None,
+                            s_type=None,
+                            ssi=None,
+                            match_filter=None,
+                            ttl=0,
+                            term_cb_enable=True,
+                            instant_mode=None):
+    """Create a publish discovery configuration based on input parameters.
+
+    Args:
+        service_name: Service name - required
+        d_type: Discovery type (publish or subscribe constants)
+        ssi: Supplemental information - defaults to None
+        match_filter, match_filter_list: The match_filter, only one mechanism can
+                                     be used to specify. Defaults to None.
+        ttl: Time-to-live - defaults to 0 (i.e. non-self terminating)
+        term_cb_enable: True (default) to enable callback on termination, False
+                      means that no callback is called when session terminates.
+        instant_mode: set the band to use instant communication mode, 2G or 5G
+    Returns:
+        publish discovery configuration object.
+    """
+    config = {}
+    config[constants.SERVICE_NAME] = service_name
+    if p_type is not None:
+      config[constants.PUBLISH_TYPE] = p_type
+    if s_type is not None:
+      config[constants.SUBSCRIBE_TYPE] = s_type
+    if ssi is not None:
+        config[constants.SERVICE_SPECIFIC_INFO] = ssi
+    if match_filter is not None:
+        config[constants.MATCH_FILTER] = match_filter
+    if instant_mode is not None:
+        config[constants.INSTANTMODE_ENABLE] = instant_mode
+    config[constants.TTL_SEC] = ttl
+    config[constants.TERMINATE_NOTIFICATION_ENABLED] = term_cb_enable
+    return config
