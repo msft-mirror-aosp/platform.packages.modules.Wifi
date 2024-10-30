@@ -13046,4 +13046,29 @@ public class WifiServiceImplTest extends WifiBaseTest {
         verify(cmmWep, never()).disconnect();
         verify(mWifiGlobals, never()).setWepAllowed(anyBoolean());
     }
+
+    @Test
+    public void testUpdateSoftApCapabilityCheckMLOSupport() throws Exception {
+        lenient().when(SubscriptionManager.getActiveDataSubscriptionId())
+                .thenReturn(SubscriptionManager.DEFAULT_SUBSCRIPTION_ID);
+        ArgumentCaptor<SoftApCapability> capabilityArgumentCaptor = ArgumentCaptor.forClass(
+                SoftApCapability.class);
+        when(mWifiNative.isMLDApSupportMLO()).thenReturn(true);
+        mWifiServiceImpl.checkAndStartWifi();
+        mLooper.dispatchAll();
+        verify(mContext).registerReceiver(mBroadcastReceiverCaptor.capture(),
+                argThat((IntentFilter filter) ->
+                        filter.hasAction(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED)),
+                isNull(),
+                any(Handler.class));
+
+        // Send the broadcast
+        Intent intent = new Intent(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED);
+        mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
+        mLooper.dispatchAll();
+        verify(mActiveModeWarden).updateSoftApCapability(capabilityArgumentCaptor.capture(),
+                eq(WifiManager.IFACE_IP_MODE_TETHERED));
+        assertTrue(capabilityArgumentCaptor.getValue()
+                .areFeaturesSupported(SoftApCapability.SOFTAP_FEATURE_MLO));
+    }
 }
