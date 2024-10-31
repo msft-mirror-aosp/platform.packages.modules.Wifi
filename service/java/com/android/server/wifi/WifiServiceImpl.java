@@ -429,6 +429,14 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 Map<String, List<WifiClient>> clients, boolean isBridged) {}
 
         /**
+         * see:
+         * {@code WifiManager.SoftApCallback#onClientsDisconnected(SoftApInfo,
+         * List<WifiClient>)}
+         */
+        void onClientsDisconnected(@NonNull SoftApInfo info,
+                @NonNull List<WifiClient> clients) {}
+
+        /**
          * see: {@code WifiManager.SoftApCallback#onCapabilityChanged(SoftApCapability)}
          */
         void onCapabilityChanged(@NonNull SoftApCapability softApCapability) {}
