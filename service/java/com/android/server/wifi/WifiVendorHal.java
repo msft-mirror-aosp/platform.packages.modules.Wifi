@@ -56,6 +56,7 @@ import com.google.errorprone.annotations.CompileTimeConstant;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
@@ -378,10 +379,10 @@ public class WifiVendorHal {
         }
     }
 
-    private long getNecessaryCapabilitiesForSoftApMode(@SoftApConfiguration.BandType int band) {
-        long caps = HalDeviceManager.CHIP_CAPABILITY_ANY;
+    private BitSet getNecessaryCapabilitiesForSoftApMode(@SoftApConfiguration.BandType int band) {
+        BitSet caps = new BitSet();
         if ((band & SoftApConfiguration.BAND_60GHZ) != 0) {
-            caps |= WifiManager.WIFI_FEATURE_INFRA_60G;
+            caps.set(WifiManager.WIFI_FEATURE_INFRA_60G);
         }
         return caps;
     }
@@ -788,15 +789,15 @@ public class WifiVendorHal {
      *
      * @return bitmask defined by WifiManager.WIFI_FEATURE_*
      */
-    private long getSupportedFeatureSetFromPackageManager() {
-        long featureSet = 0;
+    private BitSet getSupportedFeatureSetFromPackageManager() {
+        BitSet featureSet = new BitSet();
         final PackageManager pm = sContext.getPackageManager();
         for (Pair pair: sSystemFeatureCapabilityTranslation) {
             if (pm.hasSystemFeature((String) pair.second)) {
-                featureSet |= (long) pair.first;
+                featureSet.set((int) pair.first);
             }
         }
-        enter("System feature set: %").c(featureSet).flush();
+        enter("System feature set: %").c(featureSet.toString()).flush();
         return featureSet;
     }
 
@@ -873,50 +874,50 @@ public class WifiVendorHal {
      * The result may differ depending on the mode (STA or AP)
      *
      * @param ifaceName Name of the interface.
-     * @return bitmask defined by WifiManager.WIFI_FEATURE_*
+     * @return BitSet defined by WifiManager.WIFI_FEATURE_*
      */
-    public long getSupportedFeatureSet(@NonNull String ifaceName) {
-        long featureSet = 0L;
+    public BitSet getSupportedFeatureSet(@NonNull String ifaceName) {
+        BitSet featureSet = new BitSet();
         if (!mHalDeviceManager.isStarted() || !mHalDeviceManager.isSupported()) {
             return getSupportedFeatureSetFromPackageManager();
         }
 
         synchronized (sLock) {
             if (mWifiChip != null) {
-                WifiChip.Response<Long> capsResp = mWifiChip.getCapabilitiesAfterIfacesExist();
+                WifiChip.Response<BitSet> capsResp = mWifiChip.getCapabilitiesAfterIfacesExist();
                 if (capsResp.getStatusCode() == WifiHal.WIFI_STATUS_SUCCESS) {
                     featureSet = capsResp.getValue();
                 } else if (capsResp.getStatusCode() == WifiHal.WIFI_STATUS_ERROR_REMOTE_EXCEPTION) {
-                    return 0;
+                    return new BitSet();
                 }
             }
 
             WifiStaIface iface = getStaIface(ifaceName);
             if (iface != null) {
-                featureSet |= iface.getCapabilities();
+                featureSet.or(iface.getCapabilities());
                 if (mHalDeviceManager.is24g5gDbsSupported(iface)
                         || mHalDeviceManager.is5g6gDbsSupported(iface)) {
-                    featureSet |= WifiManager.WIFI_FEATURE_DUAL_BAND_SIMULTANEOUS;
+                    featureSet.set(WifiManager.WIFI_FEATURE_DUAL_BAND_SIMULTANEOUS);
                 }
             }
         }
 
         if (mWifiGlobals.isWpa3SaeH2eSupported()) {
-            featureSet |= WifiManager.WIFI_FEATURE_SAE_H2E;
+            featureSet.set(WifiManager.WIFI_FEATURE_SAE_H2E);
         }
 
         Set<Integer> supportedIfaceTypes = mHalDeviceManager.getSupportedIfaceTypes();
         if (supportedIfaceTypes.contains(WifiChip.IFACE_TYPE_STA)) {
-            featureSet |= WifiManager.WIFI_FEATURE_INFRA;
+            featureSet.set(WifiManager.WIFI_FEATURE_INFRA);
         }
         if (supportedIfaceTypes.contains(WifiChip.IFACE_TYPE_AP)) {
-            featureSet |= WifiManager.WIFI_FEATURE_MOBILE_HOTSPOT;
+            featureSet.set(WifiManager.WIFI_FEATURE_MOBILE_HOTSPOT);
         }
         if (supportedIfaceTypes.contains(WifiChip.IFACE_TYPE_P2P)) {
-            featureSet |= WifiManager.WIFI_FEATURE_P2P;
+            featureSet.set(WifiManager.WIFI_FEATURE_P2P);
         }
         if (supportedIfaceTypes.contains(WifiChip.IFACE_TYPE_NAN)) {
-            featureSet |= WifiManager.WIFI_FEATURE_AWARE;
+            featureSet.set(WifiManager.WIFI_FEATURE_AWARE);
         }
 
         return featureSet;

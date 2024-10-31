@@ -75,6 +75,7 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Set;
 
@@ -465,6 +466,8 @@ public class ConcreteClientModeManager implements ClientModeManager {
                     return true;
                 }
             }
+        } catch (UnsupportedOperationException ex) {
+            Log.d(TAG, "IMS Manager is not supported.");
         } catch (RuntimeException ex) {
             Log.e(TAG, "IMS Manager is not available.", ex);
         }
@@ -1477,7 +1480,7 @@ public class ConcreteClientModeManager implements ClientModeManager {
     }
 
     @Override
-    public long getSupportedFeatures() {
+    public @NonNull BitSet getSupportedFeatures() {
         return getClientMode().getSupportedFeatures();
     }
 
