@@ -31,6 +31,7 @@ import android.hardware.wifi.supplicant.P2pPeerClientJoinedEventParams;
 import android.hardware.wifi.supplicant.P2pProvDiscStatusCode;
 import android.hardware.wifi.supplicant.P2pProvisionDiscoveryCompletedEventParams;
 import android.hardware.wifi.supplicant.P2pStatusCode;
+import android.hardware.wifi.supplicant.P2pUsdBasedServiceDiscoveryResultParams;
 import android.hardware.wifi.supplicant.WpsConfigMethods;
 import android.hardware.wifi.supplicant.WpsDevPasswordId;
 import android.net.MacAddress;
@@ -625,6 +626,41 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
             return;
         }
         mMonitor.broadcastP2pServiceDiscoveryResponse(mInterface, response);
+    }
+
+    /**
+     * Used to indicate the reception of a USD based service discovery response.
+     *
+     * @param params Parameters associated with the USD based service discovery result.
+     */
+    @Override
+    public void onUsdBasedServiceDiscoveryResult(P2pUsdBasedServiceDiscoveryResultParams params) {
+        logd("Usd based service discovery result received on " + mInterface);
+        // TODO implementation
+    }
+
+    /**
+     * Used to indicate the termination of USD based service discovery.
+     *
+     * @param sessionId Identifier to identify the instance of a service discovery.
+     * @param reasonCode The reason for termination of service discovery.
+     */
+    @Override
+    public void onUsdBasedServiceDiscoveryTerminated(int sessionId, int reasonCode) {
+        logd("Usd based service discovery terminated on " + mInterface);
+        // TODO implementation
+    }
+
+    /**
+     * Used to indicate the termination of USD based service Advertisement
+     *
+     * @param sessionId Identifier to identify the instance of a service advertisement.
+     * @param reasonCode The reason for termination of service advertisement.
+     */
+    @Override
+    public void onUsdBasedServiceAdvertisementTerminated(int sessionId, int reasonCode) {
+        logd("Usd based service advertisement terminated on " + mInterface);
+        // TODO implementation
     }
 
     private WifiP2pDevice createStaEventDevice(byte[] interfaceAddress, byte[] p2pDeviceAddress,
