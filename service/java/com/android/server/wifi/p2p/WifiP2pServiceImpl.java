@@ -1371,6 +1371,12 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 != PackageManager.PERMISSION_DENIED;
     }
 
+    private boolean isDualP2pSupported() {
+        return mFeatureFlags.p2pDual()
+                && mFeatureFlags.p2pOwnership()
+                && mWifiNative.isP2pP2pConcurrencySupported();
+    }
+
     @Override
     protected void dump(FileDescriptor fd, PrintWriter pw, String[] args) {
         if (mContext.checkCallingOrSelfPermission(android.Manifest.permission.DUMP)
@@ -1393,6 +1399,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         pw.println("mClientInfoList " + mClientInfoList.size());
         pw.println("mActiveClients " + mActiveClients);
         pw.println("mPeerAuthorizingTimestamp" + mPeerAuthorizingTimestamp);
+        pw.println("isDualP2pSupported" + isDualP2pSupported());
         pw.println();
 
         final IIpClient ipClient = mIpClient;
@@ -1589,7 +1596,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 mSettingsConfigStore.registerChangeListener(D2D_ALLOWED_WHEN_INFRA_STA_DISABLED,
                         new D2DAllowWhenInfraStaDisabledValueListener(), this.getHandler());
                 // Register for location mode on/off broadcasts
-                mContext.registerReceiver(new BroadcastReceiver() {
+                mContext.registerReceiverForAllUsers(new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
                         /* if location mode is off, ongoing discovery should be stopped.
@@ -1603,7 +1610,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             sendMessage(WifiP2pManager.STOP_DISCOVERY);
                         }
                     }
-                }, new IntentFilter(LocationManager.MODE_CHANGED_ACTION));
+                }, new IntentFilter(LocationManager.MODE_CHANGED_ACTION), null, getHandler());
                 // Register for tethering state
                 if (!SdkLevel.isAtLeastS()) {
                     mContext.registerReceiver(new BroadcastReceiver() {

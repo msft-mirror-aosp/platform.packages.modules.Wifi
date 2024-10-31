@@ -16,6 +16,8 @@
 
 package com.android.server.wifi.hal;
 
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -63,6 +65,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Random;
 
@@ -153,12 +156,9 @@ public class WifiChipHidlImplTest extends WifiBaseTest {
                         | android.hardware.wifi.V1_1.IWifiChip.ChipCapabilityMask.D2D_RTT
                         | android.hardware.wifi.V1_1.IWifiChip.ChipCapabilityMask.D2AP_RTT
         );
-        long expected = (
-                WifiManager.WIFI_FEATURE_TX_POWER_LIMIT
-                        | WifiManager.WIFI_FEATURE_D2D_RTT
-                        | WifiManager.WIFI_FEATURE_D2AP_RTT
-        );
-        assertEquals(expected, mDut.wifiFeatureMaskFromChipCapabilities(caps));
+        BitSet expected = createCapabilityBitset(WifiManager.WIFI_FEATURE_TX_POWER_LIMIT,
+                WifiManager.WIFI_FEATURE_D2D_RTT, WifiManager.WIFI_FEATURE_D2AP_RTT);
+        assertTrue(expected.equals(mDut.wifiFeatureMaskFromChipCapabilities(caps)));
     }
 
     /**
@@ -170,11 +170,9 @@ public class WifiChipHidlImplTest extends WifiBaseTest {
                 android.hardware.wifi.V1_3.IWifiChip.ChipCapabilityMask.SET_LATENCY_MODE
                         | android.hardware.wifi.V1_1.IWifiChip.ChipCapabilityMask.D2D_RTT
         );
-        long expected = (
-                WifiManager.WIFI_FEATURE_LOW_LATENCY
-                        | WifiManager.WIFI_FEATURE_D2D_RTT
-        );
-        assertEquals(expected, mDut.wifiFeatureMaskFromChipCapabilities_1_3(caps));
+        BitSet expected = createCapabilityBitset(
+                WifiManager.WIFI_FEATURE_LOW_LATENCY, WifiManager.WIFI_FEATURE_D2D_RTT);
+        assertTrue(expected.equals(mDut.wifiFeatureMaskFromChipCapabilities_1_3(caps)));
     }
 
     /**

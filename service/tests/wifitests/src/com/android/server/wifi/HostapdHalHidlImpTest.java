@@ -49,6 +49,7 @@ import android.hardware.wifi.hostapd.V1_3.Generation;
 import android.hidl.manager.V1_0.IServiceManager;
 import android.hidl.manager.V1_0.IServiceNotification;
 import android.net.MacAddress;
+import android.net.wifi.DeauthenticationReasonCode;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SoftApConfiguration.Builder;
 import android.net.wifi.WifiContext;
@@ -86,6 +87,8 @@ public class HostapdHalHidlImpTest extends WifiBaseTest {
     private static final String NETWORK_PSK = "test-psk";
     private static final String TEST_CLIENT_MAC = "11:22:33:44:55:66";
     private static final String TEST_AP_INSTANCE = "instance-wlan0";
+    private static final int DEFAULT_DISCONNECT_REASON =
+            DeauthenticationReasonCode.REASON_UNKNOWN;
 
     private final int mBand256G = SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ
             | SoftApConfiguration.BAND_6GHZ;
@@ -1344,9 +1347,10 @@ public class HostapdHalHidlImpTest extends WifiBaseTest {
         mIHostapdCallback13.onConnectedClientsChanged(IFACE_NAME, TEST_AP_INSTANCE,
                 MacAddress.fromString(TEST_CLIENT_MAC).toByteArray(), true);
         verify(mSoftApHalCallback).onConnectedClientsChanged(eq(TEST_AP_INSTANCE),
-                eq(MacAddress.fromString(TEST_CLIENT_MAC)), eq(true));
+                eq(MacAddress.fromString(TEST_CLIENT_MAC)), eq(true),
+                eq(DEFAULT_DISCONNECT_REASON));
         verify(mSoftApHalCallback1, never()).onConnectedClientsChanged(anyString(), any(),
-                anyBoolean());
+                anyBoolean(), anyInt());
     }
 
     /**
