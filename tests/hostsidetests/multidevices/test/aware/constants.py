@@ -38,7 +38,10 @@ MAX_DISTANCE_MM = "max_distance_mm"
 PAIRING_CONFIG = "pairing_config"
 AWARE_NETWORK_INFO_CLASS_NAME = "android.net.wifi.aware.WifiAwareNetworkInfo"
 TTL_SEC = "TtlSec"
+INSTANTMODE_ENABLE = "InstantModeEnabled"
 
+#onServiceLost reason code
+EASON_PEER_NOT_VISIBLE = 1
 
 class WifiAwareTestConstants:
     """Constants for Wi-Fi Aware test."""
@@ -107,6 +110,8 @@ class DiscoverySessionCallbackMethodType(enum.StrEnum):
     DISCOVER_RESULT = "discoveryResult"
     # Event for the message send result.
     MESSAGE_SEND_RESULT = "messageSendResult"
+    SESSION_CB_ON_SERVICE_LOST = "WifiAwareSessionOnServiceLost"
+    SESSION_CB_KEY_LOST_REASON = "lostReason"
 
 
 @enum.unique
