@@ -272,6 +272,7 @@ public class WifiInjector {
     private final boolean mHasActiveModem;
     private final RunnerHandler mWifiHandler;
     private boolean mVerboseLoggingEnabled;
+    @Nullable private final WepNetworkUsageController mWepNetworkUsageController;
 
     public WifiInjector(WifiContext context) {
         if (context == null) {
@@ -303,7 +304,8 @@ public class WifiInjector {
         mWifiHandler = new RunnerHandler(wifiLooper, context.getResources().getInteger(
                 R.integer.config_wifiConfigurationWifiRunnerThresholdInMs),
                 mWifiHandlerLocalLog);
-        mWifiDeviceStateChangeManager = new WifiDeviceStateChangeManager(context, mWifiHandler);
+        mWifiDeviceStateChangeManager = new WifiDeviceStateChangeManager(context, mWifiHandler,
+                this);
         mWifiGlobals = new WifiGlobals(mContext);
         mWifiMetrics = new WifiMetrics(mContext, mFrameworkFacade, mClock, wifiLooper,
                 awareMetrics, rttMetrics, new WifiPowerMetrics(mBatteryStats), mWifiP2pMetrics,
@@ -634,6 +636,13 @@ public class WifiInjector {
             mWifiVoipDetector = null;
         }
         mHasActiveModem = makeTelephonyManager().getActiveModemCount() > 0;
+        if (mFeatureFlags.wepDisabledInApm()) {
+            mWepNetworkUsageController = new WepNetworkUsageController(mWifiHandlerThread,
+                    mWifiDeviceStateChangeManager, mSettingsConfigStore, mWifiGlobals,
+                    mActiveModeWarden, mFeatureFlags);
+        } else {
+            mWepNetworkUsageController = null;
+        }
     }
 
     /**
@@ -1315,5 +1324,10 @@ public class WifiInjector {
      */
     public boolean isVerboseLoggingEnabled() {
         return mVerboseLoggingEnabled;
+    }
+
+    @Nullable
+    public WepNetworkUsageController getWepNetworkUsageController() {
+        return mWepNetworkUsageController;
     }
 }
