@@ -168,6 +168,15 @@ public class SoftApManagerTest extends WifiBaseTest {
     private static final int TEST_AP_BANDWIDTH_IN_SOFTAPINFO = SoftApInfo.CHANNEL_WIDTH_20MHZ_NOHT;
     private static final int TEST_DISCONNECT_REASON =
             DeauthenticationReasonCode.REASON_UNKNOWN;
+    private static final WifiClient TEST_DISCONNECTED_CLIENT =
+            new WifiClient(TEST_CLIENT_MAC_ADDRESS, TEST_INTERFACE_NAME,
+                    TEST_DISCONNECT_REASON);
+    private static final WifiClient TEST_DISCONNECTED_CLIENT_2_ON_FIRST_IFACE =
+            new WifiClient(TEST_CLIENT_MAC_ADDRESS_2, TEST_FIRST_INSTANCE_NAME,
+                    TEST_DISCONNECT_REASON);
+    private static final WifiClient TEST_DISCONNECTED_CLIENT_2_ON_SECOND_IFACE =
+            new WifiClient(TEST_CLIENT_MAC_ADDRESS_2, TEST_SECOND_INSTANCE_NAME,
+                    TEST_DISCONNECT_REASON);
     private static final int[] EMPTY_CHANNEL_ARRAY = {};
     private static final int[] ALLOWED_2G_FREQS = {2462}; //ch# 11
     private static final int[] ALLOWED_5G_FREQS = {5745, 5765}; //ch# 149, 153
@@ -1624,6 +1633,7 @@ public class SoftApManagerTest extends WifiBaseTest {
      */
     @Test
     public void testDoesNotTriggerCallbackForSameClients() throws Exception {
+        when(Flags.softapDisconnectReason()).thenReturn(true);
         SoftApModeConfiguration apConfig =
                 new SoftApModeConfiguration(WifiManager.IFACE_IP_MODE_TETHERED, null,
                 mTestSoftApCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
@@ -1651,6 +1661,9 @@ public class SoftApManagerTest extends WifiBaseTest {
         // Should just trigger 1 time callback, the first time will be happen when softap enable
         verify(mCallback, times(3)).onConnectedClientsOrInfoChanged(mTestSoftApInfoMap,
                   mTestWifiClientsMap, false);
+        // onClientsDisconnected should trigger 1 time from the update to zero client.
+        verify(mCallback).onClientsDisconnected(eq(mTestSoftApInfo),
+                eq(ImmutableList.of(TEST_DISCONNECTED_CLIENT)));
 
         verify(mWifiMetrics)
                 .addSoftApNumAssociatedStationsChangedEvent(0, 0,
@@ -3245,6 +3258,7 @@ public class SoftApManagerTest extends WifiBaseTest {
     @Test
     public void schedulesTimeoutTimerWorkFlowInBridgedMode() throws Exception {
         assumeTrue(SdkLevel.isAtLeastS());
+        when(Flags.softapDisconnectReason()).thenReturn(true);
         SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
                 WifiManager.IFACE_IP_MODE_TETHERED, generateBridgedModeSoftApConfig(null),
                 mTestSoftApCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
@@ -3292,6 +3306,8 @@ public class SoftApManagerTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mCallback).onConnectedClientsOrInfoChanged(
                 mTestSoftApInfoMap, mTestWifiClientsMap, true);
+        verify(mCallback).onClientsDisconnected(eq(mTestSoftApInfoOnFirstInstance),
+                eq(ImmutableList.of(TEST_DISCONNECTED_CLIENT_2_ON_FIRST_IFACE)));
         reset(mCallback);
         mockClientConnectedEvent(TEST_CLIENT_MAC_ADDRESS_2, true, TEST_SECOND_INSTANCE_NAME, true);
         mLooper.dispatchAll();
@@ -3307,6 +3323,8 @@ public class SoftApManagerTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mCallback).onConnectedClientsOrInfoChanged(
                 mTestSoftApInfoMap, mTestWifiClientsMap, true);
+        verify(mCallback).onClientsDisconnected(eq(mTestSoftApInfoOnSecondInstance),
+                eq(ImmutableList.of(TEST_DISCONNECTED_CLIENT_2_ON_SECOND_IFACE)));
         // Verify idle timer in bridged mode is scheduled again
         verify(mAlarmManager.getAlarmManager(), times(2)).setExact(anyInt(), anyLong(),
                 eq(mSoftApManager.SOFT_AP_SEND_MESSAGE_TIMEOUT_TAG + TEST_SECOND_INSTANCE_NAME),
