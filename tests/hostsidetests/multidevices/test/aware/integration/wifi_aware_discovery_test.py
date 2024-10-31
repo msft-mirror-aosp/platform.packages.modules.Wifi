@@ -56,17 +56,6 @@ _SUBSCRIBE_TYPE_PASSIVE = 0
 _SUBSCRIBE_TYPE_ACTIVE = 1
 
 
-@enum.unique
-class AttachCallBackMethodType(enum.StrEnum):
-    """Represents Attach Callback Method Type in Wi-Fi Aware.
-
-    https://developer.android.com/reference/android/net/wifi/aware/AttachCallback
-    """
-    ATTACHED = 'onAttached'
-    ATTACH_FAILED = 'onAttachFailed'
-    AWARE_SESSION_TERMINATED = 'onAwareSessionTerminated'
-
-
 class WifiAwareDiscoveryTest(base_test.BaseTestClass):
     """Wi-Fi Aware test class."""
 
@@ -126,7 +115,6 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
     def _teardown_test_on_device(self, ad: android_device.AndroidDevice) -> None:
         ad.wifi_aware_snippet.wifiAwareCloseAllWifiAwareSession()
         autils.reset_device_parameters(ad)
-        autils.validate_forbidden_callbacks(ad)
         autils.reset_device_statistics(ad)
 
     def on_fail(self, record: records.TestResult) -> None:
@@ -138,11 +126,11 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
         """Starts the attach process on the provided device."""
         handler = ad.wifi_aware_snippet.wifiAwareAttach()
         attach_event = handler.waitAndGet(
-            event_name=AttachCallBackMethodType.ATTACHED,
+            event_name=constants.AttachCallBackMethodType.ATTACHED,
             timeout=_DEFAULT_TIMEOUT,
         )
         asserts.assert_true(
-            ad.wifi_aware_snippet.wifiAwareIsSessionAttached(),
+            ad.wifi_aware_snippet.wifiAwareIsSessionAttached(handler.callback_id),
             f'{ad} attach succeeded, but Wi-Fi Aware session is still null.'
         )
         ad.log.info('Attach Wi-Fi Aware session succeeded.')
@@ -683,6 +671,18 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
                                         s_service_name=None,
                                         p_mf_1=None,
                                         s_mf_1=None):
+        """Utility which runs the negative discovery test for mismatched service
+        configs.
+
+        Args:
+            is_expected_to_pass: True if positive test, False if negative
+            p_type: Publish discovery type
+            s_type: Subscribe discovery type
+            p_service_name: Publish service name (or None to leave unchanged)
+            s_service_name: Subscribe service name (or None to leave unchanged)
+            p_mf_1: Publish match filter element [1] (or None to leave unchanged)
+            s_mf_1: Subscribe match filter element [1] (or None to leave unchanged)
+        """
         p_dut = self.ads[0]
         s_dut = self.ads[1]
         # create configurations
@@ -756,6 +756,536 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             constants.DiscoverySessionCallbackMethodType.SESSION_TERMINATED)
         s_disc_id.waitAndGet(
             constants.DiscoverySessionCallbackMethodType.SESSION_TERMINATED)
+
+    def create_discovery_pair(
+        self, p_dut, s_dut, p_config, s_config, msg_id=None):
+        """Creates a discovery session (publish and subscribe), and waits for
+        service discovery - at that point the sessions are connected and ready for
+        further messaging of data-path setup.
+
+        Args:
+            p_dut: Device to use as publisher.
+            s_dut: Device to use as subscriber.
+            p_config: Publish configuration.
+            s_config: Subscribe configuration.
+            device_startup_offset: Number of seconds to offset the enabling of NAN on
+                                   the two devices.
+            msg_id: Controls whether a message is sent from Subscriber to Publisher
+            (so that publisher has the sub's peer ID). If None then not sent,
+            otherwise should be an int for the message id.
+        Returns: variable size list of:
+            p_id: Publisher attach session id
+            s_id: Subscriber attach session id
+            p_disc_id: Publisher discovery session id
+            s_disc_id: Subscriber discovery session id
+            peer_id_on_sub: Peer ID of the Publisher as seen on the Subscriber
+            peer_id_on_pub: Peer ID of the Subscriber as seen on the Publisher. Only
+                            included if |msg_id| is not None.
+        """
+
+        p_dut = self.ads[0]
+        s_dut = self.ads[1]
+        # attach and wait for confirmation
+        p_id = self._start_attach(p_dut)
+        s_id = self._start_attach(s_dut)
+        p_disc_id = p_dut.wifi_aware_snippet.wifiAwarePublish(
+                p_id, p_config
+                )
+        p_dut.log.info('Created the publish session.')
+        p_discovery = p_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = p_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+            callback_name,
+            f'{p_dut} publish failed, got callback: {callback_name}.',
+            )
+        # Subscriber: start subscribe and wait for confirmation
+        s_disc_id = s_dut.wifi_aware_snippet.wifiAwareSubscribe(
+            s_id, s_config
+            )
+        s_dut.log.info('Created the subscribe session.')
+        s_discovery = s_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = s_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+            callback_name,
+            f'{s_dut} subscribe failed, got callback: {callback_name}.',
+            )
+        # Subscriber: wait for service discovery
+        discovery_event = s_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED)
+        peer_id_on_sub = discovery_event.data[constants.WifiAwareSnippetParams.PEER_ID]
+        # Optionally send a message from Subscriber to Publisher
+        if msg_id is not None:
+            ping_msg = 'PING'
+            # Subscriber: send message to peer (Publisher)
+            s_dut.sender.wifi_aware_snippet.wifiAwareSendMessage(
+                s_disc_id, peer_id_on_sub, _MSG_ID_SUB_TO_PUB, ping_msg
+                )
+            message_send_result = s_disc_id.waitAndGet(
+                event_name =
+                constants.DiscoverySessionCallbackMethodType.MESSAGE_SEND_RESULT,
+                timeout =_DEFAULT_TIMEOUT,
+                )
+            actual_send_message_id = message_send_result.data[
+            constants.DiscoverySessionCallbackParamsType.MESSAGE_ID
+            ]
+            asserts.assert_equal(
+                actual_send_message_id,
+                _MSG_ID_SUB_TO_PUB,
+                f'{s_dut} send message succeeded but message ID mismatched.'
+                )
+            pub_rx_msg_event = p_disc_id.waitAndGet(
+                event_name = constants.DiscoverySessionCallbackMethodType.MESSAGE_RECEIVED,
+                timeout = _DEFAULT_TIMEOUT,
+                )
+            peer_id_on_pub = pub_rx_msg_event.data[constants.WifiAwareSnippetParams.PEER_ID]
+            received_message_raw = pub_rx_msg_event.data[
+                constants.WifiAwareSnippetParams.RECEIVED_MESSAGE
+                ]
+            received_message = bytes(received_message_raw).decode('utf-8')
+            asserts.assert_equal(
+                received_message,
+                ping_msg,
+                f'{p_dut} Subscriber -> Publisher message corrupted.'
+                )
+            return p_id, s_id, p_disc_id, s_disc_id, peer_id_on_sub, peer_id_on_pub
+        return p_id, s_id, p_disc_id, s_disc_id, peer_id_on_sub
+
+    def exchange_messages(self, p_dut, p_disc_id, s_dut, s_disc_id, peer_id_on_sub, session_name):
+        """
+        Exchange message between Publisher and Subscriber on target discovery session
+
+        Args:
+            p_dut: Publisher device
+            p_disc_id: Publish discovery session id
+            s_dut: Subscriber device
+            s_disc_id: Subscribe discovery session id
+            peer_id_on_sub: Peer ID of the Publisher as seen on the Subscriber
+            session_name: dictionary of discovery session name base on role("pub" or "sub")
+                          {role: {disc_id: name}}
+        """
+
+        msg_template = "Hello {} from {} !"
+        # Message send from Subscriber to Publisher
+        s_to_p_msg = msg_template.format(session_name["pub"][p_disc_id],
+                                         session_name["sub"][s_disc_id])
+        publisher_peer = self._send_msg_and_check_received(
+            sender = s_dut,
+            sender_aware_session_cb_handler= s_disc_id,
+            receiver = p_dut,
+            receiver_aware_session_cb_handler= p_disc_id,
+            discovery_session = s_disc_id.callback_id,
+            peer=peer_id_on_sub,
+            send_message =s_to_p_msg,
+            send_message_id = _MSG_ID_SUB_TO_PUB,
+            )
+        logging.info(
+            'The subscriber sent a message and the publisher received it.'
+            )
+
+        # Publisher sends a message to subscriber.
+        p_to_s_msg = msg_template.format(session_name["sub"][s_disc_id],
+                                         session_name["pub"][p_disc_id])
+        self._send_msg_and_check_received(
+            sender=p_dut,
+            sender_aware_session_cb_handler=p_disc_id,
+            receiver=s_dut,
+            receiver_aware_session_cb_handler=s_disc_id,
+            discovery_session=p_disc_id.callback_id,
+            peer=publisher_peer,
+            send_message=p_to_s_msg,
+            send_message_id=_MSG_ID_PUB_TO_SUB,
+        )
+        logging.info(
+            'The publisher sent a message and the subscriber received it.'
+        )
+
+    def run_multiple_concurrent_services(self, type_x, type_y):
+        """Validate same service name with multiple service specific info on publisher
+        and subscriber can see all service
+
+        - p_dut running Publish X and Y
+        - s_dut running subscribe A and B
+        - subscribe A find X and Y
+        - subscribe B find X and Y
+
+        Message exchanges:
+            - A to X and X to A
+            - B to X and X to B
+            - A to Y and Y to A
+            - B to Y and Y to B
+
+        Note: test requires that publisher device support 2 publish sessions concurrently,
+        and subscriber device support 2 subscribe sessions concurrently.
+        The test will be skipped if the devices are not capable.
+
+        Args:
+            type_x, type_y: A list of [ptype, stype] of the publish and subscribe
+                      types for services X and Y respectively.
+        """
+
+        p_dut = self.ads[0]
+        s_dut = self.ads[1]
+        X_SERVICE_NAME = "ServiceXXX"
+        Y_SERVICE_NAME = "ServiceYYY"
+        asserts.skip_if(
+            autils.get_aware_capabilities(p_dut)["maxPublishes"] < 2
+            or autils.get_aware_capabilities(s_dut)["maxPublishes"] < 2
+            ,"Devices do not support 2 publish sessions"
+            )
+        # attach and wait for confirmation
+        p_id = self._start_attach(p_dut)
+        s_id = self._start_attach(s_dut)
+        # DUT1 & DUT2: start publishing both X & Y services and wait for
+        # confirmations
+        dut1_x_pid = p_dut.wifi_aware_snippet.wifiAwarePublish(
+            p_id, autils.create_discovery_config(X_SERVICE_NAME, type_x[0], None)
+                )
+        p_dut.log.info('Created the DUT1 X publish session.')
+        p_discovery = dut1_x_pid.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = p_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+            callback_name,
+            f'{p_dut} DUT1 X publish failed, got callback: {callback_name}.',
+            )
+        dut1_y_pid = p_dut.wifi_aware_snippet.wifiAwarePublish(
+                p_id, autils.create_discovery_config(Y_SERVICE_NAME, type_y[0], None)
+                )
+        p_dut.log.info('Created the DUT1 Y publish session.')
+        p_discovery = dut1_y_pid.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = p_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+            callback_name,
+            f'{p_dut} DUT1 Y publish failed, got callback: {callback_name}.',
+            )
+        dut2_x_pid = s_dut.wifi_aware_snippet.wifiAwarePublish(
+                s_id, autils.create_discovery_config(X_SERVICE_NAME, type_x[0], None)
+                )
+        s_dut.log.info('Created the DUT2 X publish session.')
+        p_discovery = dut2_x_pid.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = p_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+            callback_name,
+            f'{s_dut} DUT2 X publish failed, got callback: {callback_name}.',
+            )
+        dut2_y_pid = s_dut.wifi_aware_snippet.wifiAwarePublish(
+                s_id, autils.create_discovery_config(Y_SERVICE_NAME, type_y[0], None)
+                )
+        s_dut.log.info('Created the DUT2 Y publish session.')
+        p_discovery = dut2_y_pid.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = p_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+            callback_name,
+            f'{s_dut} DUT1 Y publish failed, got callback: {callback_name}.',
+            )
+        # DUT1: start subscribing for X
+        dut1_x_sid = p_dut.wifi_aware_snippet.wifiAwareSubscribe(
+            p_id, autils.create_discovery_config(X_SERVICE_NAME, None, type_x[1])
+            )
+        p_dut.log.info('Created the DUT1 X subscribe session.')
+        s_discovery = dut1_x_sid.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+        callback_name = s_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+            callback_name,
+            f'{p_dut} DUT1 X subscribe failed, got callback: {callback_name}.',
+            )
+        # DUT1: start subscribing for Y
+        dut1_y_sid = p_dut.wifi_aware_snippet.wifiAwareSubscribe(
+                p_id, autils.create_discovery_config(Y_SERVICE_NAME, None, type_y[1])
+                )
+        p_dut.log.info('Created the DUT1 Y subscribe session.')
+        s_discovery = dut1_y_sid.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = s_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+            callback_name,
+            f'{p_dut} DUT1 Y subscribe failed, got callback: {callback_name}.',
+            )
+        # DUT2: start subscribing for X
+        dut2_x_sid = s_dut.wifi_aware_snippet.wifiAwareSubscribe(
+            s_id, autils.create_discovery_config(X_SERVICE_NAME, None, type_x[1])
+            )
+        s_dut.log.info('Created the DUT2 X subscribe session.')
+        s_discovery = dut2_x_sid.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+        callback_name = s_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+            callback_name,
+            f'{s_dut} DUT2 X subscribe failed, got callback: {callback_name}.',
+            )
+        # DUT2: start subscribing for Y
+        dut2_y_sid = s_dut.wifi_aware_snippet.wifiAwareSubscribe(
+                s_id, autils.create_discovery_config(Y_SERVICE_NAME, None, type_y[1])
+                )
+        s_dut.log.info('Created the DUT2 Y subscribe session.')
+        s_discovery = dut2_y_sid.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = s_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+            callback_name,
+            f'{s_dut} DUT2 Y subscribe failed, got callback: {callback_name}.',
+            )
+        dut1_x_sid_event = dut1_x_sid.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED)
+        dut1_peer_id_for_dut2_x = dut1_x_sid_event.data[constants.WifiAwareSnippetParams.PEER_ID]
+
+        dut2_y_sid_event = dut2_y_sid.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED)
+        dut2_peer_id_for_dut1_y = dut2_y_sid_event.data[constants.WifiAwareSnippetParams.PEER_ID]
+
+        # DUT1.X send message to DUT2
+        x_msg = "Hello X on DUT2!"
+        publisher_peer = self._send_msg_and_check_received(
+            sender = p_dut,
+            sender_aware_session_cb_handler= dut1_x_sid,
+            receiver = s_dut,
+            receiver_aware_session_cb_handler= dut2_x_pid,
+            discovery_session = dut1_x_sid.callback_id,
+            peer=dut1_peer_id_for_dut2_x,
+            send_message =x_msg,
+            send_message_id = _MSG_ID_PUB_TO_SUB,
+            )
+        logging.info(
+            'The DUT1.X sent a message and the DUT2 received it.'
+            )
+
+        # DUT2.Y send message to DUT1
+        y_msg = "Hello Y on DUT1!"
+        self._send_msg_and_check_received(
+            sender = s_dut,
+            sender_aware_session_cb_handler= dut2_y_sid,
+            receiver = p_dut,
+            receiver_aware_session_cb_handler= dut1_y_pid,
+            discovery_session = dut2_y_sid.callback_id,
+            peer=dut2_peer_id_for_dut1_y,
+            send_message =y_msg,
+            send_message_id = _MSG_ID_SUB_TO_PUB,
+            )
+        logging.info(
+            'The DUT2.Y sent a message and the DUT1 received it.'
+            )
+
+    def run_multiple_concurrent_services_same_name_diff_ssi(self, type_x, type_y):
+        """Validate same service name with multiple service specific info on publisher
+        and subscriber can see all service
+
+        - p_dut running Publish X and Y
+        - s_dut running subscribe A and B
+        - subscribe A find X and Y
+        - subscribe B find X and Y
+
+        Message exchanges:
+            - A to X and X to A
+            - B to X and X to B
+            - A to Y and Y to A
+         - B to Y and Y to B
+
+        Note: test requires that publisher device support 2 publish sessions concurrently,
+        and subscriber device support 2 subscribe sessions concurrently.
+        The test will be skipped if the devices are not capable.
+
+        Args:
+            type_x, type_y: A list of [ptype, stype] of the publish and subscribe
+                      types for services X and Y respectively.
+         """
+        p_dut = self.ads[0]
+        s_dut = self.ads[1]
+        asserts.skip_if(
+            autils.get_aware_capabilities(p_dut)["maxPublishes"] < 2
+            or autils.get_aware_capabilities(s_dut)["maxPublishes"] < 2
+            ,"Devices do not support 2 publish sessions"
+            )
+        SERVICE_NAME = "ServiceName"
+        X_SERVICE_SSI = "ServiceSpecificInfoXXX"
+        Y_SERVICE_SSI = "ServiceSpecificInfoYYY"
+        # use_id = True
+        # attach and wait for confirmation
+        p_id = self._start_attach(p_dut)
+        s_id = self._start_attach(s_dut)
+        p_disc_id_x = p_dut.wifi_aware_snippet.wifiAwarePublish(
+            p_id, autils.create_discovery_config(SERVICE_NAME, type_x[0], None, X_SERVICE_SSI)
+                )
+        p_dut.log.info('Created the DUT1 X publish session.')
+        p_discovery = p_disc_id_x.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = p_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+            callback_name,
+            f'{p_dut} DUT1 X publish failed, got callback: {callback_name}.',
+            )
+        p_disc_id_y = p_dut.wifi_aware_snippet.wifiAwarePublish(
+                p_id, autils.create_discovery_config(SERVICE_NAME, type_x[0], None, Y_SERVICE_SSI)
+                )
+        p_dut.log.info('Created the DUT1 Y publish session.')
+        p_discovery = p_disc_id_y.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = p_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+            callback_name,
+            f'{p_dut} DUT1 Y publish failed, got callback: {callback_name}.',
+            )
+        # Subscriber: start subscribe session A
+        s_disc_id_a = s_dut.wifi_aware_snippet.wifiAwareSubscribe(
+            s_id, autils.create_discovery_config(SERVICE_NAME, None, type_x[1] )
+            )
+        s_dut.log.info('Created the DUT2 X subscribe session.')
+        s_discovery = s_disc_id_a.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                timeout=_DEFAULT_TIMEOUT)
+        callback_name = s_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+            callback_name,
+            f'{s_dut} DUT2 X subscribe failed, got callback: {callback_name}.',
+            )
+        # Subscriber: start subscribe session B
+        s_disc_id_b = s_dut.wifi_aware_snippet.wifiAwareSubscribe(
+                s_id, autils.create_discovery_config(SERVICE_NAME, None, type_y[1])
+                )
+        s_dut.log.info('Created the DUT2 Y subscribe session.')
+        s_discovery = s_disc_id_b.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = s_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+            callback_name,
+            f'{s_dut} DUT2 Y subscribe failed, got callback: {callback_name}.',
+            )
+        session_name = {"pub": {p_disc_id_x: "X", p_disc_id_y: "Y"},
+                        "sub": {s_disc_id_a: "A", s_disc_id_b: "B"}}
+        # Subscriber: subscribe session A & B wait for service discovery
+        # Number of results on each session should be exactly 2
+        results_a = {}
+        for i in range(2):
+            event = s_disc_id_a.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED)
+            results_a[
+                bytes(event.data[constants.WifiAwareSnippetParams.SERVICE_SPECIFIC_INFO]).decode("utf-8")] = event
+        autils.callback_no_response(
+            s_disc_id_a, constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED, 10, True
+        )
+        results_b = {}
+        for i in range(2):
+            event = s_disc_id_b.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED)
+            results_b[
+                bytes(event.data[constants.WifiAwareSnippetParams.SERVICE_SPECIFIC_INFO]).decode("utf-8")] = event
+        autils.callback_no_response(
+            s_disc_id_b, constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED, 10, True
+        )
+        s_a_peer_id_for_p_x = results_a[X_SERVICE_SSI].data[constants.WifiAwareSnippetParams.PEER_ID]
+        s_a_peer_id_for_p_y = results_a[Y_SERVICE_SSI].data[constants.WifiAwareSnippetParams.PEER_ID]
+        s_b_peer_id_for_p_x = results_b[X_SERVICE_SSI].data[constants.WifiAwareSnippetParams.PEER_ID]
+        s_b_peer_id_for_p_y = results_b[Y_SERVICE_SSI].data[constants.WifiAwareSnippetParams.PEER_ID]
+
+        # Message exchange between Publisher and Subscribe
+        self.exchange_messages(p_dut, p_disc_id_x,
+                               s_dut, s_disc_id_a, s_a_peer_id_for_p_x, session_name)
+
+        self.exchange_messages(p_dut, p_disc_id_x,
+                               s_dut, s_disc_id_b, s_b_peer_id_for_p_x, session_name)
+
+        self.exchange_messages(p_dut, p_disc_id_y,
+                               s_dut, s_disc_id_a, s_a_peer_id_for_p_y, session_name)
+
+        self.exchange_messages(p_dut, p_disc_id_y,
+                               s_dut, s_disc_id_b, s_b_peer_id_for_p_y, session_name)
+
+    def run_service_discovery_on_service_lost(self, p_type, s_type):
+        """
+        Validate service lost callback will be receive on subscriber, when publisher stopped publish
+        - p_dut running Publish
+        - s_dut running subscribe
+        - s_dut discover p_dut
+        - p_dut stop publish
+        - s_dut receive service lost callback
+
+        Args:
+            p_type: Publish discovery type
+            s_type: Subscribe discovery type
+        """
+        p_dut = self.ads[0]
+        s_dut = self.ads[1]
+        # attach and wait for confirmation
+        p_id = self._start_attach(p_dut)
+        s_id = self._start_attach(s_dut)
+        p_config = self.create_publish_config(
+            p_dut.wifi_aware_snippet.getCharacteristics(),
+            p_type,
+            _PAYLOAD_SIZE_TYPICAL,
+            ttl=0,
+            term_ind_on=False,
+            null_match=False,
+            )
+        p_disc_id = p_dut.wifi_aware_snippet.wifiAwarePublish(
+            p_id, p_config
+            )
+        p_dut.log.info('Created the publish session.')
+        p_discovery = p_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = p_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+            callback_name,
+            f'{p_dut} publish failed, got callback: {callback_name}.',
+            )
+        s_config = self.create_subscribe_config(
+            s_dut.wifi_aware_snippet.getCharacteristics(),
+            s_type,
+            _PAYLOAD_SIZE_TYPICAL,
+            ttl=0,
+            term_ind_on=False,
+            null_match=True,
+            )
+        s_disc_id = s_dut.wifi_aware_snippet.wifiAwareSubscribe(
+            s_id, s_config
+            )
+        s_dut.log.info('Created the subscribe session.')
+        s_discovery = s_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+        callback_name = s_discovery.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+            callback_name,
+            f'{s_dut} subscribe failed, got callback: {callback_name}.'
+        )
+        discovered_event = s_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED)
+        peer_id_on_sub = discovered_event.data[
+            constants.WifiAwareSnippetParams.PEER_ID]
+        # Publisher+Subscriber: Terminate sessions
+        p_dut.wifi_aware_snippet.wifiAwareCloseDiscoverSession(
+            p_disc_id.callback_id)
+        time.sleep(10)
+        # service_lost_event = s_disc_id.waitAndGet("WifiAwareSessionOnServiceLost")
+        service_lost_event = s_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.SESSION_CB_ON_SERVICE_LOST)
+        asserts.assert_equal(peer_id_on_sub,
+                             service_lost_event.data[constants.WifiAwareSnippetParams.PEER_ID])
+        asserts.assert_equal(
+            constants.EASON_PEER_NOT_VISIBLE,
+            service_lost_event.data[constants.DiscoverySessionCallbackMethodType.SESSION_CB_KEY_LOST_REASON]
+            )
 
     def test_positive_unsolicited_passive_typical(self)-> None:
         """Functional test case / Discovery test cases / positive test case:
@@ -1032,6 +1562,138 @@ class WifiAwareDiscoveryTest(base_test.BaseTestClass):
             p_mf_1="hello there string",
             s_mf_1="goodbye there string")
 
+    #########################################################
+    # Multiple concurrent services
+    #######################################
+
+    def test_multiple_concurrent_services_both_unsolicited_passive(self):
+        """Validate multiple concurrent discovery sessions running on both devices.
+    - DUT1 & DUT2 running Publish for X
+    - DUT1 & DUT2 running Publish for Y
+    - DUT1 Subscribes for X
+    - DUT2 Subscribes for Y
+    Message exchanges.
+
+    Both sessions are Unsolicited/Passive.
+
+    Note: test requires that devices support 2 publish sessions concurrently.
+    The test will be skipped if the devices are not capable.
+    """
+        self.run_multiple_concurrent_services(
+            type_x=[
+                _PUBLISH_TYPE_UNSOLICITED,
+                _SUBSCRIBE_TYPE_PASSIVE
+            ],
+            type_y=[
+                _PUBLISH_TYPE_UNSOLICITED,
+                _SUBSCRIBE_TYPE_PASSIVE
+            ])
+
+    def test_multiple_concurrent_services_both_solicited_active(self):
+        """Validate multiple concurrent discovery sessions running on both devices.
+    - DUT1 & DUT2 running Publish for X
+    - DUT1 & DUT2 running Publish for Y
+    - DUT1 Subscribes for X
+    - DUT2 Subscribes for Y
+    Message exchanges.
+
+    Both sessions are Solicited/Active.
+
+    Note: test requires that devices support 2 publish sessions concurrently.
+    The test will be skipped if the devices are not capable.
+    """
+        self.run_multiple_concurrent_services(
+            type_x=[
+                _PUBLISH_TYPE_SOLICITED,
+                _SUBSCRIBE_TYPE_ACTIVE
+            ],
+            type_y=[
+                _PUBLISH_TYPE_SOLICITED, _SUBSCRIBE_TYPE_ACTIVE
+            ])
+
+    def test_multiple_concurrent_services_mix_unsolicited_solicited(self):
+        """Validate multiple concurrent discovery sessions running on both devices.
+    - DUT1 & DUT2 running Publish for X
+    - DUT1 & DUT2 running Publish for Y
+    - DUT1 Subscribes for X
+    - DUT2 Subscribes for Y
+    Message exchanges.
+
+    Session A is Unsolicited/Passive.
+    Session B is Solicited/Active.
+
+    Note: test requires that devices support 2 publish sessions concurrently.
+    The test will be skipped if the devices are not capable.
+    """
+        self.run_multiple_concurrent_services(
+            type_x=[
+                _PUBLISH_TYPE_UNSOLICITED,
+                _SUBSCRIBE_TYPE_PASSIVE
+            ],
+            type_y=[
+                _PUBLISH_TYPE_SOLICITED, _SUBSCRIBE_TYPE_ACTIVE
+            ])
+
+    #########################################################
+    # Multiple concurrent services with diff ssi
+    #########################################################
+
+    def test_multiple_concurrent_services_diff_ssi_unsolicited_passive(self):
+        """Multi service test on same service name but different Service Specific Info
+        - Unsolicited publish
+        - Passive subscribe
+        """
+        self.run_multiple_concurrent_services_same_name_diff_ssi(
+            type_x=[_PUBLISH_TYPE_UNSOLICITED, _SUBSCRIBE_TYPE_PASSIVE],
+            type_y=[_PUBLISH_TYPE_UNSOLICITED, _SUBSCRIBE_TYPE_PASSIVE])
+
+    def test_multiple_concurrent_services_diff_ssi_solicited_active(self):
+        """Multi service test on same service name but different Service Specific Info
+        - Solicited publish
+        - Active subscribe
+        """
+        self.run_multiple_concurrent_services_same_name_diff_ssi(
+            type_x=[_PUBLISH_TYPE_SOLICITED, _SUBSCRIBE_TYPE_ACTIVE],
+            type_y=[_PUBLISH_TYPE_SOLICITED, _SUBSCRIBE_TYPE_ACTIVE])
+
+    #########################################################
+
+    def test_upper_lower_service_name_equivalence(self):
+        """Validate that Service Name is case-insensitive. Publish a service name
+        with mixed case, subscribe to the same service name with alternative case
+        and verify that discovery happens."""
+        p_dut = self.ads[0]
+        s_dut = self.ads[1]
+
+        pub_service_name = "GoogleAbCdEf"
+        sub_service_name = "GoogleaBcDeF"
+        p_config = autils.create_discovery_config(pub_service_name)
+        p_config[constants.PUBLISH_TYPE] = _PUBLISH_TYPE_UNSOLICITED
+        s_config = autils.create_discovery_config(sub_service_name)
+        s_config[constants.SUBSCRIBE_TYPE] = _SUBSCRIBE_TYPE_PASSIVE
+        self.create_discovery_pair(
+            p_dut,
+            s_dut,
+            p_config,
+            s_config)
+
+    #########################################################
+    # service discovery on service lost
+    #########################################################
+
+    def test_service_discovery_on_service_lost_unsolicited_passive(self):
+        """
+        Test service discovery lost with unsolicited publish and passive subscribe
+        """
+        self.run_service_discovery_on_service_lost(_PUBLISH_TYPE_UNSOLICITED,
+                                                   _SUBSCRIBE_TYPE_PASSIVE)
+
+    def test_service_discovery_on_service_lost_solicited_active(self):
+        """
+        Test service discovery lost with solicited publish and active subscribe
+        """
+        self.run_service_discovery_on_service_lost(_PUBLISH_TYPE_SOLICITED,
+                                                   _SUBSCRIBE_TYPE_ACTIVE)
 
 if __name__ == '__main__':
     # Take test args
