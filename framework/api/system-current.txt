@@ -1862,6 +1862,28 @@ package android.net.wifi.usd {
     field public static final int TRANSMISSION_TYPE_UNICAST = 0; // 0x0
   }
 
+  @FlaggedApi("android.net.wifi.flags.usd") public final class PublishConfig extends android.net.wifi.usd.Config implements android.os.Parcelable {
+    method public int describeContents();
+    method @IntRange(from=0) public int getAnnouncementPeriodMillis();
+    method public int getSolicitedTransmissionType();
+    method public boolean isEventsEnabled();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.usd.PublishConfig> CREATOR;
+  }
+
+  public static final class PublishConfig.Builder {
+    ctor public PublishConfig.Builder(@NonNull String);
+    method @NonNull public android.net.wifi.usd.PublishConfig build();
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setAnnouncementPeriodMillis(@IntRange(from=0) int);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setEventsEnabled(boolean);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setRxMatchFilter(@NonNull java.util.List<byte[]>);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setServiceProtoType(int);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setServiceSpecificInfo(@NonNull byte[]);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setSolicitedTransmissionType(int);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setTtlSeconds(@IntRange(from=0) int);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setTxMatchFilter(@NonNull java.util.List<byte[]>);
+  }
+
   @FlaggedApi("android.net.wifi.flags.usd") public class UsdManager {
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherAvailable();
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherSupported();
