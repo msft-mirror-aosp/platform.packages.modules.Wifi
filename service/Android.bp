@@ -104,6 +104,7 @@ java_library {
         "android.hardware.wifi.supplicant-V1.3-java",
         "android.hardware.wifi.supplicant-V1.4-java",
         "android.hidl.manager-V1.2-java",
+        "android.system.wifi.mainline_supplicant-java",
         "bouncycastle-unbundled",
         "ksoap2",
         // Note: libprotobuf-java-lite uses a few core platform APIs which
