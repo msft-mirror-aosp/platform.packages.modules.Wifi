@@ -1916,6 +1916,13 @@ package android.net.wifi.usd {
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void updatePublish(@NonNull byte[]);
   }
 
+  @FlaggedApi("android.net.wifi.flags.usd") public class PublishSessionCallback extends android.net.wifi.usd.SessionCallback {
+    ctor public PublishSessionCallback();
+    method public void onPublishFailed(int);
+    method public void onPublishReplied(@NonNull android.net.wifi.usd.DiscoveryResult);
+    method public void onPublishStarted(@NonNull android.net.wifi.usd.PublishSession);
+  }
+
   @FlaggedApi("android.net.wifi.flags.usd") public abstract class SessionCallback {
     ctor public SessionCallback();
     method public void onMessageReceived(int, @Nullable byte[]);
