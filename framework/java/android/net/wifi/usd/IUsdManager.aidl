@@ -16,6 +16,7 @@
 
 package android.net.wifi.usd;
 
+import android.net.wifi.IBooleanListener;
 import android.net.wifi.usd.Characteristics;
 import android.net.wifi.usd.IAvailabilityCallback;
 
@@ -32,4 +33,6 @@ interface IUsdManager {
     void registerAvailabilityCallback(IAvailabilityCallback callback);
     void unregisterAvailabilityCallback(IAvailabilityCallback callback);
     Characteristics getCharacteristics();
+    void sendMessage(int peerId, in byte[] message, in IBooleanListener listener);
+    void cancelSubscribe(int sessionId);
 }

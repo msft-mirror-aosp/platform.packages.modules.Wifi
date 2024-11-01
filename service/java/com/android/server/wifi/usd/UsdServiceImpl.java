@@ -18,9 +18,11 @@ package com.android.server.wifi.usd;
 
 import android.annotation.NonNull;
 import android.content.Context;
+import android.net.wifi.IBooleanListener;
 import android.net.wifi.usd.Characteristics;
 import android.net.wifi.usd.IAvailabilityCallback;
 import android.net.wifi.usd.IUsdManager;
+import android.net.wifi.usd.SubscribeSession;
 import android.net.wifi.usd.UsdManager;
 import android.os.Binder;
 import android.os.Bundle;
@@ -30,7 +32,9 @@ import com.android.server.wifi.RunnerHandler;
 import com.android.server.wifi.WifiInjector;
 import com.android.server.wifi.util.WifiPermissionsUtil;
 
+import java.util.Objects;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 
 /**
  * Implementation of the IUsdManager.
@@ -166,5 +170,31 @@ public class UsdServiceImpl extends IUsdManager.Stub {
         bundle.putInt(Characteristics.KEY_MAX_MATCH_FILTER_LENGTH, 0);
         bundle.putInt(Characteristics.KEY_MAX_SERVICE_NAME_LENGTH, 0);
         return new Characteristics(bundle);
+    }
+
+    /**
+     * See {@link SubscribeSession#sendMessage(int, byte[], Executor, Consumer)}
+     */
+    public void sendMessage(int peerId, @NonNull byte[] message,
+            @NonNull IBooleanListener listener) {
+        Objects.requireNonNull(message, "message must not be null");
+        Objects.requireNonNull(listener, "listener must not be null");
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        Log.i(TAG, "sendMessage ( peerId = " + peerId + " , message length = " + message.length
+                + " )");
+    }
+
+    /**
+     * See {@link SubscribeSession#cancel()}
+     */
+    public void cancelSubscribe(int sessionId) {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        Log.i(TAG, "cancelSubscribe: ( sessionId = " + sessionId + " )");
     }
 }

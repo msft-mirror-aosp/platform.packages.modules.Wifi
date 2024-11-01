@@ -27,6 +27,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.content.Context;
+import android.net.wifi.IBooleanListener;
 import android.net.wifi.flags.Flags;
 import android.net.wifi.util.Environment;
 import android.os.Binder;
@@ -37,6 +38,7 @@ import android.util.SparseArray;
 
 import java.util.Objects;
 import java.util.concurrent.Executor;
+import java.util.function.Consumer;
 
 /**
  * This class provides the APIs for managing Unsynchronized Service Discovery (USD). USD is a
@@ -74,6 +76,31 @@ public class UsdManager {
     public UsdManager(@NonNull Context context, @NonNull IUsdManager service) {
         mContext = context;
         mService = service;
+    }
+
+    /** @hide */
+    public void sendMessage(int peerId, @NonNull byte[] message, @NonNull Executor executor,
+            @NonNull Consumer<Boolean> resultCallback) {
+        try {
+            mService.sendMessage(peerId, message, new IBooleanListener.Stub() {
+                @Override
+                public void onResult(boolean value) throws RemoteException {
+                    Binder.clearCallingIdentity();
+                    executor.execute(() -> resultCallback.accept(value));
+                }
+            });
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /** @hide */
+    public void cancelSubscribe(int sessionId) {
+        try {
+            mService.cancelSubscribe(sessionId);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
     }
 
     /**
