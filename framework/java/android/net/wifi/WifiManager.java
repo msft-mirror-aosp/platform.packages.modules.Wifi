@@ -5866,8 +5866,36 @@ public class WifiManager {
     public void startLocalOnlyHotspot(LocalOnlyHotspotCallback callback,
             @Nullable Handler handler) {
         Executor executor = handler == null ? null : new HandlerExecutor(handler);
-        startLocalOnlyHotspotInternal(null, executor, callback);
+        startLocalOnlyHotspotInternal(null, executor, callback, false);
     }
+
+   /**
+     * Starts a local-only hotspot with a specific configuration applied. See
+     * {@link #startLocalOnlyHotspot(LocalOnlyHotspotCallback, Handler)}.
+     *
+     * Since custom configuration settings may be incompatible with each other, the hotspot started
+     * through this method cannot coexist with another hotspot created through
+     * {@link #startLocalOnlyHotspot(LocalOnlyHotspotCallback, Handler)}. If this is attempted,
+     * the first hotspot request wins and others receive
+     * {@link LocalOnlyHotspotCallback#ERROR_GENERIC} through
+     * {@link LocalOnlyHotspotCallback#onFailed}.
+     *
+     * @param config Custom configuration for the hotspot. See {@link SoftApConfiguration}.
+     * @param executor Executor to run callback methods on.
+     * @param callback LocalOnlyHotspotCallback for the application to receive updates about
+     * operating status.
+     */
+    @RequiresPermission(allOf = {CHANGE_WIFI_STATE, NEARBY_WIFI_DEVICES})
+    @FlaggedApi(Flags.FLAG_PUBLIC_BANDS_FOR_LOHS)
+    public void startLocalOnlyHotspotWithConfiguration(@NonNull SoftApConfiguration config,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull LocalOnlyHotspotCallback callback) {
+        Objects.requireNonNull(config);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+        startLocalOnlyHotspotInternal(config, executor, callback, false);
+    }
+
 
     /**
      * Starts a local-only hotspot with a specific configuration applied. See
@@ -5897,7 +5925,7 @@ public class WifiManager {
             @Nullable @CallbackExecutor Executor executor,
             @Nullable LocalOnlyHotspotCallback callback) {
         Objects.requireNonNull(config);
-        startLocalOnlyHotspotInternal(config, executor, callback);
+        startLocalOnlyHotspotInternal(config, executor, callback, true);
     }
 
     /**
@@ -5911,7 +5939,8 @@ public class WifiManager {
     private void startLocalOnlyHotspotInternal(
             @Nullable SoftApConfiguration config,
             @Nullable @CallbackExecutor Executor executor,
-            @Nullable LocalOnlyHotspotCallback callback) {
+            @Nullable LocalOnlyHotspotCallback callback,
+            boolean isCalledFromSystemApi) {
         if (executor == null) {
             executor = mContext.getMainExecutor();
         }
@@ -5927,7 +5956,7 @@ public class WifiManager {
                             mContext.getAttributionSource());
                 }
                 int returnCode = mService.startLocalOnlyHotspot(proxy, packageName, featureId,
-                        config, extras);
+                        config, extras, isCalledFromSystemApi);
                 if (returnCode != LocalOnlyHotspotCallback.REQUEST_REGISTERED) {
                     // Send message to the proxy to make sure we call back on the correct thread
                     proxy.onHotspotFailed(returnCode);

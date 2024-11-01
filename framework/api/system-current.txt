@@ -489,7 +489,6 @@ package android.net.wifi {
     method @NonNull public java.util.List<android.net.MacAddress> getBlockedClientList();
     method public long getBridgedModeOpportunisticShutdownTimeoutMillis();
     method @Deprecated public int getChannel();
-    method @NonNull public android.util.SparseIntArray getChannels();
     method public int getMacRandomizationSetting();
     method public int getMaxChannelBandwidth();
     method public int getMaxNumberOfClients();
@@ -505,10 +504,6 @@ package android.net.wifi {
     method public boolean isIeee80211beEnabled();
     method public boolean isUserConfiguration();
     method @Nullable public android.net.wifi.WifiConfiguration toWifiConfiguration();
-    field public static final int BAND_2GHZ = 1; // 0x1
-    field public static final int BAND_5GHZ = 2; // 0x2
-    field public static final int BAND_60GHZ = 8; // 0x8
-    field public static final int BAND_6GHZ = 4; // 0x4
     field @Deprecated public static final int BAND_ANY = 7; // 0x7
     field public static final long DEFAULT_TIMEOUT = -1L; // 0xffffffffffffffffL
     field public static final int RANDOMIZATION_NONE = 0; // 0x0
@@ -516,10 +511,8 @@ package android.net.wifi {
     field public static final int RANDOMIZATION_PERSISTENT = 1; // 0x1
   }
 
-  public static final class SoftApConfiguration.Builder {
-    ctor public SoftApConfiguration.Builder();
+  @FlaggedApi("com.android.wifi.flags.public_bands_for_lohs") public static final class SoftApConfiguration.Builder {
     ctor public SoftApConfiguration.Builder(@NonNull android.net.wifi.SoftApConfiguration);
-    method @NonNull public android.net.wifi.SoftApConfiguration build();
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setAllowedAcsChannels(int, @NonNull int[]);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setAllowedClientList(@NonNull java.util.List<android.net.MacAddress>);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setAutoShutdownEnabled(boolean);
@@ -530,7 +523,6 @@ package android.net.wifi {
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setBridgedModeOpportunisticShutdownTimeoutMillis(@IntRange(from=0xffffffff) long);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setBssid(@Nullable android.net.MacAddress);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setChannel(int, int);
-    method @NonNull public android.net.wifi.SoftApConfiguration.Builder setChannels(@NonNull android.util.SparseIntArray);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setClientControlByUserEnabled(boolean);
     method @FlaggedApi("com.android.wifi.flags.ap_isolate") @NonNull public android.net.wifi.SoftApConfiguration.Builder setClientIsolationEnabled(boolean);
     method @NonNull public android.net.wifi.SoftApConfiguration.Builder setHiddenSsid(boolean);
