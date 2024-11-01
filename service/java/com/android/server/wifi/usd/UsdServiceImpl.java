@@ -22,6 +22,7 @@ import android.net.wifi.IBooleanListener;
 import android.net.wifi.usd.Characteristics;
 import android.net.wifi.usd.IAvailabilityCallback;
 import android.net.wifi.usd.IUsdManager;
+import android.net.wifi.usd.PublishSession;
 import android.net.wifi.usd.SubscribeSession;
 import android.net.wifi.usd.UsdManager;
 import android.os.Binder;
@@ -196,5 +197,28 @@ public class UsdServiceImpl extends IUsdManager.Stub {
             throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
         }
         Log.i(TAG, "cancelSubscribe: ( sessionId = " + sessionId + " )");
+    }
+
+    /**
+     * See {@link PublishSession#cancel()}
+     */
+    public void cancelPublish(int sessionId) {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        Log.i(TAG, "cancelPublish: ( sessionId = " + sessionId + " )");
+    }
+
+    /**
+     * See {@link PublishSession#updatePublish(byte[])}
+     */
+    public void updatePublish(int sessionId, @NonNull byte[] ssi) {
+        Objects.requireNonNull(ssi, "Service specific info must not be null");
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        Log.i(TAG, "updatePublish: ( sessionId = " + sessionId + " )");
     }
 }

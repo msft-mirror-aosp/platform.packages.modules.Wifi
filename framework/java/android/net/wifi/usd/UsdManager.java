@@ -103,6 +103,24 @@ public class UsdManager {
         }
     }
 
+    /** @hide */
+    public void cancelPublish(int sessionId) {
+        try {
+            mService.cancelPublish(sessionId);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /** @hide */
+    public void updatePublish(int sessionId, byte[] serviceSpecificInfo) {
+        try {
+            mService.updatePublish(sessionId, serviceSpecificInfo);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
     /**
      * Return whether subscriber is supported or not.
      */

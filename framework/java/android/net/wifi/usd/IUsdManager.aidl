@@ -35,4 +35,6 @@ interface IUsdManager {
     Characteristics getCharacteristics();
     void sendMessage(int peerId, in byte[] message, in IBooleanListener listener);
     void cancelSubscribe(int sessionId);
+    void cancelPublish(int sessionId);
+    void updatePublish(int sessionId, in byte[] ssi);
 }
