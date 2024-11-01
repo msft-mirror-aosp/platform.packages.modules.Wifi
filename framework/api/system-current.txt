@@ -1873,6 +1873,21 @@ package android.net.wifi.usd {
     field public static final int TRANSMISSION_TYPE_UNICAST = 0; // 0x0
   }
 
+  @FlaggedApi("android.net.wifi.flags.usd") public class DiscoveryResult {
+    method public int getPeerId();
+    method public int getServiceProtoType();
+    method @Nullable public byte[] getServiceSpecificInfo();
+    method public boolean isFsdEnabled();
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public static final class DiscoveryResult.Builder {
+    ctor public DiscoveryResult.Builder(int);
+    method @NonNull public android.net.wifi.usd.DiscoveryResult build();
+    method @NonNull public android.net.wifi.usd.DiscoveryResult.Builder setFsdEnabled(boolean);
+    method @NonNull public android.net.wifi.usd.DiscoveryResult.Builder setServiceProtoType(int);
+    method @NonNull public android.net.wifi.usd.DiscoveryResult.Builder setServiceSpecificInfo(@NonNull byte[]);
+  }
+
   @FlaggedApi("android.net.wifi.flags.usd") public final class PublishConfig extends android.net.wifi.usd.Config implements android.os.Parcelable {
     method public int describeContents();
     method @IntRange(from=0) public int getAnnouncementPeriodMillis();
