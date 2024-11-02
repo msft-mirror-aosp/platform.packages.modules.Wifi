@@ -30,9 +30,12 @@ import androidx.annotation.NonNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.android.modules.utils.build.SdkLevel;
+
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Deserializes JSONObject into data objects defined in Wi-Fi Aware API.
@@ -47,6 +50,8 @@ public class WifiAwareJsonDeserializer {
     private static final String MAX_DISTANCE_MM = "max_distance_mm";
     private static final String PAIRING_CONFIG = "pairing_config";
     private static final String TTL_SEC = "TtlSec";
+    private static final String INSTANTMODE_ENABLE = "InstantModeEnabled";
+    private static final String BAND_5 = "5G";
     // PublishConfig special
     private static final String PUBLISH_TYPE = "publish_type";
     private static final String RANGING_ENABLED = "ranging_enabled";
@@ -71,6 +76,12 @@ public class WifiAwareJsonDeserializer {
     //WifiAwareDataPathSecurityConfig specific
     private static final String CIPHER_SUITE = "cipher_suite";
     private static final String SECURITY_CONFIG_PMK = "pmk";
+    /** 2.4 GHz band */
+    public static final int WIFI_BAND_24_GHZ = 1;
+    /** 5 GHz band excluding DFS channels */
+    public static final int WIFI_BAND_5_GHZ = 1;
+    /** DFS channels from 5 GHz band only */
+    public static final int WIFI_BAND_5_GHZ_DFS_ONLY  = 1;
 
 
     private WifiAwareJsonDeserializer() {
@@ -127,6 +138,11 @@ public class WifiAwareJsonDeserializer {
         }
         if (jsonObject.has(TTL_SEC)) {
             builder.setTtlSec(jsonObject.getInt(TTL_SEC));
+        }
+        if (SdkLevel.isAtLeastT() && jsonObject.has(INSTANTMODE_ENABLE)) {
+            builder.setInstantCommunicationModeEnabled(true,
+                    Objects.equals(jsonObject.getString(INSTANTMODE_ENABLE), BAND_5)
+                            ? WIFI_BAND_5_GHZ :WIFI_BAND_24_GHZ);
         }
         return builder.build();
     }
@@ -211,6 +227,11 @@ public class WifiAwareJsonDeserializer {
         }
         if (jsonObject.has(TTL_SEC)) {
             builder.setTtlSec(jsonObject.getInt(TTL_SEC));
+        }
+        if (SdkLevel.isAtLeastT() && jsonObject.has(INSTANTMODE_ENABLE)) {
+            builder.setInstantCommunicationModeEnabled(true,
+                    Objects.equals(jsonObject.getString(INSTANTMODE_ENABLE), BAND_5)
+                            ? WIFI_BAND_5_GHZ :WIFI_BAND_24_GHZ);
         }
         return builder.build();
     }
