@@ -233,7 +233,8 @@ public class HostapdHalAidlImp implements IHostapdHal {
      */
     @Override
     public boolean addAccessPoint(@NonNull String ifaceName, @NonNull SoftApConfiguration config,
-            boolean isMetered, Runnable onFailureListener) {
+            boolean isMetered, boolean isUsingMultiLinkOperation, List<String> instanceIdentities,
+            Runnable onFailureListener) {
         synchronized (mLock) {
             final String methodStr = "addAccessPoint";
             Log.d(TAG, methodStr + ": " + ifaceName);
@@ -241,7 +242,8 @@ public class HostapdHalAidlImp implements IHostapdHal {
                 return false;
             }
             try {
-                IfaceParams ifaceParams = prepareIfaceParams(ifaceName, config);
+                IfaceParams ifaceParams = prepareIfaceParams(ifaceName, config,
+                        isUsingMultiLinkOperation, instanceIdentities);
                 NetworkParams nwParams = prepareNetworkParams(isMetered, config);
                 if (ifaceParams == null || nwParams == null) {
                     Log.e(TAG, "addAccessPoint parameters could not be prepared.");
@@ -1066,12 +1068,16 @@ public class HostapdHalAidlImp implements IHostapdHal {
         return nwParams;
     }
 
-    private IfaceParams prepareIfaceParams(String ifaceName, SoftApConfiguration config)
+    private IfaceParams prepareIfaceParams(String ifaceName, SoftApConfiguration config,
+            boolean isUsingMultiLinkOperation, List<String> instanceIdentities)
             throws IllegalArgumentException {
         IfaceParams ifaceParams = new IfaceParams();
         ifaceParams.name = ifaceName;
         ifaceParams.hwModeParams = prepareHwModeParams(config);
         ifaceParams.channelParams = prepareChannelParamsList(config);
+        ifaceParams.usesMlo = isUsingMultiLinkOperation;
+        ifaceParams.instanceIdentities =
+                instanceIdentities.toArray(new String[instanceIdentities.size()]);
         if (ifaceParams.name == null || ifaceParams.hwModeParams == null
                 || ifaceParams.channelParams == null) {
             return null;
