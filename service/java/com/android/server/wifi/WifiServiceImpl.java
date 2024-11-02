@@ -223,6 +223,7 @@ import com.android.server.wifi.util.GeneralUtil.Mutable;
 import com.android.server.wifi.util.LastCallerInfoManager;
 import com.android.server.wifi.util.RssiUtil;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
 import org.json.JSONArray;
@@ -330,6 +331,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
     private final DefaultClientModeManager mDefaultClientModeManager;
 
+    private final WepNetworkUsageController mWepNetworkUsageController;
+
+    private final FeatureFlags mFeatureFlags;
     @VisibleForTesting
     public final CountryCodeTracker mCountryCodeTracker;
     private final MultiInternetManager mMultiInternetManager;
@@ -588,10 +592,12 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         mWifiTetheringDisallowed = false;
         mMultiInternetManager = mWifiInjector.getMultiInternetManager();
         mDeviceConfigFacade = mWifiInjector.getDeviceConfigFacade();
+        mFeatureFlags = mDeviceConfigFacade.getFeatureFlags();
         mApplicationQosPolicyRequestHandler = mWifiInjector.getApplicationQosPolicyRequestHandler();
         mWifiPulledAtomLogger = mWifiInjector.getWifiPulledAtomLogger();
         mAfcManager = mWifiInjector.getAfcManager();
         mTwtManager = mWifiInjector.getTwtManager();
+        mWepNetworkUsageController = mWifiInjector.getWepNetworkUsageController();
     }
 
     /**
@@ -617,17 +623,20 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
             mWifiInjector.getWifiScanAlwaysAvailableSettingsCompatibility().initialize();
             mWifiInjector.getWifiNotificationManager().createNotificationChannels();
-            // Align the value between config stroe (i.e.WifiConfigStore.xml) and WifiGlobals.
-            mSettingsConfigStore.registerChangeListener(WIFI_WEP_ALLOWED,
-                    (key, value) -> {
-                        if (mWifiGlobals.isWepAllowed() != value) {
-                            // It should only happen when settings is restored from cloud.
-                            handleWepAllowedChanged(value);
-                            Log.i(TAG, "(Cloud Restoration) Wep allowed is changed to " + value);
-                        }
-                    },
-                    new Handler(mWifiHandlerThread.getLooper()));
-            mWifiGlobals.setWepAllowed(mSettingsConfigStore.get(WIFI_WEP_ALLOWED));
+            // Old design, flag is disabled.
+            if (!mFeatureFlags.wepDisabledInApm()) {
+                mWifiGlobals.setWepAllowed(mSettingsConfigStore.get(WIFI_WEP_ALLOWED));
+                // Align the value between config store (i.e.WifiConfigStore.xml) and WifiGlobals.
+                mSettingsConfigStore.registerChangeListener(WIFI_WEP_ALLOWED,
+                        (key, value) -> {
+                            if (mWifiGlobals.isWepAllowed() != value) {
+                                handleWepAllowedChanged(value);
+                                Log.i(TAG, "Wep allowed is changed to "
+                                        + value);
+                            }
+                        },
+                        new Handler(mWifiHandlerThread.getLooper()));
+            }
             mContext.registerReceiver(
                     new BroadcastReceiver() {
                         @Override
@@ -881,6 +890,10 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             }
             updateVerboseLoggingEnabled();
             mWifiInjector.getWifiDeviceStateChangeManager().handleBootCompleted();
+            if (mFeatureFlags.wepDisabledInApm()
+                    && mWepNetworkUsageController != null) {
+                mWepNetworkUsageController.handleBootCompleted();
+            }
             setPulledAtomCallbacks();
             mTwtManager.registerWifiNativeTwtEvents();
             mContext.registerReceiverForAllUsers(
@@ -5512,10 +5525,14 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
+                        final String action = intent.getAction();
+                        if (action == null) {
+                            return;
+                        }
                         int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
                         Uri uri = intent.getData();
                         if (uid == -1 || uri == null) {
-                            Log.e(TAG, "Uid or Uri is missing for action:" + intent.getAction());
+                            Log.e(TAG, "Uid or Uri is missing for action:" + action);
                             return;
                         }
                         String pkgName = uri.getSchemeSpecificPart();
@@ -5527,7 +5544,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                             Log.w(TAG, "Couldn't get PackageInfo for package:" + pkgName);
                         }
                         // If app is updating or replacing, just ignore
-                        if (intent.getAction().equals(Intent.ACTION_PACKAGE_REMOVED)
+                        if (Intent.ACTION_PACKAGE_REMOVED.equals(action)
                                 && intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
                             return;
                         }
@@ -5713,6 +5730,11 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 }
                 pw.println();
                 mResourceCache.dump(pw);
+                if (mFeatureFlags.wepDisabledInApm()
+                        && mWepNetworkUsageController != null) {
+                    pw.println();
+                    mWepNetworkUsageController.dump(fd, pw, args);
+                }
             }
         }, TAG + "#dump");
     }
@@ -5894,6 +5916,10 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         mBackupRestoreController.enableVerboseLogging(mVerboseLoggingEnabled);
         if (SdkLevel.isAtLeastV() && mWifiInjector.getWifiVoipDetector() != null) {
             mWifiInjector.getWifiVoipDetector().enableVerboseLogging(mVerboseLoggingEnabled);
+        }
+        if (mFeatureFlags.wepDisabledInApm()
+                && mWepNetworkUsageController != null) {
+            mWepNetworkUsageController.enableVerboseLogging(mVerboseLoggingEnabled);
         }
     }
 
@@ -8519,12 +8545,12 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     + " is not allowed to set wifi web allowed by user");
         }
         mLog.info("setWepAllowed=% uid=%").c(isAllowed).c(callingUid).flush();
-        mWifiThreadRunner.post(() -> {
-            mSettingsConfigStore.put(WIFI_WEP_ALLOWED, isAllowed);
-            handleWepAllowedChanged(isAllowed);
-        }, TAG + "#setWepAllowed");
+        mSettingsConfigStore.put(WIFI_WEP_ALLOWED, isAllowed);
     }
 
+    /**
+     * @deprecated Use mWepNetworkUsageController.handleWepAllowedChanged() instead.
+     */
     private void handleWepAllowedChanged(boolean isAllowed) {
         mWifiGlobals.setWepAllowed(isAllowed);
         if (!isAllowed) {
