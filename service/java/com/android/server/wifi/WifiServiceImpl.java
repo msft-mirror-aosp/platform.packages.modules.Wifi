@@ -5525,10 +5525,14 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
+                        final String action = intent.getAction();
+                        if (action == null) {
+                            return;
+                        }
                         int uid = intent.getIntExtra(Intent.EXTRA_UID, -1);
                         Uri uri = intent.getData();
                         if (uid == -1 || uri == null) {
-                            Log.e(TAG, "Uid or Uri is missing for action:" + intent.getAction());
+                            Log.e(TAG, "Uid or Uri is missing for action:" + action);
                             return;
                         }
                         String pkgName = uri.getSchemeSpecificPart();
@@ -5540,7 +5544,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                             Log.w(TAG, "Couldn't get PackageInfo for package:" + pkgName);
                         }
                         // If app is updating or replacing, just ignore
-                        if (intent.getAction().equals(Intent.ACTION_PACKAGE_REMOVED)
+                        if (Intent.ACTION_PACKAGE_REMOVED.equals(action)
                                 && intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
                             return;
                         }
