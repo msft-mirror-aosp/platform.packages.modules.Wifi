@@ -5500,9 +5500,14 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         when(mockSoftApModeConfiguration.getSoftApConfiguration())
                 .thenReturn(mockSoftApConfiguration);
         when(mSoftApManager.getSoftApModeConfiguration()).thenReturn(mockSoftApModeConfiguration);
-        assertEquals(1, mActiveModeWarden.getNumberOf11beSoftApManager());
+        assertEquals(1, mActiveModeWarden.getCurrentMLDAp());
+        when(mSoftApManager.isBridgedMode()).thenReturn(true);
+        when(mSoftApManager.isUsingMlo()).thenReturn(false);
+        assertEquals(2, mActiveModeWarden.getCurrentMLDAp());
+        when(mSoftApManager.isUsingMlo()).thenReturn(true);
+        assertEquals(1, mActiveModeWarden.getCurrentMLDAp());
         when(mockSoftApConfiguration.isIeee80211beEnabled()).thenReturn(false);
-        assertEquals(0, mActiveModeWarden.getNumberOf11beSoftApManager());
+        assertEquals(0, mActiveModeWarden.getCurrentMLDAp());
     }
 
 }
