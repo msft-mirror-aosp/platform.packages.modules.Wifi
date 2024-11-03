@@ -66,7 +66,10 @@ import com.android.server.wifi.coex.CoexManager;
 import com.android.server.wifi.coex.CoexManager.CoexListener;
 import com.android.server.wifi.util.ApConfigUtil;
 import com.android.server.wifi.util.WaitingState;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
+
+import com.google.common.collect.ImmutableList;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -217,6 +220,12 @@ public class SoftApManager implements ActiveModeManager {
 
     private boolean mVerboseLoggingEnabled = false;
 
+    // Whether this device supports multiple link operation in a single MLD.
+    private boolean mIsMLDApSupportMLO = false;
+
+    // Whether this SoftApManager (i.e. this AP interface) is using multiple link operation.
+    private boolean mIsUsingMlo = false;
+
     /**
      * The specified configuration passed in during initialization or during a configuration update
      * that doesn't require a restart.
@@ -339,10 +348,10 @@ public class SoftApManager implements ActiveModeManager {
 
         @Override
         public void onConnectedClientsChanged(String apIfaceInstance, MacAddress clientAddress,
-                boolean isConnected) {
+                boolean isConnected, @WifiAnnotations.SoftApDisconnectReason int disconnectReason) {
             if (clientAddress != null) {
                 WifiClient client = new WifiClient(clientAddress, apIfaceInstance != null
-                        ? apIfaceInstance : mApInterfaceName);
+                        ? apIfaceInstance : mApInterfaceName, disconnectReason);
                 mStateMachine.sendMessage(SoftApStateMachine.CMD_ASSOCIATED_STATIONS_CHANGED,
                         isConnected ? 1 : 0, 0, client);
             } else {
@@ -512,6 +521,9 @@ public class SoftApManager implements ActiveModeManager {
         updateSafeChannelFrequencyList();
         mId = id;
         mRole = role;
+        // chip support it && overlay configuration is set.
+        mIsMLDApSupportMLO = mWifiNative.isMLDApSupportMLO();
+        mIsUsingMlo = useMultilinkMloSoftAp();
         enableVerboseLogging(verboseLoggingEnabled);
         mStateMachine.sendMessage(SoftApStateMachine.CMD_START, requestorWs);
     }
@@ -534,13 +546,38 @@ public class SoftApManager implements ActiveModeManager {
         mStateMachine.sendMessage(SoftApStateMachine.CMD_STOP);
     }
 
+    public boolean isUsingMlo() {
+        return mIsUsingMlo;
+    }
+
+    private boolean useMultilinkMloSoftAp() {
+        if (!Flags.mloSap()) {
+            return false;
+        }
+        if (SdkLevel.isAtLeastT() && mCurrentSoftApConfiguration != null
+                && mCurrentSoftApConfiguration.isIeee80211beEnabled()
+                && isBridgedMode() && mIsMLDApSupportMLO) {
+
+            int currentExistingMLD =
+                    mActiveModeWarden.getCurrentMLDAp();
+            if (ApConfigUtil.is11beAllowedForThisConfiguration(
+                    null /* Wiphy capability can be ignored for MLO case*/,
+                    mContext, mCurrentSoftApConfiguration, true /* isBridgedMode */,
+                    currentExistingMLD,
+                    true /* isMLDApSupportMLO */)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isOweTransition() {
         return (SdkLevel.isAtLeastT() && mCurrentSoftApConfiguration != null
                 && mCurrentSoftApConfiguration.getSecurityType()
                         == SoftApConfiguration.SECURITY_TYPE_WPA3_OWE_TRANSITION);
     }
 
-    private boolean isBridgedMode() {
+    public boolean isBridgedMode() {
         return (SdkLevel.isAtLeastS() && mCurrentSoftApConfiguration != null
                 && (mCurrentSoftApConfiguration.getBands().length > 1));
     }
@@ -851,7 +888,6 @@ public class SoftApManager implements ActiveModeManager {
         } else {
             Log.d(getTag(), "startSoftAp: band " + mCurrentSoftApConfiguration.getBand());
         }
-
         updateApState(WifiManager.WIFI_AP_STATE_ENABLING,
                 WifiManager.WIFI_AP_STATE_DISABLED, 0);
 
@@ -889,7 +925,7 @@ public class SoftApManager implements ActiveModeManager {
                         localConfigBuilder.build(),
                         mSpecifiedModeConfiguration.getTargetMode()
                                 == WifiManager.IFACE_IP_MODE_TETHERED,
-                        mSoftApHalCallback);
+                        mSoftApHalCallback, mIsUsingMlo);
         if (startResult != START_RESULT_SUCCESS) {
             Log.e(getTag(), "Soft AP start failed");
             return startResult;
@@ -1283,11 +1319,10 @@ public class SoftApManager implements ActiveModeManager {
                                 == InterfaceConflictManager.ICM_SKIP_COMMAND_WAIT_FOR_USER) {
                             break;
                         }
-
                         mApInterfaceName = mWifiNative.setupInterfaceForSoftApMode(
                                 mWifiNativeInterfaceCallback, mRequestorWs,
                                 mCurrentSoftApConfiguration.getBand(), isBridgeRequired(),
-                                SoftApManager.this, getVendorData());
+                                SoftApManager.this, getVendorData(), mIsUsingMlo);
                         if (TextUtils.isEmpty(mApInterfaceName)) {
                             Log.e(getTag(), "setup failure when creating ap interface.");
                             // Only check if it's possible to create single AP, since a DBS request
@@ -1300,17 +1335,17 @@ public class SoftApManager implements ActiveModeManager {
                             break;
                         }
 
-                        if (SdkLevel.isAtLeastT()
+                        if (!mIsUsingMlo && SdkLevel.isAtLeastT()
                                 && mCurrentSoftApConfiguration.isIeee80211beEnabled()) {
                             DeviceWiphyCapabilities capabilities =
                                     mWifiNative.getDeviceWiphyCapabilities(
                                             mApInterfaceName, isBridgeRequired());
-                            int numberOf11beSoftApManager =
-                                    mActiveModeWarden.getNumberOf11beSoftApManager();
+                            int currentExistingMLD =
+                                    mActiveModeWarden.getCurrentMLDAp();
                             if (!ApConfigUtil.is11beAllowedForThisConfiguration(capabilities,
                                     mContext, mCurrentSoftApConfiguration, isBridgedMode(),
-                                    numberOf11beSoftApManager,
-                                    false /* TODO: pass the real isChipSupportMultiLinkOnMLD */)) {
+                                    currentExistingMLD,
+                                    mIsMLDApSupportMLO)) {
                                 Log.d(getTag(), "11BE is not allowed,"
                                         + " removing from configuration");
                                 mCurrentSoftApConfiguration = new SoftApConfiguration.Builder(
@@ -1499,7 +1534,7 @@ public class SoftApManager implements ActiveModeManager {
                             mApInterfaceName = mWifiNative.setupInterfaceForSoftApMode(
                                     mWifiNativeInterfaceCallback, mRequestorWs,
                                     mCurrentSoftApConfiguration.getBand(), isBridgeRequired(),
-                                    SoftApManager.this, getVendorData());
+                                    SoftApManager.this, getVendorData(), mIsUsingMlo);
                             if (TextUtils.isEmpty(mApInterfaceName)) {
                                 Log.e(getTag(), "setup failure when creating single AP iface");
                                 handleStartSoftApFailure(START_RESULT_FAILURE_GENERAL);
@@ -1748,6 +1783,13 @@ public class SoftApManager implements ActiveModeManager {
                         + currentInfoWithClientsChanged);
 
                 if (mSoftApCallback != null) {
+                    if (Flags.softapDisconnectReason() && !isConnected) {
+                        // Client successfully disconnected, should also notify callback
+                        mSoftApCallback.onClientsDisconnected(
+                                currentInfoWithClientsChanged,
+                                ImmutableList.of(client));
+                    }
+
                     mSoftApCallback.onConnectedClientsOrInfoChanged(mCurrentSoftApInfoMap,
                             mConnectedClientWithApInfoMap, isBridgeRequired());
                 } else {
@@ -2006,7 +2048,8 @@ public class SoftApManager implements ActiveModeManager {
                         WifiClient client = (WifiClient) message.obj;
                         Log.d(getTag(), "CMD_ASSOCIATED_STATIONS_CHANGED, Client: "
                                 + client.getMacAddress().toString() + " isConnected: "
-                                + isConnected);
+                                + isConnected + " disconnectReason: "
+                                + client.getDisconnectReason());
                         updateConnectedClients(client, isConnected);
                         break;
                     case CMD_AP_INFO_CHANGED:

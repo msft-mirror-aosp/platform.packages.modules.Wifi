@@ -705,6 +705,12 @@ public class WifiServiceImplTest extends WifiBaseTest {
             }
         }).when(mMakeBeforeBreakManager).stopAllSecondaryTransientClientModeManagers(any());
 
+        doAnswer(new AnswerWithArguments() {
+            public void answer(boolean isWepAllowed) {
+                when(mWifiGlobals.isWepAllowed()).thenReturn(isWepAllowed);
+            }
+        }).when(mWifiGlobals).setWepAllowed(anyBoolean());
+
         when(mWifiSettingsConfigStore.get(eq(WIFI_WEP_ALLOWED))).thenReturn(true);
         mWifiServiceImpl = makeWifiServiceImpl();
         mDppCallback = new IDppCallback() {
@@ -12335,17 +12341,24 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
     @Test
     public void testSetWepAllowedWithPermission() {
+        // Test if WIFI_WEP_ALLOWED starts with false.
         when(mWifiSettingsConfigStore.get(eq(WIFI_WEP_ALLOWED))).thenReturn(false);
         mWifiServiceImpl.checkAndStartWifi();
         mLooper.dispatchAll();
         verify(mWifiSettingsConfigStore).get(eq(WIFI_WEP_ALLOWED));
         verify(mWifiGlobals).setWepAllowed(eq(false));
+        verify(mWifiSettingsConfigStore).registerChangeListener(
+                eq(WIFI_WEP_ALLOWED),
+                mWepAllowedSettingChangedListenerCaptor.capture(),
+                any(Handler.class));
         // verify setWepAllowed with MANAGE_WIFI_NETWORK_SETTING
         when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(true);
         mWifiServiceImpl.setWepAllowed(true);
+        verify(mWifiSettingsConfigStore).put(eq(WIFI_WEP_ALLOWED), eq(true));
+        mWepAllowedSettingChangedListenerCaptor.getValue()
+                .onSettingsChanged(WIFI_WEP_ALLOWED, true);
         mLooper.dispatchAll();
         verify(mWifiGlobals).setWepAllowed(true);
-        verify(mWifiSettingsConfigStore).put(eq(WIFI_WEP_ALLOWED), eq(true));
     }
 
     @Test
@@ -12361,10 +12374,21 @@ public class WifiServiceImplTest extends WifiBaseTest {
         when(mockWifiInfoWpa.getCurrentSecurityType()).thenReturn(WifiInfo.SECURITY_TYPE_PSK);
         when(cmmWep.getConnectionInfo()).thenReturn(mockWifiInfoWep);
         when(cmmWpa.getConnectionInfo()).thenReturn(mockWifiInfoWpa);
+        mWifiServiceImpl.checkAndStartWifi();
+        mLooper.dispatchAll();
+        verify(mWifiSettingsConfigStore).get(eq(WIFI_WEP_ALLOWED));
+        verify(mWifiGlobals).setWepAllowed(eq(true));
+        verify(mWifiSettingsConfigStore).registerChangeListener(
+                eq(WIFI_WEP_ALLOWED),
+                mWepAllowedSettingChangedListenerCaptor.capture(),
+                any(Handler.class));
+
         mWifiServiceImpl.setWepAllowed(false);
+        verify(mWifiSettingsConfigStore).put(eq(WIFI_WEP_ALLOWED), eq(false));
+        mWepAllowedSettingChangedListenerCaptor.getValue()
+                .onSettingsChanged(WIFI_WEP_ALLOWED, false);
         mLooper.dispatchAll();
         verify(mWifiGlobals).setWepAllowed(false);
-        verify(mWifiSettingsConfigStore).put(eq(WIFI_WEP_ALLOWED), eq(false));
         // Only WEP disconnect
         verify(cmmWep).disconnect();
         verify(cmmWpa, never()).disconnect();
@@ -12986,5 +13010,40 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
         uwbAdapterStateListener.onStateChanged(2, 1);
         verify(mWifiMetrics).setLastUwbState(2);
+    }
+
+    @Test
+    public void testSetQueryAllowedWhenWepUsageControllerSupported() {
+        when(mFeatureFlags.wepDisabledInApm()).thenReturn(true);
+        WepNetworkUsageController testWepNetworkUsageController =
+                mock(WepNetworkUsageController.class);
+        when(mWifiInjector.getWepNetworkUsageController())
+                .thenReturn(testWepNetworkUsageController);
+        when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(true);
+        ConcreteClientModeManager cmmWep = mock(ConcreteClientModeManager.class);
+        WifiInfo mockWifiInfoWep = mock(WifiInfo.class);
+        List<ClientModeManager> cmms = Arrays.asList(cmmWep);
+        when(mActiveModeWarden.getClientModeManagers()).thenReturn(cmms);
+        when(mockWifiInfoWep.getCurrentSecurityType()).thenReturn(WifiInfo.SECURITY_TYPE_WEP);
+        when(cmmWep.getConnectionInfo()).thenReturn(mockWifiInfoWep);
+        mWifiServiceImpl = makeWifiServiceImpl();
+        mWifiServiceImpl.checkAndStartWifi();
+        mWifiServiceImpl.handleBootCompleted();
+        mLooper.dispatchAll();
+        // Verify boot complete go through the new design.
+        verify(mWifiSettingsConfigStore, never()).registerChangeListener(
+                eq(WIFI_WEP_ALLOWED),
+                mWepAllowedSettingChangedListenerCaptor.capture(),
+                any(Handler.class));
+        verify(mWifiGlobals, never()).setWepAllowed(anyBoolean());
+        verify(testWepNetworkUsageController).handleBootCompleted();
+
+        mWifiServiceImpl.setWepAllowed(false);
+        mLooper.dispatchAll();
+        verify(mWifiGlobals, never()).setWepAllowed(anyBoolean());
+        verify(mWifiSettingsConfigStore).put(eq(WIFI_WEP_ALLOWED), eq(false));
+        // WEP disconnect logic moved to WepNetworkUsageController.
+        verify(cmmWep, never()).disconnect();
+        verify(mWifiGlobals, never()).setWepAllowed(anyBoolean());
     }
 }
