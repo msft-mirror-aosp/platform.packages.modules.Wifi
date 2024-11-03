@@ -38,7 +38,10 @@ MAX_DISTANCE_MM = "max_distance_mm"
 PAIRING_CONFIG = "pairing_config"
 AWARE_NETWORK_INFO_CLASS_NAME = "android.net.wifi.aware.WifiAwareNetworkInfo"
 TTL_SEC = "TtlSec"
+INSTANTMODE_ENABLE = "InstantModeEnabled"
 
+#onServiceLost reason code
+EASON_PEER_NOT_VISIBLE = 1
 
 class WifiAwareTestConstants:
     """Constants for Wi-Fi Aware test."""
@@ -55,6 +58,7 @@ class WifiAwareTestConstants:
     MESSAGE_ID = 1234
     MSG_CLIENT_TO_SERVER = 'GET SOME BYTES [Random Identifier: %s]' % utils.rand_ascii_str(5)
     MSG_SERVER_TO_CLIENT = 'PUT SOME OTHER BYTES [Random Identifier: %s]' % utils.rand_ascii_str(5)
+    PMK = "01234567890123456789012345678901"
     # 6 == TCP
     TRANSPORT_PROTOCOL_TCP = 6
 
@@ -106,6 +110,8 @@ class DiscoverySessionCallbackMethodType(enum.StrEnum):
     DISCOVER_RESULT = "discoveryResult"
     # Event for the message send result.
     MESSAGE_SEND_RESULT = "messageSendResult"
+    SESSION_CB_ON_SERVICE_LOST = "WifiAwareSessionOnServiceLost"
+    SESSION_CB_KEY_LOST_REASON = "lostReason"
 
 
 @enum.unique
@@ -368,6 +374,34 @@ class NetworkRequest:
         return result
 
 
+class Characteristics(enum.IntEnum):
+    """The characteristics of the Wi-Fi Aware implementation.
+
+    https://developer.android.com/reference/android/net/wifi/aware/Characteristics
+    """
+    WIFI_AWARE_CIPHER_SUITE_NCS_SK_128 = 1
+
+
+@dataclasses.dataclass(frozen=False)
+class WifiAwareDataPathSecurityConfig:
+    """Wi-Fi Aware Network Specifier.
+
+    https://developer.android.com/reference/android/net/wifi/aware/WifiAwareNetworkSpecifier
+    """
+    pmk: str | None = None
+    cipher_suite: Characteristics | None = Characteristics.WIFI_AWARE_CIPHER_SUITE_NCS_SK_128
+
+    def to_dict(self) -> dict:
+        result = dataclasses.asdict(self)
+        if not self.pmk:
+            del result["pmk"]
+        if not self.cipher_suite:
+            del result["cipher_suite"]
+        else:
+            result["cipher_suite"] = self.cipher_suite.value
+        return result
+
+
 @dataclasses.dataclass(frozen=False)
 class WifiAwareNetworkSpecifier:
     """Wi-Fi Aware Network Specifier.
@@ -377,6 +411,8 @@ class WifiAwareNetworkSpecifier:
     psk_passphrase: str | None = None
     port: int | None = None
     transport_protocol: int | None = None
+    pmk: str | None = None
+    data_path_security_config: WifiAwareDataPathSecurityConfig | None = None
 
     def to_dict(self) -> dict:
         result = dataclasses.asdict(self)
@@ -386,6 +422,12 @@ class WifiAwareNetworkSpecifier:
             del result["port"]
         if not self.transport_protocol:
             del result["transport_protocol"]
+        if not self.pmk:
+            del result["pmk"]
+        if not self.data_path_security_config:
+            del result["data_path_security_config"]
+        else:
+            result["data_path_security_config"] = self.data_path_security_config.to_dict()
         return result
 
 

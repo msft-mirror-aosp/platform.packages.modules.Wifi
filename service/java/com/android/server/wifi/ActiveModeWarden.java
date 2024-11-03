@@ -2951,19 +2951,24 @@ public class ActiveModeWarden {
     }
 
     /**
-     * Returns the number of 11be SoftApManagers which are being operated.
+     * Returns the number of multiple link devices (MLD) which are being operated.
      */
-    public int getNumberOf11beSoftApManager() {
+    public int getCurrentMLDAp() {
         if (!SdkLevel.isAtLeastT()) {
             return 0;
         }
-        int numberOf11beSoftApManager = 0;
+        int numberMLD = 0;
         for (SoftApManager manager : mSoftApManagers) {
             if (manager.isStarted() && manager.getSoftApModeConfiguration()
                     .getSoftApConfiguration().isIeee80211beEnabled()) {
-                numberOf11beSoftApManager++;
+                if (manager.isBridgedMode() && !manager.isUsingMlo()) {
+                    // Non MLO bridged mode, it occupies two MLD APs.
+                    numberMLD += 2;
+                } else {
+                    numberMLD++;
+                }
             }
         }
-        return numberOf11beSoftApManager;
+        return numberMLD;
     }
 }
