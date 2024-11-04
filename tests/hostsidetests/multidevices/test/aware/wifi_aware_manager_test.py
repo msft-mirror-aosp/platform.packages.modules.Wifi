@@ -32,12 +32,8 @@ from mobly.controllers.android_device_lib import callback_handler_v2
 from mobly.snippet import callback_event
 
 from aware import constants
+from aware import aware_lib_utils
 
-RUNTIME_PERMISSIONS = (
-    'android.permission.ACCESS_FINE_LOCATION',
-    'android.permission.ACCESS_COARSE_LOCATION',
-    'android.permission.NEARBY_WIFI_DEVICES',
-)
 PACKAGE_NAME = constants.WIFI_AWARE_SNIPPET_PACKAGE_NAME
 _DEFAULT_TIMEOUT = constants.WAIT_WIFI_STATE_TIME_OUT.total_seconds()
 _REQUEST_NETWORK_TIMEOUT_MS = 15 * 1000
@@ -98,8 +94,12 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             device.load_snippet(
                 'wifi_aware_snippet', PACKAGE_NAME
             )
-            for permission in RUNTIME_PERMISSIONS:
-                device.adb.shell(['pm', 'grant', PACKAGE_NAME, permission])
+            aware_lib_utils.control_wifi(device, wifi_state=True)
+            asserts.abort_all_if(
+                not device.wifi_aware_snippet.wifiAwareIsSupported(),
+                f'{device} does not support Wi-Fi Aware.',
+            )
+            aware_lib_utils.set_screen_on_and_unlock(device)
             asserts.abort_all_if(
                 not device.wifi_aware_snippet.wifiAwareIsAvailable(),
                 f'{device} Wi-Fi Aware is not available.',
@@ -1056,11 +1056,11 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
     def _skip_if_wifi_rtt_is_not_supported(self):
       """Skips this test case if Wi-Fi RTT is not supported on any device."""
       asserts.skip_if(
-          not self.publisher.wifi_aware_snippet.wifiAwareIsWiFiRttSupported(),
+          not self.publisher.wifi_aware_snippet.wifiAwareIsRttSupported(),
           f'Publisher {self.publisher} does not support Wi-Fi RTT.'
       )
       asserts.skip_if(
-          not self.subscriber.wifi_aware_snippet.wifiAwareIsWiFiRttSupported(),
+          not self.subscriber.wifi_aware_snippet.wifiAwareIsRttSupported(),
           f'Subscriber {self.subscriber} does not support Wi-Fi RTT.'
       )
 

@@ -33,6 +33,7 @@ _WAIT_DOZE_MODE_IN_SEC = 5
 _TIMEOUT_INTERVAL_IN_SEC = 1
 _WAIT_WIFI_STATE_TIME_OUT = datetime.timedelta(seconds=10)
 _WAIT_TIME_SEC = 3
+_CONTROL_WIFI_TIMEOUT_SEC = 10
 
 
 def callback_no_response(
@@ -64,21 +65,37 @@ def callback_no_response(
 class CallBackError(Exception):
   """Error raised when there is a problem to get callback response."""
 
+def control_wifi(
+        ad: android_device.AndroidDevice,
+        wifi_state: bool,
+):
+    """Control Android Wi-Fi status.
 
-def control_wifi(ad: android_device.AndroidDevice,
-                 wifi_state: bool):
-  """Control Android Wi-Fi status.
+    Args:
+      ad: Android test device.
+      wifi_state: True if or Wi-Fi on False if Wi-Fi off.
+      timeout_seconds: Maximum wait time (seconds), default is 10 seconds.
 
-  Args:
-    ad: Android test device.
-    wifi_state: True if or Wifi on False if WiFi off.
-  """
-  if _check_wifi_status(ad) != wifi_state:
+    Raises:
+      TimeoutError: If the Wi-Fi state cannot be set within the timeout (in seconds).
+    """
+    if _check_wifi_status(ad) == wifi_state:
+        return
     if wifi_state:
-      ad.adb.shell("svc wifi enable")
+        ad.adb.shell("svc wifi enable")
     else:
-      ad.adb.shell("svc wifi disable")
+        ad.adb.shell("svc wifi disable")
+    start_time = time.time()
+    while True:
+        if _check_wifi_status(ad) == wifi_state:
+            return
+        # Check for timeout
+        if time.time() - start_time > _CONTROL_WIFI_TIMEOUT_SEC:
+            raise TimeoutError(
+                f"Failed to set Wi-Fi state to {wifi_state} within {_CONTROL_WIFI_TIMEOUT_SEC} seconds."
+            )
 
+        time.sleep(1)  # Wait for a second before checking again
 
 def _check_wifi_status(ad: android_device.AndroidDevice):
   """Check Android Wi-Fi status.
@@ -372,3 +389,13 @@ def create_discovery_config(service_name,
     config[constants.TTL_SEC] = ttl
     config[constants.TERMINATE_NOTIFICATION_ENABLED] = term_cb_enable
     return config
+
+def set_screen_on_and_unlock(ad: android_device.AndroidDevice):
+    """Set the screen to stay on and unlock the device.
+
+    Args:
+        ad: AndroidDevice instance.
+    """
+    ad.adb.shell("svc power stayon true")
+    ad.adb.shell("input keyevent KEYCODE_WAKEUP")
+    ad.adb.shell("wm dismiss-keyguard")
