@@ -17,6 +17,14 @@ flag {
 }
 
 flag {
+    name: "p2p_dual"
+    namespace: "wifi"
+    description: "Control the dual P2P group feature"
+    bug: "296063280"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "delay_save_to_store"
     namespace: "wifi"
     description: "Control the feature delay the save to store in batch to reduce the blocking time"
@@ -129,6 +137,15 @@ flag {
 }
 
 flag {
+    name: "autojoin_restriction_security_types_api"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add new API to set or get Autojoin Restriction security types"
+    bug: "340351634"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "rsn_overriding"
     namespace: "wifi"
     description: "Wi-Fi Alliance RSN Overriding feature"
@@ -153,5 +170,56 @@ flag {
     namespace: "wifi"
     description: "Add new API for Aware pairing"
     bug: "354820259"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "wifi_scorer_new_stats_collection"
+    namespace: "wifi"
+    description: "Gate WiFi Scorer new stats collection"
+    bug: "367362809"
+}
+
+flag {
+    name: "softap_disconnect_reason"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add SoftAP disconnect reason code"
+    bug: "361651437"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "mainline_supplicant"
+    namespace: "wifi"
+    description: "Use the secondary supplicant binary stored in the mainline module"
+    bug: "365585450"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "mlo_sap"
+    is_exported: true
+    namespace: "wifi"
+    description: "Mlo SoftAp"
+    bug: "362355566"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "wifi_direct_r2"
+    is_exported: true
+    namespace: "wifi"
+    description: "Wi-Fi Alliance Wi-Fi Direct R2 feature"
+    bug: "341971059"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "wep_disabled_in_apm"
+    is_exported: true
+    namespace: "wifi"
+    description: "Wep should be disabled in advanced protection mode"
+    bug: "362586268"
     is_fixed_read_only: true
 }

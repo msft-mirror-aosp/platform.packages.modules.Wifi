@@ -24,10 +24,13 @@ import static android.net.wifi.WifiManager.WIFI_FEATURE_MBO;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_OCE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_OWE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS;
+import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WAPI;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SUITE_B;
 import static android.os.Build.VERSION.SDK_INT;
+
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
@@ -1256,43 +1259,6 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
     }
 
     /**
-     * Tests the handling of association rejection for WPA3-Personal networks
-     */
-    @Test
-    public void testWpa3AuthRejectionEverConnected() throws Exception {
-        executeAndValidateInitializationSequence();
-        assertNotNull(mISupplicantStaIfaceCallback);
-
-        WifiConfiguration config = executeAndValidateConnectSequenceWithKeyMgmt(
-                SUPPLICANT_NETWORK_ID, false, TRANSLATED_SUPPLICANT_SSID.toString(),
-                WifiConfiguration.SECURITY_TYPE_SAE, null, true);
-        mISupplicantStaIfaceCallback.onStateChanged(
-                StaIfaceCallbackState.ASSOCIATING,
-                NativeUtil.macAddressToByteArray(BSSID),
-                SUPPLICANT_NETWORK_ID,
-                NativeUtil.byteArrayFromArrayList(NativeUtil.decodeSsid(SUPPLICANT_SSID)), false);
-        int statusCode = StaIfaceStatusCode.UNSPECIFIED_FAILURE;
-        AssociationRejectionData rejectionData = createAssocRejectData(SUPPLICANT_SSID, BSSID,
-                statusCode, false);
-        mISupplicantStaIfaceCallback.onAssociationRejected(rejectionData);
-        verify(mWifiMonitor, never()).broadcastAuthenticationFailureEvent(eq(WLAN0_IFACE_NAME),
-                anyInt(), anyInt(), any(), any());
-        ArgumentCaptor<AssocRejectEventInfo> assocRejectEventInfoCaptor =
-                ArgumentCaptor.forClass(AssocRejectEventInfo.class);
-        verify(mWifiMonitor).broadcastAssociationRejectionEvent(
-                eq(WLAN0_IFACE_NAME), assocRejectEventInfoCaptor.capture());
-        AssocRejectEventInfo assocRejectEventInfo = assocRejectEventInfoCaptor.getValue();
-        assertNotNull(assocRejectEventInfo);
-        assertEquals(TRANSLATED_SUPPLICANT_SSID.toString(), assocRejectEventInfo.ssid);
-        assertEquals(BSSID, assocRejectEventInfo.bssid);
-        assertEquals(SupplicantStaIfaceCallbackAidlImpl.halToFrameworkStatusCode(
-                statusCode), assocRejectEventInfo.statusCode);
-        assertFalse(assocRejectEventInfo.timedOut);
-        assertNull(assocRejectEventInfo.oceRssiBasedAssocRejectInfo);
-        assertNull(assocRejectEventInfo.mboAssocDisallowedInfo);
-    }
-
-    /**
      * Tests that association rejection due to timeout doesn't broadcast authentication failure
      * with reason code ERROR_AUTH_FAILURE_WRONG_PSWD.
      * Driver/Supplicant sets the timedOut field when there is no ACK or response frame for
@@ -1828,12 +1794,12 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
     /**
      * Helper function for tests involving getAdvancedCapabilities.
      */
-    private void checkKeyMgmtCapabilities(int serviceCapabilities, long expectedCapabilities)
+    private void checkKeyMgmtCapabilities(int serviceCapabilities, BitSet expectedCapabilities)
             throws Exception {
         executeAndValidateInitializationSequence();
         doReturn(serviceCapabilities).when(mISupplicantStaIfaceMock).getKeyMgmtCapabilities();
         expectedCapabilities = addDefaultKeyMgmtCap(expectedCapabilities);
-        assertEquals(expectedCapabilities, mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME));
+        assertTrue(expectedCapabilities.equals(mDut.getAdvancedCapabilities(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -1841,7 +1807,7 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
      */
     @Test
     public void testGetKeyMgmtCapabilitiesWpa3Sae() throws Exception {
-        checkKeyMgmtCapabilities(KeyMgmtMask.SAE, WIFI_FEATURE_WPA3_SAE);
+        checkKeyMgmtCapabilities(KeyMgmtMask.SAE, createCapabilityBitset(WIFI_FEATURE_WPA3_SAE));
     }
 
     /**
@@ -1849,7 +1815,8 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
      */
     @Test
     public void testGetKeyMgmtCapabilitiesWpa3SuiteB() throws Exception {
-        checkKeyMgmtCapabilities(KeyMgmtMask.SUITE_B_192, WIFI_FEATURE_WPA3_SUITE_B);
+        checkKeyMgmtCapabilities(KeyMgmtMask.SUITE_B_192,
+                createCapabilityBitset(WIFI_FEATURE_WPA3_SUITE_B));
     }
 
     /**
@@ -1857,7 +1824,7 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
      */
     @Test
     public void testGetKeyMgmtCapabilitiesOwe() throws Exception {
-        checkKeyMgmtCapabilities(KeyMgmtMask.OWE, WIFI_FEATURE_OWE);
+        checkKeyMgmtCapabilities(KeyMgmtMask.OWE, createCapabilityBitset(WIFI_FEATURE_OWE));
     }
 
     /**
@@ -1866,7 +1833,7 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
     @Test
     public void testGetKeyMgmtCapabilitiesOweAndSae() throws Exception {
         checkKeyMgmtCapabilities(KeyMgmtMask.OWE | KeyMgmtMask.SAE,
-                WIFI_FEATURE_OWE | WIFI_FEATURE_WPA3_SAE);
+                createCapabilityBitset(WIFI_FEATURE_OWE, WIFI_FEATURE_WPA3_SAE));
     }
 
     /**
@@ -1874,8 +1841,8 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
      */
     @Test
     public void testGetKeyMgmtCapabilitiesDpp() throws Exception {
-        checkKeyMgmtCapabilities(KeyMgmtMask.DPP, WIFI_FEATURE_DPP
-                        | WIFI_FEATURE_DPP_ENROLLEE_RESPONDER);
+        checkKeyMgmtCapabilities(KeyMgmtMask.DPP,
+                createCapabilityBitset(WIFI_FEATURE_DPP, WIFI_FEATURE_DPP_ENROLLEE_RESPONDER));
     }
 
     /**
@@ -1883,7 +1850,7 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
      */
     @Test
     public void testGetKeyMgmtCapabilitiesWapi() throws Exception {
-        checkKeyMgmtCapabilities(KeyMgmtMask.WAPI_PSK, WIFI_FEATURE_WAPI);
+        checkKeyMgmtCapabilities(KeyMgmtMask.WAPI_PSK, createCapabilityBitset(WIFI_FEATURE_WAPI));
     }
 
     /**
@@ -1891,7 +1858,8 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
      */
     @Test
     public void testGetKeyMgmtCapabilitiesFilsSha256() throws Exception {
-        checkKeyMgmtCapabilities(KeyMgmtMask.FILS_SHA256, WIFI_FEATURE_FILS_SHA256);
+        checkKeyMgmtCapabilities(KeyMgmtMask.FILS_SHA256,
+                createCapabilityBitset(WIFI_FEATURE_FILS_SHA256));
     }
 
     /**
@@ -1899,7 +1867,8 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
      */
     @Test
     public void testGetKeyMgmtCapabilitiesFilsSha384() throws Exception {
-        checkKeyMgmtCapabilities(KeyMgmtMask.FILS_SHA384, WIFI_FEATURE_FILS_SHA384);
+        checkKeyMgmtCapabilities(KeyMgmtMask.FILS_SHA384,
+                createCapabilityBitset(WIFI_FEATURE_FILS_SHA384));
     }
 
     /**
@@ -2163,7 +2132,8 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
         executeAndValidateInitializationSequence();
         doReturn(WpaDriverCapabilitiesMask.MBO).when(mISupplicantStaIfaceMock)
                 .getWpaDriverCapabilities();
-        assertEquals(WIFI_FEATURE_MBO, mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_MBO)
+                .equals(mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -2174,8 +2144,8 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
         executeAndValidateInitializationSequence();
         doReturn(WpaDriverCapabilitiesMask.MBO | WpaDriverCapabilitiesMask.OCE)
                 .when(mISupplicantStaIfaceMock).getWpaDriverCapabilities();
-        assertEquals(WIFI_FEATURE_MBO | WIFI_FEATURE_OCE,
-                mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_MBO, WIFI_FEATURE_OCE)
+                .equals(mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME)));
     }
 
     /**
@@ -2186,8 +2156,23 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
         executeAndValidateInitializationSequence();
         doReturn(WpaDriverCapabilitiesMask.TRUST_ON_FIRST_USE)
                 .when(mISupplicantStaIfaceMock).getWpaDriverCapabilities();
-        assertEquals(WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE,
-                mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME));
+        assertTrue(createCapabilityBitset(WIFI_FEATURE_TRUST_ON_FIRST_USE)
+                .equals(mDut.getWpaDriverFeatureSet(WLAN0_IFACE_NAME)));
+    }
+
+    /**
+     * Test RSN Overriding feature capability.
+     */
+    @Test
+    public void testIsRsnOverridingSupported() throws Exception {
+        executeAndValidateInitializationSequence();
+        doReturn(WpaDriverCapabilitiesMask.RSN_OVERRIDING)
+                .when(mISupplicantStaIfaceMock).getWpaDriverCapabilities();
+        if (mDut.isServiceVersionAtLeast(4)) {
+            assertTrue(mDut.isRsnOverridingSupported(WLAN0_IFACE_NAME));
+        } else {
+            assertFalse(mDut.isRsnOverridingSupported(WLAN0_IFACE_NAME));
+        }
     }
 
     /**
@@ -2849,9 +2834,10 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
      * Indicate support for key mgmt features supported by default in HIDL HAL V1.4,
      * i.e. the latest HIDL version before the conversion to AIDL.
      */
-    private long addDefaultKeyMgmtCap(long capabilities) {
-        return capabilities | WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS
-                | WIFI_FEATURE_DECORATED_IDENTITY;
+    private BitSet addDefaultKeyMgmtCap(BitSet capabilities) {
+        capabilities.set(WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS);
+        capabilities.set(WIFI_FEATURE_DECORATED_IDENTITY);
+        return capabilities;
     }
 
     /**
@@ -3466,8 +3452,12 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
     @Test
     public void testLegacyKeystoreMigration() throws Exception {
         assumeTrue(SDK_INT >= 36);
-        assertFalse(mDut.mHasMigratedLegacyKeystoreAliases);
         executeAndValidateInitializationSequence();
+        assertFalse(mDut.mHasMigratedLegacyKeystoreAliases);
+
+        // Migration is complete when the consumer receives a success code
+        mDut.mKeystoreMigrationStatusConsumer.accept(
+                WifiMigration.KEYSTORE_MIGRATION_SUCCESS_MIGRATION_COMPLETE);
         assertTrue(mDut.mHasMigratedLegacyKeystoreAliases);
     }
 }

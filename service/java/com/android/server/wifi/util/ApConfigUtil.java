@@ -61,6 +61,7 @@ import com.android.server.wifi.SoftApManager;
 import com.android.server.wifi.WifiNative;
 import com.android.server.wifi.WifiSettingsConfigStore;
 import com.android.server.wifi.coex.CoexManager;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.util.ArrayList;
@@ -894,29 +895,73 @@ public class ApConfigUtil {
      *                IEEE80211BE & single link MLO in bridged mode from the resource file.
      * @param config The current {@link SoftApConfiguration}.
      * @param isBridgedMode true if bridged mode is enabled, false otherwise.
+     * @param currentExistingMLD number of existing 11BE SoftApManager.
+     * @param isMLDApSupportMLO true if the chip reports the support multiple links
+     *                                    on a single MLD AP.
      *
      * @return true if IEEE80211BE is allowed for the given configuration, false otherwise.
      */
     public static boolean is11beAllowedForThisConfiguration(DeviceWiphyCapabilities capabilities,
             @NonNull WifiContext context,
             SoftApConfiguration config,
-            boolean isBridgedMode) {
+            boolean isBridgedMode, int currentExistingMLD,
+            boolean isMLDApSupportMLO) {
         if (!ApConfigUtil.isIeee80211beSupported(context)) {
             return false;
         }
-        if (capabilities == null || !capabilities.isWifiStandardSupported(
-                ScanResult.WIFI_STANDARD_11BE)) {
-            return false;
+        if (!isMLDApSupportMLO) {
+            // For non-MLO case, check capabilities
+            if (capabilities == null || !capabilities.isWifiStandardSupported(
+                    ScanResult.WIFI_STANDARD_11BE)) {
+                return false;
+            }
         }
-        if (isBridgedMode
-                && !context.getResourceCache().getBoolean(
-                        R.bool.config_wifiSoftApSingleLinkMloInBridgedModeSupported)) {
-            return false;
+        if (Flags.mloSap()) {
+            if (!hasAvailableMLD(context, isBridgedMode,
+                    currentExistingMLD, isMLDApSupportMLO)) {
+                Log.i(TAG, "No available MLD, hence downgrading from 11be. currentExistingMLD = "
+                        + currentExistingMLD + ", isMLDApSupportMLO = " + isMLDApSupportMLO);
+                return false;
+            }
+        } else {
+            if (isBridgedMode
+                    && !context.getResourceCache().getBoolean(
+                            R.bool.config_wifiSoftApSingleLinkMloInBridgedModeSupported)) {
+                return false;
+            }
         }
         if (is11beDisabledForSecurityType(config.getSecurityType())) {
             return false;
         }
         return true;
+    }
+
+    private static boolean hasAvailableMLD(@NonNull WifiContext context,
+            boolean isBridgedMode, int currentExistingMLD,
+            boolean isMLDApSupportMLO) {
+        int numberOfMLDStillAllowed =
+                maximumNumberOfMLDForMLOAp(context) - currentExistingMLD;
+        if (numberOfMLDStillAllowed < 1) {
+            return false;
+        }
+        if (isBridgedMode && !isMLDApSupportMLO && numberOfMLDStillAllowed < 2) {
+            // For non multilink MLO bridged mode, it requires two 11be instances.
+            return false;
+        }
+        return true;
+    }
+
+    private static int maximumNumberOfMLDForMLOAp(@NonNull WifiContext context) {
+        int numberOfMLDSupported = context.getResourceCache()
+                .getInteger(R.integer.config_wifiSoftApMaxNumberMLDSupported);
+        if (numberOfMLDSupported != 0) {
+            return numberOfMLDSupported;
+        }
+        if (context.getResourceCache().getBoolean(
+                        R.bool.config_wifiSoftApSingleLinkMloInBridgedModeSupported)) {
+            return 2;
+        }
+        return 1;
     }
 
     /**

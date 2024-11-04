@@ -3852,206 +3852,208 @@ public class WifiManager {
     }
 
     /** @hide */
-    public static final long WIFI_FEATURE_INFRA            = 1L << 0;  // Basic infrastructure mode
+    public static final int WIFI_FEATURE_INFRA            = 0;  // Basic infrastructure mode
     /** @hide */
-    public static final long WIFI_FEATURE_PASSPOINT        = 1L << 2;  // Support for GAS/ANQP
+    public static final int WIFI_FEATURE_PASSPOINT        = 2;  // Support for GAS/ANQP
     /** @hide */
-    public static final long WIFI_FEATURE_P2P              = 1L << 3;  // Wifi-Direct
+    public static final int WIFI_FEATURE_P2P              = 3;  // Wifi-Direct
     /** @hide */
-    public static final long WIFI_FEATURE_MOBILE_HOTSPOT   = 1L << 4;  // Soft AP
+    public static final int WIFI_FEATURE_MOBILE_HOTSPOT   = 4;  // Soft AP
     /** @hide */
-    public static final long WIFI_FEATURE_SCANNER          = 1L << 5;  // WifiScanner APIs
+    public static final int WIFI_FEATURE_SCANNER          = 5;  // WifiScanner APIs
     /** @hide */
-    public static final long WIFI_FEATURE_AWARE            = 1L << 6;  // Wi-Fi Aware networking
+    public static final int WIFI_FEATURE_AWARE            = 6;  // Wi-Fi Aware networking
     /** @hide */
-    public static final long WIFI_FEATURE_D2D_RTT          = 1L << 7;  // Device-to-device RTT
+    public static final int WIFI_FEATURE_D2D_RTT          = 7;  // Device-to-device RTT
     /** @hide */
-    public static final long WIFI_FEATURE_D2AP_RTT         = 1L << 8;  // Device-to-AP RTT
+    public static final int WIFI_FEATURE_D2AP_RTT         = 8;  // Device-to-AP RTT
     /** @hide */
-    public static final long WIFI_FEATURE_PNO              = 1L << 10;  // Preferred network offload
+    public static final int WIFI_FEATURE_PNO              = 10;  // Preferred network offload
     /** @hide */
-    public static final long WIFI_FEATURE_TDLS             = 1L << 12; // Tunnel directed link setup
+    public static final int WIFI_FEATURE_TDLS             = 12; // Tunnel directed link setup
     /** @hide */
-    public static final long WIFI_FEATURE_TDLS_OFFCHANNEL  = 1L << 13; // TDLS off channel
+    public static final int WIFI_FEATURE_TDLS_OFFCHANNEL  = 13; // TDLS off channel
     /** @hide */
-    public static final long WIFI_FEATURE_AP_STA           = 1L << 15; // AP STA Concurrency
+    public static final int WIFI_FEATURE_AP_STA           = 15; // AP STA Concurrency
     /** @hide */
-    public static final long WIFI_FEATURE_LINK_LAYER_STATS = 1L << 16; // Link layer stats
+    public static final int WIFI_FEATURE_LINK_LAYER_STATS = 16; // Link layer stats
     /** @hide */
-    public static final long WIFI_FEATURE_LOGGER           = 1L << 17; // WiFi Logger
+    public static final int WIFI_FEATURE_LOGGER           = 17; // WiFi Logger
     /** @hide */
-    public static final long WIFI_FEATURE_RSSI_MONITOR     = 1L << 19; // RSSI Monitor
+    public static final int WIFI_FEATURE_RSSI_MONITOR     = 19; // RSSI Monitor
     /** @hide */
-    public static final long WIFI_FEATURE_MKEEP_ALIVE      = 1L << 20; // mkeep_alive
+    public static final int WIFI_FEATURE_MKEEP_ALIVE      = 20; // mkeep_alive
     /** @hide */
-    public static final long WIFI_FEATURE_CONFIG_NDO       = 1L << 21; // ND offload
+    public static final int WIFI_FEATURE_CONFIG_NDO       = 21; // ND offload
     /** @hide */
-    public static final long WIFI_FEATURE_CONTROL_ROAMING  = 1L << 23; // Control firmware roaming
+    public static final int WIFI_FEATURE_CONTROL_ROAMING  = 23; // Control firmware roaming
     /** @hide */
-    public static final long WIFI_FEATURE_IE_WHITELIST     = 1L << 24; // Probe IE white listing
+    public static final int WIFI_FEATURE_IE_WHITELIST     = 24; // Probe IE white listing
     /** @hide */
-    public static final long WIFI_FEATURE_SCAN_RAND        = 1L << 25; // Random MAC & Probe seq
+    public static final int WIFI_FEATURE_SCAN_RAND        = 25; // Random MAC & Probe seq
     /** @hide */
-    public static final long WIFI_FEATURE_TX_POWER_LIMIT   = 1L << 26; // Set Tx power limit
+    public static final int WIFI_FEATURE_TX_POWER_LIMIT   = 26; // Set Tx power limit
     /** @hide */
-    public static final long WIFI_FEATURE_WPA3_SAE         = 1L << 27; // WPA3-Personal SAE
+    public static final int WIFI_FEATURE_WPA3_SAE         = 27; // WPA3-Personal SAE
     /** @hide */
-    public static final long WIFI_FEATURE_WPA3_SUITE_B     = 1L << 28; // WPA3-Enterprise Suite-B
+    public static final int WIFI_FEATURE_WPA3_SUITE_B     = 28; // WPA3-Enterprise Suite-B
     /** @hide */
-    public static final long WIFI_FEATURE_OWE              = 1L << 29; // Enhanced Open
+    public static final int WIFI_FEATURE_OWE              = 29; // Enhanced Open
     /** @hide */
-    public static final long WIFI_FEATURE_LOW_LATENCY      = 1L << 30; // Low Latency modes
+    public static final int WIFI_FEATURE_LOW_LATENCY      = 30; // Low Latency modes
     /** @hide */
-    public static final long WIFI_FEATURE_DPP              = 1L << 31; // DPP (Easy-Connect)
+    public static final int WIFI_FEATURE_DPP              = 31; // DPP (Easy-Connect)
     /** @hide */
-    public static final long WIFI_FEATURE_P2P_RAND_MAC     = 1L << 32; // Random P2P MAC
+    public static final int WIFI_FEATURE_P2P_RAND_MAC     = 32; // Random P2P MAC
     /** @hide */
-    public static final long WIFI_FEATURE_CONNECTED_RAND_MAC    = 1L << 33; // Random STA MAC
+    public static final int WIFI_FEATURE_CONNECTED_RAND_MAC    = 33; // Random STA MAC
     /** @hide */
-    public static final long WIFI_FEATURE_AP_RAND_MAC      = 1L << 34; // Random AP MAC
+    public static final int WIFI_FEATURE_AP_RAND_MAC      = 34; // Random AP MAC
     /** @hide */
-    public static final long WIFI_FEATURE_MBO              = 1L << 35; // MBO Support
+    public static final int WIFI_FEATURE_MBO              = 35; // MBO Support
     /** @hide */
-    public static final long WIFI_FEATURE_OCE              = 1L << 36; // OCE Support
+    public static final int WIFI_FEATURE_OCE              = 36; // OCE Support
     /** @hide */
-    public static final long WIFI_FEATURE_WAPI             = 1L << 37; // WAPI
+    public static final int WIFI_FEATURE_WAPI             = 37; // WAPI
 
     /** @hide */
-    public static final long WIFI_FEATURE_FILS_SHA256      = 1L << 38; // FILS-SHA256
+    public static final int WIFI_FEATURE_FILS_SHA256      = 38; // FILS-SHA256
 
     /** @hide */
-    public static final long WIFI_FEATURE_FILS_SHA384      = 1L << 39; // FILS-SHA384
+    public static final int WIFI_FEATURE_FILS_SHA384      = 39; // FILS-SHA384
 
     /** @hide */
-    public static final long WIFI_FEATURE_SAE_PK           = 1L << 40; // SAE-PK
+    public static final int WIFI_FEATURE_SAE_PK           = 40; // SAE-PK
 
     /** @hide */
-    public static final long WIFI_FEATURE_STA_BRIDGED_AP   = 1L << 41; // STA + Bridged AP
+    public static final int WIFI_FEATURE_STA_BRIDGED_AP   = 41; // STA + Bridged AP
 
     /** @hide */
-    public static final long WIFI_FEATURE_BRIDGED_AP       = 1L << 42; // Bridged AP
+    public static final int WIFI_FEATURE_BRIDGED_AP       = 42; // Bridged AP
 
     /** @hide */
-    public static final long WIFI_FEATURE_INFRA_60G        = 1L << 43; // 60 GHz Band Support
+    public static final int WIFI_FEATURE_INFRA_60G        = 43; // 60 GHz Band Support
 
     /**
      * Support for 2 STA's for the local-only (peer to peer) connection + internet connection
      * concurrency.
      * @hide
      */
-    public static final long WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY = 1L << 44;
+    public static final int WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY = 44;
 
     /**
      * Support for 2 STA's for the make before break concurrency.
      * @hide
      */
-    public static final long WIFI_FEATURE_ADDITIONAL_STA_MBB = 1L << 45;
+    public static final int WIFI_FEATURE_ADDITIONAL_STA_MBB = 45;
 
     /**
      * Support for 2 STA's for the restricted connection + internet connection concurrency.
      * @hide
      */
-    public static final long WIFI_FEATURE_ADDITIONAL_STA_RESTRICTED = 1L << 46;
+    public static final int WIFI_FEATURE_ADDITIONAL_STA_RESTRICTED = 46;
 
     /**
      * DPP (Easy-Connect) Enrollee Responder mode support
      * @hide
      */
-    public static final long WIFI_FEATURE_DPP_ENROLLEE_RESPONDER = 1L << 47;
+    public static final int WIFI_FEATURE_DPP_ENROLLEE_RESPONDER = 47;
 
     /**
      * Passpoint Terms and Conditions feature support
      * @hide
      */
-    public static final long WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS = 1L << 48;
+    public static final int WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS = 48;
 
      /** @hide */
-    public static final long WIFI_FEATURE_SAE_H2E          = 1L << 49; // Hash-to-Element
+    public static final int WIFI_FEATURE_SAE_H2E          = 49; // Hash-to-Element
 
      /** @hide */
-    public static final long WIFI_FEATURE_WFD_R2           = 1L << 50; // Wi-Fi Display R2
+    public static final int WIFI_FEATURE_WFD_R2           = 50; // Wi-Fi Display R2
 
     /**
      * RFC 7542 decorated identity support
      * @hide */
-    public static final long WIFI_FEATURE_DECORATED_IDENTITY = 1L << 51;
+    public static final int WIFI_FEATURE_DECORATED_IDENTITY = 51;
 
     /**
      * Trust On First Use support for WPA Enterprise network
      * @hide
      */
-    public static final long WIFI_FEATURE_TRUST_ON_FIRST_USE = 1L << 52;
+    public static final int WIFI_FEATURE_TRUST_ON_FIRST_USE = 52;
 
     /**
      * Support for 2 STA's multi internet concurrency.
      * @hide
      */
-    public static final long WIFI_FEATURE_ADDITIONAL_STA_MULTI_INTERNET = 1L << 53;
+    public static final int WIFI_FEATURE_ADDITIONAL_STA_MULTI_INTERNET = 53;
 
     /**
      * Support for DPP (Easy-Connect) AKM.
      * @hide
      */
-    public static final long WIFI_FEATURE_DPP_AKM = 1L << 54;
+    public static final int WIFI_FEATURE_DPP_AKM = 54;
 
     /**
      * Support for setting TLS minimum version.
      * @hide
      */
-    public static final long WIFI_FEATURE_SET_TLS_MINIMUM_VERSION = 1L << 55;
+    public static final int WIFI_FEATURE_SET_TLS_MINIMUM_VERSION = 55;
 
     /**
      * Support for TLS v.13.
      * @hide
      */
-    public static final long WIFI_FEATURE_TLS_V1_3 = 1L << 56;
+    public static final int WIFI_FEATURE_TLS_V1_3 = 56;
 
     /**
      * Support for Dual Band Simultaneous (DBS) operation.
      * @hide
      */
-    public static final long WIFI_FEATURE_DUAL_BAND_SIMULTANEOUS = 1L << 57;
+    public static final int WIFI_FEATURE_DUAL_BAND_SIMULTANEOUS = 57;
 
     /**
      * Support for TID-To-Link Mapping negotiation.
      * @hide
      */
-    public static final long WIFI_FEATURE_T2LM_NEGOTIATION = 1L << 58;
+    public static final int WIFI_FEATURE_T2LM_NEGOTIATION = 58;
 
     /**
      * Support for WEP Wi-Fi Network
      * @hide
      */
-    public static final long WIFI_FEATURE_WEP = 1L << 59;
+    public static final int WIFI_FEATURE_WEP = 59;
 
     /**
      * Support for WPA PERSONAL Wi-Fi Network
      * @hide
      */
-    public static final long WIFI_FEATURE_WPA_PERSONAL = 1L << 60;
+    public static final int WIFI_FEATURE_WPA_PERSONAL = 60;
 
     /**
      * Support for Roaming Mode
      * @hide
      */
-    public static final long WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT = 1L << 61;
+    public static final int WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT = 61;
 
     /**
      * Supports device-to-device connections when infra STA is disabled.
      * @hide
      */
-    public static final long WIFI_FEATURE_D2D_WHEN_INFRA_STA_DISABLED = 1L << 62;
+    public static final int WIFI_FEATURE_D2D_WHEN_INFRA_STA_DISABLED = 62;
 
-    private long getSupportedFeatures() {
+    /**
+     * Support for Soft AP multi-links operation.
+     * @hide
+     */
+    public static final int WIFI_FEATURE_SOFTAP_MLO = 63;
+
+    private boolean isFeatureSupported(int feature) {
         try {
-            return mService.getSupportedFeatures();
+            return mService.isFeatureSupported(feature);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-    }
-
-    private boolean isFeatureSupported(long feature) {
-        return (getSupportedFeatures() & feature) == feature;
     }
 
     /**
@@ -8282,7 +8284,7 @@ public class WifiManager {
                         mService.acquireMulticastLock(mBinder, mTag);
                         synchronized (WifiManager.this) {
                             if (mActiveLockCount >= MAX_ACTIVE_LOCKS) {
-                                mService.releaseMulticastLock(mTag);
+                                mService.releaseMulticastLock(mBinder, mTag);
                                 throw new UnsupportedOperationException(
                                         "Exceeded maximum number of wifi locks");
                             }
@@ -8324,7 +8326,7 @@ public class WifiManager {
             synchronized (mBinder) {
                 if (mRefCounted ? (--mRefCount == 0) : (mHeld)) {
                     try {
-                        mService.releaseMulticastLock(mTag);
+                        mService.releaseMulticastLock(mBinder, mTag);
                         synchronized (WifiManager.this) {
                             mActiveLockCount--;
                         }
@@ -12864,6 +12866,122 @@ public class WifiManager {
                             });
                         }
                     });
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Disallow Wi-Fi autojoin on ScanResults matching the selected security types.
+     * This does not restrict manual connections.
+     *
+     * @param restrictions An array of {@code WifiInfo.SECURITY_TYPE_*} values to disallow autojoin.
+     *                     An empty array will clear all restrictions. Note, certain combinations of
+     *                     restricted security types are not valid.
+     *                     1. restrictions contains WifiInfo.SECURITY_TYPE_OWE,
+     *                        but not WifiInfo.SECURITY_TYPE_OPEN.
+     *                     2. restrictions contains WifiInfo.SECURITY_TYPE_SAE,
+     *                        but not WifiInfo.SECURITY_TYPE_PSK.
+     *                     3. restrictions contains WifiInfo.SECURITY_TYPE_EAP_WPA3_ENTERPRISE,
+     *                        but not WifiInfo.SECURITY_TYPE_EAP.
+     *
+     * Usage example:
+     * <pre>
+     *                     To disallow autojoin to Wi-Fi networks with security type, OPEN, WEP
+     *                     or OWE, use following argument.
+     *
+     *                     {@code
+     *                         int[] restrictions = {
+     *                                 WifiInfo.SECURITY_TYPE_OPEN,
+     *                                 WifiInfo.SECURITY_TYPE_WEP,
+     *                                 WifiInfo.SECURITY_TYPE_OWE };
+     *                         wifiManager.setAutojoinDisallowedSecurityTypes(restrictions);
+     *                     }
+     *
+     *                     To clear autojoin restriction on all security types, use following
+     *                     argument.
+     *
+     *                     {@code
+     *                         wifiManager.setAutojoinDisallowedSecurityTypes(new int[0]);
+     *                     }
+     * </pre>
+     * @throws UnsupportedOperationException if the API is not supported.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_AUTOJOIN_RESTRICTION_SECURITY_TYPES_API)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.NETWORK_SETTINGS,
+            MANAGE_WIFI_NETWORK_SELECTION
+    })
+    public void setAutojoinDisallowedSecurityTypes(
+            @NonNull @WifiAnnotations.SecurityType int[] restrictions) {
+        if (!SdkLevel.isAtLeastT()) {
+            throw new UnsupportedOperationException();
+        }
+        Objects.requireNonNull(restrictions, "restrictions cannot be null");
+        try {
+            Bundle extras = new Bundle();
+            extras.putParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE,
+                    mContext.getAttributionSource());
+            int restrictionBitmap = 0;
+            for (int securityType : restrictions) {
+                restrictionBitmap |= 0x1 << securityType;
+            }
+            mService.setAutojoinDisallowedSecurityTypes(restrictionBitmap, extras);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Retrieves the autojoin disallowed Wi-Fi security types currently set for the device.
+     *
+     * @param executor The executor to run the callback on.
+     * @param resultsCallback The callback to receive the result. It will be called with an array
+     *                        of autojoin disallowedse security types from
+     *                        {@code WifiInfo.SECURITY_TYPE_*}.
+     * @throws UnsupportedOperationException if the API is not supported.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_AUTOJOIN_RESTRICTION_SECURITY_TYPES_API)
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.NETWORK_SETTINGS,
+            MANAGE_WIFI_NETWORK_SELECTION
+    })
+    public void getAutojoinDisallowedSecurityTypes(@NonNull @CallbackExecutor Executor executor,
+            @NonNull Consumer<int[]> resultsCallback) {
+        if (!SdkLevel.isAtLeastT()) {
+            throw new UnsupportedOperationException();
+        }
+        Objects.requireNonNull(executor, "executor cannot be null");
+        Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+        try {
+            Bundle extras = new Bundle();
+            extras.putParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE,
+                    mContext.getAttributionSource());
+            mService.getAutojoinDisallowedSecurityTypes(new IIntegerListener.Stub() {
+                @Override
+                public void onResult(int value) {
+                    Binder.clearCallingIdentity();
+                    executor.execute(() -> {
+                        List<Integer> restrictions = new ArrayList<>();
+                        for (int i = 0; i < Integer.SIZE; i++) {
+                            if (((0x1 << i) & value) != 0) {
+                                restrictions.add(i);
+                            }
+                        }
+                        int[] results = new int[restrictions.size()];
+                        for (int i = 0; i < restrictions.size(); i++) {
+                            results[i] = restrictions.get(i);
+                        }
+                        resultsCallback.accept(results);
+                    });
+                }
+            }, extras);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
