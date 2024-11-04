@@ -38,6 +38,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyString;
@@ -4356,8 +4357,8 @@ public class HalDeviceManagerTest extends WifiBaseTest {
                 }
                 doAnswer(new CreateApIfaceAnswer(chipMock, true, iface))
                         .when(chipMock.chip).createApIface(anyList());
-                doAnswer(new CreateApIfaceAnswer(chipMock, true, iface))
-                        .when(chipMock.chip).createBridgedApIface(anyList());
+                doAnswer(new CreateBridgedApIfaceAnswer(chipMock, true, iface))
+                        .when(chipMock.chip).createBridgedApIface(anyList(), anyBoolean());
                 mDut.createApIface(requiredChipCapabilities,
                         destroyedListener, mHandler, requestorWs,
                         createIfaceType == HDM_CREATE_IFACE_AP_BRIDGE, mSoftApManager,
@@ -4413,7 +4414,7 @@ public class HalDeviceManagerTest extends WifiBaseTest {
                 mInOrder.verify(chipMock.chip).createStaIface();
                 break;
             case HDM_CREATE_IFACE_AP_BRIDGE:
-                mInOrder.verify(chipMock.chip).createBridgedApIface(anyList());
+                mInOrder.verify(chipMock.chip).createBridgedApIface(anyList(), anyBoolean());
                 break;
             case HDM_CREATE_IFACE_AP:
                 mInOrder.verify(chipMock.chip).createApIface(anyList());
@@ -4682,6 +4683,20 @@ public class HalDeviceManagerTest extends WifiBaseTest {
         }
 
         public WifiApIface answer(@NonNull List<OuiKeyedData> vendorData) {
+            addInterfaceInfo();
+            return mSuccess ? (WifiApIface) mWifiIface : null;
+        }
+    }
+
+    private class CreateBridgedApIfaceAnswer extends CreateXxxIfaceAnswer {
+        CreateBridgedApIfaceAnswer(ChipMockBase chipMockBase, boolean success,
+                WifiInterface wifiIface) {
+            super(chipMockBase, success, wifiIface, WifiChip.IFACE_TYPE_AP);
+        }
+
+        @SuppressWarnings("unused")
+        public WifiApIface answer(@NonNull List<OuiKeyedData> vendorData,
+                boolean isUsingMultiLinkOperation) {
             addInterfaceInfo();
             return mSuccess ? (WifiApIface) mWifiIface : null;
         }

@@ -438,7 +438,9 @@ public class HostapdHalHidlImp implements IHostapdHal {
      */
     @Override
     public boolean addAccessPoint(@NonNull String ifaceName, @NonNull SoftApConfiguration config,
-            boolean isMetered, @NonNull Runnable onFailureListener) {
+            boolean isMetered, boolean isUsingMultiLinkOperation,
+            @NonNull List<String> instanceIdentities,
+            @NonNull Runnable onFailureListener) {
         synchronized (mLock) {
             final String methodStr = "addAccessPoint";
             IHostapd.IfaceParams ifaceParamsV1_0 = prepareIfaceParamsV1_0(ifaceName, config);

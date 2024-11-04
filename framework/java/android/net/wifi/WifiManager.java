@@ -4042,6 +4042,12 @@ public class WifiManager {
      */
     public static final int WIFI_FEATURE_D2D_WHEN_INFRA_STA_DISABLED = 62;
 
+    /**
+     * Support for Soft AP multi-links operation.
+     * @hide
+     */
+    public static final int WIFI_FEATURE_SOFTAP_MLO = 63;
+
     private boolean isFeatureSupported(int feature) {
         try {
             return mService.isFeatureSupported(feature);
