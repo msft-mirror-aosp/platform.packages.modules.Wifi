@@ -170,6 +170,13 @@ public class WifiP2pManager {
     public static final long FEATURE_GROUP_CLIENT_REMOVAL       = 1L << 2;
     /** @hide */
     public static final long FEATURE_GROUP_OWNER_IPV6_LINK_LOCAL_ADDRESS_PROVIDED = 1L << 3;
+    /** @hide */
+    public static final long FEATURE_WIFI_DIRECT_R2 = 1L << 4; // Wi-Fi Direct R2 Support
+    /**
+     * Wi-Fi Direct R1/R2 Compatibility Mode support.
+     * @hide
+     */
+    public static final long FEATURE_PCC_MODE_ALLOW_LEGACY_AND_R2_CONNECTION = 1L << 5;
 
     /**
      * Extra for transporting a WifiP2pConfig
@@ -3202,6 +3209,32 @@ public class WifiP2pManager {
     public boolean isGroupOwnerIPv6LinkLocalAddressProvided() {
         return SdkLevel.isAtLeastT()
                 && isFeatureSupported(FEATURE_GROUP_OWNER_IPV6_LINK_LOCAL_ADDRESS_PROVIDED);
+    }
+
+    /**
+     * Check if this device supports Wi-Fi Direct R2 (P2P2).
+     *
+     * @return true if this device supports Wi-Fi Alliance Wi-Fi Direct R2 (Support for P2P2 IE and
+     * establishing connection by using the P2P pairing protocol), false otherwise.
+     * For more details, visit <a href="https://www.wi-fi.org/">https://www.wi-fi.org/</a> and
+     * search for "Wi-Fi Direct" .
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public boolean isWiFiDirectR2Supported() {
+        return isFeatureSupported(FEATURE_WIFI_DIRECT_R2);
+    }
+
+    /**
+     * Check if this device supports P2P Connection Compatibility Mode(R1/R2 compatibility mode).
+     *
+     * @return true if this device supports hosting an autonomous Group Owner which allows
+     * legacy P2P clients and R2 clients to join the group in PCC Mode and also supports connecting
+     * to a Group Owner either using legacy security mode (WPA2-PSK) or R2 mandated security
+     * mode(WPA3-SAE) in PCC Mode.
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public boolean isPccModeSupported() {
+        return isFeatureSupported(FEATURE_PCC_MODE_ALLOW_LEGACY_AND_R2_CONNECTION);
     }
 
     /**
