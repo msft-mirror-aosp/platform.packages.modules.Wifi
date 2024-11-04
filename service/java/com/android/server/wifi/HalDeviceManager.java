@@ -1378,6 +1378,7 @@ public class HalDeviceManager {
             }
         } catch (JSONException e) {
             Log.e(TAG, "Failed to load static chip info from store: " + e);
+            return new StaticChipInfo[0];
         }
         return staticChipInfos;
     }
