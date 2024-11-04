@@ -5917,6 +5917,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                 && message.sendingUid != Process.SYSTEM_UID) {
                             replyToMessage(message, WifiP2pManager.REMOVE_GROUP_FAILED,
                                     WifiP2pManager.BUSY);
+                            logd("Remove group requested by non-group owner " + packageName);
                             break;
                         }
                         mLastCallerInfoManager.put(WifiManager.API_P2P_REMOVE_GROUP,
@@ -6499,11 +6500,60 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     broadcastOptions.setRequireNoneOfPermissions(excludedPermissionsList.toArray(
                             new String[0]));
                 }
+                context.sendBroadcast(intent, null, broadcastOptions.toBundle());
+            }
+        }
+
+        private void sendMultipleP2pConnectionChangedBroadcast(Intent intent,
+                @Nullable String[] excludedPermissions, Set<String> pkgNames) {
+            Context context = mContext.createContextAsUser(UserHandle.ALL, 0);
+            boolean isLocationModeEnabled = mWifiPermissionsUtil.isLocationModeEnabled();
+            String[] permissions = isLocationModeEnabled ? RECEIVER_PERMISSIONS_FOR_BROADCAST
+                    : RECEIVER_PERMISSIONS_FOR_BROADCAST_LOCATION_OFF;
+            if (SdkLevel.isAtLeastU()) {
+                BroadcastOptions broadcastOptions = mWifiInjector.makeBroadcastOptions();
+                broadcastOptions.setRequireAllOfPermissions(permissions);
+                broadcastOptions.setRequireNoneOfPermissions(excludedPermissions);
+                if (pkgNames.size() > 0) {
+                    for (String pkg : pkgNames) {
+                        intent.setPackage(pkg);
+                        context.sendBroadcast(intent, null, broadcastOptions.toBundle());
+                    }
+                } else {
+                    context.sendBroadcast(intent, null, broadcastOptions.toBundle());
+                }
+            } else {
+                if (pkgNames.size() > 0) {
+                    for (String pkg : pkgNames) {
+                        intent.setPackage(pkg);
+                        context.sendBroadcastWithMultiplePermissions(intent, permissions);
+                    }
+                } else {
+                    context.sendBroadcastWithMultiplePermissions(intent, permissions);
+                }
+            }
+            if (SdkLevel.isAtLeastT()) {
+                // on Android T or later, also send broadcasts to apps that have NEARBY_WIFI_DEVICES
+                String[] requiredPermissions = new String[]{
+                        android.Manifest.permission.NEARBY_WIFI_DEVICES,
+                        android.Manifest.permission.ACCESS_WIFI_STATE
+                };
+                BroadcastOptions broadcastOptions = mWifiInjector.makeBroadcastOptions();
+                broadcastOptions.setRequireAllOfPermissions(requiredPermissions);
+                ArrayList<String> excludedPermissionsList = new ArrayList<>();
+                if (isLocationModeEnabled) {
+                    excludedPermissionsList.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
+                }
+                if (excludedPermissions != null) {
+                    Collections.addAll(excludedPermissionsList, excludedPermissions);
+                }
+                if (excludedPermissionsList.size() > 0) {
+                    broadcastOptions.setRequireNoneOfPermissions(excludedPermissionsList.toArray(
+                            new String[0]));
+                }
                 // remove package name from intent for ownership
-                if (mFeatureFlags.p2pOwnership()
-                        && intent.getAction().equals(
-                                WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)) {
-                    intent = getP2pConnectionChangedIntent(true);
+                if (mFeatureFlags.p2pOwnership()) {
+                    intent = getP2pConnectionChangedIntent();
                 }
                 context.sendBroadcast(intent, null, broadcastOptions.toBundle());
             }
@@ -6529,35 +6579,80 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             sendBroadcastWithExcludedPermissions(intent, null);
         }
 
-        private Intent getP2pConnectionChangedIntent(boolean tethering) {
+        private Intent getP2pConnectionChangedIntent() {
             Intent intent = new Intent(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
             intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
             intent.putExtra(WifiP2pManager.EXTRA_WIFI_P2P_INFO, new WifiP2pInfo(mWifiP2pInfo));
             intent.putExtra(WifiP2pManager.EXTRA_NETWORK_INFO, makeNetworkInfo());
             intent.putExtra(WifiP2pManager.EXTRA_WIFI_P2P_GROUP, eraseOwnDeviceAddress(mGroup));
-            if (tethering || !mFeatureFlags.p2pOwnership()) return intent;
-            if (!mOwnershipMap.containsKey(SHARED_PKG_NAME)) {
-                for (String pkg : mOwnershipMap.keySet()) {
-                    intent.setPackage(pkg);
-                    logd("sending p2p connection changed broadcast to only " + pkg);
+            return intent;
+        }
+
+        private Set<String> getGroupOwnershipPackageList() {
+            Set<String> pkgNames = new HashSet<>();
+
+            if (mOwnershipMap.isEmpty()) {
+                logd("No ownership mapping available");
+                return pkgNames;
+            }
+
+            boolean hasSharedPkg = mOwnershipMap.containsKey(SHARED_PKG_NAME);
+
+            if (mOwnershipMap.size() == 1) {
+                if (hasSharedPkg) {
+                    logd("Sending P2P connection changed broadcast to everyone");
+                    return pkgNames;
+                }
+                String pkg = mOwnershipMap.keySet().iterator().next();
+                pkgNames.add(pkg);
+                logd("Sending P2P connection changed broadcast to only " + pkg);
+                return pkgNames;
+            }
+
+            if (hasSharedPkg) {
+                for (ClientInfo client : mClientInfoList.values()) {
+                    if (!mOwnershipMap.containsKey(client.mPackageName)) {
+                        pkgNames.add(client.mPackageName);
+                    }
+                }
+            } else {
+                if (mGroup == null) {
+                    loge("P2P current group information is not available");
+                    return pkgNames;
+                }
+                for (Map.Entry<String, WifiP2pGroupInfo> entry : mOwnershipMap.entrySet()) {
+                    if (entry.getValue().p2pGroup.getInterface().equals(mGroup.getInterface())) {
+                        pkgNames.add(entry.getKey());
+                    }
                 }
             }
-            return intent;
+
+            return pkgNames;
         }
 
         private void sendP2pConnectionChangedBroadcast() {
             if (mVerboseLoggingEnabled) logd("sending p2p connection changed broadcast");
-            Intent intent = getP2pConnectionChangedIntent(false);
+            Intent intent = getP2pConnectionChangedIntent();
+            Set<String> pkgNames = getGroupOwnershipPackageList();
             if (SdkLevel.isAtLeastU()) {
                 // First send direct foreground broadcast to Tethering package and system service
                 // with same android.permission.MAINLINE_NETWORK_STACK
                 sendBroadcastWithMainlineNetworkStackPermissionPostU();
                 // Then send the same broadcast to remaining apps without
                 // android.permission.MAINLINE_NETWORK_STACK
-                sendBroadcastWithExcludedPermissions(intent,
-                        RECEIVER_PERMISSIONS_MAINLINE_NETWORK_STACK);
+                if (mFeatureFlags.p2pOwnership()) {
+                    sendMultipleP2pConnectionChangedBroadcast(intent,
+                            RECEIVER_PERMISSIONS_MAINLINE_NETWORK_STACK, pkgNames);
+                } else {
+                    sendBroadcastWithExcludedPermissions(intent,
+                            RECEIVER_PERMISSIONS_MAINLINE_NETWORK_STACK);
+                }
             } else {
-                sendBroadcastWithExcludedPermissions(intent, null);
+                if (mFeatureFlags.p2pOwnership()) {
+                    sendMultipleP2pConnectionChangedBroadcast(intent, null, pkgNames);
+                } else {
+                    sendBroadcastWithExcludedPermissions(intent, null);
+                }
             }
             if (mWifiChannel != null) {
                 mWifiChannel.sendMessage(WifiP2pServiceImpl.P2P_CONNECTION_CHANGED,
@@ -6654,7 +6749,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             if (TextUtils.isEmpty(tetheringServicePackage)) return false;
             Log.i(TAG, "sending p2p tether request broadcast to " + tetheringServicePackage
                     + " with permission " + Arrays.toString(permissions));
-            Intent intent = getP2pConnectionChangedIntent(true);
+            Intent intent = getP2pConnectionChangedIntent();
             if (setAdditionalFlags) {
                 intent.addFlags(flags);
             }
@@ -6666,7 +6761,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
 
         private void sendBroadcastWithMainlineNetworkStackPermissionPostU() {
             String[] receiverPermissions = RECEIVER_PERMISSIONS_MAINLINE_NETWORK_STACK;
-            Intent intent = getP2pConnectionChangedIntent(true);
+            Intent intent = getP2pConnectionChangedIntent();
             // Adding the flag to allow recipient to run at foreground priority with a shorter
             // timeout interval.
             intent.addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
