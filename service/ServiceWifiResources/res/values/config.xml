@@ -1060,6 +1060,8 @@
     <!-- Indicate the time in milliseconds to wait before auto-cancelling a P2P invitation received
          dialog that the user has not responded to. A value of 0 indicates no timeout. -->
     <integer translatable="false" name="config_p2pInvitationReceivedDialogTimeoutMs">0</integer>
+    <!-- Whether to show the timeout in the P2P invitation received dialog -->
+    <bool translatable="false" name="config_p2pInvitationReceivedDialogShowRemainingTime">true</bool>
     <!-- Indicates whether or not to play a notification sound upon displaying a P2P invitation
          received dialog that the user has not responded to. If the device is in vibrate mode, then
          the device will vibrate instead of playing a sound. -->
