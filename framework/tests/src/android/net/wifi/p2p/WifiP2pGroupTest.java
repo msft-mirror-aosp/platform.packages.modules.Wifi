@@ -25,11 +25,13 @@ import android.net.InetAddresses;
 import android.net.MacAddress;
 import android.net.wifi.OuiKeyedData;
 import android.net.wifi.OuiKeyedDataUtil;
+import android.net.wifi.util.Environment;
 import android.os.Parcel;
 
 import androidx.test.filters.SmallTest;
 
 import com.android.modules.utils.build.SdkLevel;
+import com.android.wifi.flags.Flags;
 
 import org.junit.Test;
 
@@ -83,6 +85,9 @@ public class WifiP2pGroupTest {
         if (SdkLevel.isAtLeastV()) {
             group.setVendorData(VENDOR_DATA);
         }
+        if (Environment.isSdkAtLeastB() && Flags.wifiDirectR2()) {
+            group.setSecurityType(WifiP2pGroup.SECURITY_TYPE_WPA3_COMPATIBILITY);
+        }
 
         assertEquals(INTERFACE, group.getInterface());
         assertEquals(NETWORK_ID, group.getNetworkId());
@@ -93,6 +98,10 @@ public class WifiP2pGroupTest {
         assertEquals(FREQUENCY, group.getFrequency());
         if (SdkLevel.isAtLeastV()) {
             assertTrue(VENDOR_DATA.equals(group.getVendorData()));
+        }
+        if (Environment.isSdkAtLeastB() && Flags.wifiDirectR2()) {
+            assertEquals(WifiP2pGroup.SECURITY_TYPE_WPA3_COMPATIBILITY,
+                    group.getSecurityType());
         }
 
         assertFalse(group.isClientListEmpty());
