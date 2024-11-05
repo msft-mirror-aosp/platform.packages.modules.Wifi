@@ -179,3 +179,47 @@ flag {
     description: "Gate WiFi Scorer new stats collection"
     bug: "367362809"
 }
+
+flag {
+    name: "softap_disconnect_reason"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add SoftAP disconnect reason code"
+    bug: "361651437"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "mainline_supplicant"
+    namespace: "wifi"
+    description: "Use the secondary supplicant binary stored in the mainline module"
+    bug: "365585450"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "mlo_sap"
+    is_exported: true
+    namespace: "wifi"
+    description: "Mlo SoftAp"
+    bug: "362355566"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "wifi_direct_r2"
+    is_exported: true
+    namespace: "wifi"
+    description: "Wi-Fi Alliance Wi-Fi Direct R2 feature"
+    bug: "341971059"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "wep_disabled_in_apm"
+    is_exported: true
+    namespace: "wifi"
+    description: "Wep should be disabled in advanced protection mode"
+    bug: "362586268"
+    is_fixed_read_only: true
+}

@@ -17,11 +17,15 @@
 package com.android.server.wifi;
 
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+import static android.net.wifi.WifiConfiguration.SECURITY_TYPE_PSK;
+import static android.net.wifi.WifiConfiguration.SECURITY_TYPE_SAE;
 import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_INVALID_CONFIGURATION;
 import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_INVALID_CONFIGURATION_ENTERPRISE;
 import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_NO_PERMISSION_MODIFY_CONFIG;
 import static android.net.wifi.WifiManager.AddNetworkResult.STATUS_SUCCESS;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
+
+import static com.android.server.wifi.WifiConfigurationUtil.validatePassword;
 
 import android.Manifest;
 import android.annotation.NonNull;
@@ -1126,6 +1130,12 @@ public class WifiConfigManager {
             if (internalConfig.isSecurityType(newType)) {
                 internalConfig.setSecurityParamsIsAddedByAutoUpgrade(newType,
                         externalConfig.getDefaultSecurityParams().isAddedByAutoUpgrade());
+                // Set to SAE-only in case we're updating a PSK/SAE config with an SAE-only
+                // passphrase.
+                if (oldType == SECURITY_TYPE_PSK && newType == SECURITY_TYPE_SAE
+                        && !validatePassword(externalConfig.preSharedKey, false, false, false)) {
+                    internalConfig.setSecurityParams(externalConfig.getSecurityParamsList());
+                }
             } else if (externalConfig.isSecurityType(oldType)) {
                 internalConfig.setSecurityParams(newType);
                 internalConfig.addSecurityParams(oldType);

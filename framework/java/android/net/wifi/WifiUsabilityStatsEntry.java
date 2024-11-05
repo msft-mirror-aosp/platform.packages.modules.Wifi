@@ -161,6 +161,28 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     private final long mRxTransmittedBytes;
     /** The total number of LABEL_BAD event happens */
     private final int mLabelBadEventCount;
+    /** The current WiFi state in framework */
+    private final int mWifiFrameworkState;
+    /** Downstream throughput estimation provided by Network Capabilities */
+    private final int mIsNetworkCapabilitiesDownstreamSufficient;
+    /** Upstream throughput estimation provided by Network Capabilities */
+    private final int mIsNetworkCapabilitiesUpstreamSufficient;
+    /** Downstream throughput estimation used in Network Selection */
+    private final int mIsThroughputPredictorDownstreamSufficient;
+    /** Upstream throughput estimation used in Network Selection */
+    private final int mIsThroughputPredictorUpstreamSufficient;
+    /** If bluetooth is connected */
+    private final boolean mIsBluetoothConnected;
+    /** UWB Adapter state */
+    private final int mUwbAdapterState;
+    /** Low Latency mode state */
+    private final boolean mIsLowLatencyActivated;
+    /** Maximum supported tx link speed in Mbps  */
+    private final int mMaxSupportedTxLinkSpeed;
+    /** Maximum supported rx link speed in Mbps  */
+    private final int mMaxSupportedRxLinkSpeed;
+    /** WiFi Voip mode state */
+    private final int mVoipMode;
 
     /** {@hide} */
     @Retention(RetentionPolicy.SOURCE)
@@ -637,6 +659,76 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     }
 
     /**
+     * Scan Results who have the same freq with current WiFi link
+     */
+    /** @hide */
+    public static final class ScanResultWithSameFreq implements Parcelable {
+        private long mScanResultTimestampMicros;
+        private int mRssi;
+        private int mFrequencyMhz;
+
+        public ScanResultWithSameFreq() {
+        }
+
+        /**
+         * Constructor function.
+         * @param scanResultTimestampMicros Timestamp in microseconds (since boot) when this result
+         *                                  was last seen.
+         * @param rssi                      The detected signal level in dBm
+         * @param frequencyMhz              The center frequency of the primary 20 MHz frequency
+         *                                  (in MHz) of the channel
+         */
+        public ScanResultWithSameFreq(long scanResultTimestampMicros, int rssi, int frequencyMhz) {
+            this.mScanResultTimestampMicros = scanResultTimestampMicros;
+            this.mRssi = rssi;
+            this.mFrequencyMhz = frequencyMhz;
+        }
+
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+
+        @Override
+        public void writeToParcel(@NonNull Parcel dest, int flags) {
+            dest.writeLong(mScanResultTimestampMicros);
+            dest.writeInt(mRssi);
+            dest.writeInt(mFrequencyMhz);
+        }
+
+        /** Implement the Parcelable interface */
+        public static final @NonNull Creator<ScanResultWithSameFreq> CREATOR =
+                new Creator<ScanResultWithSameFreq>() {
+                    public ScanResultWithSameFreq createFromParcel(Parcel in) {
+                        ScanResultWithSameFreq scanResultWithSameFreq =
+                                new ScanResultWithSameFreq();
+                        scanResultWithSameFreq.mScanResultTimestampMicros = in.readLong();
+                        scanResultWithSameFreq.mRssi = in.readInt();
+                        scanResultWithSameFreq.mFrequencyMhz = in.readInt();
+                        return scanResultWithSameFreq;
+                        }
+                    public ScanResultWithSameFreq[] newArray(int size) {
+                        return new ScanResultWithSameFreq[size];
+                    }
+                };
+
+        /** timestamp in microseconds (since boot) when this result was last seen */
+        public long getScanResultTimestampMicros() {
+            return mScanResultTimestampMicros;
+        }
+
+        /** The detected signal level in dBm */
+        public int getRssi() {
+            return mRssi;
+        }
+
+        /** The center frequency of the primary 20 MHz frequency (in MHz) of the channel */
+        public int getFrequency() {
+            return mFrequencyMhz;
+        }
+    }
+
+    /**
      * Wifi link layer radio stats.
      */
     public static final class RadioStats implements Parcelable {
@@ -918,6 +1010,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         private final PacketStats[] mPacketStats;
         /** Peer statistics */
         private final PeerInfo[] mPeerInfo;
+        /** Scan results who have the same frequency with this WiFi link */
+        private final ScanResultWithSameFreq[] mScanResultsWithSameFreq;
 
         /** @hide */
         public LinkStats() {
@@ -944,6 +1038,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             mRateStats = null;
             mPacketStats = null;
             mPeerInfo = null;
+            mScanResultsWithSameFreq = null;
         }
 
         /** @hide
@@ -974,6 +1069,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
          * @param rateStats                   Rate information.
          * @param packetStats                 Packet statistics.
          * @param peerInfo                    Peer statistics.
+         * @param scanResultsWithSameFreq     Scan results who have the same frequency with this
+         *                                    WiFi link.
          */
         public LinkStats(int linkId, int state, int radioId, int rssi, int frequencyMhz,
                 int rssiMgmt, @WifiChannelBandwidth int channelWidth, int centerFreqFirstSegment,
@@ -982,7 +1079,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                 long totalBeaconRx, int timeSliceDutyCycleInPercent,
                 long totalCcaBusyFreqTimeMillis, long totalRadioOnFreqTimeMillis,
                 ContentionTimeStats[] contentionTimeStats, RateStats[] rateStats,
-                PacketStats[] packetStats, PeerInfo[] peerInfo) {
+                PacketStats[] packetStats, PeerInfo[] peerInfo,
+                ScanResultWithSameFreq[] scanResultsWithSameFreq) {
             this.mLinkId = linkId;
             this.mState = state;
             this.mRadioId = radioId;
@@ -1006,6 +1104,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             this.mRateStats = rateStats;
             this.mPacketStats = packetStats;
             this.mPeerInfo = peerInfo;
+            this.mScanResultsWithSameFreq = scanResultsWithSameFreq;
         }
 
         @Override
@@ -1038,6 +1137,7 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             dest.writeTypedArray(mRateStats, flags);
             dest.writeTypedArray(mPacketStats, flags);
             dest.writeTypedArray(mPeerInfo, flags);
+            dest.writeTypedArray(mScanResultsWithSameFreq, flags);
         }
 
         /** Implement the Parcelable interface */
@@ -1053,7 +1153,8 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                                 in.createTypedArray(ContentionTimeStats.CREATOR),
                                 in.createTypedArray(RateStats.CREATOR),
                                 in.createTypedArray(PacketStats.CREATOR),
-                                in.createTypedArray(PeerInfo.CREATOR));
+                                in.createTypedArray(PeerInfo.CREATOR),
+                                in.createTypedArray(ScanResultWithSameFreq.CREATOR));
                     }
 
                     public LinkStats[] newArray(int size) {
@@ -1083,7 +1184,13 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
             int cellularSignalStrengthDbm, int cellularSignalStrengthDb,
             boolean isSameRegisteredCell, SparseArray<LinkStats> linkStats,
             int wifiLinkCount, @WifiManager.MloMode int mloMode,
-            long txTransmittedBytes, long rxTransmittedBytes, int labelBadEventCount) {
+            long txTransmittedBytes, long rxTransmittedBytes, int labelBadEventCount,
+            int wifiFrameworkState, int isNetworkCapabilitiesDownstreamSufficient,
+            int isNetworkCapabilitiesUpstreamSufficient,
+            int isThroughputPredictorDownstreamSufficient,
+            int isThroughputPredictorUpstreamSufficient, boolean isBluetoothConnected,
+            int uwbAdapterState, boolean isLowLatencyActivated, int maxSupportedTxLinkSpeed,
+            int maxSupportedRxLinkSpeed, int voipMode) {
         mTimeStampMillis = timeStampMillis;
         mRssi = rssi;
         mLinkSpeedMbps = linkSpeedMbps;
@@ -1125,6 +1232,17 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         mTxTransmittedBytes = txTransmittedBytes;
         mRxTransmittedBytes = rxTransmittedBytes;
         mLabelBadEventCount = labelBadEventCount;
+        mWifiFrameworkState = wifiFrameworkState;
+        mIsNetworkCapabilitiesDownstreamSufficient = isNetworkCapabilitiesDownstreamSufficient;
+        mIsNetworkCapabilitiesUpstreamSufficient = isNetworkCapabilitiesUpstreamSufficient;
+        mIsThroughputPredictorDownstreamSufficient = isThroughputPredictorDownstreamSufficient;
+        mIsThroughputPredictorUpstreamSufficient = isThroughputPredictorUpstreamSufficient;
+        mIsBluetoothConnected = isBluetoothConnected;
+        mUwbAdapterState = uwbAdapterState;
+        mIsLowLatencyActivated = isLowLatencyActivated;
+        mMaxSupportedTxLinkSpeed = maxSupportedTxLinkSpeed;
+        mMaxSupportedRxLinkSpeed = maxSupportedRxLinkSpeed;
+        mVoipMode = voipMode;
     }
 
     /** Implement the Parcelable interface */
@@ -1175,6 +1293,17 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
         dest.writeLong(mTxTransmittedBytes);
         dest.writeLong(mRxTransmittedBytes);
         dest.writeInt(mLabelBadEventCount);
+        dest.writeInt(mWifiFrameworkState);
+        dest.writeInt(mIsNetworkCapabilitiesDownstreamSufficient);
+        dest.writeInt(mIsNetworkCapabilitiesUpstreamSufficient);
+        dest.writeInt(mIsThroughputPredictorDownstreamSufficient);
+        dest.writeInt(mIsThroughputPredictorUpstreamSufficient);
+        dest.writeBoolean(mIsBluetoothConnected);
+        dest.writeInt(mUwbAdapterState);
+        dest.writeBoolean(mIsLowLatencyActivated);
+        dest.writeInt(mMaxSupportedTxLinkSpeed);
+        dest.writeInt(mMaxSupportedRxLinkSpeed);
+        dest.writeInt(mVoipMode);
     }
 
     /** Implement the Parcelable interface */
@@ -1197,7 +1326,9 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
                     in.readBoolean(), in.readInt(), in.readInt(),
                     in.readInt(), in.readBoolean(),
                     in.readSparseArray(LinkStats.class.getClassLoader()), in.readInt(),
-                    in.readInt(), in.readLong(), in.readLong(), in.readInt()
+                    in.readInt(), in.readLong(), in.readLong(), in.readInt(), in.readInt(),
+                    in.readInt(), in.readInt(), in.readInt(), in.readInt(), in.readBoolean(),
+                    in.readInt(), in.readBoolean(), in.readInt(), in.readInt(), in.readInt()
             );
         }
 
@@ -1819,6 +1950,24 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     }
 
     /**
+     * Scan results who have the same frequency with this WiFi link
+     *
+     * @param linkId Identifier of the link.
+     * @return An array of Scan results who have the same frequency with this WiFi link
+     * @throws NoSuchElementException if linkId is invalid.
+     */
+    /** @hide */
+    @NonNull
+    public ScanResultWithSameFreq[] getScanResultsWithSameFreq(int linkId) {
+        if (mLinkStats.contains(linkId)) {
+            ScanResultWithSameFreq[] scanResultsWithSameFreq =
+                mLinkStats.get(linkId).mScanResultsWithSameFreq;
+            return scanResultsWithSameFreq;
+        }
+        throw new NoSuchElementException("linkId is invalid - " + linkId);
+    }
+
+    /**
      * Radio stats from all the radios, see {@link RadioStats#getRadioId()}
      * @return A list of Wifi link layer radio stats, see {@link RadioStats}
      */
@@ -1921,5 +2070,60 @@ public final class WifiUsabilityStatsEntry implements Parcelable {
     /** @hide */
     public long getLabelBadEventCount() {
         return mLabelBadEventCount;
+    }
+
+    /** @hide */
+    public int getWifiFrameworkState() {
+        return mWifiFrameworkState;
+    }
+
+    /** @hide */
+    public int isNetworkCapabilitiesDownstreamSufficient() {
+        return mIsNetworkCapabilitiesDownstreamSufficient;
+    }
+
+    /** @hide */
+    public int isNetworkCapabilitiesUpstreamSufficient() {
+        return mIsNetworkCapabilitiesUpstreamSufficient;
+    }
+
+    /** @hide */
+    public int isThroughputPredictorDownstreamSufficient() {
+        return mIsThroughputPredictorDownstreamSufficient;
+    }
+
+    /** @hide */
+    public int isThroughputPredictorUpstreamSufficient() {
+        return mIsThroughputPredictorUpstreamSufficient;
+    }
+
+    /** @hide */
+    public boolean isBluetoothConnected() {
+        return mIsBluetoothConnected;
+    }
+
+    /** @hide */
+    public int getUwbAdapterState() {
+        return mUwbAdapterState;
+    }
+
+    /** @hide */
+    public boolean getLowLatencyModeState() {
+        return mIsLowLatencyActivated;
+    }
+
+    /** @hide */
+    public int getMaxSupportedTxLinkSpeed() {
+        return mMaxSupportedTxLinkSpeed;
+    }
+
+    /** @hide */
+    public int getMaxSupportedRxLinkSpeed() {
+        return mMaxSupportedRxLinkSpeed;
+    }
+
+    /** @hide */
+    public int getVoipMode() {
+        return mVoipMode;
     }
 }

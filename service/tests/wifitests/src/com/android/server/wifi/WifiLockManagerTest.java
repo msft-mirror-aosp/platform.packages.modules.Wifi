@@ -1954,6 +1954,7 @@ public class WifiLockManagerTest extends WifiBaseTest {
         mWifiLockManager.updateWifiClientConnected(mClientModeManager, true);
         inOrder.verify(testListener).onOwnershipChanged(eq(new int[]{DEFAULT_TEST_UID_1}));
         inOrder.verify(testListener).onActivatedStateChanged(true);
+        verify(mWifiMetrics).setLowLatencyState(eq(true));
         inOrder.verify(testListener).onActiveUsersChanged(eq(new int[]{DEFAULT_TEST_UID_1}));
 
         // Acquire a second lock and check the owners & active users changed.

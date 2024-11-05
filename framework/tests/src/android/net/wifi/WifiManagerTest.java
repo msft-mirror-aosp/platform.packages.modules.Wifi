@@ -122,6 +122,7 @@ import android.net.wifi.WifiUsabilityStatsEntry.PacketStats;
 import android.net.wifi.WifiUsabilityStatsEntry.PeerInfo;
 import android.net.wifi.WifiUsabilityStatsEntry.RadioStats;
 import android.net.wifi.WifiUsabilityStatsEntry.RateStats;
+import android.net.wifi.WifiUsabilityStatsEntry.ScanResultWithSameFreq;
 import android.net.wifi.twt.TwtRequest;
 import android.net.wifi.twt.TwtSessionCallback;
 import android.os.Build;
@@ -2520,20 +2521,27 @@ public class WifiManagerTest {
         radioStats[1] = new RadioStats(1, 20, 21, 22, 23, 24, 25, 26, 27, 28, new int[] {1, 2, 3});
         PeerInfo[] peerInfo = new PeerInfo[1];
         peerInfo[0] = new PeerInfo(1, 50, rateStats);
+        ScanResultWithSameFreq[] scanResultsWithSameFreq2G = new ScanResultWithSameFreq[1];
+        scanResultsWithSameFreq2G[0] = new ScanResultWithSameFreq(100, -50, 2412);
+        ScanResultWithSameFreq[] scanResultsWithSameFreq5G = new ScanResultWithSameFreq[1];
+        scanResultsWithSameFreq5G[0] = new ScanResultWithSameFreq(100, -50, 5500);
         SparseArray<LinkStats> linkStats = new SparseArray<>();
         linkStats.put(0,
                 new LinkStats(0, WifiUsabilityStatsEntry.LINK_STATE_NOT_IN_USE, 0, -50, 2412,
                         -50, 0, 0, 0, 300, 200, 188, 2, 2, 100, 300, 100, 100, 200,
-                        contentionTimeStats, rateStats, packetStats, peerInfo));
+                        contentionTimeStats, rateStats, packetStats, peerInfo,
+                        scanResultsWithSameFreq2G));
         linkStats.put(1,
                 new LinkStats(0, WifiUsabilityStatsEntry.LINK_STATE_IN_USE, 0, -40, 5500,
                         -40, 1, 0, 0, 860, 600, 388, 2, 2, 200, 400, 100, 100, 200,
-                        contentionTimeStats, rateStats, packetStats, peerInfo));
+                        contentionTimeStats, rateStats, packetStats, peerInfo,
+                        scanResultsWithSameFreq5G));
         callbackCaptor.getValue().onWifiUsabilityStats(1, true,
                 new WifiUsabilityStatsEntry(System.currentTimeMillis(), -50, 100, 10, 0, 5, 5,
                         100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 1, 100, 10,
                         100, 27, contentionTimeStats, rateStats, radioStats, 101, true, true, true,
-                        0, 10, 10, true, linkStats, 1, 0, 10, 20, 1));
+                        0, 10, 10, true, linkStats, 1, 0, 10, 20, 1, 2, 1, 1, 1, 1, false, 0,
+                        false, 100, 100, 1));
         verify(mOnWifiUsabilityStatsListener).onWifiUsabilityStats(anyInt(), anyBoolean(),
                 any(WifiUsabilityStatsEntry.class));
     }
@@ -4376,72 +4384,58 @@ public class WifiManagerTest {
     }
 
     @Test
-    public void testSetAutoJoinRestrictionSecurityTypesToWifiServiceImpl() throws Exception {
+    public void testSetAutojoinDisallowedSecurityTypesToWifiServiceImpl() throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
-        Set<Integer> restrictions = new ArraySet<>(
-                Set.of(WifiInfo.SECURITY_TYPE_OPEN,
-                        WifiInfo.SECURITY_TYPE_WEP,
-                        WifiInfo.SECURITY_TYPE_OWE));
+        int[] restrictions = {
+                WifiInfo.SECURITY_TYPE_OPEN,
+                WifiInfo.SECURITY_TYPE_WEP,
+                WifiInfo.SECURITY_TYPE_OWE };
         int restrictionBitmap = (0x1 << WifiInfo.SECURITY_TYPE_OPEN)
                 | (0x1 << WifiInfo.SECURITY_TYPE_WEP)
                 | (0x1 << WifiInfo.SECURITY_TYPE_OWE);
         ArgumentCaptor<Bundle> bundleCaptor = ArgumentCaptor.forClass(Bundle.class);
-        mWifiManager.setAutojoinRestrictionSecurityTypes(restrictions);
-        verify(mWifiService).setAutojoinRestrictionSecurityTypes(eq(restrictionBitmap),
+        mWifiManager.setAutojoinDisallowedSecurityTypes(restrictions);
+        verify(mWifiService).setAutojoinDisallowedSecurityTypes(eq(restrictionBitmap),
                 bundleCaptor.capture());
         assertEquals(mContext.getAttributionSource(),
                 bundleCaptor.getValue().getParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE));
 
         // Null argument
-        assertThrows(IllegalArgumentException.class,
-                () -> mWifiManager.setAutojoinRestrictionSecurityTypes(null));
-        // Argument with negative integer element, Valid integer range is [0, Integer.SIZE(32)).
-        assertThrows(IllegalArgumentException.class,
-                () -> mWifiManager.setAutojoinRestrictionSecurityTypes(new ArraySet<>(
-                        Set.of(WifiInfo.SECURITY_TYPE_OPEN,
-                                WifiInfo.SECURITY_TYPE_WEP,
-                                WifiInfo.SECURITY_TYPE_OWE,
-                                -1))));
-        // Argument with integer element, 32. Valid integer range is [0, Integer.SIZE(32)).
-        assertThrows(IllegalArgumentException.class,
-                () -> mWifiManager.setAutojoinRestrictionSecurityTypes(new ArraySet<>(
-                        Set.of(WifiInfo.SECURITY_TYPE_OPEN,
-                                WifiInfo.SECURITY_TYPE_WEP,
-                                WifiInfo.SECURITY_TYPE_OWE,
-                                Integer.SIZE))));
+        assertThrows(NullPointerException.class,
+                () -> mWifiManager.setAutojoinDisallowedSecurityTypes(null));
     }
 
     @Test
-    public void testGetAutoJoinRestrictionSecurityTypesToWifiServiceImpl() throws Exception {
+    public void testGetAutojoinDisallowedSecurityTypesToWifiServiceImpl() throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
-        final Set<Integer> restrictionToSet = new ArraySet<>(
-                Set.of(WifiInfo.SECURITY_TYPE_OPEN,
-                        WifiInfo.SECURITY_TYPE_WEP,
-                        WifiInfo.SECURITY_TYPE_OWE));
+        final int[] restrictionToSet = {
+                WifiInfo.SECURITY_TYPE_OPEN,
+                WifiInfo.SECURITY_TYPE_WEP,
+                WifiInfo.SECURITY_TYPE_OWE };
 
         final int restrictionBitmap = (0x1 << WifiInfo.SECURITY_TYPE_OPEN)
                 | (0x1 << WifiInfo.SECURITY_TYPE_WEP)
                 | (0x1 << WifiInfo.SECURITY_TYPE_OWE);
 
         SynchronousExecutor executor = mock(SynchronousExecutor.class);
-        Consumer<Set<Integer>> mockResultsCallback = mock(Consumer.class);
+        Consumer<int[]> mockResultsCallback = mock(Consumer.class);
 
         // null executor
         assertThrows(NullPointerException.class,
-                () -> mWifiManager.getAutojoinRestrictionSecurityTypes(null, mockResultsCallback));
+                () -> mWifiManager.getAutojoinDisallowedSecurityTypes(null, mockResultsCallback));
         // null resultsCallback
         assertThrows(NullPointerException.class,
-                () -> mWifiManager.getAutojoinRestrictionSecurityTypes(executor, null));
+                () -> mWifiManager.getAutojoinDisallowedSecurityTypes(executor, null));
 
         ArgumentCaptor<Bundle> bundleCaptor = ArgumentCaptor.forClass(Bundle.class);
         ArgumentCaptor<IIntegerListener.Stub> cbCaptor = ArgumentCaptor.forClass(
                 IIntegerListener.Stub.class);
 
-        ArgumentCaptor<Set<Integer>> resultCaptor = ArgumentCaptor.forClass(Set.class);
+        ArgumentCaptor<int[]> resultCaptor = ArgumentCaptor.forClass(int[].class);
 
-        mWifiManager.getAutojoinRestrictionSecurityTypes(new SynchronousExecutor(),
+        mWifiManager.getAutojoinDisallowedSecurityTypes(new SynchronousExecutor(),
                 mockResultsCallback);
-        verify(mWifiService).getAutojoinRestrictionSecurityTypes(cbCaptor.capture(),
+        verify(mWifiService).getAutojoinDisallowedSecurityTypes(cbCaptor.capture(),
                 bundleCaptor.capture());
         assertEquals(mContext.getAttributionSource(),
                 bundleCaptor.getValue().getParcelable(EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE));
@@ -4449,6 +4443,6 @@ public class WifiManagerTest {
         cbCaptor.getValue().onResult(restrictionBitmap);
 
         verify(mockResultsCallback).accept(resultCaptor.capture());
-        assertEquals(restrictionToSet, resultCaptor.getValue());
+        assertArrayEquals(restrictionToSet, resultCaptor.getValue());
     }
 }

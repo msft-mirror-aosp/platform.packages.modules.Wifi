@@ -249,6 +249,7 @@ import com.android.modules.utils.StringParceledListSlice;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.WifiServiceImpl.LocalOnlyRequestorCallback;
 import com.android.server.wifi.WifiServiceImpl.SoftApCallbackInternal;
+import com.android.server.wifi.WifiServiceImpl.UwbAdapterStateListener;
 import com.android.server.wifi.b2b.WifiRoamingModeManager;
 import com.android.server.wifi.coex.CoexManager;
 import com.android.server.wifi.entitlement.PseudonymInfo;
@@ -703,6 +704,12 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 onStoppedListener.run();
             }
         }).when(mMakeBeforeBreakManager).stopAllSecondaryTransientClientModeManagers(any());
+
+        doAnswer(new AnswerWithArguments() {
+            public void answer(boolean isWepAllowed) {
+                when(mWifiGlobals.isWepAllowed()).thenReturn(isWepAllowed);
+            }
+        }).when(mWifiGlobals).setWepAllowed(anyBoolean());
 
         when(mWifiSettingsConfigStore.get(eq(WIFI_WEP_ALLOWED))).thenReturn(true);
         mWifiServiceImpl = makeWifiServiceImpl();
@@ -9233,20 +9240,20 @@ public class WifiServiceImplTest extends WifiBaseTest {
     }
 
     @Test
-    public void getSupportedFeaturesVerboseLoggingThrottled() {
+    public void supportedFeaturesVerboseLoggingThrottled() {
         mWifiServiceImpl.enableVerboseLogging(
                 WifiManager.VERBOSE_LOGGING_LEVEL_ENABLED); // this logs
         when(mClock.getElapsedSinceBootMillis()).thenReturn(1000L);
         when(mActiveModeWarden.getSupportedFeatureSet()).thenReturn(
                 createCapabilityBitset(WifiManager.WIFI_FEATURE_P2P));
-        mWifiServiceImpl.getSupportedFeaturesIfAllowed();
+        mWifiServiceImpl.isFeatureSupported(WifiManager.WIFI_FEATURE_P2P);
         when(mClock.getElapsedSinceBootMillis()).thenReturn(1001L);
-        mWifiServiceImpl.getSupportedFeaturesIfAllowed(); // should not log
+        mWifiServiceImpl.isFeatureSupported(WifiManager.WIFI_FEATURE_P2P); // should not log
         when(mClock.getElapsedSinceBootMillis()).thenReturn(5000L);
-        mWifiServiceImpl.getSupportedFeaturesIfAllowed();
+        mWifiServiceImpl.isFeatureSupported(WifiManager.WIFI_FEATURE_P2P);
         when(mActiveModeWarden.getSupportedFeatureSet()).thenReturn(createCapabilityBitset(
                 WifiManager.WIFI_FEATURE_P2P, WifiManager.WIFI_FEATURE_PASSPOINT));
-        mWifiServiceImpl.getSupportedFeaturesIfAllowed();
+        mWifiServiceImpl.isFeatureSupported(WifiManager.WIFI_FEATURE_P2P);
         verify(mLog, times(4)).info(any());
     }
 
@@ -12334,17 +12341,24 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
     @Test
     public void testSetWepAllowedWithPermission() {
+        // Test if WIFI_WEP_ALLOWED starts with false.
         when(mWifiSettingsConfigStore.get(eq(WIFI_WEP_ALLOWED))).thenReturn(false);
         mWifiServiceImpl.checkAndStartWifi();
         mLooper.dispatchAll();
         verify(mWifiSettingsConfigStore).get(eq(WIFI_WEP_ALLOWED));
         verify(mWifiGlobals).setWepAllowed(eq(false));
+        verify(mWifiSettingsConfigStore).registerChangeListener(
+                eq(WIFI_WEP_ALLOWED),
+                mWepAllowedSettingChangedListenerCaptor.capture(),
+                any(Handler.class));
         // verify setWepAllowed with MANAGE_WIFI_NETWORK_SETTING
         when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(true);
         mWifiServiceImpl.setWepAllowed(true);
+        verify(mWifiSettingsConfigStore).put(eq(WIFI_WEP_ALLOWED), eq(true));
+        mWepAllowedSettingChangedListenerCaptor.getValue()
+                .onSettingsChanged(WIFI_WEP_ALLOWED, true);
         mLooper.dispatchAll();
         verify(mWifiGlobals).setWepAllowed(true);
-        verify(mWifiSettingsConfigStore).put(eq(WIFI_WEP_ALLOWED), eq(true));
     }
 
     @Test
@@ -12360,10 +12374,21 @@ public class WifiServiceImplTest extends WifiBaseTest {
         when(mockWifiInfoWpa.getCurrentSecurityType()).thenReturn(WifiInfo.SECURITY_TYPE_PSK);
         when(cmmWep.getConnectionInfo()).thenReturn(mockWifiInfoWep);
         when(cmmWpa.getConnectionInfo()).thenReturn(mockWifiInfoWpa);
+        mWifiServiceImpl.checkAndStartWifi();
+        mLooper.dispatchAll();
+        verify(mWifiSettingsConfigStore).get(eq(WIFI_WEP_ALLOWED));
+        verify(mWifiGlobals).setWepAllowed(eq(true));
+        verify(mWifiSettingsConfigStore).registerChangeListener(
+                eq(WIFI_WEP_ALLOWED),
+                mWepAllowedSettingChangedListenerCaptor.capture(),
+                any(Handler.class));
+
         mWifiServiceImpl.setWepAllowed(false);
+        verify(mWifiSettingsConfigStore).put(eq(WIFI_WEP_ALLOWED), eq(false));
+        mWepAllowedSettingChangedListenerCaptor.getValue()
+                .onSettingsChanged(WIFI_WEP_ALLOWED, false);
         mLooper.dispatchAll();
         verify(mWifiGlobals).setWepAllowed(false);
-        verify(mWifiSettingsConfigStore).put(eq(WIFI_WEP_ALLOWED), eq(false));
         // Only WEP disconnect
         verify(cmmWep).disconnect();
         verify(cmmWpa, never()).disconnect();
@@ -12916,41 +12941,41 @@ public class WifiServiceImplTest extends WifiBaseTest {
     }
 
     @Test
-    public void testSetAutojoinRestrictionSecurityTypesWithPermission() throws RemoteException {
+    public void testSetAutojoinDisallowedSecurityTypesWithPermission() throws RemoteException {
         assumeTrue(SdkLevel.isAtLeastT());
         // No permission to call API
         when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(false);
         when(mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(anyInt()))
                 .thenReturn(false);
         assertThrows(SecurityException.class,
-                () -> mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(0/*restrict none*/,
+                () -> mWifiServiceImpl.setAutojoinDisallowedSecurityTypes(0/*restrict none*/,
                         mExtras));
         // Has permission to call API
         when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(true);
         // Null argument
         assertThrows(IllegalArgumentException.class,
-                () -> mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(0/*restrict none*/,
+                () -> mWifiServiceImpl.setAutojoinDisallowedSecurityTypes(0/*restrict none*/,
                         null));
         // Invalid argument
         assertThrows(IllegalArgumentException.class,
-                () -> mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(
+                () -> mWifiServiceImpl.setAutojoinDisallowedSecurityTypes(
                         0x1 << WifiInfo.SECURITY_TYPE_OWE, mExtras));
         assertThrows(IllegalArgumentException.class,
-                () -> mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(
+                () -> mWifiServiceImpl.setAutojoinDisallowedSecurityTypes(
                         0x1 << WifiInfo.SECURITY_TYPE_SAE, mExtras));
         assertThrows(IllegalArgumentException.class,
-                () -> mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(
+                () -> mWifiServiceImpl.setAutojoinDisallowedSecurityTypes(
                         0x1 << WifiInfo.SECURITY_TYPE_EAP_WPA3_ENTERPRISE, mExtras));
         // Valid argument
         int restrictions = (0x1 << WifiInfo.SECURITY_TYPE_OPEN)
                 | (0x1 << WifiInfo.SECURITY_TYPE_OWE) | (0x1 << WifiInfo.SECURITY_TYPE_WEP);
-        mWifiServiceImpl.setAutojoinRestrictionSecurityTypes(restrictions, mExtras);
+        mWifiServiceImpl.setAutojoinDisallowedSecurityTypes(restrictions, mExtras);
         mLooper.dispatchAll();
-        verify(mWifiConnectivityManager).setAutojoinRestrictionSecurityTypes(eq(restrictions));
+        verify(mWifiConnectivityManager).setAutojoinDisallowedSecurityTypes(eq(restrictions));
     }
 
     @Test
-    public void testGetAutojoinRestrictionSecurityTypesWithPermission() throws RemoteException {
+    public void testGetAutojoinDisallowedSecurityTypesWithPermission() throws RemoteException {
         assumeTrue(SdkLevel.isAtLeastT());
         // Mock listener.
         IIntegerListener listener = mock(IIntegerListener.class);
@@ -12960,17 +12985,65 @@ public class WifiServiceImplTest extends WifiBaseTest {
         when(mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(anyInt()))
                 .thenReturn(false);
         assertThrows(SecurityException.class,
-                () -> mWifiServiceImpl.getAutojoinRestrictionSecurityTypes(listener, mExtras));
+                () -> mWifiServiceImpl.getAutojoinDisallowedSecurityTypes(listener, mExtras));
         // Null arguments
         assertThrows(IllegalArgumentException.class,
-                () -> mWifiServiceImpl.getAutojoinRestrictionSecurityTypes(null, mExtras));
+                () -> mWifiServiceImpl.getAutojoinDisallowedSecurityTypes(null, mExtras));
         assertThrows(IllegalArgumentException.class,
-                () -> mWifiServiceImpl.getAutojoinRestrictionSecurityTypes(listener, null));
+                () -> mWifiServiceImpl.getAutojoinDisallowedSecurityTypes(listener, null));
         // has permission to call API
         when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(true);
-        when(mWifiConnectivityManager.getAutojoinRestrictionSecurityTypes()).thenReturn(7);
-        mWifiServiceImpl.getAutojoinRestrictionSecurityTypes(listener, mExtras);
+        when(mWifiConnectivityManager.getAutojoinDisallowedSecurityTypes()).thenReturn(7);
+        mWifiServiceImpl.getAutojoinDisallowedSecurityTypes(listener, mExtras);
         mLooper.dispatchAll();
         inOrder.verify(listener).onResult(7);
+    }
+    /**
+     * Verify UwbManager.AdapterStateCallback onStateChanged could update mLastUwbState in
+     * WifiMetrics properly
+     */
+    @Test
+    public void testServiceImplAdapterStateCallback() {
+        assumeTrue(SdkLevel.isAtLeastT());
+        UwbAdapterStateListener uwbAdapterStateListener =
+                mWifiServiceImpl.new UwbAdapterStateListener();
+
+        uwbAdapterStateListener.onStateChanged(2, 1);
+        verify(mWifiMetrics).setLastUwbState(2);
+    }
+
+    @Test
+    public void testSetQueryAllowedWhenWepUsageControllerSupported() {
+        when(mFeatureFlags.wepDisabledInApm()).thenReturn(true);
+        WepNetworkUsageController testWepNetworkUsageController =
+                mock(WepNetworkUsageController.class);
+        when(mWifiInjector.getWepNetworkUsageController())
+                .thenReturn(testWepNetworkUsageController);
+        when(mWifiPermissionsUtil.checkNetworkSettingsPermission(anyInt())).thenReturn(true);
+        ConcreteClientModeManager cmmWep = mock(ConcreteClientModeManager.class);
+        WifiInfo mockWifiInfoWep = mock(WifiInfo.class);
+        List<ClientModeManager> cmms = Arrays.asList(cmmWep);
+        when(mActiveModeWarden.getClientModeManagers()).thenReturn(cmms);
+        when(mockWifiInfoWep.getCurrentSecurityType()).thenReturn(WifiInfo.SECURITY_TYPE_WEP);
+        when(cmmWep.getConnectionInfo()).thenReturn(mockWifiInfoWep);
+        mWifiServiceImpl = makeWifiServiceImpl();
+        mWifiServiceImpl.checkAndStartWifi();
+        mWifiServiceImpl.handleBootCompleted();
+        mLooper.dispatchAll();
+        // Verify boot complete go through the new design.
+        verify(mWifiSettingsConfigStore, never()).registerChangeListener(
+                eq(WIFI_WEP_ALLOWED),
+                mWepAllowedSettingChangedListenerCaptor.capture(),
+                any(Handler.class));
+        verify(mWifiGlobals, never()).setWepAllowed(anyBoolean());
+        verify(testWepNetworkUsageController).handleBootCompleted();
+
+        mWifiServiceImpl.setWepAllowed(false);
+        mLooper.dispatchAll();
+        verify(mWifiGlobals, never()).setWepAllowed(anyBoolean());
+        verify(mWifiSettingsConfigStore).put(eq(WIFI_WEP_ALLOWED), eq(false));
+        // WEP disconnect logic moved to WepNetworkUsageController.
+        verify(cmmWep, never()).disconnect();
+        verify(mWifiGlobals, never()).setWepAllowed(anyBoolean());
     }
 }

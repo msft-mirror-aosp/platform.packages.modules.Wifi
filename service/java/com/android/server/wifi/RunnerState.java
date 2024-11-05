@@ -74,7 +74,10 @@ public abstract class RunnerState extends State {
         if (traceEvent) {
             Trace.traceBegin(Trace.TRACE_TAG_NETWORK, signatureToLog);
         }
+
         long startTime = System.currentTimeMillis();
+        // TODO(b/295398783): Support deferMessage and sendMessageAtFrontOfQueue where when is 0;
+        long scheduleLatency = message.getWhen() != 0 ? startTime - message.getWhen() : 0;
         boolean ret = processMessageImpl(message);
         long runTime = System.currentTimeMillis() - startTime;
         if (traceEvent) {
@@ -83,8 +86,9 @@ public abstract class RunnerState extends State {
         if (runTime > mRunningTimeThresholdInMilliseconds) {
             mLocalLog.log(signatureToLog + " was running for " + runTime + " ms");
         }
-        if (runTime > METRICS_THRESHOLD_MILLIS) {
-            WifiStatsLog.write(WIFI_THREAD_TASK_EXECUTED, (int) runTime, 0, signatureToLog);
+        if (runTime > METRICS_THRESHOLD_MILLIS || scheduleLatency > METRICS_THRESHOLD_MILLIS) {
+            WifiStatsLog.write(WIFI_THREAD_TASK_EXECUTED, (int) runTime, (int) scheduleLatency,
+                    signatureToLog);
         }
         return ret;
     }

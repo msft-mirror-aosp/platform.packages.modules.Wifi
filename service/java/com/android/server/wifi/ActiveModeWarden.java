@@ -681,14 +681,14 @@ public class ActiveModeWarden {
 
     /** Begin listening to broadcasts and start the internal state machine. */
     public void start() {
-        mContext.registerReceiver(new BroadcastReceiver() {
+        mContext.registerReceiverForAllUsers(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 // Location mode has been toggled...  trigger with the scan change
                 // update to make sure we are in the correct mode
                 scanAlwaysModeChanged();
             }
-        }, new IntentFilter(LocationManager.MODE_CHANGED_ACTION));
+        }, new IntentFilter(LocationManager.MODE_CHANGED_ACTION), null, mHandler);
         mContext.registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -2700,6 +2700,28 @@ public class ActiveModeWarden {
                         // onStopped will move the state machine to "DisabledState".
                         break;
                     }
+                    case CMD_RECOVERY_RESTART_WIFI_CONTINUE: {
+                        log("received CMD_RECOVERY_RESTART_WIFI_CONTINUE when already in "
+                                + "mEnabledState");
+                        // This could happen when SoftAp is turned on before recovery is complete.
+                        // Simply make sure the primary CMM is on in this case.
+                        if (shouldEnableSta() && !hasPrimaryOrScanOnlyModeManager()) {
+                            startPrimaryOrScanOnlyClientModeManager(
+                                    // Assumes user toggled it on from settings before.
+                                    mFacade.getSettingsWorkSource(mContext));
+                        }
+                        int numCallbacks = mRestartCallbacks.beginBroadcast();
+                        for (int i = 0; i < numCallbacks; i++) {
+                            try {
+                                mRestartCallbacks.getBroadcastItem(i).onSubsystemRestarted();
+                            } catch (RemoteException e) {
+                                Log.e(TAG, "Failure calling onSubsystemRestarted" + e);
+                            }
+                        }
+                        mRestartCallbacks.finishBroadcast();
+                        mWifiInjector.getSelfRecovery().onRecoveryCompleted();
+                        break;
+                    }
                     default:
                         return NOT_HANDLED;
                 }
@@ -2926,5 +2948,27 @@ public class ActiveModeWarden {
     public void handleSatelliteModeChange() {
         mSettingsStore.updateSatelliteModeTracker();
         mWifiController.sendMessage(WifiController.CMD_SATELLITE_MODE_CHANGED);
+    }
+
+    /**
+     * Returns the number of multiple link devices (MLD) which are being operated.
+     */
+    public int getCurrentMLDAp() {
+        if (!SdkLevel.isAtLeastT()) {
+            return 0;
+        }
+        int numberMLD = 0;
+        for (SoftApManager manager : mSoftApManagers) {
+            if (manager.isStarted() && manager.getSoftApModeConfiguration()
+                    .getSoftApConfiguration().isIeee80211beEnabled()) {
+                if (manager.isBridgedMode() && !manager.isUsingMlo()) {
+                    // Non MLO bridged mode, it occupies two MLD APs.
+                    numberMLD += 2;
+                } else {
+                    numberMLD++;
+                }
+            }
+        }
+        return numberMLD;
     }
 }

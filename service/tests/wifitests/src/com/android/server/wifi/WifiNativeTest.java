@@ -731,6 +731,51 @@ public class WifiNativeTest extends WifiBaseTest {
     }
 
     /**
+     * Verifies valules of ScanResultWithSameFreq in getWifiLinkLayerStats() call
+     *
+     */
+    @Test
+    public void testGetWifiLinkLayerStatsForScanResultWithSameFreq() {
+        WifiLinkLayerStats testWifiLinkLayerStats = new WifiLinkLayerStats();
+        testWifiLinkLayerStats.links = new WifiLinkLayerStats.LinkSpecificStats[2];
+        // Define 2 test WiFi links, whose frequencyMhz are 0, 1, respectively
+        for (int i = 0; i < 2; ++i) {
+            testWifiLinkLayerStats.links[i] = new WifiLinkLayerStats.LinkSpecificStats();
+            testWifiLinkLayerStats.links[i].frequencyMhz = i;
+        }
+        when(mWifiVendorHal.getWifiLinkLayerStats(WIFI_IFACE_NAME))
+                .thenReturn(testWifiLinkLayerStats);
+
+        // Define 6 test WiFi scan results with unique BSSID
+        // Their frequency are 0, 1, 2, 0, 1, 2, respectively
+        ScanResult[] scanResults = new ScanResult[6];
+        for (int i = 0; i < 6; i++) {
+            ScanResult scanResult = new ScanResult();
+            scanResult.BSSID = Integer.toString(i);
+            scanResult.frequency = i < 3 ? i : (i - 3);
+            // Make sure the timestamp is valid
+            scanResult.timestamp = Long.MAX_VALUE;
+            scanResults[i] = scanResult;
+        }
+        ScanData testScanData = new ScanData(0, 0,
+                0, WifiScanner.WIFI_BAND_UNSPECIFIED, scanResults);
+        when(mWifiVendorHal.getCachedScanData(WIFI_IFACE_NAME)).thenReturn(testScanData);
+        mWifiNative.setLocationModeEnabled(true);
+
+        WifiLinkLayerStats resultWifiLinkLayerStats =
+                mWifiNative.getWifiLinkLayerStats(WIFI_IFACE_NAME);
+        assertEquals(2, resultWifiLinkLayerStats.links.length);
+        // WiFi link 0's frequency is 0, scan results 0 and 3 have the same frequency
+        assertEquals(2, resultWifiLinkLayerStats.links[0].scan_results_same_freq.size());
+        assertEquals("0", resultWifiLinkLayerStats.links[0].scan_results_same_freq.get(0).bssid);
+        assertEquals("3", resultWifiLinkLayerStats.links[0].scan_results_same_freq.get(1).bssid);
+        // WiFi link 1's frequency is 1, scan results 1 and 4 have the same frequency
+        assertEquals(2, resultWifiLinkLayerStats.links[1].scan_results_same_freq.size());
+        assertEquals("1", resultWifiLinkLayerStats.links[1].scan_results_same_freq.get(0).bssid);
+        assertEquals("4", resultWifiLinkLayerStats.links[1].scan_results_same_freq.get(1).bssid);
+    }
+
+    /**
      * Verifies client mode + scan success.
      */
     @Test
@@ -825,7 +870,7 @@ public class WifiNativeTest extends WifiBaseTest {
         when(mWifiVendorHal.getBridgedApInstances(WIFI_IFACE_NAME))
                 .thenReturn(Arrays.asList(instance1, instance2));
         mWifiNative.setupInterfaceForSoftApMode(null, TEST_WORKSOURCE, SoftApConfiguration.BAND_2GHZ
-                | SoftApConfiguration.BAND_5GHZ, true, mSoftApManager, new ArrayList<>());
+                | SoftApConfiguration.BAND_5GHZ, true, mSoftApManager, new ArrayList<>(), false);
         ArgumentCaptor<HalDeviceManager.InterfaceDestroyedListener> ifaceDestroyedListenerCaptor =
                 ArgumentCaptor.forClass(HalDeviceManager.InterfaceDestroyedListener.class);
         verify(mWifiVendorHal).createApIface(ifaceDestroyedListenerCaptor.capture(), any(),
@@ -914,7 +959,7 @@ public class WifiNativeTest extends WifiBaseTest {
 
         mWifiNative.teardownAllInterfaces();
         mWifiNative.setupInterfaceForSoftApMode(null, TEST_WORKSOURCE, WIFI_BAND_24_GHZ, false,
-                mSoftApManager, new ArrayList<>());
+                mSoftApManager, new ArrayList<>(), false);
         verify(mWifiVendorHal, times(4)).setCoexUnsafeChannels(unsafeChannels, restrictions);
     }
 
@@ -1904,5 +1949,27 @@ public class WifiNativeTest extends WifiBaseTest {
         mWifiNative.switchClientInterfaceToConnectivityMode(WIFI_IFACE_NAME, TEST_WORKSOURCE);
         assertFalse(mWifiNative.mIsRsnOverridingSupported);
         mWifiNative.teardownAllInterfaces();
+    }
+
+    @Test
+    public void testIsMLDApSupportMLO() throws Exception {
+        when(Flags.mloSap()).thenReturn(true);
+        BitSet mloFeature =
+                createCapabilityBitset(WifiManager.WIFI_FEATURE_SOFTAP_MLO);
+        when(mWifiGlobals.isMLDApSupported()).thenReturn(true);
+        assertFalse(mWifiNative.isMLDApSupportMLO());
+
+        when(mSettingsConfigStore.get(eq(WIFI_NATIVE_EXTENDED_SUPPORTED_FEATURES)))
+                .thenReturn(mloFeature.toLongArray());
+        mWifiNative = new WifiNative(
+                mWifiVendorHal, mStaIfaceHal, mHostapdHal, mWificondControl,
+                mWifiMonitor, mPropertyService, mWifiMetrics,
+                mHandler, mRandom, mBuildProperties, mWifiInjector);
+        assertTrue(mWifiNative.isMLDApSupportMLO());
+        when(Flags.mloSap()).thenReturn(false);
+        assertFalse(mWifiNative.isMLDApSupportMLO());
+        when(Flags.mloSap()).thenReturn(true);
+        when(mWifiGlobals.isMLDApSupported()).thenReturn(false);
+        assertFalse(mWifiNative.isMLDApSupportMLO());
     }
 }

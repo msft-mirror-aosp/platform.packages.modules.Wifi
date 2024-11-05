@@ -139,6 +139,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto.PeerInfo;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.PnoScanMetrics;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.RadioStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.RateStats;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.ScanResultWithSameFreq;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.SoftApConnectedClientsEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent.ConfigInfo;
@@ -341,6 +342,12 @@ public class WifiMetrics {
     private int mScorerUid = Process.WIFI_UID;
     @VisibleForTesting
     int mUnusableEventType = WifiIsUnusableEvent.TYPE_UNKNOWN;
+    private int mWifiFrameworkState = 0;
+    private SpeedSufficient mSpeedSufficientNetworkCapabilities = new SpeedSufficient();
+    private SpeedSufficient mSpeedSufficientThroughputPredictor = new SpeedSufficient();
+    private int mLastUwbState = -1;
+    private boolean mIsLowLatencyActivated = false;
+    private int mVoipMode = -1;
 
     /**
      * Wi-Fi usability state per interface as predicted by the network scorer.
@@ -528,6 +535,7 @@ public class WifiMetrics {
 
     private final WifiMonitor mWifiMonitor;
     private ActiveModeWarden mActiveModeWarden;
+    private WifiGlobals mWifiGlobals;
     private final Map<String, ActiveModeManager.ClientRole> mIfaceToRoleMap = new ArrayMap<>();
 
     /** WifiConfigStore read duration histogram. */
@@ -1675,7 +1683,8 @@ public class WifiMetrics {
             WifiP2pMetrics wifiP2pMetrics,
             DppMetrics dppMetrics,
             WifiMonitor wifiMonitor,
-            WifiDeviceStateChangeManager wifiDeviceStateChangeManager) {
+            WifiDeviceStateChangeManager wifiDeviceStateChangeManager,
+            WifiGlobals wifiGlobals) {
         mContext = context;
         mFacade = facade;
         mClock = clock;
@@ -1710,6 +1719,7 @@ public class WifiMetrics {
                         handleScreenStateChanged(screenOn);
                     }
                 });
+        mWifiGlobals = wifiGlobals;
     }
 
     /** Sets internal ScoringParams member */
@@ -5267,11 +5277,37 @@ public class WifiMetrics {
                     }
                 }
             }
+            if (linkStat.scanResultWithSameFreq != null) {
+                for (ScanResultWithSameFreq scanResultWithSameFreq
+                        : linkStat.scanResultWithSameFreq) {
+                    line.append(",scan_result_timestamp_micros="
+                            + scanResultWithSameFreq.scanResultTimestampMicros);
+                    line.append(",rssi=" + scanResultWithSameFreq.rssi);
+                    line.append(",frequencyMhz=" + scanResultWithSameFreq.frequencyMhz);
+                }
+            }
+            line.append(",tx_linkspeed=" + linkStat.txLinkspeed);
+            line.append(",rx_linkspeed=" + linkStat.rxLinkspeed);
         }
         line.append(",mlo_mode=" + entry.mloMode);
-        line.append(",tx_transmitted_bytes" + entry.txTransmittedBytes);
-        line.append(",rx_transmitted_bytes" + entry.rxTransmittedBytes);
-        line.append(",label_bad_event_count" + entry.labelBadEventCount);
+        line.append(",tx_transmitted_bytes=" + entry.txTransmittedBytes);
+        line.append(",rx_transmitted_bytes=" + entry.rxTransmittedBytes);
+        line.append(",label_bad_event_count=" + entry.labelBadEventCount);
+        line.append(",wifi_framework_state=" + entry.wifiFrameworkState);
+        line.append(",is_network_capabilities_downstream_sufficient="
+                + entry.isNetworkCapabilitiesDownstreamSufficient);
+        line.append(",is_network_capabilities_upstream_sufficient="
+                + entry.isNetworkCapabilitiesUpstreamSufficient);
+        line.append(",is_throughput_predictor_downstream_sufficient="
+                + entry.isThroughputPredictorDownstreamSufficient);
+        line.append(",is_throughput_predictor_upstream_sufficient="
+                + entry.isThroughputPredictorUpstreamSufficient);
+        line.append(",is_bluetooth_connected=" + entry.isBluetoothConnected);
+        line.append(",uwb_adapter_state=" + entry.uwbAdapterState);
+        line.append(",is_low_latency_activated=" + entry.isLowLatencyActivated);
+        line.append(",max_supported_tx_linkspeed=" + entry.maxSupportedTxLinkspeed);
+        line.append(",max_supported_rx_linkspeed=" + entry.maxSupportedRxLinkspeed);
+        line.append(",voip_mode=" + entry.voipMode);
         pw.println(line.toString());
     }
 
@@ -7189,6 +7225,10 @@ public class WifiMetrics {
                         linkStats.timeSliceDutyCycleInPercent = link.timeSliceDutyCycleInPercent;
                         linkStats.rssi = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
                                 new MloLink()).getRssi() : info.getRssi();
+                        linkStats.txLinkspeed = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
+                                new MloLink()).getTxLinkSpeedMbps() : info.getTxLinkSpeedMbps();
+                        linkStats.rxLinkspeed = (mloLinks.size() > 0) ? mloLinks.get(link.link_id,
+                                new MloLink()).getRxLinkSpeedMbps() : info.getRxLinkSpeedMbps();
                         WifiLinkLayerStats.ChannelStats channlStatsEntryOnFreq =
                                 stats.channelStatsMap.get(link.frequencyMhz);
                         if (channlStatsEntryOnFreq != null) {
@@ -7315,11 +7355,55 @@ public class WifiMetrics {
                                 linkStats.peerInfo[peerIndex] = peerInfo;
                             }
                         }
+                        List<ScanResultWithSameFreq> scanResultsWithSameFreq = new ArrayList<>();
+                        if (link.scan_results_same_freq != null
+                                && link.scan_results_same_freq.size() > 0) {
+                            for (int scanResultsIndex = 0; scanResultsIndex
+                                    < link.scan_results_same_freq.size(); ++scanResultsIndex) {
+                                WifiLinkLayerStats.ScanResultWithSameFreq linkLayerScanResult =
+                                        link.scan_results_same_freq.get(scanResultsIndex);
+                                if (linkLayerScanResult != null) {
+                                    String wifiLinkBssid = (mloLinks.size() > 0)
+                                            ? mloLinks.get(link.link_id, new MloLink())
+                                            .getApMacAddress().toString() : info.getBSSID();
+                                    if (!linkLayerScanResult.bssid.equals(wifiLinkBssid)) {
+                                        ScanResultWithSameFreq scanResultWithSameFreq =
+                                                new ScanResultWithSameFreq();
+                                        scanResultWithSameFreq.scanResultTimestampMicros =
+                                                linkLayerScanResult.scan_result_timestamp_micros;
+                                        scanResultWithSameFreq.rssi = linkLayerScanResult.rssi;
+                                        scanResultWithSameFreq.frequencyMhz =
+                                                linkLayerScanResult.frequencyMhz;
+                                        scanResultsWithSameFreq.add(scanResultWithSameFreq);
+                                    }
+                                }
+                            }
+                        }
+                        linkStats.scanResultWithSameFreq =
+                            scanResultsWithSameFreq.toArray(new ScanResultWithSameFreq[0]);
                         wifiUsabilityStatsEntry.linkStats[i] = linkStats;
                     }
                 }
                 wifiUsabilityStatsEntry.mloMode = stats.wifiMloMode;
                 wifiUsabilityStatsEntry.labelBadEventCount = mAccumulatedLabelBadCount;
+                wifiUsabilityStatsEntry.wifiFrameworkState = mWifiFrameworkState;
+                wifiUsabilityStatsEntry.isNetworkCapabilitiesDownstreamSufficient =
+                        mSpeedSufficientNetworkCapabilities.Downstream;
+                wifiUsabilityStatsEntry.isNetworkCapabilitiesUpstreamSufficient =
+                        mSpeedSufficientNetworkCapabilities.Upstream;
+                wifiUsabilityStatsEntry.isThroughputPredictorDownstreamSufficient =
+                        mSpeedSufficientThroughputPredictor.Downstream;
+                wifiUsabilityStatsEntry.isThroughputPredictorUpstreamSufficient =
+                        mSpeedSufficientThroughputPredictor.Upstream;
+                wifiUsabilityStatsEntry.isBluetoothConnected =
+                        mWifiGlobals.isBluetoothConnected();
+                wifiUsabilityStatsEntry.uwbAdapterState = getLastUwbState();
+                wifiUsabilityStatsEntry.isLowLatencyActivated = getLowLatencyState();
+                wifiUsabilityStatsEntry.maxSupportedTxLinkspeed =
+                        info.getMaxSupportedTxLinkSpeedMbps();
+                wifiUsabilityStatsEntry.maxSupportedRxLinkspeed =
+                        info.getMaxSupportedRxLinkSpeedMbps();
+                wifiUsabilityStatsEntry.voipMode = getVoipMode();
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7766,6 +7850,30 @@ public class WifiMetrics {
             mLastLinkMetrics.put(inStat.link_id, linkMetrics);
             WifiLinkLayerStats.ChannelStats channelStatsMap = stats.channelStatsMap.get(
                     inStat.frequencyMhz);
+            List<android.net.wifi.WifiUsabilityStatsEntry.ScanResultWithSameFreq>
+                    scanResultsWithSameFreq = new ArrayList<>();
+
+            if (inStat.scan_results_same_freq != null
+                    && inStat.scan_results_same_freq.size() > 0) {
+                for (int scanResultsIndex = 0; scanResultsIndex
+                        < inStat.scan_results_same_freq.size(); ++scanResultsIndex) {
+                    WifiLinkLayerStats.ScanResultWithSameFreq linkLayerScanResult =
+                            inStat.scan_results_same_freq.get(scanResultsIndex);
+                    if (linkLayerScanResult != null) {
+                        if (!linkLayerScanResult.bssid.equals(info.getBSSID())) {
+                            android.net.wifi.WifiUsabilityStatsEntry.ScanResultWithSameFreq
+                                    scanResultWithSameFreq =
+                                    new android.net.wifi.WifiUsabilityStatsEntry
+                                        .ScanResultWithSameFreq(
+                                    linkLayerScanResult.scan_result_timestamp_micros,
+                                    linkLayerScanResult.rssi,
+                                    linkLayerScanResult.frequencyMhz
+                                );
+                            scanResultsWithSameFreq.add(scanResultWithSameFreq);
+                        }
+                    }
+                }
+            }
             // Note: RSSI, Tx & Rx link speed are derived from signal poll stats which is updated in
             // Mlolink or WifiInfo (non-MLO case).
             android.net.wifi.WifiUsabilityStatsEntry.LinkStats outStat =
@@ -7793,7 +7901,10 @@ public class WifiMetrics {
                             (channelStatsMap != null) ? channelStatsMap.ccaBusyTimeMs : 0 ,
                             (channelStatsMap != null) ? channelStatsMap.radioOnTimeMs : 0,
                             convertContentionTimeStats(inStat), convertRateStats(inStat),
-                            convertPacketStats(inStat), convertPeerInfo(inStat));
+                            convertPacketStats(inStat), convertPeerInfo(inStat),
+                            scanResultsWithSameFreq.toArray(
+                                new android.net.wifi.WifiUsabilityStatsEntry
+                                .ScanResultWithSameFreq[0]));
             linkStats.put(inStat.link_id, outStat);
         }
 
@@ -7842,7 +7953,13 @@ public class WifiMetrics {
                 radioStats, s.channelUtilizationRatio, s.isThroughputSufficient,
                 s.isWifiScoringEnabled, s.isCellularDataAvailable, 0, 0, 0, false,
                 convertLinkStats(stats, info), s.wifiLinkCount, s.mloMode,
-                s.txTransmittedBytes, s.rxTransmittedBytes, s.labelBadEventCount
+                s.txTransmittedBytes, s.rxTransmittedBytes, s.labelBadEventCount,
+                s.wifiFrameworkState, s.isNetworkCapabilitiesDownstreamSufficient,
+                s.isNetworkCapabilitiesUpstreamSufficient,
+                s.isThroughputPredictorDownstreamSufficient,
+                s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
+                s.uwbAdapterState, s.isLowLatencyActivated, s.maxSupportedTxLinkspeed,
+                s.maxSupportedRxLinkspeed, s.voipMode
         );
     }
 
@@ -8046,6 +8163,17 @@ public class WifiMetrics {
         out.txTransmittedBytes = s.txTransmittedBytes;
         out.rxTransmittedBytes = s.rxTransmittedBytes;
         out.labelBadEventCount = s.labelBadEventCount;
+        out.wifiFrameworkState = s.wifiFrameworkState;
+        out.isNetworkCapabilitiesDownstreamSufficient = s.isNetworkCapabilitiesDownstreamSufficient;
+        out.isNetworkCapabilitiesUpstreamSufficient = s.isNetworkCapabilitiesUpstreamSufficient;
+        out.isThroughputPredictorDownstreamSufficient = s.isThroughputPredictorDownstreamSufficient;
+        out.isThroughputPredictorUpstreamSufficient = s.isThroughputPredictorUpstreamSufficient;
+        out.isBluetoothConnected = s.isBluetoothConnected;
+        out.uwbAdapterState = s.uwbAdapterState;
+        out.isLowLatencyActivated = s.isLowLatencyActivated;
+        out.maxSupportedTxLinkspeed = s.maxSupportedTxLinkspeed;
+        out.maxSupportedRxLinkspeed = s.maxSupportedRxLinkspeed;
+        out.voipMode = s.voipMode;
         return out;
     }
 
@@ -9377,6 +9505,18 @@ public class WifiMetrics {
         return speedSufficient;
     }
 
+    public void updateWiFiEvaluationAndScorerStats(boolean lingering, WifiInfo wifiInfo,
+            ConnectionCapabilities connectionCapabilities) {
+        mWifiFrameworkState = getFrameworkStateForScorer(lingering);
+        Speeds speedsNetworkCapabilities = getNetworkCapabilitiesSpeeds();
+        mSpeedSufficientNetworkCapabilities =
+                calcSpeedSufficientNetworkCapabilities(speedsNetworkCapabilities);
+        WifiDataStall.Speeds speedsThroughputPredictor =
+                mWifiDataStall.getThrouhgputPredictorSpeeds(wifiInfo, connectionCapabilities);
+        mSpeedSufficientThroughputPredictor =
+                calcSpeedSufficientThroughputPredictor(speedsThroughputPredictor);
+    }
+
     /**
      * Log a ScorerPredictionResultReported atom.
      */
@@ -9385,10 +9525,7 @@ public class WifiMetrics {
             boolean isMobileDataEnabled,
             int pollingIntervalMs,
             int aospScorerPrediction,
-            int externalScorerPrediction,
-            boolean lingering,
-            WifiInfo wifiInfo,
-            ConnectionCapabilities connectionCapabilities
+            int externalScorerPrediction
     ) {
         boolean isCellularDataAvailable = mWifiDataStall.isCellularDataAvailable();
         boolean isThroughputSufficient = mWifiDataStall.isThroughputSufficient();
@@ -9397,14 +9534,6 @@ public class WifiMetrics {
                 hasActiveSubInfo, isMobileDataEnabled, isCellularDataAvailable,
                 mAdaptiveConnectivityEnabled);
         int scorerUnusableEvent = convertWifiUnusableTypeForScorer(mUnusableEventType);
-        int wifiFrameworkState = getFrameworkStateForScorer(lingering);
-        Speeds speedsNetworkCapabilities = getNetworkCapabilitiesSpeeds();
-        SpeedSufficient speedSufficientNetworkCapabilities =
-                calcSpeedSufficientNetworkCapabilities(speedsNetworkCapabilities);
-        WifiDataStall.Speeds speedsThroughputPredictor = mWifiDataStall.getThrouhgputPredictorSpeeds(
-                wifiInfo, connectionCapabilities);
-        SpeedSufficient speedSufficientThroughputPredictor =
-                calcSpeedSufficientThroughputPredictor(speedsThroughputPredictor);
 
         WifiStatsLog.write_non_chained(SCORER_PREDICTION_RESULT_REPORTED,
                     Process.WIFI_UID,
@@ -9412,10 +9541,10 @@ public class WifiMetrics {
                     aospScorerPrediction,
                     scorerUnusableEvent,
                     isThroughputSufficient, deviceState, pollingIntervalMs,
-                    wifiFrameworkState, speedSufficientNetworkCapabilities.Downstream,
-                    speedSufficientNetworkCapabilities.Upstream,
-                    speedSufficientThroughputPredictor.Downstream,
-                    speedSufficientThroughputPredictor.Upstream);
+                    mWifiFrameworkState, mSpeedSufficientNetworkCapabilities.Downstream,
+                    mSpeedSufficientNetworkCapabilities.Upstream,
+                    mSpeedSufficientThroughputPredictor.Downstream,
+                    mSpeedSufficientThroughputPredictor.Upstream);
         if (mScorerUid != Process.WIFI_UID) {
             WifiStatsLog.write_non_chained(SCORER_PREDICTION_RESULT_REPORTED,
                     mScorerUid,
@@ -9423,10 +9552,10 @@ public class WifiMetrics {
                     externalScorerPrediction,
                     scorerUnusableEvent,
                     isThroughputSufficient, deviceState, pollingIntervalMs,
-                    wifiFrameworkState, speedSufficientNetworkCapabilities.Downstream,
-                    speedSufficientNetworkCapabilities.Upstream,
-                    speedSufficientThroughputPredictor.Downstream,
-                    speedSufficientThroughputPredictor.Upstream);
+                    mWifiFrameworkState, mSpeedSufficientNetworkCapabilities.Downstream,
+                    mSpeedSufficientNetworkCapabilities.Upstream,
+                    mSpeedSufficientThroughputPredictor.Downstream,
+                    mSpeedSufficientThroughputPredictor.Upstream);
         }
 
         // We'd better reset to TYPE_NONE if it is defined in the future.
@@ -10320,5 +10449,29 @@ public class WifiMetrics {
                 getSoftApStoppedUpstreamType(upstreamCaps));
         WifiStatsLog.write(WifiStatsLog.SOFT_AP_STATE_CHANGED,
                 WifiStatsLog.SOFT_AP_STATE_CHANGED__HOTSPOT_ON__STATE_OFF);
+    }
+
+    public int getLastUwbState() {
+        return mLastUwbState;
+    }
+
+    public void setLastUwbState(int state) {
+        mLastUwbState = state;
+    }
+
+    public boolean getLowLatencyState() {
+        return mIsLowLatencyActivated;
+    }
+
+    public void setLowLatencyState(boolean state) {
+        mIsLowLatencyActivated = state;
+    }
+
+    public int getVoipMode() {
+        return mVoipMode;
+    }
+
+    public void setVoipMode(int mode) {
+        mVoipMode = mode;
     }
 }

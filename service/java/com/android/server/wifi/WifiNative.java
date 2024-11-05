@@ -39,6 +39,7 @@ import android.net.MacAddress;
 import android.net.TrafficStats;
 import android.net.apf.ApfCapabilities;
 import android.net.wifi.CoexUnsafeChannel;
+import android.net.wifi.DeauthenticationReasonCode;
 import android.net.wifi.MscsParams;
 import android.net.wifi.OuiKeyedData;
 import android.net.wifi.QosPolicyParams;
@@ -78,6 +79,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.HexDump;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.SupplicantStaIfaceHal.QosPolicyStatus;
+import com.android.server.wifi.WifiLinkLayerStats.ScanResultWithSameFreq;
 import com.android.server.wifi.hal.WifiChip;
 import com.android.server.wifi.hal.WifiHal;
 import com.android.server.wifi.hal.WifiNanIface;
@@ -89,6 +91,7 @@ import com.android.server.wifi.util.InformationElementUtil;
 import com.android.server.wifi.util.NativeUtil;
 import com.android.server.wifi.util.NetdWrapper;
 import com.android.server.wifi.util.NetdWrapper.NetdEventObserver;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.io.PrintWriter;
@@ -293,7 +296,8 @@ public class WifiNative {
         @Override
         public void onConnectedClientsChanged(NativeWifiClient client, boolean isConnected) {
             mSoftApHalCallback.onConnectedClientsChanged(mIfaceName,
-                    client.getMacAddress(), isConnected);
+                    client.getMacAddress(), isConnected,
+                    DeauthenticationReasonCode.REASON_UNKNOWN);
         }
     }
 
@@ -358,9 +362,11 @@ public class WifiNative {
          * @param clientAddress Macaddress of the client.
          * @param isConnected Indication as to whether the client is connected (true), or
          *                    disconnected (false).
+         * @param disconnectReason The reason for disconnection, if applicable. This
+         *                         parameter is only meaningful when {@code isConnected} is false.
          */
         void onConnectedClientsChanged(String apIfaceInstance, MacAddress clientAddress,
-                boolean isConnected);
+                boolean isConnected, @WifiAnnotations.SoftApDisconnectReason int disconnectReason);
     }
 
     /********************************************************
@@ -1581,6 +1587,18 @@ public class WifiNative {
     }
 
     /**
+     * Return true when the device supports Wi-Fi 7 MLD AP and multiple links operation (MLO).
+     */
+    public boolean isMLDApSupportMLO() {
+        if (!Flags.mloSap()) {
+            return false;
+        }
+        BitSet cachedFeatureSet = getCompleteFeatureSetFromConfigStore();
+        return mWifiInjector.getWifiGlobals().isMLDApSupported()
+                && cachedFeatureSet.get(WifiManager.WIFI_FEATURE_SOFTAP_MLO);
+    }
+
+    /**
      * Setup an interface for Soft AP mode operations.
      *
      * This method configures an interface in AP mode in all the native daemons
@@ -1597,7 +1615,8 @@ public class WifiNative {
     public String setupInterfaceForSoftApMode(
             @NonNull InterfaceCallback interfaceCallback, @NonNull WorkSource requestorWs,
             @SoftApConfiguration.BandType int band, boolean isBridged,
-            @NonNull SoftApManager softApManager, @NonNull List<OuiKeyedData> vendorData) {
+            @NonNull SoftApManager softApManager, @NonNull List<OuiKeyedData> vendorData,
+            boolean isUsingMlo) {
         synchronized (mLock) {
             String bugTitle = "Wi-Fi BugReport (softAp interface failure)";
             String errorMsg = "";
@@ -1635,7 +1654,7 @@ public class WifiNative {
                 return null;
             }
             String ifaceInstanceName = iface.name;
-            if (isBridged) {
+            if (isBridged && !isUsingMlo) {
                 List<String> instances = getBridgedApInstances(iface.name);
                 if (instances == null || instances.size() == 0) {
                     errorMsg = "Failed to get bridged AP instances" + iface.name;
@@ -2381,7 +2400,7 @@ public class WifiNative {
      */
     public @SoftApManager.StartResult int startSoftAp(
             @NonNull String ifaceName, SoftApConfiguration config, boolean isMetered,
-            SoftApHalCallback callback) {
+            SoftApHalCallback callback, boolean isUsingMlo) {
         if (mHostapdHal.isApInfoCallbackSupported()) {
             if (!mHostapdHal.registerApCallback(ifaceName, callback)) {
                 Log.e(TAG, "Failed to register ap hal event callback");
@@ -2396,8 +2415,10 @@ public class WifiNative {
                 return SoftApManager.START_RESULT_FAILURE_REGISTER_AP_CALLBACK_WIFICOND;
             }
         }
-
-        if (!mHostapdHal.addAccessPoint(ifaceName, config, isMetered, callback::onFailure)) {
+        if (!mHostapdHal.addAccessPoint(ifaceName, config, isMetered,
+                isUsingMlo,
+                getBridgedApInstances(ifaceName),
+                callback::onFailure)) {
             String errorMsg = "Failed to add softAp";
             Log.e(TAG, errorMsg);
             mWifiMetrics.incrementNumSetupSoftApInterfaceFailureDueToHostapd();
@@ -3778,6 +3799,29 @@ public class WifiNative {
         if (stats != null) {
             stats.aggregateLinkLayerStats();
             stats.wifiMloMode = getMloMode();
+            ScanData scanData = getCachedScanResults(ifaceName);
+            if (scanData != null && scanData.getResults() != null
+                    && scanData.getResults().length >  0) {
+                for (int linkIndex = 0; linkIndex < stats.links.length; ++linkIndex) {
+                    List<ScanResultWithSameFreq> ScanResultsSameFreq = new ArrayList<>();
+                    for (int scanResultsIndex = 0; scanResultsIndex < scanData.getResults().length;
+                            ++scanResultsIndex) {
+                        if (scanData.getResults()[scanResultsIndex].frequency
+                                != stats.links[linkIndex].frequencyMhz) {
+                            continue;
+                        }
+                        ScanResultWithSameFreq ScanResultSameFreq = new ScanResultWithSameFreq();
+                        ScanResultSameFreq.scan_result_timestamp_micros =
+                            scanData.getResults()[scanResultsIndex].timestamp;
+                        ScanResultSameFreq.rssi = scanData.getResults()[scanResultsIndex].level;
+                        ScanResultSameFreq.frequencyMhz =
+                            scanData.getResults()[scanResultsIndex].frequency;
+                        ScanResultSameFreq.bssid = scanData.getResults()[scanResultsIndex].BSSID;
+                        ScanResultsSameFreq.add(ScanResultSameFreq);
+                    }
+                    stats.links[linkIndex].scan_results_same_freq = ScanResultsSameFreq;
+                }
+            }
         }
         return stats;
     }

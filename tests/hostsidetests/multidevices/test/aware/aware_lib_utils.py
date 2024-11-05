@@ -14,10 +14,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 """Util for aware test."""
+import base64
 import datetime
+import json
 import logging
 import time
-from typing import Any, Callable
+from typing import Any, Callable, Dict, List, Optional
 
 from aware import constants
 
@@ -207,3 +209,166 @@ def set_airplane_mode(ad: android_device.AndroidDevice, state: bool):
         time.time() - start_time > _WAIT_TIME_SEC,
         f"Failed to set airplane mode to: {state}",
     )
+
+
+def decode_list(list_of_b64_strings: List[str]) -> List[bytes]:
+  """Converts the list of b64 encoded strings to a list of bytearray.
+
+  Args:
+    list_of_b64_strings: A list of strings, each of which is b64 encoded array.
+
+  Returns:
+    A list of bytearrays.
+  """
+  decoded_list = []
+  for string_item in list_of_b64_strings:
+    decoded_list.append(base64.b64decode(string_item))
+  return decoded_list
+
+
+def encode_list(
+    list_of_objects: List[Any]) -> List[str]:
+  """Converts a list of strings/bytearrays to a list of b64 encoded bytearrays.
+
+  A None object is treated as a zero-length bytearray.
+
+  Args:
+    list_of_objects: A list of strings or bytearray objects.
+  Returns:
+    A list of the same objects, converted to bytes and b64 encoded.
+  """
+  encoded_list = []
+  for obj in list_of_objects:
+    if obj is None:
+      obj = bytes()
+    if isinstance(obj, str):
+      encoded_list.append(base64.b64encode(bytes(obj, "utf-8")).decode("utf-8"))
+    else:
+      encoded_list.append(base64.b64encode(bytes(obj)).decode("utf-8"))
+  return encoded_list
+
+
+def construct_max_match_filter(max_size: int)-> List[bytes]:
+  """Constructs a maximum size match filter that fits into the 'max_size' bytes.
+
+  Match filters are a set of LVs (Length, Value pairs) where L is 1 byte. The
+  maximum size match filter will contain max_size/2 LVs with all Vs (except
+  possibly the last one) of 1 byte, the last V may be 2 bytes for odd max_size.
+
+  Args:
+    max_size: Maximum size of the match filter.
+  Returns:
+    A list of bytearrays.
+  """
+  mf_list = []
+  num_lvs = max_size // 2
+  for i in range(num_lvs - 1):
+    mf_list.append(bytes([i]))
+  if max_size % 2 == 0:
+    mf_list.append(bytes([255]))
+  else:
+    mf_list.append(bytes([254, 255]))
+  return mf_list
+
+
+def validate_forbidden_callbacks(ad: android_device.AndroidDevice,
+                                 limited_cb: Optional[Dict[str, int]] = None
+                                ) -> None:
+  """Validate the specified callbacks have not been called more than permitted.
+
+  In addition to the input configuration also validates that forbidden callbacks
+  have never been called.
+
+  Args:
+    ad: Device on which to run.
+    limited_cb: Dictionary of CB_EV_* ids and maximum permitted calls (0
+                meaning never).
+  Raises:
+    CallBackError: If forbidden callbacks are triggered.
+  """
+  cb_data = json.loads(ad.adb.shell("cmd wifiaware native_cb get_cb_count"))
+  if limited_cb is None:
+    limited_cb = {}
+  # Add callbacks which should never be called.
+  limited_cb["5"] = 0
+  fail = False
+  for cb_event in limited_cb.keys():
+    if cb_event in cb_data:
+      if cb_data[cb_event] > limited_cb[cb_event]:
+        fail = True
+        ad.log.info(
+            "Callback %s observed %d times: more than permitted %d times",
+            cb_event, cb_data[cb_event], limited_cb[cb_event])
+        break
+  if fail:
+    raise CallBackError("Forbidden callbacks observed.")
+
+
+def reset_device_parameters(ad: android_device.AndroidDevice):
+  """Reset device configurations which may have been set by tests.
+  Should be done before tests start (in case previous one was killed
+  without tearing down) and after they end (to leave device in usable
+  state).
+
+  Args:
+    ad: device to be reset
+  """
+  ad.adb.shell("cmd wifiaware reset")
+
+
+def reset_device_statistics(ad: android_device.AndroidDevice,):
+  """Reset device statistics.
+
+  Args:
+    ad: device to be reset
+  """
+  ad.adb.shell("cmd wifiaware native_cb get_cb_count --reset")
+
+def get_aware_capabilities(ad: android_device.AndroidDevice):
+    """Get the Wi-Fi Aware capabilities from the specified device. The
+  capabilities are a dictionary keyed by aware_const.CAP_* keys.
+
+  Args:
+    ad: the Android device
+  Returns: the capability dictionary.
+  """
+    return json.loads(ad.adb.shell('cmd wifiaware state_mgr get_capabilities'))
+
+def create_discovery_config(service_name,
+                            p_type=None,
+                            s_type=None,
+                            ssi=None,
+                            match_filter=None,
+                            ttl=0,
+                            term_cb_enable=True,
+                            instant_mode=None):
+    """Create a publish discovery configuration based on input parameters.
+
+    Args:
+        service_name: Service name - required
+        d_type: Discovery type (publish or subscribe constants)
+        ssi: Supplemental information - defaults to None
+        match_filter, match_filter_list: The match_filter, only one mechanism can
+                                     be used to specify. Defaults to None.
+        ttl: Time-to-live - defaults to 0 (i.e. non-self terminating)
+        term_cb_enable: True (default) to enable callback on termination, False
+                      means that no callback is called when session terminates.
+        instant_mode: set the band to use instant communication mode, 2G or 5G
+    Returns:
+        publish discovery configuration object.
+    """
+    config = {}
+    config[constants.SERVICE_NAME] = service_name
+    if p_type is not None:
+      config[constants.PUBLISH_TYPE] = p_type
+    if s_type is not None:
+      config[constants.SUBSCRIBE_TYPE] = s_type
+    if ssi is not None:
+        config[constants.SERVICE_SPECIFIC_INFO] = ssi
+    if match_filter is not None:
+        config[constants.MATCH_FILTER] = match_filter
+    if instant_mode is not None:
+        config[constants.INSTANTMODE_ENABLE] = instant_mode
+    config[constants.TTL_SEC] = ttl
+    config[constants.TERMINATE_NOTIFICATION_ENABLED] = term_cb_enable
+    return config
