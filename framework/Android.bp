@@ -109,6 +109,7 @@ java_defaults {
         "android.hardware.wifi-V1.0-java-constants",
         "wifi-modules-utils",
         "PlatformProperties",
+        "android.net.wifi.flags-aconfig-java",
     ],
     libs: [
         "androidx.annotation_annotation",
