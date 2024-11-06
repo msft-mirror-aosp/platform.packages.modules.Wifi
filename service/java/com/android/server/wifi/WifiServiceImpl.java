@@ -2288,6 +2288,10 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     // Default country code
                     mSoftApCapability = updateSoftApCapabilityWithAvailableChannelList(
                             mSoftApCapability, mCountryCode.getCountryCode(), null);
+                    if (mWifiNative.isMLDApSupportMLO()) {
+                        mSoftApCapability.setSupportedFeatures(
+                                true, SoftApCapability.SOFTAP_FEATURE_MLO);
+                    }
                 }
                 return mSoftApCapability;
             }
