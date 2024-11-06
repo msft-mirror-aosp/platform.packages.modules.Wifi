@@ -1881,6 +1881,92 @@ public class HalDeviceManagerTest extends WifiBaseTest {
                         }));
     }
 
+    /**
+     * Validates that {@link HalDeviceManager#canDeviceSupportCreateTypeCombo(SparseArray)} with
+     * a faulty stored static chip info will be updated once we load the chip info when the driver
+     * is up.
+     */
+    @Test
+    public void testCanDeviceSupportCreateTypeComboChipV1WithFaultyStoredStaticChipInfo()
+            throws Exception {
+        TestChipV1 chipMock = new TestChipV1();
+        chipMock.initialize();
+        mInOrder = inOrder(mWifiMock, chipMock.chip, mManagerStatusListenerMock);
+
+        // Try to query iface support before starting the HAL. Should return false with the outdated
+        // stored static chip info that's missing AP capabilities.
+        String faultyStaticChipInfo =
+                "["
+                        + "    {"
+                        + "        \"chipId\": 10,"
+                        + "        \"chipCapabilities\": -1,"
+                        + "        \"availableModes\": ["
+                        + "            {"
+                        + "                \"id\": 0,"
+                        + "                \"availableCombinations\": ["
+                        + "                    {"
+                        + "                        \"limits\": ["
+                        + "                            {"
+                        + "                                \"maxIfaces\": 1,"
+                        + "                                \"types\": [0]"
+                        + "                            },"
+                        + "                            {"
+                        + "                                \"maxIfaces\": 1,"
+                        + "                                \"types\": [3, 4]";
+        when(mWifiMock.isStarted()).thenReturn(false);
+        when(mWifiSettingsConfigStore.get(WifiSettingsConfigStore.WIFI_STATIC_CHIP_INFO))
+                .thenReturn(faultyStaticChipInfo);
+
+        // Can't create anything since the stored static chip info is faulty.
+        assertFalse(
+                mDut.canDeviceSupportCreateTypeCombo(
+                        new SparseArray<Integer>() {
+                            {
+                                put(WifiChip.IFACE_CONCURRENCY_TYPE_NAN, 1);
+                            }
+                        }));
+        assertFalse(
+                mDut.canDeviceSupportCreateTypeCombo(
+                        new SparseArray<Integer>() {
+                            {
+                                put(WifiChip.IFACE_CONCURRENCY_TYPE_AP, 1);
+                            }
+                        }));
+
+        verify(mWifiMock, never()).getChipIds();
+        when(mWifiMock.isStarted()).thenReturn(true);
+        executeAndValidateStartupSequence();
+        clearInvocations(mWifiMock);
+
+        // Create a STA to get the static chip info from driver and save it to store.
+        validateInterfaceSequence(
+                chipMock,
+                false, // chipModeValid
+                -1000, // chipModeId (only used if chipModeValid is true)
+                HDM_CREATE_IFACE_STA, // ifaceTypeToCreate
+                "wlan0", // ifaceName
+                TestChipV1.STA_CHIP_MODE_ID, // finalChipMode
+                null, // tearDownList
+                mock(InterfaceDestroyedListener.class), // destroyedListener
+                TEST_WORKSOURCE_0 // requestorWs
+        );
+
+        // Verify that the latest static chip info is saved to store.
+        verify(mWifiSettingsConfigStore)
+                .put(
+                        eq(WifiSettingsConfigStore.WIFI_STATIC_CHIP_INFO),
+                        eq(new JSONArray(TestChipV1.STATIC_CHIP_INFO_JSON_STRING).toString()));
+
+        // Now we can create an AP.
+        assertTrue(
+                mDut.canDeviceSupportCreateTypeCombo(
+                        new SparseArray<Integer>() {
+                            {
+                                put(WifiChip.IFACE_CONCURRENCY_TYPE_AP, 1);
+                            }
+                        }));
+    }
+
     @Test
     public void testIsItPossibleToCreateIfaceTestChipV1() throws Exception {
         assumeTrue(SdkLevel.isAtLeastS());
