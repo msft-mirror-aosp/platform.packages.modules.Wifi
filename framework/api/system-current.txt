@@ -1848,6 +1848,8 @@ package android.net.wifi.twt {
 package android.net.wifi.usd {
 
   @FlaggedApi("android.net.wifi.flags.usd") public class UsdManager {
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherSupported();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isSubscriberSupported();
   }
 
 }

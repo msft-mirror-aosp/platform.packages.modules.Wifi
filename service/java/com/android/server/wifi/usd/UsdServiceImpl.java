@@ -16,11 +16,16 @@
 
 package com.android.server.wifi.usd;
 
+import android.annotation.NonNull;
 import android.content.Context;
 import android.net.wifi.usd.IUsdManager;
+import android.net.wifi.usd.UsdManager;
+import android.os.Binder;
 import android.util.Log;
 
 import com.android.server.wifi.RunnerHandler;
+import com.android.server.wifi.WifiInjector;
+import com.android.server.wifi.util.WifiPermissionsUtil;
 
 /**
  * Implementation of the IUsdManager.
@@ -29,6 +34,9 @@ public class UsdServiceImpl extends IUsdManager.Stub {
     private static final String TAG = UsdServiceImpl.class.getName();
     private final Context mContext;
     private RunnerHandler mHandler;
+    private WifiInjector mWifiInjector;
+    WifiPermissionsUtil mWifiPermissionsUtil;
+
 
     /**
      * Constructor
@@ -40,7 +48,9 @@ public class UsdServiceImpl extends IUsdManager.Stub {
     /**
      * Start the service
      */
-    public void start() {
+    public void start(@NonNull WifiInjector wifiInjector) {
+        mWifiInjector = wifiInjector;
+        mWifiPermissionsUtil = mWifiInjector.getWifiPermissionsUtil();
         Log.i(TAG, "start");
     }
 
@@ -50,4 +60,39 @@ public class UsdServiceImpl extends IUsdManager.Stub {
     public void startLate() {
         Log.i(TAG, "startLate");
     }
+
+    /**
+     * Proxy for the final native call of the parent class. Enables mocking of
+     * the function.
+     */
+    public int getMockableCallingUid() {
+        return Binder.getCallingUid();
+    }
+
+    /**
+     * See {@link UsdManager#isSubscriberSupported()}
+     */
+    @Override
+    public boolean isSubscriberSupported() {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        // Subscriber is not supported.
+        return false;
+    }
+
+    /**
+     * See {@link UsdManager#isPublisherSupported()}
+     */
+    @Override
+    public boolean isPublisherSupported() {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        // Publisher is not supported.
+        return false;
+    }
+
 }

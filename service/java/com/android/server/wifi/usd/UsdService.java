@@ -24,6 +24,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import com.android.server.SystemService;
+import com.android.server.wifi.WifiInjector;
 
 /**
  * Service implementing USD functionality. Delegates actual interface implementation to
@@ -53,7 +54,12 @@ public class UsdService extends SystemService {
             return;
         }
         if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
-            mUsdServiceImpl.start();
+            WifiInjector wifiInjector = WifiInjector.getInstance();
+            if (wifiInjector == null) {
+                Log.e(TAG, "onBootPhase(PHASE_SYSTEM_SERVICES_READY): NULL injector!");
+                return;
+            }
+            mUsdServiceImpl.start(wifiInjector);
         } else if (phase == SystemService.PHASE_BOOT_COMPLETED) {
             mUsdServiceImpl.startLate();
         }

@@ -21,4 +21,7 @@ package android.net.wifi.usd;
  *
  * {@hide}
  */
-interface IUsdManager {}
+interface IUsdManager {
+    boolean isSubscriberSupported();
+    boolean isPublisherSupported();
+}
