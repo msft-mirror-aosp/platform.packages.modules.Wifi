@@ -29,6 +29,7 @@ android_app {
         "androidx.appcompat_appcompat",
     ],
     srcs: ["src/**/*.java"],
+    min_sdk_version: "30",
     sdk_version: "module_current",
 
     apex_available: [
