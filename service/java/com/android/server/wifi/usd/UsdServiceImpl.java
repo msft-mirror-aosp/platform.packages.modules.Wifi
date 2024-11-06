@@ -18,6 +18,7 @@ package com.android.server.wifi.usd;
 
 import android.annotation.NonNull;
 import android.content.Context;
+import android.net.wifi.usd.IAvailabilityCallback;
 import android.net.wifi.usd.IUsdManager;
 import android.net.wifi.usd.UsdManager;
 import android.os.Binder;
@@ -26,6 +27,8 @@ import android.util.Log;
 import com.android.server.wifi.RunnerHandler;
 import com.android.server.wifi.WifiInjector;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+
+import java.util.concurrent.Executor;
 
 /**
  * Implementation of the IUsdManager.
@@ -95,4 +98,52 @@ public class UsdServiceImpl extends IUsdManager.Stub {
         return false;
     }
 
+    /**
+     * See {@link UsdManager#isSubscriberAvailable()}
+     */
+    @Override
+    public boolean isSubscriberAvailable() {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        Log.i(TAG, "Subscriber is not available");
+        return false;
+    }
+
+    /**
+     * See {@link UsdManager#isPublisherAvailable()}
+     */
+    @Override
+    public boolean isPublisherAvailable() {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        Log.i(TAG, "Publisher is not available");
+        return false;
+    }
+
+    /**
+     * See
+     * {@link UsdManager#registerAvailabilityCallback(Executor, UsdManager.AvailabilityCallback)}
+     */
+    @Override
+    public void registerAvailabilityCallback(IAvailabilityCallback callback) {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+    }
+
+    /**
+     * See {@link UsdManager#unregisterAvailabilityCallback(UsdManager.AvailabilityCallback)}
+     */
+    @Override
+    public void unregisterAvailabilityCallback(IAvailabilityCallback callback) {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+    }
 }

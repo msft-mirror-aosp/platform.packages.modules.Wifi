@@ -1848,8 +1848,17 @@ package android.net.wifi.twt {
 package android.net.wifi.usd {
 
   @FlaggedApi("android.net.wifi.flags.usd") public class UsdManager {
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherAvailable();
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherSupported();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isSubscriberAvailable();
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isSubscriberSupported();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void registerAvailabilityCallback(@NonNull java.util.concurrent.Executor, @NonNull android.net.wifi.usd.UsdManager.AvailabilityCallback);
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void unregisterAvailabilityCallback(@NonNull android.net.wifi.usd.UsdManager.AvailabilityCallback);
+  }
+
+  public static interface UsdManager.AvailabilityCallback {
+    method public default void onPublisherAvailable();
+    method public default void onSubscriberAvailable();
   }
 
 }

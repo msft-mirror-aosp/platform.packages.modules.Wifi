@@ -18,6 +18,7 @@ package android.net.wifi.usd;
 
 import static android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION;
 
+import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.RequiresApi;
@@ -27,8 +28,14 @@ import android.annotation.SystemService;
 import android.content.Context;
 import android.net.wifi.flags.Flags;
 import android.net.wifi.util.Environment;
+import android.os.Binder;
 import android.os.Build;
 import android.os.RemoteException;
+import android.util.Log;
+import android.util.SparseArray;
+
+import java.util.Objects;
+import java.util.concurrent.Executor;
 
 /**
  * This class provides the APIs for managing Unsynchronized Service Discovery (USD). USD is a
@@ -58,6 +65,9 @@ public class UsdManager {
     private final Context mContext;
     private final IUsdManager mService;
     private static final String TAG = UsdManager.class.getName();
+
+    private static final SparseArray<IAvailabilityCallback> sAvailabilityCallbackMap =
+            new SparseArray<>();
 
     /** @hide */
     public UsdManager(@NonNull Context context, @NonNull IUsdManager service) {
@@ -100,6 +110,149 @@ public class UsdManager {
             return mService.isPublisherSupported();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Checks if the subscriber feature is currently available or not. Due to concurrent operations
+     * such as Station, SoftAP, Wi-Fi Aware, Wi-Fi Direct ..etc. the subscriber functionality
+     * may not be available.
+     *
+     * @return true if subscriber feature is available, otherwise false.
+     */
+    @RequiresPermission(MANAGE_WIFI_NETWORK_SELECTION)
+    public boolean isSubscriberAvailable() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        try {
+            return mService.isSubscriberAvailable();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+
+    /**
+     * Checks if the publisher feature is currently available or not. Due to concurrent
+     * operations such as Station, SoftAP, Wi-Fi Aware, Wi-Fi Direct ..etc.  the publisher
+     * functionality may not be available.
+     *
+     * @return true if publisher feature is available, otherwise false.
+     */
+    @RequiresPermission(MANAGE_WIFI_NETWORK_SELECTION)
+    public boolean isPublisherAvailable() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        try {
+            return mService.isPublisherAvailable();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    private static class AvailabilityCallbackProxy extends IAvailabilityCallback.Stub {
+        private final Executor mExecutor;
+        private final AvailabilityCallback mAvailabilityCallback;
+
+        private AvailabilityCallbackProxy(Executor executor,
+                AvailabilityCallback availabilityCallback) {
+            mExecutor = executor;
+            mAvailabilityCallback = availabilityCallback;
+        }
+
+        @Override
+        public void onSubscriberAvailable() {
+            Log.d(TAG, "onSubscriberAvailable");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(mAvailabilityCallback::onSubscriberAvailable);
+        }
+
+        @Override
+        public void onPublisherAvailable() {
+            Log.d(TAG, "onPublisherAvailable");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(mAvailabilityCallback::onPublisherAvailable);
+        }
+
+    }
+
+    /**
+     * Interface for indicating publisher or subscriber availability.
+     */
+    public interface AvailabilityCallback {
+        /**
+         * Callback to notify subscriber functionality is available.
+         */
+        default void onSubscriberAvailable() {
+        }
+
+        /**
+         * Callback to notify publisher functionality is available.
+         */
+        default void onPublisherAvailable() {
+        }
+    }
+
+    /**
+     * Register for publisher or subscriber availability. Concurrent operations such as Station,
+     * SoftAP, Wi-Fi Aware, Wi-Fi Direct ..etc. impact the current availability of publisher or
+     * subscriber functionality.
+     *
+     * @param executor The Executor on whose thread to execute the callbacks of the {@code
+     *                 callback} object
+     * @param callback Callback for USD roles availability
+     * @throws NullPointerException if executor or callback is null
+     */
+    @RequiresPermission(MANAGE_WIFI_NETWORK_SELECTION)
+    public void registerAvailabilityCallback(@NonNull @CallbackExecutor Executor executor,
+            @NonNull AvailabilityCallback callback) {
+        Objects.requireNonNull(executor, "executor must not be null");
+        Objects.requireNonNull(callback, "callback must not be null");
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        final int callbackHash = System.identityHashCode(callback);
+        synchronized (sAvailabilityCallbackMap) {
+            try {
+                IAvailabilityCallback.Stub availabilityCallbackProxy =
+                        new AvailabilityCallbackProxy(executor, callback);
+                sAvailabilityCallbackMap.put(callbackHash, availabilityCallbackProxy);
+                mService.registerAvailabilityCallback(availabilityCallbackProxy);
+            } catch (RemoteException e) {
+                sAvailabilityCallbackMap.remove(callbackHash);
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * Unregister the callback previously registered with
+     * {@link #registerAvailabilityCallback(Executor, AvailabilityCallback)}.
+     *
+     * @param callback a registered callback
+     * @throws NullPointerException if callback is null
+     */
+    @RequiresPermission(MANAGE_WIFI_NETWORK_SELECTION)
+    public void unregisterAvailabilityCallback(@NonNull AvailabilityCallback callback) {
+        Objects.requireNonNull(callback, "callback must not be null");
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        final int callbackHash = System.identityHashCode(callback);
+        synchronized (sAvailabilityCallbackMap) {
+            try {
+                if (!sAvailabilityCallbackMap.contains(callbackHash)) {
+                    Log.w(TAG, "Unknown callback");
+                    return;
+                }
+                mService.unregisterAvailabilityCallback(sAvailabilityCallbackMap.get(callbackHash));
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            } finally {
+                sAvailabilityCallbackMap.remove(callbackHash);
+            }
         }
     }
 }

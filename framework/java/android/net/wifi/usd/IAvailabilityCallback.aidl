@@ -16,18 +16,18 @@
 
 package android.net.wifi.usd;
 
-import android.net.wifi.usd.IAvailabilityCallback;
-
 /**
- * Interface that UsdService implements
+ * Interface for USD availability callback.
  *
- * {@hide}
+ * @hide
  */
-interface IUsdManager {
-    boolean isSubscriberSupported();
-    boolean isPublisherSupported();
-    boolean isSubscriberAvailable();
-    boolean isPublisherAvailable();
-    void registerAvailabilityCallback(IAvailabilityCallback callback);
-    void unregisterAvailabilityCallback(IAvailabilityCallback callback);
+oneway interface IAvailabilityCallback {
+    /**
+     * Called when subscriber is available
+     */
+    void onSubscriberAvailable();
+    /**
+     * Called when publisher is available
+     */
+    void onPublisherAvailable();
 }
