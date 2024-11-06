@@ -21,6 +21,8 @@ import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_LC
 import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_LCR;
 import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_NTB_INITIATOR;
 import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_ONE_SIDED_RTT;
+import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_RANGING_FRAME_PROTECTION_SUPPORTED;
+import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_SECURE_HE_LTF_SUPPORTED;
 import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_STA_RESPONDER;
 
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_VERBOSE_LOGGING_ENABLED;
@@ -240,6 +242,9 @@ public class RttServiceImpl extends IWifiRttManager.Stub {
                             j.put("mcVersion", mCapabilities.mcVersion);
                             j.put("ntbInitiatorSupported", mCapabilities.ntbInitiatorSupported);
                             j.put("ntbResponderSupported", mCapabilities.ntbResponderSupported);
+                            j.put("secureHeLtfSupported", mCapabilities.secureHeLtfSupported);
+                            j.put("rangingFrameProtectionSupported",
+                                    mCapabilities.rangingFrameProtectionSupported);
                         } catch (JSONException e) {
                             Log.e(TAG, "onCommand: get_capabilities e=" + e);
                         }
@@ -483,6 +488,10 @@ public class RttServiceImpl extends IWifiRttManager.Stub {
                 capabilities.responderSupported);
         characteristics.putBoolean(CHARACTERISTICS_KEY_BOOLEAN_NTB_INITIATOR,
                 capabilities.ntbInitiatorSupported);
+        characteristics.putBoolean(CHARACTERISTICS_KEY_BOOLEAN_SECURE_HE_LTF_SUPPORTED,
+                capabilities.secureHeLtfSupported);
+        characteristics.putBoolean(CHARACTERISTICS_KEY_BOOLEAN_RANGING_FRAME_PROTECTION_SUPPORTED,
+                capabilities.rangingFrameProtectionSupported);
         return characteristics;
     }
 
