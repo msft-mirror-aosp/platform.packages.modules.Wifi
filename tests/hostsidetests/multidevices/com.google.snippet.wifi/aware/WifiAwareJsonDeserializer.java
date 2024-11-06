@@ -17,25 +17,30 @@
 
 package com.google.snippet.wifi.aware;
 
+import android.net.MacAddress;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.wifi.aware.AwarePairingConfig;
+import android.net.wifi.aware.PeerHandle;
 import android.net.wifi.aware.PublishConfig;
 import android.net.wifi.aware.SubscribeConfig;
 import android.net.wifi.aware.WifiAwareDataPathSecurityConfig;
 import android.net.wifi.aware.WifiAwareNetworkSpecifier;
+import android.net.wifi.rtt.RangingRequest;
 
 import androidx.annotation.NonNull;
 
+import com.android.modules.utils.build.SdkLevel;
+
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import com.android.modules.utils.build.SdkLevel;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Deserializes JSONObject into data objects defined in Wi-Fi Aware API.
@@ -82,6 +87,10 @@ public class WifiAwareJsonDeserializer {
     public static final int WIFI_BAND_5_GHZ = 1;
     /** DFS channels from 5 GHz band only */
     public static final int WIFI_BAND_5_GHZ_DFS_ONLY  = 1;
+
+    // Fields for rangingRequest
+    private static final String RANGING_REQUEST_PEER_IDS = "peer_ids";
+    private static final String RANGING_REQUEST_PEER_MACS = "peer_mac_addresses";
 
 
     private WifiAwareJsonDeserializer() {
@@ -334,5 +343,43 @@ public class WifiAwareJsonDeserializer {
         }
         return builder.build();
 
+    }
+
+    /**
+     * Converts the ranging request from JSONObject to {@link android.net.wifi.rtt.RangingRequest}.
+     * This converts peer IDs in the request to Wi-Fi Aware peer handles in
+     * {@link #mPeerHandles mPeerHandles}.
+     *
+     * @param jsonObject        The ranging request in JSONObject type.
+     * @param peerHandles       All Wi-Fi Aware peers.
+     * @return The converted ranging request.
+     */
+    public static RangingRequest jsonToRangingRequest(
+            @NonNull JSONObject jsonObject, ConcurrentHashMap<Integer, PeerHandle> peerHandles
+    ) throws JSONException, IllegalArgumentException {
+        RangingRequest.Builder builder = new RangingRequest.Builder();
+        if (jsonObject.has(RANGING_REQUEST_PEER_IDS)) {
+            JSONArray values = jsonObject.getJSONArray(RANGING_REQUEST_PEER_IDS);
+            for (int i = 0; i < values.length(); i++) {
+                int peerId = values.getInt(i);
+                PeerHandle handle = peerHandles.get(peerId);
+                if (handle == null) {
+                    throw new IllegalArgumentException(
+                        "Got an invalid peerId. peerId: " + peerId + ", all peer Handles: "
+                            + peerHandles
+                    );
+                }
+                builder.addWifiAwarePeer(handle);
+            }
+        }
+        if (jsonObject.has(RANGING_REQUEST_PEER_MACS)) {
+            JSONArray values = jsonObject.getJSONArray(RANGING_REQUEST_PEER_MACS);
+            for (int i = 0; i < values.length(); i++) {
+                String macAddressStr = values.getString(i);
+                MacAddress macAddress = MacAddress.fromString(macAddressStr);
+                builder.addWifiAwarePeer(macAddress);
+            }
+        }
+        return builder.build();
     }
 }
