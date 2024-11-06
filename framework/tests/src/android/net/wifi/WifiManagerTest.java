@@ -141,6 +141,8 @@ import com.android.modules.utils.HandlerExecutor;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.wifi.x.com.android.modules.utils.ParceledListSlice;
 
+import com.google.common.collect.ImmutableList;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -190,6 +192,8 @@ public class WifiManagerTest {
     private static final String TEST_SSID = "\"Test WiFi Networks\"";
     private static final byte[] TEST_OUI = new byte[]{0x01, 0x02, 0x03};
     private static final int TEST_LINK_LAYER_STATS_POLLING_INTERVAL_MS = 1000;
+    private static final int TEST_DISCONNECT_REASON =
+            DeauthenticationReasonCode.REASON_AUTHORIZED_ACCESS_LIMIT_REACHED;
 
     private static final TetheringManager.TetheringRequest TEST_TETHERING_REQUEST =
             new TetheringManager.TetheringRequest.Builder(TetheringManager.TETHERING_WIFI).build();
@@ -1810,6 +1814,25 @@ public class WifiManagerTest {
         mLooper.dispatchAll();
         verify(mSoftApCallback).onBlockedClientConnecting(testWifiClient,
                 WifiManager.SAP_CLIENT_BLOCK_REASON_CODE_NO_MORE_STAS);
+    }
+
+    /*
+     * Verify client-provided callback is being called through callback proxy.
+     */
+    @Test
+    public void softApCallbackProxyCallsOnClientsDisconnected() throws Exception {
+        WifiClient testWifiClient = new WifiClient(MacAddress.fromString("22:33:44:55:66:77"),
+                TEST_AP_INSTANCES[0], TEST_DISCONNECT_REASON);
+        ArgumentCaptor<ISoftApCallback.Stub> callbackCaptor =
+                ArgumentCaptor.forClass(ISoftApCallback.Stub.class);
+        mWifiManager.registerSoftApCallback(new HandlerExecutor(mHandler), mSoftApCallback);
+        verify(mWifiService).registerSoftApCallback(callbackCaptor.capture());
+
+        callbackCaptor.getValue().onClientsDisconnected(mTestApInfo1,
+                ImmutableList.of(testWifiClient));
+        mLooper.dispatchAll();
+        verify(mSoftApCallback).onClientsDisconnected(mTestApInfo1,
+                ImmutableList.of(testWifiClient));
     }
 
     /*
