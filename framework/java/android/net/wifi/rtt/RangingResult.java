@@ -19,6 +19,7 @@ package android.net.wifi.rtt;
 import android.annotation.ElapsedRealtimeLong;
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
+import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
@@ -114,6 +115,10 @@ public final class RangingResult implements Parcelable {
     private final int mNumTxSpatialStreams;
     private final int mNumRxSpatialStreams;
     private List<OuiKeyedData> mVendorData;
+    private final boolean mIsRangingAuthenticated;
+    private final boolean mIsRangingFrameProtected;
+    private final boolean mIsSecureHeLtfEnabled;
+    private final int mSecureHeLtfProtocolVersion;
 
     /**
      * Builder class used to construct {@link RangingResult} objects.
@@ -143,6 +148,10 @@ public final class RangingResult implements Parcelable {
         private int mNumTxSpatialStreams = UNSPECIFIED;
         private int mNumRxSpatialStreams = UNSPECIFIED;
         private List<OuiKeyedData> mVendorData = Collections.emptyList();
+        private  boolean mIsRangingAuthenticated;
+        private  boolean mIsRangingFrameProtected;
+        private  boolean mIsSecureHeLtfEnabled;
+        private  int mSecureHeLtfProtocolVersion;
 
         /**
          * Sets the Range result status.
@@ -496,6 +505,67 @@ public final class RangingResult implements Parcelable {
         }
 
         /**
+         * Set whether mutual authentication is done for the ranging. Authentication of ranging
+         * enables frame protection also. See {@link #setRangingFrameProtected(boolean)}.
+         *
+         * @param isRangingAuthenticated true if ranging is mutually authenticated, otherwise false.
+         * @return The builder to facilitate chaining.
+         */
+        @NonNull
+        @FlaggedApi(Flags.FLAG_SECURE_RANGING)
+        public Builder setRangingAuthenticated(boolean isRangingAuthenticated) {
+            mIsRangingAuthenticated = isRangingAuthenticated;
+            return this;
+        }
+
+        /**
+         * Set whether ranging frames are protected. Frame protection provides both encryption and
+         * integrity protection to the ranging frames.
+         *
+         * @param isRangingFrameProtected true if ranging frames are protected, otherwise false.
+         * @return The builder to facilitate chaining.
+         */
+        @NonNull
+        @FlaggedApi(Flags.FLAG_SECURE_RANGING)
+        public Builder setRangingFrameProtected(boolean isRangingFrameProtected) {
+            mIsRangingFrameProtected = isRangingFrameProtected;
+            return this;
+        }
+
+        /**
+         * Set whether secure HE-LTF is used for this ranging.
+         *
+         * @param isSecureHeLtfEnabled true if secure HE-LTF is enabled, otherwise false.
+         * @return The builder to facilitate chaining.
+         */
+        @NonNull
+        @FlaggedApi(Flags.FLAG_SECURE_RANGING)
+        public Builder setSecureHeLtfEnabled(boolean isSecureHeLtfEnabled) {
+            mIsSecureHeLtfEnabled = isSecureHeLtfEnabled;
+            return this;
+        }
+
+        /**
+         * Set secure HE-LTF protocol version used for this ranging.
+         *
+         * The secure HE-LTF negotiation supports negotiation of the secure HE-LTF protocol version
+         * which allows a responder and an initiator to negotiate the highest mutually supported
+         * secure HE-LTF protocol version.
+         *
+         * Refer IEEE 802.11az-2022 spec, section 9.4.2.298 Ranging Parameters element.
+         *
+         * @param secureHeLtfProtocolVersion Secure HE-LTF protocol version.
+         * @return The builder to facilitate chaining.
+         */
+        @NonNull
+        @FlaggedApi(Flags.FLAG_SECURE_RANGING)
+        public Builder setSecureHeLtfProtocolVersion(
+                @IntRange(from = 0, to = 7) int secureHeLtfProtocolVersion) {
+            mSecureHeLtfProtocolVersion = secureHeLtfProtocolVersion;
+            return  this;
+        }
+
+        /**
          * Build {@link RangingResult}
          * @return an instance of {@link RangingResult}
          */
@@ -539,6 +609,10 @@ public final class RangingResult implements Parcelable {
         mNumRxSpatialStreams = builder.mNumRxSpatialStreams;
         mNumTxSpatialStreams = builder.mNumTxSpatialStreams;
         mVendorData = builder.mVendorData;
+        mIsRangingAuthenticated = builder.mIsRangingAuthenticated;
+        mIsRangingFrameProtected = builder.mIsRangingFrameProtected;
+        mIsSecureHeLtfEnabled = builder.mIsSecureHeLtfEnabled;
+        mSecureHeLtfProtocolVersion = builder.mSecureHeLtfProtocolVersion;
     }
 
     /**
@@ -902,6 +976,51 @@ public final class RangingResult implements Parcelable {
             throw new UnsupportedOperationException();
         }
         return mVendorData;
+    }
+
+    /**
+     * @return whether the ranging is authenticated or not.
+     *
+     * Refer IEEE 802.11az-2022 spec, section 12 Security.
+     */
+    @FlaggedApi(Flags.FLAG_SECURE_RANGING)
+    public boolean isRangingAuthenticated() {
+        return mIsRangingAuthenticated;
+    }
+
+    /**
+     * @return whether the ranging frames are protected or not.
+     *
+     * Refer IEEE 802.11az-2022 spec, section 12 Security.
+     */
+    @FlaggedApi(Flags.FLAG_SECURE_RANGING)
+    public boolean isRangingFrameProtected() {
+        return mIsRangingFrameProtected;
+    }
+
+    /**
+     * @return whether the secure HE-LTF is enabled or not.
+     *
+     * Refer IEEE 802.11az-2022 spec, section 9.4.2.298 Ranging Parameters element.
+     */
+    @FlaggedApi(Flags.FLAG_SECURE_RANGING)
+    public boolean isSecureHeLtfEnabled() {
+        return mIsSecureHeLtfEnabled;
+    }
+
+    /**
+     * Get Secure HE-LTF protocol version used.
+     *
+     * The secure HE-LTF negotiation supports negotiation of the secure HE-LTF protocol version
+     * which allows a responder and an initiator to negotiate the highest mutually supported
+     * secure HE-LTF protocol version.
+     *
+     * Refer IEEE 802.11az-2022 spec, section 9.4.2.298 Ranging Parameters element.
+     */
+    @FlaggedApi(Flags.FLAG_SECURE_RANGING)
+    @IntRange(from = 0, to = 7)
+    public int getSecureHeLtfProtocolVersion() {
+        return mSecureHeLtfProtocolVersion;
     }
 
     @Override
