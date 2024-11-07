@@ -6774,6 +6774,17 @@ public class WifiManager {
                 @SapClientBlockedReason int blockedReason) {
             // Do nothing: can be used to ask user to update client to allowed list or blocked list.
         }
+
+        /**
+         * Called when clients disconnect from a soft AP instance.
+         *
+         * @param info The {@link SoftApInfo} of the AP.
+         * @param clients The clients that have disconnected from the AP instance specified by
+         *                {@code info}.
+         */
+        @FlaggedApi(Flags.FLAG_SOFTAP_DISCONNECT_REASON)
+        default void onClientsDisconnected(@NonNull SoftApInfo info,
+                @NonNull List<WifiClient> clients) {}
     }
 
     /**
@@ -6950,6 +6961,18 @@ public class WifiManager {
             mExecutor.execute(() -> {
                 mCallback.onBlockedClientConnecting(client, blockedReason);
             });
+        }
+
+        @Override
+        public void onClientsDisconnected(SoftApInfo info, List<WifiClient> clients) {
+            if (mVerboseLoggingEnabled) {
+                Log.v(TAG, "SoftApCallbackProxy on mode " + mIpMode
+                        + ", onClientsDisconnected: info =" + info
+                        + " with clients = " + clients);
+            }
+
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mCallback.onClientsDisconnected(info, clients));
         }
     }
 
