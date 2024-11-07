@@ -1963,6 +1963,13 @@ package android.net.wifi.usd {
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void sendMessage(int, @NonNull byte[], @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Boolean>);
   }
 
+  @FlaggedApi("android.net.wifi.flags.usd") public class SubscribeSessionCallback extends android.net.wifi.usd.SessionCallback {
+    ctor public SubscribeSessionCallback();
+    method public void onServiceDiscovered(@NonNull android.net.wifi.usd.DiscoveryResult);
+    method public void onSubscribeFailed(int);
+    method public void onSubscribeStarted(@NonNull android.net.wifi.usd.SubscribeSession);
+  }
+
   @FlaggedApi("android.net.wifi.flags.usd") public class UsdManager {
     method @Nullable @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public android.net.wifi.usd.Characteristics getCharacteristics();
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherAvailable();
