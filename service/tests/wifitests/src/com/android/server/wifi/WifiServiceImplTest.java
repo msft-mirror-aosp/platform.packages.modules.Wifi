@@ -66,6 +66,7 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_LO
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TRANSIENT;
 import static com.android.server.wifi.LocalOnlyHotspotRequestInfo.HOTSPOT_NO_ERROR;
 import static com.android.server.wifi.SelfRecovery.REASON_API_CALL;
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 import static com.android.server.wifi.WifiConfigurationTestUtil.SECURITY_NONE;
 import static com.android.server.wifi.WifiSettingsConfigStore.D2D_ALLOWED_WHEN_INFRA_STA_DISABLED;
 import static com.android.server.wifi.WifiSettingsConfigStore.SHOW_DIALOG_WHEN_THIRD_PARTY_APPS_ENABLE_WIFI;
@@ -73,7 +74,6 @@ import static com.android.server.wifi.WifiSettingsConfigStore.SHOW_DIALOG_WHEN_T
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_VERBOSE_LOGGING_ENABLED;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_WEP_ALLOWED;
-import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -4337,6 +4337,19 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mStateMachineSoftApCallback.onStateChanged(state);
         mLooper.dispatchAll();
         verify(mClientSoftApCallback).onStateChanged(eq(state));
+    }
+
+    /**
+     * Verify that soft AP callback is called on ClientsDisconnected event
+     */
+    @Test
+    public void callsRegisteredCallbacksOnClientsDisconnectedEvent() throws Exception {
+        List<WifiClient> testClients = new ArrayList<>();
+        registerSoftApCallbackAndVerify(mClientSoftApCallback);
+
+        mStateMachineSoftApCallback.onClientsDisconnected(mTestSoftApInfo, testClients);
+        mLooper.dispatchAll();
+        verify(mClientSoftApCallback).onClientsDisconnected(eq(mTestSoftApInfo), eq(testClients));
     }
 
     /**
@@ -13045,5 +13058,30 @@ public class WifiServiceImplTest extends WifiBaseTest {
         // WEP disconnect logic moved to WepNetworkUsageController.
         verify(cmmWep, never()).disconnect();
         verify(mWifiGlobals, never()).setWepAllowed(anyBoolean());
+    }
+
+    @Test
+    public void testUpdateSoftApCapabilityCheckMLOSupport() throws Exception {
+        lenient().when(SubscriptionManager.getActiveDataSubscriptionId())
+                .thenReturn(SubscriptionManager.DEFAULT_SUBSCRIPTION_ID);
+        ArgumentCaptor<SoftApCapability> capabilityArgumentCaptor = ArgumentCaptor.forClass(
+                SoftApCapability.class);
+        when(mWifiNative.isMLDApSupportMLO()).thenReturn(true);
+        mWifiServiceImpl.checkAndStartWifi();
+        mLooper.dispatchAll();
+        verify(mContext).registerReceiver(mBroadcastReceiverCaptor.capture(),
+                argThat((IntentFilter filter) ->
+                        filter.hasAction(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED)),
+                isNull(),
+                any(Handler.class));
+
+        // Send the broadcast
+        Intent intent = new Intent(CarrierConfigManager.ACTION_CARRIER_CONFIG_CHANGED);
+        mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
+        mLooper.dispatchAll();
+        verify(mActiveModeWarden).updateSoftApCapability(capabilityArgumentCaptor.capture(),
+                eq(WifiManager.IFACE_IP_MODE_TETHERED));
+        assertTrue(capabilityArgumentCaptor.getValue()
+                .areFeaturesSupported(SoftApCapability.SOFTAP_FEATURE_MLO));
     }
 }
