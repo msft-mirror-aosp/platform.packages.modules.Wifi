@@ -19,6 +19,10 @@ package android.net.wifi.usd;
 import android.net.wifi.IBooleanListener;
 import android.net.wifi.usd.Characteristics;
 import android.net.wifi.usd.IAvailabilityCallback;
+import android.net.wifi.usd.IPublishSessionCallback;
+import android.net.wifi.usd.ISubscribeSessionCallback;
+import android.net.wifi.usd.PublishConfig;
+import android.net.wifi.usd.SubscribeConfig;
 
 /**
  * Interface that UsdService implements
@@ -37,4 +41,6 @@ interface IUsdManager {
     void cancelSubscribe(int sessionId);
     void cancelPublish(int sessionId);
     void updatePublish(int sessionId, in byte[] ssi);
+    void publish(in PublishConfig publishConfig, IPublishSessionCallback callback);
+    void subscribe(in SubscribeConfig subscribeConfig, ISubscribeSessionCallback callback);
 }

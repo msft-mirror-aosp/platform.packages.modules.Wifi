@@ -221,7 +221,6 @@ public class UsdManager {
             Binder.clearCallingIdentity();
             mExecutor.execute(mAvailabilityCallback::onPublisherAvailable);
         }
-
     }
 
     /**
@@ -316,6 +315,191 @@ public class UsdManager {
         }
         try {
             return mService.getCharacteristics();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    private static class PublishSessionCallbackProxy extends IPublishSessionCallback.Stub {
+        private final Executor mExecutor;
+        private final PublishSessionCallback mPublishSessionCallback;
+        private final UsdManager mUsdManager;
+
+        private PublishSessionCallbackProxy(UsdManager usdManager, Executor executor,
+                PublishSessionCallback publishSessionCallback) {
+            mUsdManager = usdManager;
+            mExecutor = executor;
+            mPublishSessionCallback = publishSessionCallback;
+        }
+
+        @Override
+        public void onPublishFailed(int reasonCode) throws RemoteException {
+            Log.d(TAG, "onPublishFailed (reasonCode = " + reasonCode + " )");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mPublishSessionCallback.onPublishFailed(reasonCode));
+        }
+
+        @Override
+        public void onPublishStarted(int sessionId) throws RemoteException {
+            Log.d(TAG, "onPublishStarted ( sessionId = " + sessionId + " )");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mPublishSessionCallback.onPublishStarted(
+                    new PublishSession(mUsdManager, sessionId)));
+        }
+
+        @Override
+        public void onPublishReplied(int peerId, byte[] ssi, int protoType, boolean isFsdEnabled)
+                throws RemoteException {
+            Log.d(TAG, "onPublishReplied ( peerId = " + peerId + ", protoType = " + protoType
+                    + ", isFsdEnabled = " + isFsdEnabled + " )");
+            Binder.clearCallingIdentity();
+            DiscoveryResult discoveryResult = new DiscoveryResult.Builder(peerId)
+                    .setServiceSpecificInfo(ssi)
+                    .setServiceProtoType(protoType)
+                    .setFsdEnabled(isFsdEnabled)
+                    .build();
+            mExecutor.execute(() -> mPublishSessionCallback.onPublishReplied(discoveryResult));
+        }
+
+        @Override
+        public void onPublishSessionTerminated(int reasonCode) throws RemoteException {
+            Log.d(TAG, "onPublishSessionTerminated ( reasonCode = " + reasonCode + " )");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mPublishSessionCallback.onSessionTerminated(reasonCode));
+        }
+
+        @Override
+        public void onMessageReceived(int peerId, byte[] message) throws RemoteException {
+            Log.d(TAG, "onMessageReceived ( peerId = " + peerId + " )");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mPublishSessionCallback.onMessageReceived(peerId, message));
+        }
+    }
+
+
+    /**
+     * Issue a request to the USD service to create a new publish session using the specified
+     * {@link PublishConfig} configuration. The result of the publish operation are routed to the
+     * callbacks of {@link PublishSessionCallback}.
+     *
+     * <p>Note: Maximum number of publish sessions are limited by
+     * {@link Characteristics#getMaxNumberOfPublishSessions()}.
+     *
+     * @param publishConfig          The {@link PublishConfig} specifying the configuration of the
+     *                               requested publish session.
+     * @param executor               The Executor on whose thread to execute the callbacks of the
+     *                               {@link PublishSessionCallback}
+     * @param publishSessionCallback A {@link PublishSessionCallback} object to be used for session
+     *                               event callback
+     */
+    @RequiresPermission(MANAGE_WIFI_NETWORK_SELECTION)
+    public void publish(@NonNull PublishConfig publishConfig,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull PublishSessionCallback publishSessionCallback) {
+        Objects.requireNonNull(publishConfig, "publishConfig must not be null");
+        Objects.requireNonNull(executor, "executor must not be null");
+        Objects.requireNonNull(publishSessionCallback, "publishSessionCallback must not be null");
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        try {
+            PublishSessionCallbackProxy publishSessionCallbackProxy =
+                    new PublishSessionCallbackProxy(this, executor, publishSessionCallback);
+            mService.publish(publishConfig, publishSessionCallbackProxy);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    private static class SubscribeSessionCallbackProxy extends ISubscribeSessionCallback.Stub {
+        private final UsdManager mUsdManager;
+        private final Executor mExecutor;
+        private final SubscribeSessionCallback mSubscribeSessionCallback;
+
+        private SubscribeSessionCallbackProxy(UsdManager usdManager, Executor executor,
+                SubscribeSessionCallback subscribeSessionCallback) {
+            mUsdManager = usdManager;
+            mExecutor = executor;
+            mSubscribeSessionCallback = subscribeSessionCallback;
+        }
+
+        @Override
+        public void onSubscribeFailed(int reasonCode) throws RemoteException {
+            Log.d(TAG, "onSubscribeFailed (reasonCode = " + reasonCode + " )");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mSubscribeSessionCallback.onSubscribeFailed(reasonCode));
+        }
+
+        @Override
+        public void onSubscribeStarted(int sessionId) throws RemoteException {
+            Log.d(TAG, "onSubscribeStarted ( sessionId = " + sessionId + " )");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mSubscribeSessionCallback.onSubscribeStarted(
+                    new SubscribeSession(mUsdManager, sessionId)));
+        }
+
+        @Override
+        public void onSubscribeDiscovered(int peerId, byte[] ssi, int protoType,
+                boolean isFsdEnabled)
+                throws RemoteException {
+            Log.d(TAG, "onSubscribeDiscovered ( peerId = " + peerId + ", protoType = " + protoType
+                    + ", isFsdEnabled = " + isFsdEnabled + " )");
+            Binder.clearCallingIdentity();
+            DiscoveryResult discoveryResult = new DiscoveryResult.Builder(peerId)
+                    .setServiceSpecificInfo(ssi)
+                    .setServiceProtoType(protoType)
+                    .setFsdEnabled(isFsdEnabled)
+                    .build();
+            mExecutor.execute(() -> mSubscribeSessionCallback.onServiceDiscovered(discoveryResult));
+        }
+
+        @Override
+        public void onSubscribeSessionTerminated(int reasonCode) throws RemoteException {
+            Log.d(TAG, "onSubscribeSessionTerminated ( reasonCode = " + reasonCode + " )");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mSubscribeSessionCallback.onSessionTerminated(reasonCode));
+        }
+
+        @Override
+        public void onMessageReceived(int peerId, byte[] message) throws RemoteException {
+            Log.d(TAG, "onMessageReceived ( peerId = " + peerId + " )");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mSubscribeSessionCallback.onMessageReceived(peerId, message));
+        }
+    }
+
+
+    /**
+     * Issue a request to the USD service to create a new subscribe session using the specified
+     * {@link SubscribeConfig} configuration. The result of the subscribe operation are
+     * routed to
+     * the callbacks of {@link SubscribeSessionCallback}.
+     *
+     * <p>Note: Maximum number of subscribe sessions are limited by
+     * {@link Characteristics#getMaxNumberOfSubscribeSessions()}.
+     *
+     * @param subscribeConfig          The {@link SubscribeConfig} specifying the
+     *                                 configuration of the requested subscribe session.
+     * @param executor                 The Executor on whose thread to execute the callbacks of
+     *                                 the {@link SubscribeSessionCallback}
+     * @param subscribeSessionCallback A {@link SubscribeSessionCallback} object to be used for
+     *                                 session event callback
+     */
+    @RequiresPermission(MANAGE_WIFI_NETWORK_SELECTION)
+    public void subscribe(@NonNull SubscribeConfig subscribeConfig,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull SubscribeSessionCallback subscribeSessionCallback) {
+        Objects.requireNonNull(subscribeConfig, "subscribeConfig must not be null");
+        Objects.requireNonNull(executor, "executor must not be null");
+        Objects.requireNonNull(subscribeSessionCallback,
+                "subscribeSessionCallback must not be null");
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        try {
+            SubscribeSessionCallbackProxy subscribeSessionCallbackProxy =
+                    new SubscribeSessionCallbackProxy(this, executor, subscribeSessionCallback);
+            mService.subscribe(subscribeConfig, subscribeSessionCallbackProxy);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

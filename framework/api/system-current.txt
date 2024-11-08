@@ -1976,7 +1976,9 @@ package android.net.wifi.usd {
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherSupported();
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isSubscriberAvailable();
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isSubscriberSupported();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void publish(@NonNull android.net.wifi.usd.PublishConfig, @NonNull java.util.concurrent.Executor, @NonNull android.net.wifi.usd.PublishSessionCallback);
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void registerAvailabilityCallback(@NonNull java.util.concurrent.Executor, @NonNull android.net.wifi.usd.UsdManager.AvailabilityCallback);
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void subscribe(@NonNull android.net.wifi.usd.SubscribeConfig, @NonNull java.util.concurrent.Executor, @NonNull android.net.wifi.usd.SubscribeSessionCallback);
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void unregisterAvailabilityCallback(@NonNull android.net.wifi.usd.UsdManager.AvailabilityCallback);
   }
 
