@@ -33,9 +33,9 @@ import static android.net.wifi.WifiManager.WIFI_FEATURE_WAPI;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WFD_R2;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SUITE_B;
-import static android.os.Build.VERSION.SDK_INT;
 
 import android.annotation.NonNull;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.hardware.wifi.WifiChannelWidthInMhz;
 import android.hardware.wifi.supplicant.BtCoexistenceMode;
@@ -91,6 +91,7 @@ import android.net.wifi.WifiKeystore;
 import android.net.wifi.WifiMigration;
 import android.net.wifi.WifiSsid;
 import android.net.wifi.flags.Flags;
+import android.net.wifi.util.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.IBinder.DeathRecipient;
@@ -4104,6 +4105,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
         }
     }
 
+    @SuppressLint("NewApi") // Keystore migration API is guarded by an SDK check
     private void registerNonStandardCertCallback() {
         synchronized (mLock) {
             final String methodStr = "registerNonStandardCertCallback";
@@ -4114,8 +4116,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
                 return;
             }
 
-            // TODO: Use SdkLevel API when it exists, rather than the SDK_INT
-            if (!mHasMigratedLegacyKeystoreAliases && SDK_INT >= 36
+            if (!mHasMigratedLegacyKeystoreAliases && Environment.isSdkAtLeastB()
                     && Flags.legacyKeystoreToWifiBlobstoreMigrationReadOnly()) {
                 if (mKeystoreMigrationStatusConsumer == null) {
                     // Create global callback temporarily for access in the unit tests
