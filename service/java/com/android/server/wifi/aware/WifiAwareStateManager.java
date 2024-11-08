@@ -717,17 +717,15 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
                         }
                         if (action.equals(Intent.ACTION_SCREEN_ON)
                                 || action.equals(Intent.ACTION_SCREEN_OFF)) {
-                            reconfigure();
+                            mHandler.post(() -> reconfigure());
                         }
 
                         if (action.equals(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)) {
-                            reconfigure();
+                            mHandler.post(() -> reconfigure());
                         }
                     }
                 },
-                intentFilter,
-                null,
-                mHandler);
+                intentFilter);
 
         intentFilter = new IntentFilter();
         intentFilter.addAction(LocationManager.MODE_CHANGED_ACTION);
@@ -738,20 +736,20 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
                         if (mVerboseLoggingEnabled) {
                             Log.v(TAG, "onReceive: MODE_CHANGED_ACTION: intent=" + intent);
                         }
-                        if (mWifiPermissionsUtil.isLocationModeEnabled()) {
-                            enableUsage();
-                        } else {
-                            if (SdkLevel.isAtLeastT()) {
-                                handleLocationModeDisabled();
+                        mHandler.post(() -> {
+                            if (mWifiPermissionsUtil.isLocationModeEnabled()) {
+                                enableUsage();
                             } else {
-                                disableUsage(false);
+                                if (SdkLevel.isAtLeastT()) {
+                                    handleLocationModeDisabled();
+                                } else {
+                                    disableUsage(false);
+                                }
                             }
-                        }
+                        });
                     }
                 },
-                intentFilter,
-                null,
-                mHandler);
+                intentFilter, null, null);
 
         intentFilter = new IntentFilter();
         intentFilter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
@@ -767,18 +765,18 @@ public class WifiAwareStateManager implements WifiAwareShellCommand.DelegatedShe
                                         WifiManager.EXTRA_WIFI_STATE,
                                         WifiManager.WIFI_STATE_UNKNOWN)
                                         == WifiManager.WIFI_STATE_ENABLED;
-                        if (isEnabled) {
-                            enableUsage();
-                        } else {
-                            if (!isD2dAllowedWhenStaDisabled()) {
-                                disableUsage(false);
+                        mHandler.post(() -> {
+                            if (isEnabled) {
+                                enableUsage();
+                            } else {
+                                if (!isD2dAllowedWhenStaDisabled()) {
+                                    disableUsage(false);
+                                }
                             }
-                        }
+                        });
                     }
                 },
-                intentFilter,
-                null,
-                mHandler);
+                intentFilter);
         mSettingsConfigStore.registerChangeListener(D2D_ALLOWED_WHEN_INFRA_STA_DISABLED,
                 (key, value) -> {
                     // Check setting & wifi enabled status only when feature is supported.
