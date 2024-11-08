@@ -9,6 +9,7 @@ android_app {
     static_libs: ["androidx.legacy_legacy-support-v4"],
     resource_dirs: ["res"],
     srcs: ["src/**/*.java"],
+    min_sdk_version: "30",
     sdk_version: "system_current",
     certificate: ":com.android.hotspot2.osulogin.certificate",
     apex_available: [
