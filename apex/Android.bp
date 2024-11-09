@@ -27,6 +27,8 @@ apex_defaults {
     // from build rule `cacerts_wfa`
     prebuilts: [
         "cacerts_wfa",
+        "mainline_supplicant_conf",
+        "mainline_supplicant_rc",
     ],
     key: "com.android.wifi.key",
     certificate: ":com.android.wifi.certificate",
