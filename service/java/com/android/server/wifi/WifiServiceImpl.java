@@ -528,6 +528,28 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             }
             callbacks.finishBroadcast();
         }
+
+        /**
+         * Notify register that clients have disconnected from a soft AP instance.
+         *
+         * @param info The {@link SoftApInfo} of the AP.
+         * @param clients The clients that have disconnected from the AP instance specified by
+         *                {@code info}.
+         */
+        public void notifyRegisterOnClientsDisconnected(
+                RemoteCallbackList<ISoftApCallback> callbacks, SoftApInfo info,
+                List<WifiClient> clients) {
+            int itemCount = callbacks.beginBroadcast();
+            for (int i = 0; i < itemCount; i++) {
+                try {
+                    callbacks.getBroadcastItem(i).onClientsDisconnected(new SoftApInfo(info),
+                            clients);
+                } catch (RemoteException e) {
+                    Log.e(TAG, "onClientsDisconnected: remote exception -- " + e);
+                }
+            }
+            callbacks.finishBroadcast();
+        }
     }
 
     public WifiServiceImpl(WifiContext context, WifiInjector wifiInjector) {
@@ -1344,9 +1366,10 @@ public class WifiServiceImpl extends IWifiManager.Stub {
      */
     @Override
     public synchronized boolean setWifiEnabled(String packageName, boolean enable) {
-        if (!isValidCallingUser() || enforceChangePermission(packageName) != MODE_ALLOWED) {
+        if (enforceChangePermission(packageName) != MODE_ALLOWED) {
             return false;
         }
+        enforceValidCallingUser();
         int callingUid = Binder.getCallingUid();
         int callingPid = Binder.getCallingPid();
         boolean isPrivileged = isPrivileged(callingPid, callingUid);
@@ -2266,6 +2289,10 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     // Default country code
                     mSoftApCapability = updateSoftApCapabilityWithAvailableChannelList(
                             mSoftApCapability, mCountryCode.getCountryCode(), null);
+                    if (mWifiNative.isMLDApSupportMLO()) {
+                        mSoftApCapability.setSupportedFeatures(
+                                true, SoftApCapability.SOFTAP_FEATURE_MLO);
+                    }
                 }
                 return mSoftApCapability;
             }
@@ -2385,6 +2412,19 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         public void onBlockedClientConnecting(WifiClient client, int blockedReason) {
             notifyRegisterOnBlockedClientConnecting(mRegisteredSoftApCallbacks, client,
                     blockedReason);
+        }
+
+        /**
+         * Called when clients disconnect from a soft AP instance.
+         *
+         * @param info The {@link SoftApInfo} of the AP.
+         * @param clients The clients that have disconnected from the AP instance specified by
+         *                {@code info}.
+         */
+        @Override
+        public void onClientsDisconnected(@NonNull SoftApInfo info,
+                @NonNull List<WifiClient> clients) {
+            notifyRegisterOnClientsDisconnected(mRegisteredSoftApCallbacks, info, clients);
         }
     }
 

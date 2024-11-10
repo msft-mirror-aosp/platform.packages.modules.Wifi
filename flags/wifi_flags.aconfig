@@ -190,6 +190,15 @@ flag {
 }
 
 flag {
+    name: "secure_ranging"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add secure ranging support"
+    bug: "364722301"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "mainline_supplicant"
     namespace: "wifi"
     description: "Use the secondary supplicant binary stored in the mainline module"
