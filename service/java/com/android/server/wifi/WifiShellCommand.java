@@ -275,6 +275,11 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         @Override
         public void onBlockedClientConnecting(WifiClient client, int reason) {
         }
+
+        @Override
+        public void onClientsDisconnected(SoftApInfo info, List<WifiClient> clients) {
+            mPrintWriter.println("onClientsDisconnected, info: " + info + ", clients: " + clients);
+        }
     }
 
     /**
@@ -1505,7 +1510,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     String neutralButtonText = null;
                     String dialogOption = getNextOption();
                     boolean simpleTimeoutSpecified = false;
-                    long simpleTimeoutMs = 0;
+                    long simpleTimeoutMs = 15 * 1000;
                     boolean useLegacy = false;
                     while (dialogOption != null) {
                         switch (dialogOption) {
@@ -1591,29 +1596,16 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                                 wifiEnableRequestCallback,
                                 mWifiThreadRunner);
                     }
-                    if (simpleTimeoutSpecified) {
-                        simpleDialogHandle.launchDialog(simpleTimeoutMs);
-                        pw.println("Launched dialog with " + simpleTimeoutMs + " millisecond"
-                                + " timeout. Waiting for user response...");
-                        pw.flush();
-                        String dialogResponse = simpleQueue.take();
-                        if (dialogResponse == null) {
-                            pw.println("No response received.");
-                        } else {
-                            pw.println(dialogResponse);
-                        }
+                    simpleDialogHandle.launchDialog();
+                    pw.println("Launched dialog. Waiting up to " + simpleTimeoutMs + " ms for"
+                            + " user response before dismissing...");
+                    String simpleDialogResponse = simpleQueue.poll(simpleTimeoutMs,
+                            TimeUnit.MILLISECONDS);
+                    if (simpleDialogResponse == null) {
+                        pw.println("No response received. Dismissing dialog.");
+                        simpleDialogHandle.dismissDialog();
                     } else {
-                        simpleDialogHandle.launchDialog();
-                        pw.println("Launched dialog. Waiting up to 15 seconds for user response"
-                                + " before dismissing...");
-                        pw.flush();
-                        String dialogResponse = simpleQueue.poll(15, TimeUnit.SECONDS);
-                        if (dialogResponse == null) {
-                            pw.println("No response received. Dismissing dialog.");
-                            simpleDialogHandle.dismissDialog();
-                        } else {
-                            pw.println(dialogResponse);
-                        }
+                        pw.println(simpleDialogResponse);
                     }
                     return 0;
                 case "launch-dialog-p2p-invitation-sent": {
@@ -1651,7 +1643,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     String pinOption = getNextOption();
                     int displayId = Display.DEFAULT_DISPLAY;
                     boolean p2pInvRecTimeoutSpecified = false;
-                    long p2pInvRecTimeout = 0;
+                    int p2pInvRecTimeout = 0;
                     while (pinOption != null) {
                         if (pinOption.equals("-p")) {
                             isPinRequested = true;
@@ -1701,11 +1693,12 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                                     deviceName,
                                     isPinRequested,
                                     displayPin,
+                                    p2pInvRecTimeout,
                                     displayId,
                                     callback,
                                     mWifiThreadRunner);
+                    p2pInvitationReceivedDialogHandle.launchDialog();
                     if (p2pInvRecTimeoutSpecified) {
-                        p2pInvitationReceivedDialogHandle.launchDialog(p2pInvRecTimeout);
                         pw.println("Launched dialog with " + p2pInvRecTimeout + " millisecond"
                                 + " timeout. Waiting for user response...");
                         pw.flush();
@@ -1716,7 +1709,6 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                             pw.println(dialogResponse);
                         }
                     } else {
-                        p2pInvitationReceivedDialogHandle.launchDialog();
                         pw.println("Launched dialog. Waiting up to 15 seconds for user response"
                                 + " before dismissing...");
                         pw.flush();
