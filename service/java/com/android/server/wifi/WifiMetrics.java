@@ -144,6 +144,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto.SoftApConnectedClient
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent.ConfigInfo;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.TargetNetworkInfo;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.TrainingData;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.UserActionEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.UserReactionToApprovalUiEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.UserReactionToApprovalUiEvent.UserReaction;
@@ -158,6 +159,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiToWifiSwitchStats
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiToggleStats;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStats;  // This contains a time series of WifiUsabilityStatsEntry along with some metadata, such as the label of the time series or trigger type.
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStatsEntry;  // This contains all the stats for a single point in time.
+import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStatsTraining;
 import com.android.server.wifi.rtt.RttMetrics;
 import com.android.server.wifi.scanner.KnownBandsChannelHelper;
 import com.android.server.wifi.util.InformationElementUtil;
@@ -178,6 +180,8 @@ import org.json.JSONObject;
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -244,6 +248,7 @@ public class WifiMetrics {
     public static final int MIN_DATA_STALL_WAIT_MS = 120 * 1000; // 2 minutes
     // Max number of WifiUsabilityStatsEntry elements to store in the ringbuffer.
     public static final int MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE = 80;
+    public static final int MAX_WIFI_USABILITY_STATS_TRAINING_SIZE = 10;
     // Max number of WifiUsabilityStats records to store for each type.
     public static final int MAX_WIFI_USABILITY_STATS_RECORDS_PER_TYPE = 10;
     // Max number of WifiUsabilityStats per labeled type to upload to server
@@ -280,6 +285,8 @@ public class WifiMetrics {
     public static final int MIN_DOWNSTREAM_BANDWIDTH_KBPS = 1000;
     public static final int MIN_UPSTREAM_BANDWIDTH_KBPS = 1000;
     public static final int INVALID_SPEED = -1;
+    public static final long MILLIS_IN_A_SECOND = 1000;
+    public static final long MILLIS_IN_AN_HOUR = 3600 * 1000;
 
     private Clock mClock;
     private boolean mScreenOn;
@@ -500,6 +507,12 @@ public class WifiMetrics {
     @VisibleForTesting
     public final LinkedList<WifiUsabilityStatsEntry> mWifiUsabilityStatsEntriesRingBuffer =
             new LinkedList<>();
+    // Each WifiUsabilityStatsTraining instance contains a list of WifiUsabilityStatsEntry objects,
+    // representing a time series of WiFi usability statistics recorded within a specific data
+    // capture period. It also includes information about the type of data capture and the duration
+    // of the capture period.
+    public final List<WifiUsabilityStatsTraining> mWifiUsabilityStatsTrainingExamples =
+            new ArrayList<>();
     // One WifiUsabilityStats contains a single time series of WifiUsabilityStatsEntry along with
     // some metadata. These LinkedList's below contain sets of time series that are labeled as
     // either 'good' or 'bad'.
@@ -5001,6 +5014,17 @@ public class WifiMetrics {
                     printWifiUsabilityStatsEntry(pw, stats);
                 }
 
+                pw.println("mWifiUsabilityStatsTrainingExamples:");
+                for (WifiUsabilityStatsTraining statsTraining
+                        : mWifiUsabilityStatsTrainingExamples) {
+                    pw.println("\ndata_capture_type=" + statsTraining.dataCaptureType);
+                    pw.println("\ncapture_start_timestamp_secs="
+                            + statsTraining.captureStartTimestampSecs);
+                    for (WifiUsabilityStatsEntry stats : statsTraining.trainingData.stats) {
+                        printWifiUsabilityStatsEntry(pw, stats);
+                    }
+                }
+
                 pw.println("mMobilityStatePnoStatsMap:");
                 for (int i = 0; i < mMobilityStatePnoStatsMap.size(); i++) {
                     printDeviceMobilityStatePnoScanStats(pw, mMobilityStatePnoStatsMap.valueAt(i));
@@ -5768,6 +5792,12 @@ public class WifiMetrics {
             }
             mWifiLogProto.hardwareRevision = SystemProperties.get("ro.boot.revision", "");
 
+            mWifiLogProto.wifiUsabilityStatsTraining =
+                    new WifiUsabilityStatsTraining[mWifiUsabilityStatsTrainingExamples.size()];
+            for (int i = 0; i < mWifiUsabilityStatsTrainingExamples.size(); i++) {
+                mWifiLogProto.wifiUsabilityStatsTraining[i] =
+                        mWifiUsabilityStatsTrainingExamples.remove(0);
+            }
             mWifiLogProto.mobilityStatePnoStatsList =
                     new DeviceMobilityStatePnoScanStats[mMobilityStatePnoStatsMap.size()];
             for (int i = 0; i < mMobilityStatePnoStatsMap.size(); i++) {
@@ -7163,10 +7193,62 @@ public class WifiMetrics {
      */
     public int storeCapturedData(int triggerType, boolean isFullCapture,
             long triggerStartTimeMillis, long triggerStopTimeMillis) {
-        // TODO: Implement how to extract WifiUsabilityStatsEntries from ring buffer whose
-        // timestamps are within [triggerStartTimeMillis, triggerStopTimeMillis]
         Log.d(TAG, "storeCapturedData: triggerType=" + triggerType
                 + ", isFullCapture=" + isFullCapture);
+
+        // Validate triggerStartTimeMillis and triggerStopTimeMillis in non full-capture case
+        if (!isFullCapture && ((triggerStartTimeMillis < 0 || triggerStopTimeMillis < 0
+                || triggerStopTimeMillis <= triggerStartTimeMillis))) {
+            return 1;
+        }
+
+        Instant now = mClock.getCurrentInstant();
+        Duration durationSinceBoot = Duration.ofMillis(mClock.getElapsedSinceBootMillis());
+
+        WifiUsabilityStatsTraining wifiUsabilityStatsTraining = new WifiUsabilityStatsTraining();
+        while (mWifiUsabilityStatsTrainingExamples.size()
+                >= MAX_WIFI_USABILITY_STATS_TRAINING_SIZE) {
+            mWifiUsabilityStatsTrainingExamples.remove(0);
+        }
+        wifiUsabilityStatsTraining.dataCaptureType = triggerType;
+
+        long capturePeriodStartTime = triggerStartTimeMillis;
+        long capturePeriodStopTime = triggerStopTimeMillis;
+
+        if (isFullCapture) {
+            capturePeriodStartTime = mWifiUsabilityStatsEntriesRingBuffer.size() > 0
+                ? mWifiUsabilityStatsEntriesRingBuffer.get(0).timeStampMs :
+                0;
+            capturePeriodStopTime = mWifiUsabilityStatsEntriesRingBuffer.size() > 0
+                ? mWifiUsabilityStatsEntriesRingBuffer.get(
+                    mWifiUsabilityStatsEntriesRingBuffer.size() - 1).timeStampMs :
+                durationSinceBoot.toMillis();
+        }
+
+        wifiUsabilityStatsTraining.captureStartTimestampSecs =
+                now.minus(durationSinceBoot)
+                    .plus(Duration.ofMillis(capturePeriodStartTime))
+                    .truncatedTo(ChronoUnit.HOURS)
+                    .getEpochSecond();
+        wifiUsabilityStatsTraining.storeTimeOffsetMs =
+                    durationSinceBoot.toMillis() - capturePeriodStopTime;
+
+        // If isFullCapture is true, store everything in ring buffer
+        // If isFullCapture is false, Store WifiUsabilityStatsEntries within capture period
+        TrainingData trainingData = new TrainingData();
+        List<WifiUsabilityStatsEntry> trainingDataList = new ArrayList<>();
+        for (WifiUsabilityStatsEntry currStats : mWifiUsabilityStatsEntriesRingBuffer) {
+            if (isFullCapture || (currStats.timeStampMs >= triggerStartTimeMillis
+                    && currStats.timeStampMs < triggerStopTimeMillis)) {
+                WifiUsabilityStatsEntry trainingStats =
+                        createNewWifiUsabilityStatsEntry(currStats, capturePeriodStartTime);
+                trainingDataList.add(trainingStats);
+            }
+        }
+        trainingData.stats = trainingDataList.toArray(new WifiUsabilityStatsEntry[0]);
+        wifiUsabilityStatsTraining.trainingData = trainingData;
+
+        mWifiUsabilityStatsTrainingExamples.add(wifiUsabilityStatsTraining);
         return 0;
     }
 
@@ -8112,9 +8194,11 @@ public class WifiMetrics {
         }
     }
 
-    private WifiUsabilityStatsEntry createNewWifiUsabilityStatsEntry(WifiUsabilityStatsEntry s) {
+    private WifiUsabilityStatsEntry createNewWifiUsabilityStatsEntry(WifiUsabilityStatsEntry s,
+            long referenceTimestampMs) {
         WifiUsabilityStatsEntry out = new WifiUsabilityStatsEntry();
-        out.timeStampMs = s.timeStampMs;
+        // Privacy review suggests not to upload real timestamp
+        out.timeStampMs = 0;
         out.totalTxSuccess = s.totalTxSuccess;
         out.totalTxRetries = s.totalTxRetries;
         out.totalTxBad = s.totalTxBad;
@@ -8173,6 +8257,7 @@ public class WifiMetrics {
         out.voipMode = s.voipMode;
         out.threadDeviceRole = s.threadDeviceRole;
         out.statusDataStall = s.statusDataStall;
+        out.timestampOffsetMs = s.timeStampMs - referenceTimestampMs;
         return out;
     }
 
@@ -8213,7 +8298,8 @@ public class WifiMetrics {
                 new WifiUsabilityStatsEntry[mWifiUsabilityStatsEntriesRingBuffer.size()];
         for (int i = 0; i < mWifiUsabilityStatsEntriesRingBuffer.size(); i++) {
             wifiUsabilityStats.stats[i] =
-                    createNewWifiUsabilityStatsEntry(mWifiUsabilityStatsEntriesRingBuffer.get(i));
+                    createNewWifiUsabilityStatsEntry(mWifiUsabilityStatsEntriesRingBuffer.get(i),
+                    0);
         }
         return wifiUsabilityStats;
     }
