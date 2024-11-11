@@ -18,6 +18,7 @@ package com.android.server.wifi;
 
 import static android.net.wifi.WifiManager.SAP_START_FAILURE_GENERAL;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_FAILED;
+import static android.net.wifi.WifiManager.WIFI_STATE_DISABLED;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLING;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
 
@@ -76,6 +77,7 @@ import android.net.Network;
 import android.net.wifi.ISubsystemRestartCallback;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiNetworkStateChangedListener;
+import android.net.wifi.IWifiStateChangedListener;
 import android.net.wifi.SoftApCapability;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SoftApConfiguration.Builder;
@@ -5550,4 +5552,65 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         assertEquals(0, mActiveModeWarden.getCurrentMLDAp());
     }
 
+    /**
+     * Verifies that registered remote WifiStateChangedListeners are notified when the Wifi state
+     * changes.
+     */
+    @Test
+    public void testRegisteredWifiStateChangedListenerIsNotifiedWhenWifiStateChanges()
+            throws RemoteException {
+        // Start off ENABLED
+        mActiveModeWarden.setWifiStateForApiCalls(WIFI_STATE_ENABLED);
+
+        // Registering should give the current state of ENABLED.
+        IWifiStateChangedListener remoteCallback1 = mock(IWifiStateChangedListener.class);
+        when(remoteCallback1.asBinder()).thenReturn(mock(IBinder.class));
+        IWifiStateChangedListener remoteCallback2 = mock(IWifiStateChangedListener.class);
+        when(remoteCallback2.asBinder()).thenReturn(mock(IBinder.class));
+        mActiveModeWarden.addWifiStateChangedListener(remoteCallback1);
+        mActiveModeWarden.addWifiStateChangedListener(remoteCallback2);
+
+        verify(remoteCallback1).onWifiStateChanged(WIFI_STATE_ENABLED);
+        verify(remoteCallback2).onWifiStateChanged(WIFI_STATE_ENABLED);
+
+        // Change the state to DISABLED and verify the listeners were called.
+        final int newState = WIFI_STATE_DISABLED;
+        mActiveModeWarden.setWifiStateForApiCalls(newState);
+
+        verify(remoteCallback1, times(1)).onWifiStateChanged(newState);
+        verify(remoteCallback2, times(1)).onWifiStateChanged(newState);
+
+        // Duplicate wifi state should not notify the callbacks again.
+        mActiveModeWarden.setWifiStateForApiCalls(newState);
+        mActiveModeWarden.setWifiStateForApiCalls(newState);
+        mActiveModeWarden.setWifiStateForApiCalls(newState);
+
+        verify(remoteCallback1, times(1)).onWifiStateChanged(newState);
+        verify(remoteCallback2, times(1)).onWifiStateChanged(newState);
+    }
+
+    /**
+     * Verifies that unregistered remote WifiStateChangedListeners are not notified when the Wifi
+     * state changes.
+     */
+    @Test
+    public void testUnregisteredWifiStateChangedListenerIsNotNotifiedWhenWifiStateChanges()
+            throws RemoteException {
+        IWifiStateChangedListener remoteCallback1 = mock(IWifiStateChangedListener.class);
+        when(remoteCallback1.asBinder()).thenReturn(mock(IBinder.class));
+        IWifiStateChangedListener remoteCallback2 = mock(IWifiStateChangedListener.class);
+        when(remoteCallback2.asBinder()).thenReturn(mock(IBinder.class));
+        mActiveModeWarden.addWifiStateChangedListener(remoteCallback1);
+        mActiveModeWarden.addWifiStateChangedListener(remoteCallback2);
+        verify(remoteCallback1).onWifiStateChanged(anyInt());
+        verify(remoteCallback2).onWifiStateChanged(anyInt());
+        mActiveModeWarden.removeWifiStateChangedListener(remoteCallback1);
+        mActiveModeWarden.removeWifiStateChangedListener(remoteCallback2);
+
+        final int newState = WIFI_STATE_ENABLED;
+        mActiveModeWarden.setWifiStateForApiCalls(newState);
+
+        verify(remoteCallback1, times(1)).onWifiStateChanged(newState);
+        verify(remoteCallback2, times(1)).onWifiStateChanged(newState);
+    }
 }

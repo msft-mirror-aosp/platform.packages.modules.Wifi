@@ -226,6 +226,7 @@ public class WifiManagerTest {
     private WifiNetworkSuggestion mWifiNetworkSuggestion;
     private ScanResultsCallback mScanResultsCallback;
     private CoexCallback mCoexCallback;
+    private WifiManager.WifiStateChangedListener mWifiStateChangedListener;
     private SubsystemRestartTrackingCallback mRestartCallback;
     private int mRestartCallbackMethodRun = 0; // 1: restarting, 2: restarted
     private WifiActivityEnergyInfo mWifiActivityEnergyInfo;
@@ -324,6 +325,7 @@ public class WifiManagerTest {
                 mRunnable.run();
             }
         };
+        mWifiStateChangedListener = state -> mRunnable.run();
         if (SdkLevel.isAtLeastS()) {
             mCoexCallback = new CoexCallback() {
                 @Override
@@ -4503,12 +4505,59 @@ public class WifiManagerTest {
                 anyString(), nullable(String.class), eq(userConfig), any(), eq(false));
         assertThrows(NullPointerException.class,
                 () -> mWifiManager.startLocalOnlyHotspotWithConfiguration(
-                null, mExecutor, callback));
+                        null, mExecutor, callback));
         assertThrows(NullPointerException.class,
                 () -> mWifiManager.startLocalOnlyHotspotWithConfiguration(
-                customConfig, null, callback));
+                        customConfig, null, callback));
         assertThrows(NullPointerException.class,
                 () -> mWifiManager.startLocalOnlyHotspotWithConfiguration(
-                customConfig, mExecutor, null));
+                        customConfig, mExecutor, null));
+    }
+
+    /**
+     * Verify an IllegalArgumentException is thrown if listener is not provided.
+     */
+    @Test(expected = NullPointerException.class)
+    public void testAddWifiStateChangedListenerWithNullListener() throws Exception {
+        mWifiManager.addWifiStateChangedListener(mExecutor, null);
+    }
+
+    /**
+     * Verify an IllegalArgumentException is thrown if executor is not provided.
+     */
+    @Test(expected = NullPointerException.class)
+    public void testAddWifiStateChangedListenerWithNullExecutor() throws Exception {
+        mWifiManager.addWifiStateChangedListener(null, mWifiStateChangedListener);
+    }
+
+    /**
+     * Verify client provided listener is being called to the right listener.
+     */
+    @Test
+    public void testAddWifiStateChangedListenerAndReceiveEvent() throws Exception {
+        ArgumentCaptor<IWifiStateChangedListener.Stub> listenerCaptor =
+                ArgumentCaptor.forClass(IWifiStateChangedListener.Stub.class);
+        mWifiManager.addWifiStateChangedListener(new SynchronousExecutor(),
+                mWifiStateChangedListener);
+        verify(mWifiService).addWifiStateChangedListener(listenerCaptor.capture());
+        listenerCaptor.getValue().onWifiStateChanged(0);
+        verify(mRunnable).run();
+    }
+
+    /**
+     * Verify client removeWifiStateChangedListener.
+     */
+    @Test
+    public void testRemoveUnknownWifiStateChangedListener() throws Exception {
+        mWifiManager.removeWifiStateChangedListener(mWifiStateChangedListener);
+        verify(mWifiService, never()).removeWifiStateChangedListener(any());
+    }
+
+    /**
+     * Verify client removeWifiStateChangedListener with null listener will cause an exception.
+     */
+    @Test(expected = NullPointerException.class)
+    public void testRemoveWifiStateChangedListenerWithNullListener() throws Exception {
+        mWifiManager.removeWifiStateChangedListener(null);
     }
 }
