@@ -110,6 +110,7 @@ java_defaults {
         "wifi-modules-utils",
         "PlatformProperties",
         "android.net.wifi.flags-aconfig-java",
+        "ranging_aconfig_flags_lib",
     ],
     libs: [
         "androidx.annotation_annotation",

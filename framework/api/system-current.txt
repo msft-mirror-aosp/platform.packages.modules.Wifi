@@ -1525,6 +1525,17 @@ package android.net.wifi.aware {
     field public static final int UNSET_PARAMETER = -1; // 0xffffffff
   }
 
+  public final class Characteristics implements android.os.Parcelable {
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public int getMaxSupportedRangingPktBandwidth();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public int getMaxSupportedRxChains();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public boolean isPeriodicRangingSupported();
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int SUPPORTED_RX_CHAINS_1 = 1; // 0x1
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int SUPPORTED_RX_CHAINS_2 = 2; // 0x2
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int SUPPORTED_RX_CHAINS_3 = 3; // 0x3
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int SUPPORTED_RX_CHAINS_4 = 4; // 0x4
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int SUPPORTED_RX_CHAINS_UNSPECIFIED = 0; // 0x0
+  }
+
   @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") public final class ConfigRequest implements android.os.Parcelable {
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") public int describeContents();
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") @NonNull public java.util.List<android.net.wifi.OuiKeyedData> getVendorData();
@@ -1545,6 +1556,7 @@ package android.net.wifi.aware {
   }
 
   public class DiscoverySessionCallback {
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public void onRangingResultsReceived(@NonNull java.util.List<android.net.wifi.rtt.RangingResult>);
     method public void onSessionResumeFailed(int);
     method public void onSessionResumeSucceeded();
     method public void onSessionSuspendFailed(int);
@@ -1553,10 +1565,12 @@ package android.net.wifi.aware {
 
   public final class PublishConfig implements android.os.Parcelable {
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") @NonNull public java.util.List<android.net.wifi.OuiKeyedData> getVendorData();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public boolean isPeriodicRangingResultsEnabled();
     method public boolean isSuspendable();
   }
 
   public static final class PublishConfig.Builder {
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @NonNull public android.net.wifi.aware.PublishConfig.Builder setPeriodicRangingResultsEnabled(boolean);
     method @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public android.net.wifi.aware.PublishConfig.Builder setSuspendable(boolean);
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") @NonNull public android.net.wifi.aware.PublishConfig.Builder setVendorData(@NonNull java.util.List<android.net.wifi.OuiKeyedData>);
   }
@@ -1566,11 +1580,35 @@ package android.net.wifi.aware {
   }
 
   public final class SubscribeConfig implements android.os.Parcelable {
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @IntRange(from=0) public int getCenterFreq0Mhz();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @IntRange(from=0) public int getCenterFreq1Mhz();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public int getChannelWidth();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @IntRange(from=0) public int getFrequencyMhz();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public int getPeriodicRangingInterval();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public int getPreamble();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public int getRttBurstSize();
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") @NonNull public java.util.List<android.net.wifi.OuiKeyedData> getVendorData();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public boolean isPeriodicRangingEnabled();
     method public boolean isSuspendable();
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int PERIODIC_RANGING_INTERVAL_1024TU = 1024; // 0x400
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int PERIODIC_RANGING_INTERVAL_128TU = 128; // 0x80
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int PERIODIC_RANGING_INTERVAL_2048TU = 2048; // 0x800
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int PERIODIC_RANGING_INTERVAL_256TU = 256; // 0x100
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int PERIODIC_RANGING_INTERVAL_4096TU = 4096; // 0x1000
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int PERIODIC_RANGING_INTERVAL_512TU = 512; // 0x200
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int PERIODIC_RANGING_INTERVAL_8192TU = 8192; // 0x2000
+    field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int PERIODIC_RANGING_INTERVAL_NONE = 0; // 0x0
   }
 
   public static final class SubscribeConfig.Builder {
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @NonNull public android.net.wifi.aware.SubscribeConfig.Builder setCenterFreq0Mhz(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @NonNull public android.net.wifi.aware.SubscribeConfig.Builder setCenterFreq1Mhz(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @NonNull public android.net.wifi.aware.SubscribeConfig.Builder setChannelWidth(int);
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @NonNull public android.net.wifi.aware.SubscribeConfig.Builder setFrequencyMhz(@IntRange(from=0) int);
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @NonNull public android.net.wifi.aware.SubscribeConfig.Builder setPeriodicRangingEnabled(boolean);
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @NonNull public android.net.wifi.aware.SubscribeConfig.Builder setPeriodicRangingInterval(int);
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @NonNull public android.net.wifi.aware.SubscribeConfig.Builder setPreamble(int);
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") @NonNull public android.net.wifi.aware.SubscribeConfig.Builder setRttBurstSize(int);
     method @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public android.net.wifi.aware.SubscribeConfig.Builder setSuspendable(boolean);
     method @FlaggedApi("com.android.wifi.flags.android_v_wifi_api") @NonNull public android.net.wifi.aware.SubscribeConfig.Builder setVendorData(@NonNull java.util.List<android.net.wifi.OuiKeyedData>);
   }
