@@ -16,6 +16,7 @@
 package com.android.server.wifi;
 
 import android.annotation.NonNull;
+import android.annotation.SuppressLint;
 import android.hardware.wifi.hostapd.ApInfo;
 import android.hardware.wifi.hostapd.BandMask;
 import android.hardware.wifi.hostapd.ChannelBandwidth;
@@ -41,6 +42,7 @@ import android.net.wifi.SoftApInfo;
 import android.net.wifi.WifiAnnotations;
 import android.net.wifi.WifiContext;
 import android.net.wifi.WifiManager;
+import android.net.wifi.util.Environment;
 import android.net.wifi.util.WifiResourceCache;
 import android.os.Handler;
 import android.os.IBinder;
@@ -57,6 +59,7 @@ import com.android.server.wifi.WifiNative.SoftApHalCallback;
 import com.android.server.wifi.util.ApConfigUtil;
 import com.android.server.wifi.util.HalAidlUtil;
 import com.android.server.wifi.util.NativeUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.io.PrintWriter;
@@ -1032,6 +1035,7 @@ public class HostapdHalAidlImp implements IHostapdHal {
         };
     }
 
+    @SuppressLint("NewApi")
     private NetworkParams prepareNetworkParams(boolean isMetered,
             SoftApConfiguration config) {
         NetworkParams nwParams = new NetworkParams();
@@ -1061,6 +1065,9 @@ public class HostapdHalAidlImp implements IHostapdHal {
         nwParams.encryptionType = getEncryptionType(config);
         nwParams.passphrase = (config.getPassphrase() != null)
                     ? config.getPassphrase() : "";
+        if (Flags.apIsolate() && isServiceVersionAtLeast(3) && Environment.isSdkAtLeastB()) {
+            nwParams.isClientIsolationEnabled = config.isClientIsolationEnabled();
+        }
 
         if (nwParams.ssid == null || nwParams.passphrase == null) {
             return null;
