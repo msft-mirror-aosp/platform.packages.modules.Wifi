@@ -68,6 +68,7 @@ import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.twt.TwtRequest;
 import android.net.wifi.twt.TwtSession;
 import android.net.wifi.twt.TwtSessionCallback;
+import android.net.wifi.util.Environment;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
@@ -79,6 +80,7 @@ import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.WorkSource;
 import android.os.connectivity.WifiActivityEnergyInfo;
+import android.security.advancedprotection.AdvancedProtectionFeature;
 import android.telephony.SubscriptionInfo;
 import android.text.TextUtils;
 import android.util.ArraySet;
@@ -13037,5 +13039,29 @@ public class WifiManager {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+    }
+
+    /**
+     * Indicates what {@link AdvancedProtectionFeature} are supported over Wi-Fi.
+     *
+     * The {@link AdvancedProtectionFeature} is the advanced protection feature
+     * providing protections which works when Android Advanced Protection Mode (AAPM)
+     * is enabled.
+     *
+     * @return a list of the supported features.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_WEP_DISABLED_IN_APM)
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @NonNull
+    public List<AdvancedProtectionFeature> getAvailableAdvancedProtectionFeatures() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        List<AdvancedProtectionFeature> features = List.of(
+        // TODO: b/362586268 Change to AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP
+                new AdvancedProtectionFeature("WEP"));
+        return features;
     }
 }
