@@ -1372,7 +1372,9 @@ public class ActiveModeWarden {
         Log.d(TAG, "Switching all client mode managers");
         for (ConcreteClientModeManager clientModeManager : mClientModeManagers) {
             if (clientModeManager.getRole() != ROLE_CLIENT_PRIMARY
-                    && clientModeManager.getRole() != ROLE_CLIENT_SCAN_ONLY) {
+                    && clientModeManager.getRole() != ROLE_CLIENT_SCAN_ONLY
+                    && clientModeManager.getTargetRole() != ROLE_CLIENT_PRIMARY
+                    && clientModeManager.getTargetRole() != ROLE_CLIENT_SCAN_ONLY) {
                 continue;
             }
             if (!switchPrimaryOrScanOnlyClientModeManagerRole(clientModeManager)) {

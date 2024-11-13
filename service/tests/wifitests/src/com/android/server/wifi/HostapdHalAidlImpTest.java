@@ -34,8 +34,10 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.validateMockitoUsage;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import android.app.test.MockAnswerUtil;
 import android.hardware.wifi.hostapd.ApInfo;
@@ -59,6 +61,7 @@ import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SoftApConfiguration.Builder;
 import android.net.wifi.WifiContext;
 import android.net.wifi.WifiManager;
+import android.net.wifi.util.Environment;
 import android.net.wifi.util.PersistableBundleUtils;
 import android.net.wifi.util.WifiResourceCache;
 import android.os.Binder;
@@ -73,16 +76,20 @@ import android.util.SparseIntArray;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.dx.mockito.inline.extended.ExtendedMockito;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.util.ApConfigUtil;
 import com.android.server.wifi.util.NativeUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.MockitoSession;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -121,6 +128,7 @@ public class HostapdHalAidlImpTest extends WifiBaseTest {
 
     private IHostapdCallback mIHostapdCallback;
     private MockResources mResources;
+    private MockitoSession mSession;
 
     private TestLooper mLooper = new TestLooper();
     private HostapdHalAidlImp mHostapdHal;
@@ -188,6 +196,9 @@ public class HostapdHalAidlImpTest extends WifiBaseTest {
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
+        mSession = ExtendedMockito.mockitoSession()
+                .mockStatic(Flags.class, withSettings().lenient())
+                .startMocking();
         mResources = new MockResources();
         mResources.setBoolean(R.bool.config_wifi_softap_acs_supported, false);
         mResources.setBoolean(R.bool.config_wifi_softap_ieee80211ac_supported, false);
@@ -204,6 +215,17 @@ public class HostapdHalAidlImpTest extends WifiBaseTest {
                 mIfaceParamsCaptor.capture(), mNetworkParamsCaptor.capture());
         doNothing().when(mIHostapdMock).removeAccessPoint(any());
         mHostapdHal = new HostapdHalSpy();
+    }
+
+    /**
+     * Called after each test
+     */
+    @After
+    public void cleanup() {
+        validateMockitoUsage();
+        if (mSession != null) {
+            mSession.finishMocking();
+        }
     }
 
     /**
@@ -935,10 +957,10 @@ public class HostapdHalAidlImpTest extends WifiBaseTest {
     }
 
     /**
-     * Verifies the successful addition of access point with SAE with metered indication.
+     * Verifies the successful addition of access point with SAE with metered.
      */
     @Test
-    public void testAddAccessPointSuccess_WithMeteredSAE() throws Exception {
+    public void testAddSAEAccessPointSuccess_WithMetered() throws Exception {
         boolean isMetered = true;
         mResources.setBoolean(R.bool.config_wifi_softap_acs_supported, true);
         mHostapdHal = new HostapdHalSpy();
@@ -1333,5 +1355,55 @@ public class HostapdHalAidlImpTest extends WifiBaseTest {
         assertTrue(mIfaceParamsCaptor.getValue().usesMlo);
         assertTrue(Arrays.equals(new String[] {"1", "2"},
                 mIfaceParamsCaptor.getValue().instanceIdentities));
+    }
+
+    /*
+     * Verifies the successful addition of access point with SAE with
+     * client isolation indication.
+     *
+     * SuppressWarnings DirectInvocationOnMock for "mSoftApHalCallback.onFailure()"
+     * since it is a lambda callback implementation. Not a really function call.
+     */
+    @SuppressWarnings("DirectInvocationOnMock")
+    @Test
+    public void testAddSAEAccessPointSuccess_WithClientIsolation() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        mResources.setBoolean(R.bool.config_wifi_softap_acs_supported, true);
+        when(Flags.mloSap()).thenReturn(true);
+        when(Flags.apIsolate()).thenReturn(true);
+        when(mIHostapdMock.getInterfaceVersion()).thenReturn(3);
+        mHostapdHal = new HostapdHalSpy();
+
+        executeAndValidateInitializationSequence(true);
+
+        Builder configurationBuilder = new SoftApConfiguration.Builder();
+        configurationBuilder.setSsid(NETWORK_SSID);
+        configurationBuilder.setClientIsolationEnabled(true);
+        configurationBuilder.setHiddenSsid(false);
+        configurationBuilder.setPassphrase(NETWORK_PSK,
+                SoftApConfiguration.SECURITY_TYPE_WPA3_SAE);
+        configurationBuilder.setBand(mBand256G);
+
+        doNothing().when(mIHostapdMock).addAccessPoint(
+                mIfaceParamsCaptor.capture(), mNetworkParamsCaptor.capture());
+
+        assertTrue(mHostapdHal.addAccessPoint(IFACE_NAME,
+                configurationBuilder.build(), true, false, Collections.emptyList(),
+                () -> mSoftApHalCallback.onFailure()));
+        verify(mIHostapdMock).addAccessPoint(any(), any());
+
+        assertEquals(IFACE_NAME, mIfaceParamsCaptor.getValue().name);
+        assertTrue(mIfaceParamsCaptor.getValue().hwModeParams.enable80211N);
+        assertFalse(mIfaceParamsCaptor.getValue().hwModeParams.enable80211AC);
+        assertTrue(mIfaceParamsCaptor.getValue().channelParams[0].enableAcs);
+
+        assertEquals(NETWORK_SSID,
+                NativeUtil.stringFromByteArray(mNetworkParamsCaptor.getValue().ssid));
+        assertTrue(mNetworkParamsCaptor.getValue().isClientIsolationEnabled);
+        assertFalse(mNetworkParamsCaptor.getValue().isHidden);
+        assertEquals(EncryptionType.WPA3_SAE,
+                mNetworkParamsCaptor.getValue().encryptionType);
+        assertEquals(NETWORK_PSK, mNetworkParamsCaptor.getValue().passphrase);
+        assertTrue(mNetworkParamsCaptor.getValue().isMetered);
     }
 }
