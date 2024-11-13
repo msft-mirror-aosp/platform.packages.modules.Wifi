@@ -279,8 +279,7 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
         mDut.start(mMockContext, mMockLooper.getLooper(), mAwareMetricsMock,
                 mWifiPermissionsUtil, mPermissionsWrapperMock, new Clock(),
                 mock(NetdWrapper.class), mInterfaceConflictManager);
-        verify(mMockContext, never()).registerReceiver(any(), any(IntentFilter.class), isNull(),
-                any(Handler.class));
+        verify(mMockContext, never()).registerReceiver(any(), any(IntentFilter.class));
         mDut.startLate();
         mDut.enableVerboseLogging(true, true, true);
         mMockLooper.dispatchAll();
@@ -295,14 +294,11 @@ public class WifiAwareStateManagerTest extends WifiBaseTest {
                 .registerReceiverForAllUsers(
                         bcastRxCaptor.capture(),
                         argThat(filter -> filter.hasAction(LocationManager.MODE_CHANGED_ACTION)),
-                        isNull(),
-                        any(Handler.class));
+                        isNull(), isNull());
         verify(mMockContext, times(2))
                 .registerReceiver(
                         bcastRxCaptor.capture(),
-                        any(IntentFilter.class),
-                        isNull(),
-                        any(Handler.class));
+                        any(IntentFilter.class));
         mLocationModeReceiver = bcastRxCaptor.getAllValues().get(0);
         mPowerBcastReceiver = bcastRxCaptor.getAllValues().get(1);
         mWifiStateChangedReceiver = bcastRxCaptor.getAllValues().get(2);
