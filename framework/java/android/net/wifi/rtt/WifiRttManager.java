@@ -134,6 +134,13 @@ public class WifiRttManager {
     public static final String CHARACTERISTICS_KEY_BOOLEAN_RANGING_FRAME_PROTECTION_SUPPORTED =
             "key_rnm_mfp_supported";
 
+    /**
+     * Bundle key to access the maximum supported secure HE-LTF protocol version.
+     */
+    @FlaggedApi(Flags.FLAG_SECURE_RANGING)
+    public static final String CHARACTERISTICS_KEY_INT_MAX_SUPPORTED_SECURE_HE_LTF_PROTO_VERSION =
+            "key_max_supported_secure_he_ltf_proto_ver";
+
     /** @hide */
     @StringDef(prefix = { "CHARACTERISTICS_KEY_"}, value = {
             CHARACTERISTICS_KEY_BOOLEAN_ONE_SIDED_RTT,
@@ -142,7 +149,8 @@ public class WifiRttManager {
             CHARACTERISTICS_KEY_BOOLEAN_STA_RESPONDER,
             CHARACTERISTICS_KEY_BOOLEAN_NTB_INITIATOR,
             CHARACTERISTICS_KEY_BOOLEAN_SECURE_HE_LTF_SUPPORTED,
-            CHARACTERISTICS_KEY_BOOLEAN_RANGING_FRAME_PROTECTION_SUPPORTED
+            CHARACTERISTICS_KEY_BOOLEAN_RANGING_FRAME_PROTECTION_SUPPORTED,
+            CHARACTERISTICS_KEY_INT_MAX_SUPPORTED_SECURE_HE_LTF_PROTO_VERSION
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface RttCharacteristicsKey {}
