@@ -250,3 +250,12 @@ flag {
     bug: "364333929"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "public_bands_for_lohs"
+    is_exported: true
+    namespace: "wifi"
+    description: "Public bands api for local only hotspot from system api"
+    bug: "362355566"
+    is_fixed_read_only: true
+}
