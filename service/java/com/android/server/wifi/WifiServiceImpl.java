@@ -103,6 +103,7 @@ import android.net.Uri;
 import android.net.ip.IpClientUtil;
 import android.net.thread.ThreadNetworkController;
 import android.net.thread.ThreadNetworkManager;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -9136,5 +9137,15 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 Log.e(TAG, e.getMessage(), e);
             }
         }, TAG + "#getAutojoinDisallowedSecurityTypes");
+    }
+
+    @Override
+    public void disallowCurrentSuggestedNetwork(BlockingOption option, String packageName) {
+        int callingUid = Binder.getCallingUid();
+        mWifiPermissionsUtil.checkPackage(callingUid, packageName);
+        if (enforceChangePermission(packageName) != MODE_ALLOWED) {
+            throw new SecurityException("Caller does not hold CHANGE_WIFI_STATE permission");
+        }
+        // TODO: function implementation
     }
 }
