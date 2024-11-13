@@ -232,3 +232,21 @@ flag {
     bug: "362586268"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "bssid_blocklist_for_suggestion"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add BSSID to blocklist for network suggestion"
+    bug: "340263610"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "ap_isolate"
+    is_exported: true
+    namespace: "wifi"
+    description: "Supports Soft AP client isolation configuration"
+    bug: "364333929"
+    is_fixed_read_only: true
+}
