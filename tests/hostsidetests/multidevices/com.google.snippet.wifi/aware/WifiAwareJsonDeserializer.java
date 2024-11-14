@@ -74,6 +74,7 @@ public class WifiAwareJsonDeserializer {
     private static final String PORT = "port";
     private static final String TRANSPORT_PROTOCOL = "transport_protocol";
     private static final String DATA_PATH_SECURITY_CONFIG = "data_path_security_config";
+    private static final String CHANNEL_FREQUENCY_M_HZ = "channel_frequency_m_hz";
     //NetworkRequest specific
     private static final String TRANSPORT_TYPE = "transport_type";
     private static final String CAPABILITY = "capability";
@@ -313,6 +314,9 @@ public class WifiAwareJsonDeserializer {
         if (jsonObject.has(DATA_PATH_SECURITY_CONFIG)) {
             builder.setDataPathSecurityConfig(jsonToDataPathSSecurityConfig(
                     jsonObject.getJSONObject(DATA_PATH_SECURITY_CONFIG)));
+        }
+        if (jsonObject.has(CHANNEL_FREQUENCY_M_HZ)) {
+            builder.setChannelFrequencyMhz(jsonObject.getInt(CHANNEL_FREQUENCY_M_HZ), true);
         }
 
         return builder.build();
