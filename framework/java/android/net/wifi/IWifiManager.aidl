@@ -249,7 +249,8 @@ interface IWifiManager {
     boolean validateSoftApConfiguration(in SoftApConfiguration config);
 
     int startLocalOnlyHotspot(in ILocalOnlyHotspotCallback callback, String packageName,
-            String featureId, in SoftApConfiguration customConfig, in Bundle extras);
+            String featureId, in SoftApConfiguration customConfig, in Bundle extras,
+            boolean isCalledFromSystemApi);
 
     void stopLocalOnlyHotspot();
 

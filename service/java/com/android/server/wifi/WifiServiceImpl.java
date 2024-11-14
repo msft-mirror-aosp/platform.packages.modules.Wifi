@@ -168,6 +168,7 @@ import android.net.wifi.hotspot2.PasspointConfiguration;
 import android.net.wifi.twt.TwtRequest;
 import android.net.wifi.twt.TwtSession;
 import android.net.wifi.twt.TwtSessionCallback;
+import android.net.wifi.util.Environment;
 import android.net.wifi.util.ScanResultUtil;
 import android.net.wifi.util.WifiResourceCache;
 import android.os.AsyncTask;
@@ -2876,7 +2877,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
      */
     @Override
     public int startLocalOnlyHotspot(ILocalOnlyHotspotCallback callback, String packageName,
-            String featureId, SoftApConfiguration customConfig, Bundle extras) {
+            String featureId, SoftApConfiguration customConfig, Bundle extras,
+            boolean isCalledFromSystemApi) {
         // first check if the caller has permission to start a local only hotspot
         // need to check for WIFI_STATE_CHANGE and location permission
         final int uid = Binder.getCallingUid();
@@ -2886,7 +2888,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         mLog.info("start lohs uid=% pid=%").c(uid).c(pid).flush();
 
         // Permission requirements are different with/without custom config.
-        if (customConfig == null) {
+        // From B, the custom config may from public API, check isCalledFromSystemApi
+        if (customConfig == null
+                || (Environment.isSdkAtLeastB() && !isCalledFromSystemApi)) {
             if (enforceChangePermission(packageName) != MODE_ALLOWED) {
                 return LocalOnlyHotspotCallback.ERROR_GENERIC;
             }
