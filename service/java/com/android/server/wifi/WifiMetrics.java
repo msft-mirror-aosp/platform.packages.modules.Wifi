@@ -7148,6 +7148,28 @@ public class WifiMetrics {
     }
 
     /**
+     * If isFullCapture is true, capture everything in ring buffer
+     *
+     * If isFullCapture is false, extract WifiUsabilityStatsEntries from ring buffer whose
+     * timestamps are within [triggerStartTimeMillis, triggerStopTimeMillis) and store them as
+     * upload candidates.
+     *
+     * @param triggerType data capture trigger type
+     * @param isFullCapture if we do full capture on ring buffer or not
+     * @param triggerStartTimeMillis data capture start timestamp, elapsed time since boot
+     * @param triggerStopTimeMillis data capture stop timestamp, elapsed time since boot
+     * @return error code, 0 is success
+     */
+    public int storeCapturedData(int triggerType, boolean isFullCapture,
+            long triggerStartTimeMillis, long triggerStopTimeMillis) {
+        // TODO: Implement how to extract WifiUsabilityStatsEntries from ring buffer whose
+        // timestamps are within [triggerStartTimeMillis, triggerStopTimeMillis]
+        Log.d(TAG, "storeCapturedData: triggerType=" + triggerType
+                + ", isFullCapture=" + isFullCapture);
+        return 0;
+    }
+
+    /**
      * Extract data from |info| and |stats| to build a WifiUsabilityStatsEntry and then adds it
      * into an internal ring buffer.
      *
