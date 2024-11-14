@@ -908,7 +908,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     mWifiService.registerLocalOnlyHotspotSoftApCallback(softApCallback, extras);
                     if (REQUEST_REGISTERED != mWifiService.startLocalOnlyHotspot(
                               lohsCallback, SHELL_PACKAGE_NAME, null /* featureId */,
-                              config, extras)) {
+                              config, extras, false)) {
                         pw.println("Lohs failed to start. Please check config parameters");
                     }
                     // Wait for lohs to start and complete callback
