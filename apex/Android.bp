@@ -38,7 +38,7 @@ apex_defaults {
         "WifiDialog",
     ],
     binaries: select(release_flag("RELEASE_WIFI_MAINLINE_SUPPLICANT_BINARY"), {
-        true: [wpa_supplicant_mainline],
+        true: ["wpa_supplicant_mainline"],
         default: [],
     }),
     jni_libs: [

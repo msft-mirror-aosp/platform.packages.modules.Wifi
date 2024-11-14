@@ -24,6 +24,7 @@ import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_ON
 import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_RANGING_FRAME_PROTECTION_SUPPORTED;
 import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_SECURE_HE_LTF_SUPPORTED;
 import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_BOOLEAN_STA_RESPONDER;
+import static android.net.wifi.rtt.WifiRttManager.CHARACTERISTICS_KEY_INT_MAX_SUPPORTED_SECURE_HE_LTF_PROTO_VERSION;
 
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_VERBOSE_LOGGING_ENABLED;
 
@@ -492,6 +493,8 @@ public class RttServiceImpl extends IWifiRttManager.Stub {
                 capabilities.secureHeLtfSupported);
         characteristics.putBoolean(CHARACTERISTICS_KEY_BOOLEAN_RANGING_FRAME_PROTECTION_SUPPORTED,
                 capabilities.rangingFrameProtectionSupported);
+        characteristics.putInt(CHARACTERISTICS_KEY_INT_MAX_SUPPORTED_SECURE_HE_LTF_PROTO_VERSION,
+                capabilities.maxSupportedSecureHeLtfProtocolVersion);
         return characteristics;
     }
 
