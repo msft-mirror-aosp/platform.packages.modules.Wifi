@@ -68,6 +68,7 @@ import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.twt.TwtRequest;
 import android.net.wifi.twt.TwtSession;
 import android.net.wifi.twt.TwtSessionCallback;
+import android.net.wifi.util.Environment;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
@@ -79,6 +80,7 @@ import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.WorkSource;
 import android.os.connectivity.WifiActivityEnergyInfo;
+import android.security.advancedprotection.AdvancedProtectionFeature;
 import android.telephony.SubscriptionInfo;
 import android.text.TextUtils;
 import android.util.ArraySet;
@@ -5866,8 +5868,36 @@ public class WifiManager {
     public void startLocalOnlyHotspot(LocalOnlyHotspotCallback callback,
             @Nullable Handler handler) {
         Executor executor = handler == null ? null : new HandlerExecutor(handler);
-        startLocalOnlyHotspotInternal(null, executor, callback);
+        startLocalOnlyHotspotInternal(null, executor, callback, false);
     }
+
+   /**
+     * Starts a local-only hotspot with a specific configuration applied. See
+     * {@link #startLocalOnlyHotspot(LocalOnlyHotspotCallback, Handler)}.
+     *
+     * Since custom configuration settings may be incompatible with each other, the hotspot started
+     * through this method cannot coexist with another hotspot created through
+     * {@link #startLocalOnlyHotspot(LocalOnlyHotspotCallback, Handler)}. If this is attempted,
+     * the first hotspot request wins and others receive
+     * {@link LocalOnlyHotspotCallback#ERROR_GENERIC} through
+     * {@link LocalOnlyHotspotCallback#onFailed}.
+     *
+     * @param config Custom configuration for the hotspot. See {@link SoftApConfiguration}.
+     * @param executor Executor to run callback methods on.
+     * @param callback LocalOnlyHotspotCallback for the application to receive updates about
+     * operating status.
+     */
+    @RequiresPermission(allOf = {CHANGE_WIFI_STATE, NEARBY_WIFI_DEVICES})
+    @FlaggedApi(Flags.FLAG_PUBLIC_BANDS_FOR_LOHS)
+    public void startLocalOnlyHotspotWithConfiguration(@NonNull SoftApConfiguration config,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull LocalOnlyHotspotCallback callback) {
+        Objects.requireNonNull(config);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+        startLocalOnlyHotspotInternal(config, executor, callback, false);
+    }
+
 
     /**
      * Starts a local-only hotspot with a specific configuration applied. See
@@ -5897,7 +5927,7 @@ public class WifiManager {
             @Nullable @CallbackExecutor Executor executor,
             @Nullable LocalOnlyHotspotCallback callback) {
         Objects.requireNonNull(config);
-        startLocalOnlyHotspotInternal(config, executor, callback);
+        startLocalOnlyHotspotInternal(config, executor, callback, true);
     }
 
     /**
@@ -5911,7 +5941,8 @@ public class WifiManager {
     private void startLocalOnlyHotspotInternal(
             @Nullable SoftApConfiguration config,
             @Nullable @CallbackExecutor Executor executor,
-            @Nullable LocalOnlyHotspotCallback callback) {
+            @Nullable LocalOnlyHotspotCallback callback,
+            boolean isCalledFromSystemApi) {
         if (executor == null) {
             executor = mContext.getMainExecutor();
         }
@@ -5927,7 +5958,7 @@ public class WifiManager {
                             mContext.getAttributionSource());
                 }
                 int returnCode = mService.startLocalOnlyHotspot(proxy, packageName, featureId,
-                        config, extras);
+                        config, extras, isCalledFromSystemApi);
                 if (returnCode != LocalOnlyHotspotCallback.REQUEST_REGISTERED) {
                     // Send message to the proxy to make sure we call back on the correct thread
                     proxy.onHotspotFailed(returnCode);
@@ -13008,5 +13039,29 @@ public class WifiManager {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+    }
+
+    /**
+     * Indicates what {@link AdvancedProtectionFeature} are supported over Wi-Fi.
+     *
+     * The {@link AdvancedProtectionFeature} is the advanced protection feature
+     * providing protections which works when Android Advanced Protection Mode (AAPM)
+     * is enabled.
+     *
+     * @return a list of the supported features.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_WEP_DISABLED_IN_APM)
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @NonNull
+    public List<AdvancedProtectionFeature> getAvailableAdvancedProtectionFeatures() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        List<AdvancedProtectionFeature> features = List.of(
+        // TODO: b/362586268 Change to AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP
+                new AdvancedProtectionFeature("WEP"));
+        return features;
     }
 }

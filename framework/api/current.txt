@@ -110,12 +110,17 @@ package android.net.wifi {
   public final class SoftApConfiguration implements android.os.Parcelable {
     method public int describeContents();
     method @Nullable public android.net.MacAddress getBssid();
+    method @FlaggedApi("com.android.wifi.flags.public_bands_for_lohs") @NonNull public android.util.SparseIntArray getChannels();
     method @Nullable public String getPassphrase();
     method public int getSecurityType();
     method @Deprecated @Nullable public String getSsid();
     method @Nullable public android.net.wifi.WifiSsid getWifiSsid();
     method public boolean isHiddenSsid();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @FlaggedApi("com.android.wifi.flags.public_bands_for_lohs") public static final int BAND_2GHZ = 1; // 0x1
+    field @FlaggedApi("com.android.wifi.flags.public_bands_for_lohs") public static final int BAND_5GHZ = 2; // 0x2
+    field @FlaggedApi("com.android.wifi.flags.public_bands_for_lohs") public static final int BAND_60GHZ = 8; // 0x8
+    field @FlaggedApi("com.android.wifi.flags.public_bands_for_lohs") public static final int BAND_6GHZ = 4; // 0x4
     field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.SoftApConfiguration> CREATOR;
     field public static final int SECURITY_TYPE_OPEN = 0; // 0x0
     field public static final int SECURITY_TYPE_WPA2_PSK = 1; // 0x1
@@ -123,6 +128,12 @@ package android.net.wifi {
     field public static final int SECURITY_TYPE_WPA3_OWE_TRANSITION = 4; // 0x4
     field public static final int SECURITY_TYPE_WPA3_SAE = 3; // 0x3
     field public static final int SECURITY_TYPE_WPA3_SAE_TRANSITION = 2; // 0x2
+  }
+
+  @FlaggedApi("com.android.wifi.flags.public_bands_for_lohs") public static final class SoftApConfiguration.Builder {
+    ctor public SoftApConfiguration.Builder();
+    method @NonNull public android.net.wifi.SoftApConfiguration build();
+    method @NonNull public android.net.wifi.SoftApConfiguration.Builder setChannels(@NonNull android.util.SparseIntArray);
   }
 
   public enum SupplicantState implements android.os.Parcelable {
@@ -544,6 +555,7 @@ package android.net.wifi {
     method public void setTdlsEnabledWithMacAddress(@NonNull String, boolean, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Boolean>);
     method @Deprecated public boolean setWifiEnabled(boolean);
     method @RequiresPermission(allOf={android.Manifest.permission.CHANGE_WIFI_STATE, android.Manifest.permission.ACCESS_FINE_LOCATION, android.Manifest.permission.NEARBY_WIFI_DEVICES}, conditional=true) public void startLocalOnlyHotspot(android.net.wifi.WifiManager.LocalOnlyHotspotCallback, @Nullable android.os.Handler);
+    method @FlaggedApi("com.android.wifi.flags.public_bands_for_lohs") @RequiresPermission(allOf={android.Manifest.permission.CHANGE_WIFI_STATE, android.Manifest.permission.NEARBY_WIFI_DEVICES}) public void startLocalOnlyHotspotWithConfiguration(@NonNull android.net.wifi.SoftApConfiguration, @NonNull java.util.concurrent.Executor, @NonNull android.net.wifi.WifiManager.LocalOnlyHotspotCallback);
     method @Deprecated public boolean startScan();
     method @Deprecated public void startWps(android.net.wifi.WpsInfo, android.net.wifi.WifiManager.WpsCallback);
     method @RequiresPermission(android.Manifest.permission.ACCESS_WIFI_STATE) public void unregisterScanResultsCallback(@NonNull android.net.wifi.WifiManager.ScanResultsCallback);
@@ -1917,6 +1929,7 @@ package android.net.wifi.rtt {
     field @FlaggedApi("com.android.wifi.flags.secure_ranging") public static final String CHARACTERISTICS_KEY_BOOLEAN_RANGING_FRAME_PROTECTION_SUPPORTED = "key_rnm_mfp_supported";
     field @FlaggedApi("com.android.wifi.flags.secure_ranging") public static final String CHARACTERISTICS_KEY_BOOLEAN_SECURE_HE_LTF_SUPPORTED = "key_secure_he_ltf_supported";
     field public static final String CHARACTERISTICS_KEY_BOOLEAN_STA_RESPONDER = "key_sta_responder";
+    field @FlaggedApi("com.android.wifi.flags.secure_ranging") public static final String CHARACTERISTICS_KEY_INT_MAX_SUPPORTED_SECURE_HE_LTF_PROTO_VERSION = "key_max_supported_secure_he_ltf_proto_ver";
   }
 
 }
