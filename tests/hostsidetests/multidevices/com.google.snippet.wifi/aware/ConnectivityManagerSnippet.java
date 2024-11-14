@@ -21,6 +21,7 @@ import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.TransportInfo;
+import android.net.wifi.aware.WifiAwareChannelInfo;
 import android.net.wifi.aware.WifiAwareNetworkInfo;
 
 import androidx.annotation.NonNull;
@@ -42,6 +43,8 @@ import java.net.Inet6Address;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ConnectivityManagerSnippet implements Snippet {
@@ -49,6 +52,7 @@ public class ConnectivityManagerSnippet implements Snippet {
     private static final String EVENT_KEY_NETWORK = "network";
     private static final String EVENT_KEY_NETWORK_CAP = "networkCapabilities";
     private static final String EVENT_KEY_TRANSPORT_INFO_CLASS = "transportInfoClassName";
+    private static final String EVENT_KEY_TRANSPORT_INFO_CHANNEL_IN_MHZ = "channelInMhz";
     private static final int CLOSE_SOCKET_TIMEOUT = 15 * 1000;
     private static final int ACCEPT_TIMEOUT = 30 * 1000;
     private static final int SOCKET_SO_TIMEOUT = 30 * 1000;
@@ -107,7 +111,7 @@ public class ConnectivityManagerSnippet implements Snippet {
 
         @Override
         public void onCapabilitiesChanged(@NonNull Network network,
-                                          @NonNull NetworkCapabilities networkCapabilities) {
+                @NonNull NetworkCapabilities networkCapabilities) {
             SnippetEvent event = new SnippetEvent(mCallBackId, "NetworkCallback");
             event.getData().putString(EVENT_KEY_CB_NAME, "onCapabilitiesChanged");
             event.getData().putParcelable(EVENT_KEY_NETWORK, network);
@@ -118,8 +122,24 @@ public class ConnectivityManagerSnippet implements Snippet {
             String transportInfoClassName = "";
             if (transportInfo != null) {
                 transportInfoClassName = transportInfo.getClass().getName();
+                event.getData().putString(EVENT_KEY_TRANSPORT_INFO_CLASS, transportInfoClassName);
             }
-            event.getData().putString(EVENT_KEY_TRANSPORT_INFO_CLASS, transportInfoClassName);
+            if (networkCapabilities.getTransportInfo() instanceof WifiAwareNetworkInfo) {
+                WifiAwareNetworkInfo
+                        newWorkInfo =
+                        (WifiAwareNetworkInfo) networkCapabilities.getTransportInfo();
+                List<WifiAwareChannelInfo> channelInfoList = newWorkInfo.getChannelInfoList();
+                ArrayList<Integer> channelFrequencies = new ArrayList<>();
+                if (!channelInfoList.isEmpty()) {
+                    for (WifiAwareChannelInfo info : channelInfoList) {
+                        channelFrequencies.add(info.getChannelFrequencyMhz());
+                    }
+                }
+                event.getData().putIntegerArrayList(
+                    EVENT_KEY_TRANSPORT_INFO_CHANNEL_IN_MHZ, channelFrequencies
+                );
+
+            }
             EventCache.getInstance().postEvent(event);
         }
     }
@@ -139,7 +159,7 @@ public class ConnectivityManagerSnippet implements Snippet {
      */
     @AsyncRpc(description = "Request a network.")
     public void connectivityRequestNetwork(String callBackId, String requestNetWorkId,
-                                           NetworkRequest request, int requestNetworkTimeoutMs) {
+            NetworkRequest request, int requestNetworkTimeoutMs) {
         Log.v("Requesting network with request: " + request.toString());
         NetworkCallback callback = new NetworkCallback(callBackId);
         mNetworkCallBacks.put(requestNetWorkId, callback);

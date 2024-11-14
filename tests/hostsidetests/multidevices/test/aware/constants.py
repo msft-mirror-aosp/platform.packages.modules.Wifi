@@ -61,6 +61,7 @@ class WifiAwareTestConstants:
     PMK = "01234567890123456789012345678901"
     # 6 == TCP
     TRANSPORT_PROTOCOL_TCP = 6
+    CHANNEL_IN_MHZ = 5745
 
 
 
@@ -135,6 +136,7 @@ class NetworkCbEventKey(enum.StrEnum):
     CALLBACK_NAME = "callbackName"
     NETWORK_CAPABILITIES = "networkCapabilities"
     TRANSPORT_INFO_CLASS_NAME = "transportInfoClassName"
+    CHANNEL_IN_MHZ = "channelInMhz"
 
 
 @enum.unique
@@ -472,6 +474,7 @@ class WifiAwareNetworkSpecifier:
     transport_protocol: int | None = None
     pmk: str | None = None
     data_path_security_config: WifiAwareDataPathSecurityConfig | None = None
+    channel_frequency_m_hz: int | None = None
 
     def to_dict(self) -> dict:
         result = dataclasses.asdict(self)
@@ -487,6 +490,8 @@ class WifiAwareNetworkSpecifier:
             del result["data_path_security_config"]
         else:
             result["data_path_security_config"] = self.data_path_security_config.to_dict()
+        if not self.channel_frequency_m_hz:
+            del result["channel_frequency_m_hz"]
         return result
 
 
