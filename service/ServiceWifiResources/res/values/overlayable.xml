@@ -308,6 +308,7 @@
           <item type="bool" name="config_wifiUserApprovalNotRequireForDisconnectedP2p" />
           <item type="integer" name="config_disconnectedP2pIfaceLowPriorityTimeoutMs" />
           <item type="array" name="config_wifiP2pAwareConcurrencyAllowlist" />
+          <item type="array" name="config_wifiSoftApAwareConcurrencyAllowlist" />
           <item type="bool" name="config_wifiNetworkCentricQosPolicyFeatureEnabled" />
           <item type="bool" name="config_wifiApplicationCentricQosPolicyFeatureEnabled" />
           <item type="string" name="config_wifiDriverWorldModeCountryCode" />
