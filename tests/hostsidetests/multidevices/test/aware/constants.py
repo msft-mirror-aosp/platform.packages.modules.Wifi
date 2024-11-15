@@ -39,6 +39,7 @@ PAIRING_CONFIG = "pairing_config"
 AWARE_NETWORK_INFO_CLASS_NAME = "android.net.wifi.aware.WifiAwareNetworkInfo"
 TTL_SEC = "TtlSec"
 INSTANTMODE_ENABLE = "InstantModeEnabled"
+FEATURE_WIFI_AWARE = "feature:android.hardware.wifi.aware"
 
 #onServiceLost reason code
 EASON_PEER_NOT_VISIBLE = 1
