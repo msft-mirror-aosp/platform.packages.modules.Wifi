@@ -2771,6 +2771,9 @@ message WifiUsabilityStatsEntry {
 
   // Wifi Voip mode state
   optional int32 voip_mode = 61;
+
+  // Device Role of thread. Refers to ThreadNetworkController@DeviceRole
+  optional int32 thread_device_role = 62;
 }
 
 message ContentionTimeStats {

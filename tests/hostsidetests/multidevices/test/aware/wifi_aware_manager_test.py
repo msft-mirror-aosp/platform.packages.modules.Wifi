@@ -568,6 +568,51 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             constants.RangingRequest(peer_mac_addresses=[self.publisher_mac]),
         )
 
+    def test_data_path_force_channel_setup(self):
+        """ Test Wi-Fi Aware with PMK, force channel publish, and subscribe.
+
+        Steps:
+        1. Attach a Wi-Fi Aware session on each device.
+        2. Publish and subscribe to a discovery session.
+        3. Send messages through discovery session’s API.
+        4. Request a Wi-Fi Aware network.
+        5. Establish a socket connection and send messages through it.
+        """
+        # The support of this function depends on the chip used.
+        asserts.skip_if(
+            not self.publisher.wifi_aware_snippet.wifiAwareIsSetChannelOnDataPathSupported(),
+            'Publish device not support this test feature.'
+        )
+        asserts.skip_if(
+            not self.subscriber.wifi_aware_snippet.wifiAwareIsSetChannelOnDataPathSupported(),
+            'Subscriber device not support this test feature.'
+        )
+
+        self._test_wifi_aware(
+            pub_config=constants.PublishConfig(
+                service_specific_info=constants.WifiAwareTestConstants.PUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                publish_type=constants.PublishType.UNSOLICITED,
+                ranging_enabled=False,
+            ),
+            sub_config=constants.SubscribeConfig(
+                service_specific_info=constants.WifiAwareTestConstants.SUB_SSI,
+                match_filter=[constants.WifiAwareTestConstants.MATCH_FILTER_BYTES],
+                subscribe_type=constants.SubscribeType.PASSIVE,
+            ),
+            network_specifier_on_pub=constants.WifiAwareNetworkSpecifier(
+                transport_protocol=constants.WifiAwareTestConstants.TRANSPORT_PROTOCOL_TCP,
+                pmk=constants.WifiAwareTestConstants.PMK,
+                channel_frequency_m_hz=constants.WifiAwareTestConstants.CHANNEL_IN_MHZ,
+            ),
+            network_specifier_on_sub=constants.WifiAwareNetworkSpecifier(
+                data_path_security_config=constants.WifiAwareDataPathSecurityConfig(
+                    pmk=constants.WifiAwareTestConstants.PMK
+                ),
+                channel_frequency_m_hz=constants.WifiAwareTestConstants.CHANNEL_IN_MHZ,
+            )
+        )
+
     def _test_wifi_aware(
         self,
         pub_config: constants.PublishConfig,
@@ -603,14 +648,21 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             net_work_request_id=network_id,
             network_specifier_params=network_specifier_on_sub,
         )
-
+        expected_channel = None
+        if (network_specifier_on_pub and
+                network_specifier_on_pub.channel_frequency_m_hz and
+                network_specifier_on_sub and
+                network_specifier_on_sub.channel_frequency_m_hz):
+            expected_channel = network_specifier_on_sub.channel_frequency_m_hz
         self._wait_for_network(
             ad=self.publisher,
             request_network_cb_handler=pub_network_cb_handler,
+            expected_channel=None,
         )
         self._wait_for_network(
             ad=self.subscriber,
             request_network_cb_handler=sub_network_cb_handler,
+            expected_channel=expected_channel,
         )
         # 5. Establish a socket connection and send messages through it.
         self._establish_socket_and_send_msg(
@@ -967,6 +1019,7 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
         self,
         ad: android_device.AndroidDevice,
         request_network_cb_handler: callback_handler_v2.CallbackHandlerV2,
+        expected_channel: str | None = None,
     ):
         """Waits for and verifies the establishment of a Wi-Fi Aware network."""
         network_callback_event = request_network_cb_handler.waitAndGet(
@@ -997,6 +1050,13 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
                 f'{ad} network capabilities changes but it is not a WiFi Aware'
                 ' network.',
             )
+            if expected_channel:
+                mhz_list = network_callback_event.data[constants.NetworkCbEventKey.CHANNEL_IN_MHZ]
+                asserts.assert_equal(
+                    mhz_list,
+                    [expected_channel],
+                    f'{ad} Channel freq is not match the request.'
+                )
         else:
             asserts.fail(
                 f'{ad} got unknown request network callback {callback_name}.'
