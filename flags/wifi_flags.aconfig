@@ -268,3 +268,12 @@ flag {
     bug: "349530934"
     is_fixed_read_only: true
 }
+
+flag {
+    name: "p2p_dialog2"
+    is_exported: true
+    namespace: "wifi"
+    description: "Updated P2P dialogs"
+    bug: "349253691"
+    is_fixed_read_only: true
+}
