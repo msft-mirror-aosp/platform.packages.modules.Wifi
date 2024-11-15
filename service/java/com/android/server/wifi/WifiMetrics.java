@@ -348,6 +348,7 @@ public class WifiMetrics {
     private int mLastUwbState = -1;
     private boolean mIsLowLatencyActivated = false;
     private int mVoipMode = -1;
+    private int mLastThreadDeviceRole = -1;
 
     /**
      * Wi-Fi usability state per interface as predicted by the network scorer.
@@ -5308,6 +5309,7 @@ public class WifiMetrics {
         line.append(",max_supported_tx_linkspeed=" + entry.maxSupportedTxLinkspeed);
         line.append(",max_supported_rx_linkspeed=" + entry.maxSupportedRxLinkspeed);
         line.append(",voip_mode=" + entry.voipMode);
+        line.append(",thread_device_role=" + entry.threadDeviceRole);
         pw.println(line.toString());
     }
 
@@ -7404,6 +7406,7 @@ public class WifiMetrics {
                 wifiUsabilityStatsEntry.maxSupportedRxLinkspeed =
                         info.getMaxSupportedRxLinkSpeedMbps();
                 wifiUsabilityStatsEntry.voipMode = getVoipMode();
+                wifiUsabilityStatsEntry.threadDeviceRole = getLastThreadDeviceRole();
             }
 
             wifiUsabilityStatsEntry.timeStampMs = stats.timeStampInMs;
@@ -7959,7 +7962,7 @@ public class WifiMetrics {
                 s.isThroughputPredictorDownstreamSufficient,
                 s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
                 s.uwbAdapterState, s.isLowLatencyActivated, s.maxSupportedTxLinkspeed,
-                s.maxSupportedRxLinkspeed, s.voipMode
+                s.maxSupportedRxLinkspeed, s.voipMode, s.threadDeviceRole
         );
     }
 
@@ -8174,6 +8177,7 @@ public class WifiMetrics {
         out.maxSupportedTxLinkspeed = s.maxSupportedTxLinkspeed;
         out.maxSupportedRxLinkspeed = s.maxSupportedRxLinkspeed;
         out.voipMode = s.voipMode;
+        out.threadDeviceRole = s.threadDeviceRole;
         return out;
     }
 
@@ -10473,5 +10477,13 @@ public class WifiMetrics {
 
     public void setVoipMode(int mode) {
         mVoipMode = mode;
+    }
+
+    public int getLastThreadDeviceRole() {
+        return mLastThreadDeviceRole;
+    }
+
+    public void setLastThreadDeviceRole(int deviceRole) {
+        mLastThreadDeviceRole = deviceRole;
     }
 }

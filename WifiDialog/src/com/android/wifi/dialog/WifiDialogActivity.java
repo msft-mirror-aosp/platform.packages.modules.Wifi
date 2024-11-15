@@ -59,8 +59,12 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.os.BuildCompat;
 
+import com.android.wifi.x.com.android.wifi.flags.Flags;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -96,6 +100,10 @@ public class WifiDialogActivity extends Activity  {
 
     private String getWifiString(@NonNull String name) {
         return getWifiContext().getString(getWifiResourceId(name, "string"));
+    }
+
+    private String getWifiString(@NonNull String name, @Nullable String arg) {
+        return getWifiContext().getString(getWifiResourceId(name, "string"), arg);
     }
 
     private int getWifiInteger(@NonNull String name) {
@@ -491,6 +499,10 @@ public class WifiDialogActivity extends Activity  {
             final int dialogId,
             @Nullable final String deviceName,
             @Nullable final String displayPin) {
+        if (Flags.p2pDialog2()) {
+            return createP2pInvitationSentDialog2(dialogId, deviceName, displayPin);
+        }
+
         final View textEntryView = getWifiLayoutInflater()
                 .inflate(getWifiLayoutId("wifi_p2p_dialog"), null);
         ViewGroup group = textEntryView.findViewById(getWifiViewId("info"));
@@ -528,6 +540,59 @@ public class WifiDialogActivity extends Activity  {
     }
 
     /**
+     * Returns a P2P Invitation Sent Dialog2 for the given Intent.
+     */
+    private @NonNull AlertDialog createP2pInvitationSentDialog2(
+            final int dialogId,
+            @Nullable final String deviceName,
+            @Nullable final String displayPin) {
+        if (TextUtils.isEmpty(deviceName)) {
+            Log.w(TAG, "P2P Invitation Sent dialog device name is null or empty."
+                    + " id=" + dialogId
+                    + " deviceName=" + deviceName
+                    + " displayPin=" + displayPin);
+        }
+        final View customView;
+        final String title;
+        final String message;
+        if (displayPin != null) {
+            customView = getWifiLayoutInflater()
+                    .inflate(getWifiLayoutId("wifi_p2p_dialog2_display_pin"), null);
+            ((TextView) customView.findViewById(getWifiViewId("wifi_p2p_dialog2_display_pin")))
+                    .setText(displayPin);
+            title = getWifiString("wifi_p2p_dialog2_sent_title_display_pin", deviceName);
+            message = getWifiString("wifi_p2p_dialog2_sent_message_display_pin", deviceName);
+        } else {
+            customView = null;
+            title = getWifiString("wifi_p2p_dialog2_sent_title", deviceName);
+            message = getWifiString("wifi_p2p_dialog2_sent_message", deviceName);
+        }
+
+        AlertDialog.Builder builder = getWifiAlertDialogBuilder("wifi_p2p_dialog2")
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(getWifiString("wifi_p2p_dialog2_sent_positive_button"),
+                        (dialogPositive, which) -> {
+                            // No-op
+                            if (mIsVerboseLoggingEnabled) {
+                                Log.v(TAG, "P2P Invitation Sent Dialog id=" + dialogId
+                                        + " accepted.");
+                            }
+                        });
+        if (customView != null) {
+            builder.setView(customView);
+        }
+        AlertDialog dialog = builder.create();
+        if (mIsVerboseLoggingEnabled) {
+            Log.v(TAG, "Created P2P Invitation Sent dialog."
+                    + " id=" + dialogId
+                    + " deviceName=" + deviceName
+                    + " displayPin=" + displayPin);
+        }
+        return dialog;
+    }
+
+    /**
      * Returns a P2P Invitation Received Dialog for the given Intent.
      */
     private @NonNull AlertDialog createP2pInvitationReceivedDialog(
@@ -536,6 +601,11 @@ public class WifiDialogActivity extends Activity  {
             final boolean isPinRequested,
             @Nullable final String displayPin,
             int timeoutMs) {
+        if (Flags.p2pDialog2()) {
+            return createP2pInvitationReceivedDialog2(dialogId, deviceName, isPinRequested,
+                    displayPin, timeoutMs);
+        }
+
         if (TextUtils.isEmpty(deviceName)) {
             Log.w(TAG, "P2P Invitation Received dialog device name is null or empty."
                     + " id=" + dialogId
@@ -709,5 +779,196 @@ public class WifiDialogActivity extends Activity  {
         ((TextView) row.findViewById(getWifiViewId("name"))).setText(name);
         ((TextView) row.findViewById(getWifiViewId("value"))).setText(value);
         group.addView(row);
+    }
+
+    /**
+     * Returns a P2P Invitation Received Dialog2 for the given Intent.
+     */
+    private @NonNull AlertDialog createP2pInvitationReceivedDialog2(
+            final int dialogId,
+            @Nullable final String deviceName,
+            final boolean isPinRequested,
+            @Nullable final String displayPin,
+            final int timeoutMs) {
+        if (TextUtils.isEmpty(deviceName)) {
+            Log.w(TAG, "P2P Invitation Received dialog device name is null or empty."
+                    + " id=" + dialogId
+                    + " deviceName=" + deviceName
+                    + " displayPin=" + displayPin);
+        }
+        final View customView;
+        String title = getWifiString("wifi_p2p_dialog2_received_title", deviceName);
+        final String message;
+        final String timeoutMessage;
+        final EditText pinEditText;
+        if (isPinRequested) {
+            customView = getWifiLayoutInflater()
+                    .inflate(getWifiLayoutId("wifi_p2p_dialog2_enter_pin"), null);
+            pinEditText = customView.findViewById(getWifiViewId("wifi_p2p_dialog2_enter_pin"));
+            title = getWifiString("wifi_p2p_dialog2_received_title_enter_pin", deviceName);
+            message = getWifiString("wifi_p2p_dialog2_received_message_enter_pin", deviceName);
+            timeoutMessage = getWifiString("wifi_p2p_dialog2_received_message_enter_pin_countdown",
+                    deviceName);
+        } else {
+            pinEditText = null;
+            if (!TextUtils.isEmpty(displayPin)) {
+                customView = getWifiLayoutInflater()
+                        .inflate(getWifiLayoutId("wifi_p2p_dialog2_display_pin"), null);
+                ((TextView) customView.findViewById(getWifiViewId("wifi_p2p_dialog2_display_pin")))
+                        .setText(displayPin);
+                title = getWifiString("wifi_p2p_dialog2_received_title_display_pin", deviceName);
+                message = getWifiString("wifi_p2p_dialog2_received_message_display_pin",
+                        deviceName);
+                timeoutMessage = getWifiString(
+                        "wifi_p2p_dialog2_received_message_display_pin_countdown", deviceName);
+            } else {
+                customView = null;
+                message = getWifiString("wifi_p2p_dialog2_received_message", deviceName);
+                timeoutMessage = getWifiString("wifi_p2p_dialog2_received_message_countdown",
+                        deviceName);
+            }
+        }
+
+        AlertDialog.Builder builder = getWifiAlertDialogBuilder("wifi_p2p_dialog2")
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(getWifiString("wifi_p2p_dialog2_received_positive_button"),
+                        (dialogPositive, which) -> {
+                            String pin = null;
+                            if (pinEditText != null) {
+                                pin = pinEditText.getText().toString();
+                            }
+                            if (mIsVerboseLoggingEnabled) {
+                                Log.v(TAG, "P2P Invitation Received Dialog id=" + dialogId
+                                        + " accepted with pin=" + pin);
+                            }
+                            getWifiManager().replyToP2pInvitationReceivedDialog(dialogId, true,
+                                    pin);
+                        })
+                .setNegativeButton(getWifiString("wifi_p2p_dialog2_received_negative_button"),
+                        (dialogNegative, which) -> {
+                            if (mIsVerboseLoggingEnabled) {
+                                Log.v(TAG, "P2P Invitation Received dialog id=" + dialogId
+                                        + " declined.");
+                            }
+                            getWifiManager().replyToP2pInvitationReceivedDialog(dialogId, false,
+                                    null);
+                        })
+                .setOnCancelListener((dialogCancel) -> {
+                    if (mIsVerboseLoggingEnabled) {
+                        Log.v(TAG, "P2P Invitation Received dialog id=" + dialogId
+                                + " cancelled.");
+                    }
+                    getWifiManager().replyToP2pInvitationReceivedDialog(dialogId, false, null);
+                });
+        if (customView != null) {
+            builder.setView(customView);
+        }
+        AlertDialog dialog = builder.create();
+        if (isPinRequested) {
+            dialog.getWindow().setSoftInputMode(
+                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+            dialog.setOnShowListener(dialogShow -> {
+                Intent intent = mLaunchIntentsPerId.get(dialogId);
+                if (intent != null) {
+                    // Populate the pin EditText with the previous user input if we're recreating
+                    // the dialog after a configuration change.
+                    CharSequence previousPin =
+                            intent.getCharSequenceExtra(EXTRA_DIALOG_P2P_PIN_INPUT);
+                    if (previousPin != null) {
+                        pinEditText.setText(previousPin);
+                    }
+                }
+                if (getResources().getConfiguration().orientation
+                        == Configuration.ORIENTATION_PORTRAIT
+                        || (getResources().getConfiguration().screenLayout
+                        & Configuration.SCREENLAYOUT_SIZE_MASK)
+                        >= Configuration.SCREENLAYOUT_SIZE_LARGE) {
+                    pinEditText.requestFocus();
+                    pinEditText.setSelection(pinEditText.getText().length());
+                }
+                dialog.getButton(Dialog.BUTTON_POSITIVE).setEnabled(
+                        pinEditText.length() == 4 || pinEditText.length() == 8);
+            });
+            pinEditText.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    // No-op.
+                }
+
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                    // No-op.
+                }
+
+                @Override
+                public void afterTextChanged(Editable s) {
+                    Intent intent = mLaunchIntentsPerId.get(dialogId);
+                    if (intent != null) {
+                        // Store the current input in the Intent in case we need to reload from a
+                        // configuration change.
+                        intent.putExtra(EXTRA_DIALOG_P2P_PIN_INPUT, s);
+                    }
+                    dialog.getButton(Dialog.BUTTON_POSITIVE).setEnabled(
+                            s.length() == 4 || s.length() == 8);
+                }
+            });
+        } else {
+            dialog.setOnShowListener(dialogShow -> {
+                dialog.getButton(Dialog.BUTTON_NEGATIVE).requestFocus();
+            });
+        }
+        if ((getResources().getConfiguration().uiMode & Configuration.UI_MODE_TYPE_APPLIANCE)
+                == Configuration.UI_MODE_TYPE_APPLIANCE) {
+            // For appliance devices, add a key listener which accepts.
+            dialog.setOnKeyListener((dialogKey, keyCode, event) -> {
+                if (keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
+                    dialog.dismiss();
+                    getWifiManager().replyToP2pInvitationReceivedDialog(dialogId, true, null);
+                }
+                return true;
+            });
+        }
+        if (timeoutMs > 0) {
+            CountDownTimer countDownTimer = new CountDownTimer(timeoutMs, 100) {
+                @Override
+                public void onTick(long millisUntilFinished) {
+                    Intent intent = mLaunchIntentsPerId.get(dialogId);
+                    if (intent != null) {
+                        // Store the updated timeout to use if we reload this dialog after a
+                        // configuration change
+                        intent.putExtra(WifiManager.EXTRA_DIALOG_TIMEOUT_MS,
+                                (int) millisUntilFinished);
+                    }
+
+                    if (!getWifiBoolean("config_p2pInvitationReceivedDialogShowRemainingTime")) {
+                        return;
+                    }
+                    int secondsRemaining = (int) millisUntilFinished / 1000;
+                    if (millisUntilFinished % 1000 != 0) {
+                        // Round up to the nearest whole second.
+                        secondsRemaining++;
+                    }
+                    Map<String, Object> messageArgs = new HashMap<>();
+                    messageArgs.put("device", deviceName);
+                    messageArgs.put("countdown", secondsRemaining);
+                    dialog.setMessage(MessageFormat.format(timeoutMessage, messageArgs));
+                }
+
+                @Override
+                public void onFinish() {
+                    removeIntentAndPossiblyFinish(dialogId);
+                }
+            }.start();
+            mActiveCountDownTimersPerId.put(dialogId, countDownTimer);
+        }
+        if (mIsVerboseLoggingEnabled) {
+            Log.v(TAG, "Created P2P Invitation Received dialog."
+                    + " id=" + dialogId
+                    + " deviceName=" + deviceName
+                    + " isPinRequested=" + isPinRequested
+                    + " displayPin=" + displayPin);
+        }
+        return dialog;
     }
 }

@@ -250,6 +250,7 @@ import com.android.modules.utils.StringParceledListSlice;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.WifiServiceImpl.LocalOnlyRequestorCallback;
 import com.android.server.wifi.WifiServiceImpl.SoftApCallbackInternal;
+import com.android.server.wifi.WifiServiceImpl.ThreadStateListener;
 import com.android.server.wifi.WifiServiceImpl.UwbAdapterStateListener;
 import com.android.server.wifi.b2b.WifiRoamingModeManager;
 import com.android.server.wifi.coex.CoexManager;
@@ -13026,6 +13027,20 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
         uwbAdapterStateListener.onStateChanged(2, 1);
         verify(mWifiMetrics).setLastUwbState(2);
+    }
+
+    /**
+     * Verify ThreadNetworkController.StateCallback onDeviceRoleChanged could update
+     * mLastThreadDeviceRole in WifiMetrics properly
+     */
+    @Test
+    public void testServiceImplThreadStateCallback() {
+        assumeTrue(SdkLevel.isAtLeastV());
+        ThreadStateListener threadStateListener =
+                mWifiServiceImpl.new ThreadStateListener();
+
+        threadStateListener.onDeviceRoleChanged(3);
+        verify(mWifiMetrics).setLastThreadDeviceRole(3);
     }
 
     @Test

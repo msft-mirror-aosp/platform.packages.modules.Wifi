@@ -116,7 +116,7 @@ public class WifiUsabilityStatsEntryTest {
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 32, contentionTimeStats, rateStats, radioStats, 100, true,
                 true, true, 23, 24, 25, true, linkStats, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-                false, 36, false, 37, 38, 39);
+                false, 36, false, 37, 38, 39, 40);
         assertEquals(32, usabilityStatsEntry.getTimeSliceDutyCycleInPercent());
 
         WifiUsabilityStatsEntry usabilityStatsEntryWithInvalidDutyCycleValue =
@@ -124,7 +124,7 @@ public class WifiUsabilityStatsEntryTest {
                         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
                         21, 22, -1, contentionTimeStats, rateStats, radioStats, 101, true, true,
                         true, 23, 24, 25, true, linkStats, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-                        true, 36, true, 37, 38, 39);
+                        true, 36, true, 37, 38, 39, 40);
         try {
             usabilityStatsEntryWithInvalidDutyCycleValue.getTimeSliceDutyCycleInPercent();
             fail();
@@ -182,7 +182,7 @@ public class WifiUsabilityStatsEntryTest {
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 50, contentionTimeStats, rateStats, radioStats, 102, true,
                 true, true, 23, 24, 25, true, linkStats, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
-                true, 36, false, 37, 38, 39
+                true, 36, false, 37, 38, 39, 40
         );
     }
 
@@ -673,7 +673,7 @@ public class WifiUsabilityStatsEntryTest {
         WifiUsabilityStatsEntry usabilityStatsEntry = new WifiUsabilityStatsEntry(
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 32, null, null, null, 100, true, true, true, 23, 24, 25, true, linkStats, 26, 27,
-                28, 29, 30, 31, 32, 33, 34, 35, true, 36, true, 37, 38, 39);
+                28, 29, 30, 31, 32, 33, 34, 35, true, 36, true, 37, 38, 39, 40);
 
         assertThrows("linkId is invalid - " + MloLink.INVALID_MLO_LINK_ID,
                 NoSuchElementException.class,
