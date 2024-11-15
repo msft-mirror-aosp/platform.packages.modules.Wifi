@@ -2283,9 +2283,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 sb.append(" ");
                 sb.append(Integer.toString(msg.arg2));
                 if (mWifiInfo.getSSID() != null) {
-                    if (mWifiInfo.getSSID() != null) {
-                        sb.append(" ").append(mWifiInfo.getSSID());
-                    }
+                    sb.append(" ").append(mWifiInfo.getSSID());
                 }
                 if (mWifiInfo.getBSSID() != null) {
                     sb.append(" ").append(mWifiInfo.getBSSID());
