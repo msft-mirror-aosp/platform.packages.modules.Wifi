@@ -66,6 +66,7 @@ python_test_host {
     srcs: ["aware/wifi_aware_manager_test.py"],
     device_common_data: [":wifi_aware_snippet_new"],
     libs: [
+        "aware_lib_utils",
         "mobly",
         "wifi_aware_constants",
     ],
