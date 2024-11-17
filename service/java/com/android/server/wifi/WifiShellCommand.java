@@ -908,7 +908,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     mWifiService.registerLocalOnlyHotspotSoftApCallback(softApCallback, extras);
                     if (REQUEST_REGISTERED != mWifiService.startLocalOnlyHotspot(
                               lohsCallback, SHELL_PACKAGE_NAME, null /* featureId */,
-                              config, extras)) {
+                              config, extras, false)) {
                         pw.println("Lohs failed to start. Please check config parameters");
                     }
                     // Wait for lohs to start and complete callback
@@ -1611,25 +1611,32 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 case "launch-dialog-p2p-invitation-sent": {
                     int displayId = Display.DEFAULT_DISPLAY;
                     String deviceName = getNextArgRequired();
-                    String displayPin = getNextArgRequired();
                     String cmdOption = getNextOption();
-                    if (cmdOption != null && cmdOption.equals("-i")) {
-                        String displayIdStr = getNextArgRequired();
-                        try {
-                            displayId = Integer.parseInt(displayIdStr);
-                        } catch (NumberFormatException e) {
-                            pw.println("Invalid <display-id> argument to "
-                                    + "'launch-dialog-p2p-invitation-sent' "
-                                    + "- must be an integer: "
-                                    + displayIdStr);
-                            return -1;
+                    String displayPin = null;
+                    while (cmdOption != null) {
+                        if (cmdOption.equals("-d")) {
+                            displayPin = getNextArgRequired();
+                        } else if (cmdOption.equals("-i")) {
+                            String displayIdStr = getNextArgRequired();
+                            try {
+                                displayId = Integer.parseInt(displayIdStr);
+                            } catch (NumberFormatException e) {
+                                pw.println("Invalid <display-id> argument to "
+                                        + "'launch-dialog-p2p-invitation-sent' "
+                                        + "- must be an integer: "
+                                        + displayIdStr);
+                                return -1;
+                            }
+                            DisplayManager dm = mContext.getSystemService(DisplayManager.class);
+                            Display[] displays = dm.getDisplays();
+                            for (Display display : displays) {
+                                pw.println("Display: id=" + display.getDisplayId() + ", info="
+                                        + display.getDeviceProductInfo());
+                            }
+                        } else {
+                            pw.println("Ignoring unknown option " + cmdOption);
                         }
-                        DisplayManager dm = mContext.getSystemService(DisplayManager.class);
-                        Display[] displays = dm.getDisplays();
-                        for (Display display : displays) {
-                            pw.println("Display: id=" + display.getDisplayId() + ", info="
-                                    + display.getDeviceProductInfo());
-                        }
+                        cmdOption = getNextOption();
                     }
                     mWifiDialogManager.createP2pInvitationSentDialog(deviceName, displayPin,
                             displayId).launchDialog();
@@ -3043,7 +3050,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    -x - Neutral Button Text");
         pw.println("    -c - Optional timeout in milliseconds");
         pw.println("    -s - Use the legacy dialog implementation on the system process");
-        pw.println("  launch-dialog-p2p-invitation-sent <device_name> <pin> [-i <display_id>]");
+        pw.println("  launch-dialog-p2p-invitation-sent <device_name> [-d <pin>]"
+                + " [-i <display_id>]");
         pw.println("    Launches a P2P Invitation Sent dialog.");
         pw.println("    <device_name> - Name of the device the invitation was sent to");
         pw.println("    <pin> - PIN for the invited device to input");

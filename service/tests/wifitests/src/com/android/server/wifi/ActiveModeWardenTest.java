@@ -885,6 +885,30 @@ public class ActiveModeWardenTest extends WifiBaseTest {
     }
 
     @Test
+    public void testClientModeChangeRoleDuringTransition() throws Exception {
+        enterClientModeActiveState();
+        verify(mWifiInjector).makeClientModeManager(
+                any(), eq(TEST_WORKSOURCE), eq(ROLE_CLIENT_PRIMARY), anyBoolean());
+
+        // Simulate the primary not fully started by making the role null and targetRole primary.
+        when(mClientModeManager.getRole()).thenReturn(null);
+        when(mClientModeManager.getTargetRole()).thenReturn(ROLE_CLIENT_PRIMARY);
+        List<ClientModeManager> currentCMMs = mActiveModeWarden.getClientModeManagers();
+        assertEquals(1, currentCMMs.size());
+        ConcreteClientModeManager currentCmm = (ConcreteClientModeManager) currentCMMs.get(0);
+        assertTrue(currentCmm.getTargetRole() == ROLE_CLIENT_PRIMARY);
+
+        // toggle wifi off while wifi scanning is on
+        when(mSettingsStore.isScanAlwaysAvailable()).thenReturn(true);
+        when(mSettingsStore.isWifiToggleEnabled()).thenReturn(false);
+        mActiveModeWarden.wifiToggled(TEST_WORKSOURCE);
+        mLooper.dispatchAll();
+
+        // expect transition to scan only mode
+        verify(mClientModeManager).setRole(eq(ROLE_CLIENT_SCAN_ONLY), any());
+    }
+
+    @Test
     public void testPrimaryNotCreatedTwice() throws Exception {
         enterClientModeActiveState();
         verify(mWifiInjector).makeClientModeManager(

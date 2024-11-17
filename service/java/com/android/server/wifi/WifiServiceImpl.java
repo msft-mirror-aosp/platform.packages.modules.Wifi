@@ -100,6 +100,8 @@ import android.net.NetworkStack;
 import android.net.TetheringManager;
 import android.net.Uri;
 import android.net.ip.IpClientUtil;
+import android.net.thread.ThreadNetworkController;
+import android.net.thread.ThreadNetworkManager;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -168,6 +170,7 @@ import android.net.wifi.hotspot2.PasspointConfiguration;
 import android.net.wifi.twt.TwtRequest;
 import android.net.wifi.twt.TwtSession;
 import android.net.wifi.twt.TwtSessionCallback;
+import android.net.wifi.util.Environment;
 import android.net.wifi.util.ScanResultUtil;
 import android.net.wifi.util.WifiResourceCache;
 import android.os.AsyncTask;
@@ -939,6 +942,24 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 if (uwbManager != null) {
                     uwbManager.registerAdapterStateCallback(new HandlerExecutor(new Handler(
                             mWifiHandlerThread.getLooper())), new UwbAdapterStateListener());
+                }
+            }
+
+            if (SdkLevel.isAtLeastV()) {
+                ThreadNetworkManager threadManager =
+                        mContext.getSystemService(ThreadNetworkManager.class);
+                if (threadManager != null) {
+                    List<ThreadNetworkController> threadNetworkControllers =
+                            threadManager.getAllThreadNetworkControllers();
+                    if (threadNetworkControllers.size() > 0) {
+                        ThreadNetworkController threadNetworkController =
+                                threadNetworkControllers.get(0);
+                        if (threadNetworkController != null) {
+                            threadNetworkController.registerStateCallback(
+                                new HandlerExecutor(new Handler(mWifiHandlerThread.getLooper())),
+                                new ThreadStateListener());
+                        }
+                    }
                 }
             }
         }, TAG + "#handleBootCompleted");
@@ -2185,6 +2206,20 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    class ThreadStateListener implements ThreadNetworkController.StateCallback {
+        @Override
+        public void onDeviceRoleChanged(int mDeviceRole) {
+            if (mVerboseLoggingEnabled) {
+                Log.d(TAG, "ThreadNetworkController.DeviceRole=" + mDeviceRole);
+            }
+            mWifiMetrics.setLastThreadDeviceRole(mDeviceRole);
+        }
+
+        @Override
+        public void onPartitionIdChanged(long mPartitionId) {}
+    }
+
     /**
      * SoftAp callback
      */
@@ -2876,7 +2911,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
      */
     @Override
     public int startLocalOnlyHotspot(ILocalOnlyHotspotCallback callback, String packageName,
-            String featureId, SoftApConfiguration customConfig, Bundle extras) {
+            String featureId, SoftApConfiguration customConfig, Bundle extras,
+            boolean isCalledFromSystemApi) {
         // first check if the caller has permission to start a local only hotspot
         // need to check for WIFI_STATE_CHANGE and location permission
         final int uid = Binder.getCallingUid();
@@ -2886,7 +2922,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         mLog.info("start lohs uid=% pid=%").c(uid).c(pid).flush();
 
         // Permission requirements are different with/without custom config.
-        if (customConfig == null) {
+        // From B, the custom config may from public API, check isCalledFromSystemApi
+        if (customConfig == null
+                || (Environment.isSdkAtLeastB() && !isCalledFromSystemApi)) {
             if (enforceChangePermission(packageName) != MODE_ALLOWED) {
                 return LocalOnlyHotspotCallback.ERROR_GENERIC;
             }
