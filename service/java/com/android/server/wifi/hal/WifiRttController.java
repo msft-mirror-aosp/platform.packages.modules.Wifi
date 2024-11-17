@@ -120,6 +120,8 @@ public class WifiRttController {
         public boolean secureHeLtfSupported;
         // Whether ranging frame protection is supported
         public boolean rangingFrameProtectionSupported;
+        // Maximum supported secure HE-LTF protocol version
+        public int maxSupportedSecureHeLtfProtocolVersion;
 
         public Capabilities() {
         }
@@ -170,9 +172,10 @@ public class WifiRttController {
             azBwSupported = rttHalCapabilities.azBwSupport;
             ntbInitiatorSupported = rttHalCapabilities.ntbInitiatorSupported;
             ntbResponderSupported = rttHalCapabilities.ntbResponderSupported;
-            //TODO: Fill this in from HAL
-            secureHeLtfSupported = false;
-            rangingFrameProtectionSupported = false;
+            secureHeLtfSupported = rttHalCapabilities.secureHeLtfSupported;
+            rangingFrameProtectionSupported = rttHalCapabilities.rangingFrameProtectionSupported;
+            maxSupportedSecureHeLtfProtocolVersion =
+                    rttHalCapabilities.maxSupportedSecureHeLtfProtocolVersion;
         }
     }
 
