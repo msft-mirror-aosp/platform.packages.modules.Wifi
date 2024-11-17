@@ -18,6 +18,7 @@ package com.android.server.wifi.p2p;
 
 import static android.net.wifi.p2p.WifiP2pConfig.GROUP_CLIENT_IP_PROVISIONING_MODE_IPV4_DHCP;
 import static android.net.wifi.p2p.WifiP2pConfig.GROUP_CLIENT_IP_PROVISIONING_MODE_IPV6_LINK_LOCAL;
+import static android.net.wifi.p2p.WifiP2pConfig.P2P_VERSION_2;
 
 import static com.android.net.module.util.Inet4AddressUtils.inet4AddressToIntHTL;
 import static com.android.net.module.util.Inet4AddressUtils.netmaskToPrefixLength;
@@ -83,6 +84,7 @@ import android.net.wifi.p2p.WifiP2pWfdInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
 import android.net.wifi.p2p.nsd.WifiP2pServiceResponse;
+import android.net.wifi.util.Environment;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
@@ -146,6 +148,7 @@ import com.android.server.wifi.util.WaitingState;
 import com.android.server.wifi.util.WifiPermissionsUtil;
 import com.android.server.wifi.util.WifiPermissionsWrapper;
 import com.android.wifi.flags.FeatureFlags;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.io.FileDescriptor;
@@ -3410,7 +3413,22 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                     WifiP2pManager.BUSY);
                             break;
                         }
-                        if (mVerboseLoggingEnabled) logd(getName() + " discover services");
+                        int serviceDiscoveryType = message.arg1;
+                        logd(getName() + " discover services - Type: " + serviceDiscoveryType);
+                        if (serviceDiscoveryType
+                                == WifiP2pManager.WIFI_P2P_USD_BASED_SERVICE_DISCOVERY) {
+                            if (Environment.isSdkAtLeastB() && Flags.wifiDirectR2()
+                                     && isFeatureSupported(
+                                             WifiP2pManager.FEATURE_WIFI_DIRECT_R2)) {
+                                // TODO implementation
+                                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                                        WifiP2pManager.ERROR);
+                            } else {
+                                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                                        WifiP2pManager.ERROR);
+                            }
+                            break;
+                        }
                         if (!updateSupplicantServiceRequest()) {
                             replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
                                     WifiP2pManager.NO_SERVICE_REQUESTS);
@@ -3473,9 +3491,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             break;
                         }
                         if (mVerboseLoggingEnabled) logd(getName() + " add service");
-                        WifiP2pServiceInfo servInfo =
-                                extras.getParcelable(WifiP2pManager.EXTRA_PARAM_KEY_SERVICE_INFO);
-                        if (addLocalService(message.replyTo, servInfo)) {
+                        if (addLocalService(message)) {
                             replyToMessage(message, WifiP2pManager.ADD_LOCAL_SERVICE_SUCCEEDED);
                         } else {
                             replyToMessage(message, WifiP2pManager.ADD_LOCAL_SERVICE_FAILED);
@@ -3495,8 +3511,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         break;
                     case WifiP2pManager.ADD_SERVICE_REQUEST:
                         if (mVerboseLoggingEnabled) logd(getName() + " add service request");
-                        if (!addServiceRequest(message.replyTo,
-                                (WifiP2pServiceRequest) message.obj)) {
+                        if (!addServiceRequest(message)) {
                             replyToMessage(message, WifiP2pManager.ADD_SERVICE_REQUEST_FAILED);
                             break;
                         }
@@ -4428,8 +4443,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                         : WifiManager.API_P2P_CREATE_GROUP_P2P_CONFIG,
                                 Process.myTid(), uid, 0, packageName, true);
                         boolean ret = false;
-                        if (config != null) {
-                            if (isConfigValidAsGroup(config)) {
+                        if (config != null && isConfigValidAsGroup(config)) {
                                 mConnectionPkgName = packageName;
                                 if (mVerboseLoggingEnabled) {
                                     logd("FAST_CONNECTION GO band freq: "
@@ -4439,7 +4453,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                         P2pConnectionEvent.CONNECTION_FAST,
                                         config, GroupEvent.GROUP_OWNER, uid, attributionTag);
                                 ret = mWifiNative.p2pGroupAdd(config, false);
-                            }
+                        } else if (isConfigForGroupOwnerV2(config)) {
+                            logd("Requested to create Group Owner - V2");
+                            // TODO implementation
                         } else if (netId == WifiP2pGroup.NETWORK_ID_PERSISTENT) {
                             // check if the go persistent group is present.
                             netId = mGroups.getNetworkId(mThisDevice.deviceAddress);
@@ -7334,6 +7350,23 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     && !TextUtils.isEmpty(config.passphrase);
         }
 
+        /**
+         * Check the config for group owner version 2.
+         *
+         * @param config config to be checked for P2P group owner version.
+         * @return true if it is version 2, false otherwise.
+         */
+        @SuppressLint("NewApi")
+        private boolean isConfigForGroupOwnerV2(WifiP2pConfig config) {
+            if (config != null && Environment.isSdkAtLeastB()
+                    && isFeatureSupported(WifiP2pManager.FEATURE_WIFI_DIRECT_R2)
+                    && Flags.wifiDirectR2()
+                    && config.getGroupOwnerVersion() == P2P_VERSION_2) {
+                return true;
+            }
+            return false;
+        }
+
         private WifiP2pDevice fetchCurrentDeviceDetails(WifiP2pConfig config) {
             if (config == null) return null;
             // Fetch & update group capability from supplicant on the device
@@ -8142,10 +8175,24 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             mServiceDiscReqId = null;
         }
 
-        private boolean addServiceRequest(Messenger m, WifiP2pServiceRequest req) {
+        @SuppressLint("NewApi")
+        private boolean addServiceRequest(@NonNull Message message) {
+            Messenger m = message.replyTo;
+            WifiP2pServiceRequest req = (WifiP2pServiceRequest) message.obj;
             if (m == null || req == null) {
                 Log.e(TAG, "Illegal argument(s)");
                 return false;
+            }
+            if (Environment.isSdkAtLeastB() && Flags.wifiDirectR2()
+                    && isFeatureSupported(WifiP2pManager.FEATURE_WIFI_DIRECT_R2)) {
+                if (req.getWifiP2pUsdBasedServiceConfig() != null) {
+                    if (mVerboseLoggingEnabled) {
+                        logd(getName() + " USD service config: "
+                                + req.getWifiP2pUsdBasedServiceConfig().toString());
+                    }
+                    // TODO implementation
+                    return false;
+                }
             }
             // TODO: We could track individual service adds separately and avoid
             // having to do update all service requests on every new request
@@ -8221,9 +8268,20 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             updateSupplicantServiceRequest();
         }
 
-        private boolean addLocalService(Messenger m, WifiP2pServiceInfo servInfo) {
+        private boolean addLocalService(@NonNull Message message) {
+            Messenger m = message.replyTo;
+            Bundle extras = message.getData()
+                    .getBundle(WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE);
+            WifiP2pServiceInfo servInfo =
+                    extras.getParcelable(WifiP2pManager.EXTRA_PARAM_KEY_SERVICE_INFO);
             if (m == null || servInfo == null) {
                 Log.e(TAG, "Illegal arguments");
+                return false;
+            }
+            int addLocalServiceType = message.arg1;
+            if (addLocalServiceType
+                    == WifiP2pManager.WIFI_P2P_USD_BASED_ADD_LOCAL_SERVICE) {
+                // TODO implementation
                 return false;
             }
 
