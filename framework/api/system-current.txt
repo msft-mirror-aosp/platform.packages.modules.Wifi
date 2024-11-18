@@ -1884,6 +1884,28 @@ package android.net.wifi.usd {
     method @NonNull public android.net.wifi.usd.PublishConfig.Builder setTxMatchFilter(@NonNull java.util.List<byte[]>);
   }
 
+  @FlaggedApi("android.net.wifi.flags.usd") public final class SubscribeConfig extends android.net.wifi.usd.Config implements android.os.Parcelable {
+    method public int describeContents();
+    method @IntRange(from=0) public int getQueryPeriodMillis();
+    method @Nullable public int[] getRecommendedFreqList();
+    method public int getSubscribeType();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.usd.SubscribeConfig> CREATOR;
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public static final class SubscribeConfig.Builder {
+    ctor public SubscribeConfig.Builder(@NonNull String);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig build();
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setQueryPeriodMillis(@IntRange(from=0) int);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setRecommendedFreqList(@NonNull int[]);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setRxMatchFilter(@NonNull java.util.List<byte[]>);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setServiceProtoType(int);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setServiceSpecificInfo(@NonNull byte[]);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setSubscribeType(int);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setTtlSeconds(@IntRange(from=0) int);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setTxMatchFilter(@NonNull java.util.List<byte[]>);
+  }
+
   @FlaggedApi("android.net.wifi.flags.usd") public class UsdManager {
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherAvailable();
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherSupported();
