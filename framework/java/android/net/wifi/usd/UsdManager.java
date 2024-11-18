@@ -21,6 +21,7 @@ import static android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION;
 import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.RequiresApi;
 import android.annotation.RequiresPermission;
 import android.annotation.SystemApi;
@@ -253,6 +254,25 @@ public class UsdManager {
             } finally {
                 sAvailabilityCallbackMap.remove(callbackHash);
             }
+        }
+    }
+
+    /**
+     * Gets the characteristics of USD: a set of parameters which specify limitations on
+     * configurations, e.g. maximum service name length.
+     *
+     * @return An object specifying the configuration limitation of USD. Return {@code null} if
+     * USD feature is not supported.
+     */
+    @RequiresPermission(MANAGE_WIFI_NETWORK_SELECTION)
+    public @Nullable Characteristics getCharacteristics() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        try {
+            return mService.getCharacteristics();
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
         }
     }
 }

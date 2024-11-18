@@ -1847,6 +1847,17 @@ package android.net.wifi.twt {
 
 package android.net.wifi.usd {
 
+  @FlaggedApi("android.net.wifi.flags.usd") public final class Characteristics implements android.os.Parcelable {
+    method public int describeContents();
+    method public int getMaxMatchFilterLength();
+    method public int getMaxNumberOfPublishSessions();
+    method public int getMaxNumberOfSubscribeSessions();
+    method public int getMaxServiceNameLength();
+    method public int getMaxServiceSpecificInfoLength();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.usd.Characteristics> CREATOR;
+  }
+
   @FlaggedApi("android.net.wifi.flags.usd") public abstract class Config {
     method @NonNull public java.util.List<byte[]> getRxMatchFilter();
     method @NonNull public byte[] getServiceName();
@@ -1907,6 +1918,7 @@ package android.net.wifi.usd {
   }
 
   @FlaggedApi("android.net.wifi.flags.usd") public class UsdManager {
+    method @Nullable @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public android.net.wifi.usd.Characteristics getCharacteristics();
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherAvailable();
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherSupported();
     method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isSubscriberAvailable();

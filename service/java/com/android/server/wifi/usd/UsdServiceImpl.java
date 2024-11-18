@@ -18,10 +18,12 @@ package com.android.server.wifi.usd;
 
 import android.annotation.NonNull;
 import android.content.Context;
+import android.net.wifi.usd.Characteristics;
 import android.net.wifi.usd.IAvailabilityCallback;
 import android.net.wifi.usd.IUsdManager;
 import android.net.wifi.usd.UsdManager;
 import android.os.Binder;
+import android.os.Bundle;
 import android.util.Log;
 
 import com.android.server.wifi.RunnerHandler;
@@ -145,5 +147,24 @@ public class UsdServiceImpl extends IUsdManager.Stub {
         if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
             throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
         }
+    }
+
+    /**
+     * See {@link UsdManager#getCharacteristics()}
+     */
+    @Override
+    public Characteristics getCharacteristics() {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+
+        Bundle bundle = new Bundle();
+        bundle.putInt(Characteristics.KEY_MAX_NUM_SUBSCRIBE_SESSIONS, 0);
+        bundle.putInt(Characteristics.KEY_MAX_NUM_SUBSCRIBE_SESSIONS, 0);
+        bundle.putInt(Characteristics.KEY_MAX_SERVICE_SPECIFIC_INFO_LENGTH, 0);
+        bundle.putInt(Characteristics.KEY_MAX_MATCH_FILTER_LENGTH, 0);
+        bundle.putInt(Characteristics.KEY_MAX_SERVICE_NAME_LENGTH, 0);
+        return new Characteristics(bundle);
     }
 }

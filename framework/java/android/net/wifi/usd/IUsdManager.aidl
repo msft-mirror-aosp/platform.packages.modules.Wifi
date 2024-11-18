@@ -16,6 +16,7 @@
 
 package android.net.wifi.usd;
 
+import android.net.wifi.usd.Characteristics;
 import android.net.wifi.usd.IAvailabilityCallback;
 
 /**
@@ -30,4 +31,5 @@ interface IUsdManager {
     boolean isPublisherAvailable();
     void registerAvailabilityCallback(IAvailabilityCallback callback);
     void unregisterAvailabilityCallback(IAvailabilityCallback callback);
+    Characteristics getCharacteristics();
 }
