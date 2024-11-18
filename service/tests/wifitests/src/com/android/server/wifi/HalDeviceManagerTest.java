@@ -4222,6 +4222,157 @@ public class HalDeviceManagerTest extends WifiBaseTest {
         collector.checkThat("interface was null", p2pIface, IsNull.notNullValue());
     }
 
+    /**
+     * Validate an AP request from requestors not on the AP/NAN concurrency allowlist.
+     */
+    @Test
+    public void testApNanConcurrencyNotAllowedTestChipV11()
+            throws Exception {
+        when(mResources.getStringArray(R.array.config_wifiSoftApAwareConcurrencyAllowlist))
+                .thenReturn(new String[]{"Some other package"});
+
+        TestChipV11 chipMock = new TestChipV11();
+        chipMock.initialize();
+        mInOrder = inOrder(mWifiMock, chipMock.chip, mManagerStatusListenerMock);
+        executeAndValidateStartupSequence();
+
+        InterfaceDestroyedListener idl = mock(InterfaceDestroyedListener.class);
+
+        // Create a NAN
+        WifiInterface nanIface = validateInterfaceSequence(chipMock,
+                false, // chipModeValid
+                -1000, // chipModeId (only used if chipModeValid is true)
+                HDM_CREATE_IFACE_NAN,
+                "wlan0",
+                TestChipV11.CHIP_MODE_ID,
+                null, // tearDownList
+                idl, // destroyedListener
+                TEST_WORKSOURCE_0 // requestorWs
+        );
+        collector.checkThat("interface was null", nanIface, IsNull.notNullValue());
+
+        // AP request from Worksource 1 (lower priority) should be blocked.
+        when(mWorkSourceHelper1.getRequestorWsPriority())
+                .thenReturn(WorkSourceHelper.PRIORITY_FG_APP);
+        List<Pair<Integer, WorkSource>> apDetails = mDut.reportImpactToCreateIface(
+                HDM_CREATE_IFACE_AP, true, TEST_WORKSOURCE_1);
+        if (SdkLevel.isAtLeastS()) {
+            assertNull("Should not be able to create this AP", apDetails);
+        } else {
+            // Pre-S lets AP/NAN destroy each other.
+            assertEquals(apDetails.get(0).second, TEST_WORKSOURCE_0);
+        }
+
+        // Bridged AP request should also be blocked
+        apDetails = mDut.reportImpactToCreateIface(
+                HDM_CREATE_IFACE_AP_BRIDGE, true, TEST_WORKSOURCE_1);
+        if (SdkLevel.isAtLeastS()) {
+            assertNull("Should not be able to create this Bridged AP", apDetails);
+        } else {
+            // Pre-S lets AP/NAN destroy each other.
+            assertEquals(apDetails.get(0).second, TEST_WORKSOURCE_0);
+        }
+
+        // AP request from Worksource 2 (same privileged priority) should tear down NAN.
+        WifiInterface ApIface = validateInterfaceSequence(chipMock,
+                true, // chipModeValid
+                TestChipV11.CHIP_MODE_ID, // chipModeId (only used if chipModeValid is true)
+                HDM_CREATE_IFACE_AP,
+                "wlan1",
+                TestChipV11.CHIP_MODE_ID,
+                new WifiInterface[]{nanIface}, // tearDownList
+                idl, // destroyedListener
+                TEST_WORKSOURCE_2 // requestorWs
+        );
+        collector.checkThat("interface was null", ApIface, IsNull.notNullValue());
+    }
+
+    /**
+     * Validate an AP request from a requestor on the AP/NAN concurrency allowlist.
+     */
+    @Test
+    public void testSingleApNanConcurrencyAllowedTestChipV11()
+            throws Exception {
+        when(mResources.getStringArray(R.array.config_wifiSoftApAwareConcurrencyAllowlist))
+                .thenReturn(new String[]{TEST_WORKSOURCE_1.getPackageName(0)});
+
+        TestChipV11 chipMock = new TestChipV11();
+        chipMock.initialize();
+        mInOrder = inOrder(mWifiMock, chipMock.chip, mManagerStatusListenerMock);
+        executeAndValidateStartupSequence();
+
+        InterfaceDestroyedListener idl = mock(InterfaceDestroyedListener.class);
+
+        // Create a NAN
+        WifiInterface nanIface = validateInterfaceSequence(chipMock,
+                false, // chipModeValid
+                -1000, // chipModeId (only used if chipModeValid is true)
+                HDM_CREATE_IFACE_NAN,
+                "wlan0",
+                TestChipV11.CHIP_MODE_ID,
+                null, // tearDownList
+                idl, // destroyedListener
+                TEST_WORKSOURCE_0 // requestorWs
+        );
+        collector.checkThat("interface was null", nanIface, IsNull.notNullValue());
+
+        // AP request from Worksource 1 (on allowlist) should be allowed.
+        WifiInterface apIface = validateInterfaceSequence(chipMock,
+                true, // chipModeValid
+                TestChipV11.CHIP_MODE_ID, // chipModeId (only used if chipModeValid is true)
+                HDM_CREATE_IFACE_AP,
+                "wlan1",
+                TestChipV11.CHIP_MODE_ID,
+                null, // tearDownList
+                idl, // destroyedListener
+                TEST_WORKSOURCE_1 // requestorWs
+        );
+        collector.checkThat("interface was null", apIface, IsNull.notNullValue());
+    }
+
+    /**
+     * Validate a Bridged AP request from a requestor on the AP/NAN concurrency allowlist.
+     */
+    @Test
+    public void testBridgedApNanConcurrencyAllowedTestChipV11()
+            throws Exception {
+        when(mResources.getStringArray(R.array.config_wifiSoftApAwareConcurrencyAllowlist))
+                .thenReturn(new String[]{TEST_WORKSOURCE_1.getPackageName(0)});
+
+        TestChipV11 chipMock = new TestChipV11();
+        chipMock.initialize();
+        mInOrder = inOrder(mWifiMock, chipMock.chip, mManagerStatusListenerMock);
+        executeAndValidateStartupSequence();
+
+        InterfaceDestroyedListener idl = mock(InterfaceDestroyedListener.class);
+
+        // Create a NAN
+        WifiInterface nanIface = validateInterfaceSequence(chipMock,
+                false, // chipModeValid
+                -1000, // chipModeId (only used if chipModeValid is true)
+                HDM_CREATE_IFACE_NAN,
+                "wlan0",
+                TestChipV11.CHIP_MODE_ID,
+                null, // tearDownList
+                idl, // destroyedListener
+                TEST_WORKSOURCE_0 // requestorWs
+        );
+        collector.checkThat("interface was null", nanIface, IsNull.notNullValue());
+
+        // Bridged AP request from Worksource 1 (on allowlist) should be allowed.
+        WifiInterface apIface = validateInterfaceSequence(chipMock,
+                true, // chipModeValid
+                TestChipV11.CHIP_MODE_ID, // chipModeId (only used if chipModeValid is true)
+                HDM_CREATE_IFACE_AP_BRIDGE,
+                "wlan1",
+                TestChipV11.CHIP_MODE_ID,
+                null, // tearDownList
+                idl, // destroyedListener
+                TEST_WORKSOURCE_1 // requestorWs
+        );
+        collector.checkThat("interface was null", apIface, IsNull.notNullValue());
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////
     // utilities
     ///////////////////////////////////////////////////////////////////////////////////////
@@ -5533,7 +5684,7 @@ public class HalDeviceManagerTest extends WifiBaseTest {
 
     // Test chip configuration V11 for P2P/NAN concurrency
     // mode:
-    //    (STA + AP + NAN + P2P)
+    //    (STA + AP + AP_BRIDGE + NAN + P2P)
     private class TestChipV11 extends ChipMockBase {
         static final int CHIP_MODE_ID = 90;
 
@@ -5555,6 +5706,7 @@ public class HalDeviceManagerTest extends WifiBaseTest {
             WifiChip.ChipConcurrencyCombination combo1 = createConcurrencyCombo(
                     createConcurrencyComboLimit(1, WifiChip.IFACE_CONCURRENCY_TYPE_STA),
                     createConcurrencyComboLimit(1, WifiChip.IFACE_CONCURRENCY_TYPE_AP),
+                    createConcurrencyComboLimit(1, WifiChip.IFACE_CONCURRENCY_TYPE_AP_BRIDGED),
                     createConcurrencyComboLimit(1, WifiChip.IFACE_CONCURRENCY_TYPE_P2P),
                     createConcurrencyComboLimit(1, WifiChip.IFACE_CONCURRENCY_TYPE_NAN));
             availableModes.add(createChipMode(CHIP_MODE_ID, combo1));
