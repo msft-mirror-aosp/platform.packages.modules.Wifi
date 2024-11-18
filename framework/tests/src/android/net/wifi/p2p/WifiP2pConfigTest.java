@@ -18,11 +18,13 @@ package android.net.wifi.p2p;
 
 import static android.net.wifi.p2p.WifiP2pConfig.GROUP_CLIENT_IP_PROVISIONING_MODE_IPV4_DHCP;
 import static android.net.wifi.p2p.WifiP2pConfig.GROUP_CLIENT_IP_PROVISIONING_MODE_IPV6_LINK_LOCAL;
+import static android.net.wifi.p2p.WifiP2pConfig.P2P_VERSION_2;
 import static android.net.wifi.p2p.WifiP2pConfig.PCC_MODE_CONNECTION_TYPE_LEGACY_OR_R2;
 import static android.net.wifi.p2p.WifiP2pConfig.PCC_MODE_CONNECTION_TYPE_R2_ONLY;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
@@ -429,5 +431,35 @@ public class WifiP2pConfigTest {
                 .build();
         assertEquals(c.deviceAddress, DEVICE_ADDRESS);
         assertEquals(PCC_MODE_CONNECTION_TYPE_LEGACY_OR_R2, c.getPccModeConnectionType());
+    }
+
+    /** Verify that a config with the group owner version field can be built. */
+    @Test
+    public void testBuildConfigWithGroupOwnerVersion() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        WifiP2pConfig c = new WifiP2pConfig.Builder()
+                .setDeviceAddress(MacAddress.fromString(DEVICE_ADDRESS))
+                .build();
+        c.setGroupOwnerVersion(P2P_VERSION_2);
+        assertEquals(c.deviceAddress, DEVICE_ADDRESS);
+        assertEquals(PCC_MODE_CONNECTION_TYPE_LEGACY_OR_R2, c.getGroupOwnerVersion());
+    }
+
+    /** Verify that a config pairing bootstrapping configuration can be built. */
+    @Test
+    public void testBuildConfigWithPairingBootstrappingConfig() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        WifiP2pPairingBootstrappingConfig expectedPairingBootstrappingConfig =
+                new WifiP2pPairingBootstrappingConfig(WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE, "1234");
+        WifiP2pConfig c = new WifiP2pConfig.Builder()
+                .setDeviceAddress(MacAddress.fromString(DEVICE_ADDRESS))
+                .setPairingBootstrappingConfig(expectedPairingBootstrappingConfig)
+                .build();
+        assertEquals(c.deviceAddress, DEVICE_ADDRESS);
+        WifiP2pPairingBootstrappingConfig pairingBootstrappingConfig =
+                c.getPairingBootstrappingConfig();
+        assertNotNull(pairingBootstrappingConfig);
+        assertEquals(expectedPairingBootstrappingConfig, pairingBootstrappingConfig);
     }
 }
