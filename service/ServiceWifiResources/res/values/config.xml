@@ -1114,6 +1114,14 @@
         <item>com.company2.example.test.name2</item>
         -->
     </string-array>
+    <!-- list of package names that the framework will allow to use SoftAp/Aware concurrency. If
+         this list is empty, then all packages are allowed -->
+    <string-array translatable="false" name="config_wifiSoftApAwareConcurrencyAllowlist">
+        <!-- Below is a sample configuration for this list:
+        <item>com.company1.example.test.name1</item>
+        <item>com.company2.example.test.name2</item>
+        -->
+    </string-array>
     <!-- boolean indicating whether the Easy Connect (DPP) AKM is supported -->
     <bool translatable="false" name ="config_wifiDppAkmSupported">false</bool>
     <!-- Indicates the number of octets to mask for each BSSID in the SecurityLog output.
