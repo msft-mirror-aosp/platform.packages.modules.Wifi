@@ -1900,6 +1900,51 @@ public class HalDeviceManager {
         return false;
     }
 
+    private boolean isRequestorAllowedToUseApNanConcurrency(WorkSource requestorWs) {
+        String[] allowlistArray = mContext.getResources().getStringArray(
+                R.array.config_wifiSoftApAwareConcurrencyAllowlist);
+        if (allowlistArray == null || allowlistArray.length == 0) {
+            // No allowlist defined, so allow.
+            return true;
+        }
+        List<String> allowlist = Arrays.asList(allowlistArray);
+        for (int i = 0; i < requestorWs.size(); i++) {
+            if (allowlist.contains(requestorWs.getPackageName(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Remove AP from the combo if NAN requested (or NAN if AP is requested) if the current
+     * requestor is not allowed to use AP/NAN concurrency.
+     */
+    @NonNull
+    private int[] removeApNanConcurrencyIfNotAllowed(
+            @NonNull int[] chipCreateTypeCombo,
+            @HdmIfaceTypeForCreation int requestedCreateType,
+            WorkSource requestorWs) {
+        if (isRequestorAllowedToUseApNanConcurrency(requestorWs)) {
+            return chipCreateTypeCombo;
+        }
+
+        int[] newCombo = chipCreateTypeCombo.clone();
+        switch (requestedCreateType) {
+            case HDM_CREATE_IFACE_AP:
+            case HDM_CREATE_IFACE_AP_BRIDGE:
+                newCombo[HDM_CREATE_IFACE_NAN] = 0;
+                break;
+            case HDM_CREATE_IFACE_NAN:
+                newCombo[HDM_CREATE_IFACE_AP] = 0;
+                newCombo[HDM_CREATE_IFACE_AP_BRIDGE] = 0;
+                break;
+            default:
+                break;
+        }
+        return newCombo;
+    }
+
     /**
      * Checks whether the input chip-create-type-combo can support the requested create type:
      * if not then returns null, if yes then returns information containing the list of interfaces
@@ -1946,6 +1991,10 @@ public class HalDeviceManager {
                 }
             }
         }
+
+        // Remove AP/NAN concurrency if the requestor isn't on the allowlist.
+        chipCreateTypeCombo = removeApNanConcurrencyIfNotAllowed(
+                chipCreateTypeCombo, requestedCreateType, requestorWs);
 
         IfaceCreationData ifaceCreationData = new IfaceCreationData();
         ifaceCreationData.chipInfo = chipInfo;
