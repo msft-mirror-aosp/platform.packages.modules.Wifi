@@ -7205,7 +7205,8 @@ public class WifiMetrics {
             WifiUsabilityStatsEntry wifiUsabilityStatsEntry =
                     mWifiUsabilityStatsEntriesRingBuffer.size()
                     < MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE
-                    ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove();
+                    ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove()
+                    .clear();
             if (isWiFiScorerNewStatsCollected()) {
                 SparseArray<MloLink> mloLinks = new SparseArray<>();
                 for (MloLink link: info.getAffiliatedMloLinks()) {
@@ -7610,7 +7611,6 @@ public class WifiMetrics {
                     wifiUsabilityStatsEntry.rateStats[i] = rate;
                 }
             }
-
             mWifiUsabilityStatsEntriesRingBuffer.add(wifiUsabilityStatsEntry);
             mWifiUsabilityStatsEntryCounter++;
             if (mWifiUsabilityStatsEntryCounter >= NUM_WIFI_USABILITY_STATS_ENTRIES_PER_WIFI_GOOD) {
