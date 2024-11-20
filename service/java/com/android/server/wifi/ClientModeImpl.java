@@ -924,6 +924,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         mRoamingState = new RoamingState(threshold);
         mDisconnectedState = new DisconnectedState(threshold);
 
+        // Code indentation is used to show the hierarchical relationship between states.
         addState(mConnectableState); {
             addState(mConnectingOrConnectedState, mConnectableState); {
                 addState(mL2ConnectingState, mConnectingOrConnectedState);
@@ -5126,8 +5127,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 case CMD_CONNECTING_WATCHDOG_TIMER:
                 case WifiMonitor.NETWORK_NOT_FOUND_EVENT:
                 case CMD_ROAM_WATCHDOG_TIMER: {
-                    // no-op: all messages must be handled in the base state in case it was missed
-                    // in one of the child states.
+                    // no-op: all messages must be handled in the base state if they were not
+                    // handled in one of the child states.
                     break;
                 }
                 case CMD_ACCEPT_EAP_SERVER_CERTIFICATE:
@@ -7373,7 +7374,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         @Override
         public void enterImpl() {
             if (mVerboseLoggingEnabled) {
-                log("Enter ConnectedState  mScreenOn=" + mScreenOn);
+                log("Enter ConnectedState mScreenOn=" + mScreenOn);
             }
 
             reportConnectionAttemptEnd(
