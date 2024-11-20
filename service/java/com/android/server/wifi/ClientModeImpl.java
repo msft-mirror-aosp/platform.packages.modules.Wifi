@@ -160,6 +160,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiIsUnusableEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStats;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStatsEntry;
 import com.android.server.wifi.util.ActionListenerWrapper;
 import com.android.server.wifi.util.InformationElementUtil;
 import com.android.server.wifi.util.NativeUtil;
@@ -6477,6 +6478,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             mRssiPollToken++;
             if (mEnableRssiPolling) {
                 sendMessage(CMD_RSSI_POLL, mRssiPollToken, 0);
+                mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                        WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED);
             } else {
                 updateLinkLayerStatsRssiAndScoreReport();
             }
@@ -6693,7 +6696,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 }
                 case CMD_ONESHOT_RSSI_POLL: {
                     if (!mEnableRssiPolling) {
-                        updateLinkLayerStatsRssiDataStallScoreReport();
+                        updateLinkLayerStatsRssiDataStallScoreReport(true);
                     }
                     break;
                 }
@@ -6705,7 +6708,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         break;
                     }
                     if (message.arg1 == mRssiPollToken) {
-                        updateLinkLayerStatsRssiDataStallScoreReport();
+                        updateLinkLayerStatsRssiDataStallScoreReport(false);
                         mWifiScoreCard.noteSignalPoll(mWifiInfo);
                         // Update the polling interval as needed before sending the delayed message
                         // so that the next polling can happen after the updated interval
@@ -6737,10 +6740,14 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         updateLinkLayerStatsRssiSpeedFrequencyCapabilities(txBytes, rxBytes);
                         sendMessageDelayed(obtainMessage(CMD_RSSI_POLL, mRssiPollToken, 0),
                                 mWifiGlobals.getPollRssiIntervalMillis());
+                        mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                                WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED);
                     }
                     else {
                         mRssiMonitor.setShortPollRssiInterval();
                         removeMessages(CMD_RSSI_POLL);
+                        mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                                WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_DISABLED);
                     }
                     break;
                 }
@@ -6900,8 +6907,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
 
         /**
          * Fetches link stats, updates Wifi Data Stall, Score Card and Score Report.
+         *
+         * oneshot indicates that this update request came from CMD_ONESHOT_RSSI_POLL.
          */
-        private WifiLinkLayerStats updateLinkLayerStatsRssiDataStallScoreReport() {
+        private WifiLinkLayerStats updateLinkLayerStatsRssiDataStallScoreReport(boolean oneshot) {
             // Get Info and continue polling
             long txBytes;
             long rxBytes;
@@ -6925,7 +6934,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             // mWifiMetrics.logScorerPredictionResult
             mWifiMetrics.updateWiFiEvaluationAndScorerStats(mWifiScoreReport.getLingering(),
                     mWifiInfo, mLastConnectionCapabilities);
-            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats);
+            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats, oneshot);
             if (getClientRoleForMetrics(getConnectedWifiConfiguration())
                     == WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
                 mWifiMetrics.logScorerPredictionResult(mWifiInjector.hasActiveModem(),
