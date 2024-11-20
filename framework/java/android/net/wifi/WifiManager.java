@@ -13054,6 +13054,7 @@ public class WifiManager {
     @SystemApi
     @FlaggedApi(Flags.FLAG_WEP_DISABLED_IN_APM)
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @SuppressLint("ReferencesHidden")
     @NonNull
     public List<AdvancedProtectionFeature> getAvailableAdvancedProtectionFeatures() {
         if (!Environment.isSdkAtLeastB()) {
