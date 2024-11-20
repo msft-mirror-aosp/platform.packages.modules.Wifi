@@ -9140,12 +9140,27 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     }
 
     @Override
-    public void disallowCurrentSuggestedNetwork(BlockingOption option, String packageName) {
+    public void disallowCurrentSuggestedNetwork(@NonNull BlockingOption option,
+            @NonNull String packageName) {
+        Objects.requireNonNull(option, "blockingOption cannot be null");
         int callingUid = Binder.getCallingUid();
         mWifiPermissionsUtil.checkPackage(callingUid, packageName);
         if (enforceChangePermission(packageName) != MODE_ALLOWED) {
             throw new SecurityException("Caller does not hold CHANGE_WIFI_STATE permission");
         }
-        // TODO: function implementation
+        if (mVerboseLoggingEnabled) {
+            mLog.info("disallowCurrentSuggestedNetwork:  Uid=% Package Name=%").c(
+                    callingUid).c(option.toString()).flush();
+        }
+        if (mActiveModeWarden.getWifiState() != WIFI_STATE_ENABLED) {
+            return;
+        }
+        WifiInfo info = mActiveModeWarden.getConnectionInfo();
+        if (!packageName.equals(info.getRequestingPackageName())) {
+            return;
+        }
+        mWifiThreadRunner.post(
+                () -> mActiveModeWarden.getPrimaryClientModeManager().blockNetwork(option),
+                "disallowCurrentSuggestedNetwork");
     }
 }

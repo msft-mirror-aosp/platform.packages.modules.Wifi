@@ -149,4 +149,11 @@ public final class BlockingOption implements Parcelable {
     public int hashCode() {
         return Objects.hash(mBSSIDOnly, mDisableTime);
     }
+
+    @Override
+    public String toString() {
+        return "BlockingOption[ "
+                + "DisableTime=" + mDisableTime
+                + ", BSSIDOnly=" + mBSSIDOnly;
+    }
 }
