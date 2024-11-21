@@ -54,6 +54,7 @@ import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiLowLatencyLockListener;
 import android.net.wifi.IWifiNetworkSelectionConfigListener;
 import android.net.wifi.IWifiNetworkStateChangedListener;
+import android.net.wifi.IWifiStateChangedListener;
 import android.net.wifi.IWifiVerboseLoggingStatusChangedListener;
 import android.net.wifi.MscsParams;
 import android.net.wifi.QosPolicyParams;
@@ -174,6 +175,10 @@ interface IWifiManager {
     boolean setWifiEnabled(String packageName, boolean enable);
 
     int getWifiEnabledState();
+
+    void addWifiStateChangedListener(in IWifiStateChangedListener listener);
+
+    void removeWifiStateChangedListener(in IWifiStateChangedListener listener);
 
     void registerDriverCountryCodeChangedListener(
             in IOnWifiDriverCountryCodeChangedListener listener, String packageName,
