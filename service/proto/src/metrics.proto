@@ -774,6 +774,12 @@ message WifiLog {
   // and telephony.
   // Bucket value is capped to WifiMetrics.MAX_COUNTRY_CODE_COUNT.
   repeated Int32Count country_code_scan_histogram = 219;
+
+  // Each WifiUsabilityStatsTraining instance contains a list of WifiUsabilityStatsEntry objects,
+  // representing a time series of WiFi usability statistics recorded within a specific data
+  // capture period. It also includes information about the type of data capture and the duration
+  // of the capture period.
+  repeated WifiUsabilityStatsTraining wifi_usability_stats_training = 220;
 }
 
 // Information that gets logged for every WiFi connection.
@@ -3113,6 +3119,21 @@ message WifiUsabilityStats {
 
   // Absolute milliseconds from device boot when these stats were sampled
   optional int64 time_stamp_ms = 5;
+}
+
+message TrainingData {
+  // The list of timestamped wifi usability stats
+  repeated WifiUsabilityStatsEntry stats = 1;
+}
+
+message WifiUsabilityStatsTraining {
+  // Data capture type
+  optional int32 data_capture_type = 1;
+
+  // Capture period start timestamp floored to the nearest hour.
+  optional int64 capture_start_timestamp_secs = 2;
+
+  optional TrainingData training_data = 3;
 }
 
 message DeviceMobilityStatePnoScanStats {
