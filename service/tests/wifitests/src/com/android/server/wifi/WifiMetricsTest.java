@@ -4503,6 +4503,28 @@ public class WifiMetricsTest extends WifiBaseTest {
     }
 
     /**
+     * Verify that firmware alerts appear in the ring buffer.
+     */
+    @Test
+    public void testLogFirmwareAlert() throws Exception {
+        when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 123);
+
+        // Buffer starts out empty.
+        assertEquals(0, mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
+
+        // Add record
+        mWifiMetrics.logFirmwareAlert(TEST_IFACE_NAME, 789);
+
+        // Confirm that exactly one record is added and with default subcode.
+        assertEquals(1, mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
+        WifiUsabilityStatsEntry actual = mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.get(0);
+        assertEquals(123, actual.timeStampMs);
+        assertEquals(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_FIRMWARE_ALERT,
+                actual.captureEventType);
+        assertEquals(789, actual.captureEventTypeSubcode);
+    }
+
+    /**
      * Tests device mobility state metrics as states are changed.
      */
     @Test

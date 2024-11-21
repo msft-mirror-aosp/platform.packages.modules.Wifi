@@ -2599,6 +2599,9 @@ message WifiUsabilityStatsEntry {
 
     // IP reachability failure
     CAPTURE_EVENT_TYPE_IP_REACHABILITY_FAILURE = 6;
+
+    // Firmware alert
+    CAPTURE_EVENT_TYPE_FIRMWARE_ALERT = 7;
   }
 
   // Absolute milliseconds from device boot when these stats were sampled
