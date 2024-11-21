@@ -317,6 +317,83 @@ public class WifiP2pConfig implements Parcelable {
         return mPccModeConnectionType;
     }
 
+    /**
+     * Default P2P version used internally by the P2P service.
+     *
+     * @hide
+     */
+    public static final int P2P_DEFAULT_VERSION_1 = 0;
+
+    /**
+     * P2P Protocol version 1
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public static final int P2P_VERSION_1 = P2P_DEFAULT_VERSION_1;
+
+    /**
+     * P2P Protocol version 2
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public static final int P2P_VERSION_2 = 1;
+
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(flag = false, prefix = { "P2P_VERSION_" }, value = {
+            P2P_DEFAULT_VERSION_1,
+            P2P_VERSION_1,
+            P2P_VERSION_2,
+    })
+    public @interface P2pVersion {}
+
+    @P2pVersion
+    private int mGroupOwnerVersion = P2P_DEFAULT_VERSION_1;
+
+    /**
+     * Get the P2P Group Owner version.
+     * See also {@link #setGroupOwnerVersion(int)}.
+     *
+     * @return The P2P Group Owner protocol version.
+     */
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public @P2pVersion int getGroupOwnerVersion() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        return mGroupOwnerVersion;
+    }
+
+    /**
+     * Set the P2P Group Owner version.
+     *
+     * @param version The P2P Group Owner protocol version.
+     */
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public void setGroupOwnerVersion(
+            @P2pVersion int version) {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        mGroupOwnerVersion = version;
+    }
+
+    private @Nullable WifiP2pPairingBootstrappingConfig mPairingBootstrappingConfig;
+
+    /**
+     * Get the pairing bootstrapping configuration , or null if unset.
+     */
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    @Nullable
+    public WifiP2pPairingBootstrappingConfig getPairingBootstrappingConfig() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        return mPairingBootstrappingConfig;
+    }
+
     public WifiP2pConfig() {
         //set defaults
         wps = new WpsInfo();
@@ -394,6 +471,12 @@ public class WifiP2pConfig implements Parcelable {
         sbuf.append("\n groupClientIpProvisioningMode: ").append(mGroupClientIpProvisioningMode);
         sbuf.append("\n joinExistingGroup: ").append(mJoinExistingGroup);
         sbuf.append("\n vendorData: ").append(mVendorData);
+        sbuf.append("\n Group Owner Version: ").append(mGroupOwnerVersion);
+        if (Environment.isSdkAtLeastB() && Flags.wifiDirectR2()) {
+            sbuf.append("\n Pairing bootstrapping config : ")
+                    .append((mPairingBootstrappingConfig == null)
+                            ? "<null>" : mPairingBootstrappingConfig.toString());
+        }
         return sbuf.toString();
     }
 
@@ -416,6 +499,8 @@ public class WifiP2pConfig implements Parcelable {
             mGroupClientIpProvisioningMode = source.mGroupClientIpProvisioningMode;
             mJoinExistingGroup = source.mJoinExistingGroup;
             mVendorData = new ArrayList<>(source.mVendorData);
+            mGroupOwnerVersion = source.mGroupOwnerVersion;
+            mPairingBootstrappingConfig = source.mPairingBootstrappingConfig;
         }
     }
 
@@ -432,6 +517,10 @@ public class WifiP2pConfig implements Parcelable {
         dest.writeInt(mGroupClientIpProvisioningMode);
         dest.writeBoolean(mJoinExistingGroup);
         dest.writeList(mVendorData);
+        dest.writeInt(mGroupOwnerVersion);
+        if (Environment.isSdkAtLeastB() && Flags.wifiDirectR2()) {
+            dest.writeParcelable(mPairingBootstrappingConfig, flags);
+        }
     }
 
     /** Implement the Parcelable interface */
@@ -451,6 +540,11 @@ public class WifiP2pConfig implements Parcelable {
                     config.mGroupClientIpProvisioningMode = in.readInt();
                     config.mJoinExistingGroup = in.readBoolean();
                     config.mVendorData = ParcelUtil.readOuiKeyedDataList(in);
+                    config.mGroupOwnerVersion = in.readInt();
+                    if (Environment.isSdkAtLeastB() && Flags.wifiDirectR2()) {
+                        config.mPairingBootstrappingConfig = in.readParcelable(
+                                WifiP2pPairingBootstrappingConfig.class.getClassLoader());
+                    }
                     return config;
             }
 
@@ -490,6 +584,7 @@ public class WifiP2pConfig implements Parcelable {
         private boolean mJoinExistingGroup = false;
         @PccModeConnectionType
         private int mPccModeConnectionType = PCC_MODE_DEFAULT_CONNECTION_TYPE_LEGACY_ONLY;
+        private @Nullable WifiP2pPairingBootstrappingConfig mPairingBootstrappingConfig;
 
         /**
          * Specify the peer's MAC address. If not set, the device will
@@ -798,6 +893,26 @@ public class WifiP2pConfig implements Parcelable {
         }
 
         /**
+         * Set the pairing bootstrapping configuration for connecting using P2P pairing
+         * Protocol.
+         *
+         * @param config See {@link WifiP2pPairingBootstrappingConfig }
+         * @return The builder to facilitate chaining {@code builder.setXXX(..).setXXX(..)}.
+         */
+        @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+        @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+        @NonNull
+        public Builder setPairingBootstrappingConfig(
+                @NonNull WifiP2pPairingBootstrappingConfig config) {
+            if (!Environment.isSdkAtLeastB()) {
+                throw new UnsupportedOperationException();
+            }
+            Objects.requireNonNull(config, "config cannot be null");
+            mPairingBootstrappingConfig = config;
+            return this;
+        }
+
+        /**
          * Build {@link WifiP2pConfig} given the current requests made on the builder.
          * @return {@link WifiP2pConfig} constructed based on builder method calls.
          */
@@ -847,6 +962,7 @@ public class WifiP2pConfig implements Parcelable {
             config.netId = mNetId;
             config.mGroupClientIpProvisioningMode = mGroupClientIpProvisioningMode;
             config.mJoinExistingGroup = mJoinExistingGroup;
+            config.mPairingBootstrappingConfig = mPairingBootstrappingConfig;
             return config;
         }
     }

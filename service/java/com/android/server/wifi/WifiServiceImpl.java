@@ -43,6 +43,7 @@ import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_AWARE;
 import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_DIRECT;
 import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_STA;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
+import static android.net.wifi.WifiManager.WifiStateChangedListener;
 import static android.os.Process.WIFI_UID;
 
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_LOCAL_ONLY;
@@ -100,6 +101,8 @@ import android.net.NetworkStack;
 import android.net.TetheringManager;
 import android.net.Uri;
 import android.net.ip.IpClientUtil;
+import android.net.thread.ThreadNetworkController;
+import android.net.thread.ThreadNetworkManager;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -135,6 +138,7 @@ import android.net.wifi.IWifiLowLatencyLockListener;
 import android.net.wifi.IWifiManager;
 import android.net.wifi.IWifiNetworkSelectionConfigListener;
 import android.net.wifi.IWifiNetworkStateChangedListener;
+import android.net.wifi.IWifiStateChangedListener;
 import android.net.wifi.IWifiVerboseLoggingStatusChangedListener;
 import android.net.wifi.MscsParams;
 import android.net.wifi.QosPolicyParams;
@@ -942,6 +946,24 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                             mWifiHandlerThread.getLooper())), new UwbAdapterStateListener());
                 }
             }
+
+            if (SdkLevel.isAtLeastV()) {
+                ThreadNetworkManager threadManager =
+                        mContext.getSystemService(ThreadNetworkManager.class);
+                if (threadManager != null) {
+                    List<ThreadNetworkController> threadNetworkControllers =
+                            threadManager.getAllThreadNetworkControllers();
+                    if (threadNetworkControllers.size() > 0) {
+                        ThreadNetworkController threadNetworkController =
+                                threadNetworkControllers.get(0);
+                        if (threadNetworkController != null) {
+                            threadNetworkController.registerStateCallback(
+                                new HandlerExecutor(new Handler(mWifiHandlerThread.getLooper())),
+                                new ThreadStateListener());
+                        }
+                    }
+                }
+            }
         }, TAG + "#handleBootCompleted");
     }
 
@@ -1668,6 +1690,36 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     }
 
     /**
+     * See {@link WifiManager#addWifiStateChangedListener(Executor, WifiStateChangedListener)}
+     */
+    public void addWifiStateChangedListener(@NonNull IWifiStateChangedListener listener) {
+        enforceAccessPermission();
+        if (listener == null) {
+            throw new IllegalArgumentException("listener must not be null");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("addWifiStateChangedListener uid=%").c(Binder.getCallingUid()).flush();
+        }
+        mWifiThreadRunner.post(() -> mActiveModeWarden.addWifiStateChangedListener(listener),
+                TAG + "#addWifiStateChangedListener");
+    }
+
+    /**
+     * See {@link WifiManager#removeWifiStateChangedListener(WifiStateChangedListener)}
+     */
+    public void removeWifiStateChangedListener(@NonNull IWifiStateChangedListener listener) {
+        enforceAccessPermission();
+        if (listener == null) {
+            throw new IllegalArgumentException("listener must not be null");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("removeWifiStateChangedListener uid=%").c(Binder.getCallingUid()).flush();
+        }
+        mWifiThreadRunner.post(() -> mActiveModeWarden.removeWifiStateChangedListener(listener),
+                TAG + "#removeWifiStateChangedListener");
+    }
+
+    /**
      * see {@link WifiManager#getWifiApState()}
      * @return One of {@link WifiManager#WIFI_AP_STATE_DISABLED},
      *         {@link WifiManager#WIFI_AP_STATE_DISABLING},
@@ -2184,6 +2236,20 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             }
             mWifiMetrics.setLastUwbState(state);
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    class ThreadStateListener implements ThreadNetworkController.StateCallback {
+        @Override
+        public void onDeviceRoleChanged(int mDeviceRole) {
+            if (mVerboseLoggingEnabled) {
+                Log.d(TAG, "ThreadNetworkController.DeviceRole=" + mDeviceRole);
+            }
+            mWifiMetrics.setLastThreadDeviceRole(mDeviceRole);
+        }
+
+        @Override
+        public void onPartitionIdChanged(long mPartitionId) {}
     }
 
     /**

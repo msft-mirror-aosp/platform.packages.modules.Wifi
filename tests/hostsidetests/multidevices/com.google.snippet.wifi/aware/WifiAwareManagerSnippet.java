@@ -106,10 +106,18 @@ public class WifiAwareManagerSnippet implements Snippet {
     }
 
     /**
+     * Returns whether Wi-Fi Aware is supported.
+     */
+    @Rpc(description = "Is Wi-Fi Aware supported.")
+    public boolean wifiAwareIsSupported() {
+        return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE);
+    }
+
+    /**
      * Returns whether Wi-Fi RTT is supported.
      */
     @Rpc(description = "Is Wi-Fi RTT supported.")
-    public boolean wifiAwareIsWiFiRttSupported() {
+    public boolean wifiAwareIsRttSupported() {
         return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_RTT);
     }
 
@@ -806,6 +814,17 @@ public class WifiAwareManagerSnippet implements Snippet {
             event.getData().putParcelableArray("results", resultBundles);
             mEventCache.postEvent(event);
         }
+    }
+
+    /**
+     * Return whether this device supports setting a channel requirement in a data-path request.
+     */
+    @Rpc(
+            description = "Return whether this device supports setting a channel requirement in a "
+                + "data-path request."
+    )
+    public boolean wifiAwareIsSetChannelOnDataPathSupported() {
+        return mWifiAwareManager.isSetChannelOnDataPathSupported();
     }
 
 }
