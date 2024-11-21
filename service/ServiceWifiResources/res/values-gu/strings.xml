@@ -60,6 +60,42 @@
     <string name="wifi_p2p_to_message" msgid="3809923305696994787">"પ્રતિ:"</string>
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"આવશ્યક પિન લખો:"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"પિન:"</string>
+    <!-- no translation found for wifi_p2p_dialog2_sent_title (2336103322429678328) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_sent_title_display_pin (511248898541903515) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_sent_message (2544736217133674163) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_sent_message_display_pin (5017076731258834940) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_sent_positive_button (6464227471745156497) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_title (6897349204607457747) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_title_enter_pin (6431543271224139601) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_title_display_pin (5017007825248741433) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_message (4376275522073306499) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_message_enter_pin (6070908860523284394) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_message_display_pin (5906560549535982131) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_message_countdown (557930403509771814) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_message_enter_pin_countdown (3723666737782219820) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_message_display_pin_countdown (1248395771858360837) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_positive_button (6358592617824573781) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_received_negative_button (4762549789911681138) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_enter_pin_label (7410100924400114335) -->
+    <skip />
+    <!-- no translation found for wifi_p2p_dialog2_display_pin_label (3929561425167093538) -->
+    <skip />
     <string name="wifi_p2p_frequency_conflict_message" msgid="8535404941723941766">"જ્યારે તમારું ડિવાઇસ <xliff:g id="DEVICE_NAME">%1$s</xliff:g> સાથે કનેક્ટેડ હોય, ત્યારે તેને વાઇ-ફાઇથી હંગામી રીતે ડિસ્કનેક્ટ કરવામાં આવશે"</string>
     <string name="dlg_ok" msgid="254496739491689405">"ઓકે"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_title" msgid="2344570489693915253">"<xliff:g id="SSID">%1$s</xliff:g> સાથે કનેક્ટ કરી શકાતું નથી"</string>
