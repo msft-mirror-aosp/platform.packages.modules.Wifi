@@ -4180,6 +4180,39 @@ public class ClientModeImplTest extends WifiBaseTest {
     }
 
     /**
+     * Verify that IP reachability problems are recorded in the capture buffer.
+     */
+    @Test
+    public void testCaptureBufferReachabilityLost() throws Exception {
+        // Log should indicate RSSI polling turned on.
+        connect();
+        verify(mWifiMetrics).logAsynchronousEvent(
+                eq(WIFI_IFACE_NAME),
+                eq(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED));
+        reset(mWifiMetrics);
+
+        // Simulate an IP_REACHABILITY_LOST event.
+        mIpClientCallback.onReachabilityLost("CMD_IP_REACHABILITY_LOST");
+        mLooper.dispatchAll();
+        verify(mWifiMetrics).logAsynchronousEvent(
+                eq(WIFI_IFACE_NAME),
+                eq(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_IP_REACHABILITY_LOST),
+                eq(-1));
+        reset(mWifiMetrics);
+
+        // Simulate an IP_REACHABILITY_FAILURE event.
+        ReachabilityLossInfoParcelable lossInfo =
+                new ReachabilityLossInfoParcelable("", ReachabilityLossReason.CONFIRM);
+        mIpClientCallback.onReachabilityFailure(lossInfo);
+        mLooper.dispatchAll();
+        verify(mWifiMetrics).logAsynchronousEvent(
+                eq(WIFI_IFACE_NAME),
+                eq(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_IP_REACHABILITY_FAILURE),
+                eq(ReachabilityLossReason.CONFIRM));
+        reset(mWifiMetrics);
+    }
+
+    /**
      * Verify link bandwidth update in connected mode
      */
     @Test

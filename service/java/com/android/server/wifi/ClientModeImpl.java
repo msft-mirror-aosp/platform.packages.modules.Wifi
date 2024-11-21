@@ -6624,6 +6624,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             WifiDiagnostics.REPORT_REASON_REACHABILITY_LOST);
                     mWifiMetrics.logWifiIsUnusableEvent(mInterfaceName,
                             WifiIsUnusableEvent.TYPE_IP_REACHABILITY_LOST);
+                    mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                            WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_IP_REACHABILITY_LOST, -1);
                     if (mWifiGlobals.getIpReachabilityDisconnectEnabled()) {
                         handleIpReachabilityLost(-1);
                     } else {
@@ -6635,6 +6637,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     if (!isFromCurrentIpClientCallbacks(message)) break;
                     mWifiDiagnostics.triggerBugReportDataCapture(
                             WifiDiagnostics.REPORT_REASON_REACHABILITY_FAILURE);
+                    mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                            WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_IP_REACHABILITY_FAILURE,
+                            ((ReachabilityLossInfoParcelable) message.obj).reason);
                     handleIpReachabilityFailure((ReachabilityLossInfoParcelable) message.obj);
                     break;
                 }

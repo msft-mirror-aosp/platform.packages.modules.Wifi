@@ -2591,8 +2591,14 @@ message WifiUsabilityStatsEntry {
     // RSSI polling turned off
     CAPTURE_EVENT_TYPE_RSSI_POLLING_DISABLED = 3;
 
-    // Data sample came from CMD_ONESHOT_RSSI_POLL.
+    // Data sample came from CMD_ONESHOT_RSSI_POLL
     CAPTURE_EVENT_TYPE_ONESHOT_RSSI_POLL = 4;
+
+    // IP reachability lost
+    CAPTURE_EVENT_TYPE_IP_REACHABILITY_LOST = 5;
+
+    // IP reachability failure
+    CAPTURE_EVENT_TYPE_IP_REACHABILITY_FAILURE = 6;
   }
 
   // Absolute milliseconds from device boot when these stats were sampled
