@@ -7914,6 +7914,12 @@ public class WifiMetrics {
         return linkStats;
     }
 
+    /**
+     * Converts from the WifiUsabilityStatsEntry proto used internally to the
+     * WifiUsabilityStatsEntry structure sent on the SDK API.
+     *
+     * These are two different types.
+     */
     private android.net.wifi.WifiUsabilityStatsEntry createNewWifiUsabilityStatsEntryParcelable(
             WifiUsabilityStatsEntry s, WifiLinkLayerStats stats, WifiInfo info) {
         int probeStatus;

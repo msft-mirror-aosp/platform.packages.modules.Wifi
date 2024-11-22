@@ -351,6 +351,7 @@ public class SoftApManagerTest extends WifiBaseTest {
         mLooper = new TestLooper();
 
         when(WifiInjector.getInstance()).thenReturn(mWifiInjector);
+        when(mWifiInjector.getContext()).thenReturn(mContext);
         when(mWifiNative.isItPossibleToCreateApIface(any())).thenReturn(true);
         when(mWifiNative.isItPossibleToCreateBridgedApIface(any())).thenReturn(true);
         when(mWifiNative.isApSetMacAddressSupported(any())).thenReturn(true);
