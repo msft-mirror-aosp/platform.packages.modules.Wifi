@@ -243,7 +243,7 @@ public class WifiMetrics {
     // Minimum time wait before generating next WifiIsUnusableEvent from data stall
     public static final int MIN_DATA_STALL_WAIT_MS = 120 * 1000; // 2 minutes
     // Max number of WifiUsabilityStatsEntry elements to store in the ringbuffer.
-    public static final int MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE = 40;
+    public static final int MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE = 80;
     // Max number of WifiUsabilityStats records to store for each type.
     public static final int MAX_WIFI_USABILITY_STATS_RECORDS_PER_TYPE = 10;
     // Max number of WifiUsabilityStats per labeled type to upload to server
@@ -7205,7 +7205,8 @@ public class WifiMetrics {
             WifiUsabilityStatsEntry wifiUsabilityStatsEntry =
                     mWifiUsabilityStatsEntriesRingBuffer.size()
                     < MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE
-                    ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove();
+                    ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove()
+                    .clear();
             if (isWiFiScorerNewStatsCollected()) {
                 SparseArray<MloLink> mloLinks = new SparseArray<>();
                 for (MloLink link: info.getAffiliatedMloLinks()) {
@@ -7610,7 +7611,6 @@ public class WifiMetrics {
                     wifiUsabilityStatsEntry.rateStats[i] = rate;
                 }
             }
-
             mWifiUsabilityStatsEntriesRingBuffer.add(wifiUsabilityStatsEntry);
             mWifiUsabilityStatsEntryCounter++;
             if (mWifiUsabilityStatsEntryCounter >= NUM_WIFI_USABILITY_STATS_ENTRIES_PER_WIFI_GOOD) {
@@ -7914,6 +7914,12 @@ public class WifiMetrics {
         return linkStats;
     }
 
+    /**
+     * Converts from the WifiUsabilityStatsEntry proto used internally to the
+     * WifiUsabilityStatsEntry structure sent on the SDK API.
+     *
+     * These are two different types.
+     */
     private android.net.wifi.WifiUsabilityStatsEntry createNewWifiUsabilityStatsEntryParcelable(
             WifiUsabilityStatsEntry s, WifiLinkLayerStats stats, WifiInfo info) {
         int probeStatus;
