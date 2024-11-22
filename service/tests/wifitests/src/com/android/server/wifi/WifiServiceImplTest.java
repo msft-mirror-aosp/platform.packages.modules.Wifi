@@ -541,6 +541,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         WifiInjector.sWifiInjector = mWifiInjector;
         when(mRequestInfo.getPid()).thenReturn(mPid);
         when(mRequestInfo2.getPid()).thenReturn(mPid2);
+        when(mWifiInjector.getContext()).thenReturn(mContext);
         when(mWifiInjector.getUserManager()).thenReturn(mUserManager);
         when(mWifiInjector.getWifiCountryCode()).thenReturn(mWifiCountryCode);
         when(mWifiInjector.getWifiMetrics()).thenReturn(mWifiMetrics);
