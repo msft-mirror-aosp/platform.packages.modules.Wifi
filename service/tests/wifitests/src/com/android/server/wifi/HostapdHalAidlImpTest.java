@@ -1366,7 +1366,8 @@ public class HostapdHalAidlImpTest extends WifiBaseTest {
      */
     @SuppressWarnings("DirectInvocationOnMock")
     @Test
-    public void testAddSAEAccessPointSuccess_WithClientIsolation() throws Exception {
+    public void testAddSAEAccessPointSuccess_WithClientIsolationAndNullBridgedInstances()
+            throws Exception {
         assumeTrue(Environment.isSdkAtLeastB());
         mResources.setBoolean(R.bool.config_wifi_softap_acs_supported, true);
         when(Flags.mloSap()).thenReturn(true);
@@ -1387,8 +1388,9 @@ public class HostapdHalAidlImpTest extends WifiBaseTest {
         doNothing().when(mIHostapdMock).addAccessPoint(
                 mIfaceParamsCaptor.capture(), mNetworkParamsCaptor.capture());
 
+        // Null instanceIdentities won't cause crash.
         assertTrue(mHostapdHal.addAccessPoint(IFACE_NAME,
-                configurationBuilder.build(), true, false, Collections.emptyList(),
+                configurationBuilder.build(), true, false, null /* instanceIdentities */,
                 () -> mSoftApHalCallback.onFailure()));
         verify(mIHostapdMock).addAccessPoint(any(), any());
 

@@ -2169,7 +2169,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                             continue;
                         }
                         List<Integer> freqsForBand = ApConfigUtil.getAvailableChannelFreqsForBand(
-                                band, mWifiNative, mResourceCache, true);
+                                band, mWifiNative, null, true);
                         if (freqsForBand != null) {
                             freqs.addAll(freqsForBand);
                             int[] channel = new int[freqsForBand.size()];
