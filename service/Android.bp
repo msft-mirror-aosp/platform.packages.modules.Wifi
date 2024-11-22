@@ -124,6 +124,7 @@ java_library {
         "wifi-lite-protos",
         "wifi-nano-protos",
         "android.net.wifi.flags-aconfig-java",
+        "android.security.flags-aconfig-java-export",
         "net-utils-service-wifi",
     ],
     apex_available: ["com.android.wifi"],
