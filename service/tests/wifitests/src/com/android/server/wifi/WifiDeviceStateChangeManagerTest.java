@@ -123,6 +123,7 @@ public class WifiDeviceStateChangeManagerTest extends WifiBaseTest {
     @Test
     public void testCallbackWhenAdvancedProtectionModeSupported() {
         assumeTrue(Environment.isSdkAtLeastB());
+        assumeTrue(android.security.Flags.aapmApi());
         ArgumentCaptor<AdvancedProtectionManager.Callback> apmCallbackCaptor =
                 ArgumentCaptor.forClass(AdvancedProtectionManager.Callback.class);
         when(mFeatureFlags.wepDisabledInApm()).thenReturn(true);

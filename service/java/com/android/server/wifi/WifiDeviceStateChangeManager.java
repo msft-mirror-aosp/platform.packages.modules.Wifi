@@ -24,6 +24,7 @@ import android.content.IntentFilter;
 import android.net.wifi.util.Environment;
 import android.os.Handler;
 import android.os.PowerManager;
+import android.security.Flags;
 import android.security.advancedprotection.AdvancedProtectionManager;
 import android.text.TextUtils;
 import android.util.ArraySet;
@@ -97,8 +98,7 @@ public class WifiDeviceStateChangeManager {
                 },
                 filter);
         handleScreenStateChanged(mPowerManager.isInteractive());
-        //TODO: b/362586268 - check AAPM API flag.
-        if (Environment.isSdkAtLeastB() && mFeatureFlags.wepDisabledInApm()) {
+        if (Environment.isSdkAtLeastB() && mFeatureFlags.wepDisabledInApm() && Flags.aapmApi()) {
             mAdvancedProtectionManager =
                     mContext.getSystemService(AdvancedProtectionManager.class);
             if (mAdvancedProtectionManager != null) {
