@@ -51,7 +51,7 @@ java_defaults {
     sdk_version: "core_platform",
     libs: [
         "fake_device_config",
-        "aconfig_storage_reader_java",
+        "aconfig_storage_stub",
     ],
 }
 
