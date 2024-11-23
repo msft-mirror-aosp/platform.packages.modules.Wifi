@@ -13167,17 +13167,18 @@ public class WifiManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_WEP_DISABLED_IN_APM)
+    @FlaggedApi(android.security.Flags.FLAG_AAPM_API)
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
-    @SuppressLint("ReferencesHidden")
     @NonNull
     public List<AdvancedProtectionFeature> getAvailableAdvancedProtectionFeatures() {
         if (!Environment.isSdkAtLeastB()) {
             throw new UnsupportedOperationException();
         }
-        List<AdvancedProtectionFeature> features = List.of(
-        // TODO: b/362586268 Change to AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP
-                new AdvancedProtectionFeature("WEP"));
+        List<AdvancedProtectionFeature> features = new ArrayList<>();
+        if (Flags.wepDisabledInApm()) {
+            // TODO: b/362586268 Change to AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP
+            features.add(new AdvancedProtectionFeature("WEP"));
+        }
         return features;
     }
 }

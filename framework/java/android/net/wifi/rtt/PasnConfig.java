@@ -30,6 +30,7 @@ import com.android.wifi.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -184,8 +185,8 @@ public final class PasnConfig implements Parcelable {
     @Cipher
     private final int mCiphers;
     private final String mPassword;
-
     private final WifiSsid mWifiSsid;
+    private final byte[] mPasnComebackCookie;
 
     /**
      * Return base AKMs (Authentication and Key Management).
@@ -222,12 +223,22 @@ public final class PasnConfig implements Parcelable {
         return mWifiSsid;
     }
 
+    /**
+     * Get PASN comeback cookie. See {@link Builder#setPasnComebackCookie(byte[])}.
+     **/
+    @Nullable
+    public byte[] getPasnComebackCookie() {
+        return mPasnComebackCookie;
+    }
+
+
     private PasnConfig(@NonNull Parcel in) {
         mBaseAkms = in.readInt();
         mCiphers = in.readInt();
         mPassword = in.readString();
         mWifiSsid = (SdkLevel.isAtLeastT()) ? in.readParcelable(WifiSsid.class.getClassLoader(),
                 WifiSsid.class) : in.readParcelable(WifiSsid.class.getClassLoader());
+        mPasnComebackCookie = in.createByteArray();
     }
 
     public static final @NonNull Creator<PasnConfig> CREATOR = new Creator<PasnConfig>() {
@@ -252,6 +263,7 @@ public final class PasnConfig implements Parcelable {
         dest.writeInt(mBaseAkms);
         dest.writeInt(mCiphers);
         dest.writeString(mPassword);
+        dest.writeByteArray(mPasnComebackCookie);
     }
 
     /**
@@ -293,6 +305,7 @@ public final class PasnConfig implements Parcelable {
         mCiphers = builder.mCiphers;
         mPassword = builder.mPassword;
         mWifiSsid = builder.mWifiSsid;
+        mPasnComebackCookie = builder.mPasnComebackCookie;
     }
 
     /**
@@ -311,6 +324,7 @@ public final class PasnConfig implements Parcelable {
         private final int mCiphers;
         private String mPassword = null;
         private WifiSsid mWifiSsid = null;
+        byte[] mPasnComebackCookie = null;
 
         /**
          * Builder
@@ -359,6 +373,32 @@ public final class PasnConfig implements Parcelable {
         }
 
         /**
+         * Set PASN comeback cookie. PASN authentication allows the station to provide comeback
+         * cookie which was indicated in the {@link RangingResult} by the AP with a deferral time.
+         * <p>
+         * When an AP receives a large volume of initial PASN Authentication frames, it can use
+         * the comeback after field in the PASN Parameters element to indicate a deferral time
+         * and optionally provide a comeback cookie which is an opaque sequence of octets. Upon
+         * receiving this response, the ranging initiator (STA) must wait for the specified time
+         * before retrying secure authentication, presenting the received cookie to the AP. See
+         * {@link RangingResult#getPasnComebackCookie()} and
+         * {@link RangingResult#getPasnComebackAfterMillis()}.
+         *
+         * @param pasnComebackCookie an opaque  sequence of octets
+         * @return a reference to this Builder
+         */
+        @NonNull
+        public Builder setPasnComebackCookie(@NonNull byte[] pasnComebackCookie) {
+            Objects.requireNonNull(pasnComebackCookie, "PASN comeback cookie must not be null");
+            if (pasnComebackCookie.length > 255 || pasnComebackCookie.length == 0) {
+                throw new IllegalArgumentException("Cookie with invalid length "
+                        + pasnComebackCookie.length);
+            }
+            mPasnComebackCookie = pasnComebackCookie;
+            return this;
+        }
+
+        /**
          * Builds a {@link PasnConfig} object.
          */
         @NonNull
@@ -372,17 +412,21 @@ public final class PasnConfig implements Parcelable {
         if (this == o) return true;
         if (!(o instanceof PasnConfig that)) return false;
         return mBaseAkms == that.mBaseAkms && mCiphers == that.mCiphers && Objects.equals(
-                mPassword, that.mPassword) && Objects.equals(mWifiSsid, that.mWifiSsid);
+                mPassword, that.mPassword) && Objects.equals(mWifiSsid, that.mWifiSsid)
+                && Arrays.equals(mPasnComebackCookie, that.mPasnComebackCookie);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(mBaseAkms, mCiphers, mPassword, mWifiSsid);
+        int result = Objects.hash(mBaseAkms, mCiphers, mPassword, mWifiSsid);
+        result = 31 * result + Arrays.hashCode(mPasnComebackCookie);
+        return result;
     }
 
     @Override
     public String toString() {
-        return "PasnConfig{" + "mBaseAkms=" + mBaseAkms + ", mCiphers=" + mCiphers
-                + ", mPassword='" + mPassword + '\'' + ", mWifiSsid=" + mWifiSsid + '}';
+        return "PasnConfig{" + "mBaseAkms=" + mBaseAkms + ", mCiphers=" + mCiphers + ", mPassword='"
+                + mPassword + '\'' + ", mWifiSsid=" + mWifiSsid + ", mPasnComebackCookie="
+                + Arrays.toString(mPasnComebackCookie) + '}';
     }
 }

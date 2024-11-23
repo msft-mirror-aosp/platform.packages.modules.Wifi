@@ -131,6 +131,7 @@ bootclasspath_fragment {
             "android.net.wifi.p2p",
             "android.net.wifi.rtt",
             "android.net.wifi.twt",
+            "android.net.wifi.usd",
             "android.net.wifi.util",
             "com.android.wifi",
         ],
