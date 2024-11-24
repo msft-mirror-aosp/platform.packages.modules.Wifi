@@ -183,6 +183,7 @@ import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiLowLatencyLockListener;
 import android.net.wifi.IWifiNetworkSelectionConfigListener;
 import android.net.wifi.IWifiNetworkStateChangedListener;
+import android.net.wifi.IWifiStateChangedListener;
 import android.net.wifi.IWifiVerboseLoggingStatusChangedListener;
 import android.net.wifi.MscsParams;
 import android.net.wifi.QosCharacteristics;
@@ -454,6 +455,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
     @Mock IDppCallback mDppCallback;
     @Mock ILocalOnlyHotspotCallback mLohsCallback;
     @Mock ICoexCallback mCoexCallback;
+    @Mock IWifiStateChangedListener mWifiStateChangedListener;
     @Mock IScanResultsCallback mScanResultsCallback;
     @Mock ISuggestionConnectionStatusListener mSuggestionConnectionStatusListener;
     @Mock ILocalOnlyConnectionStatusListener mLocalOnlyConnectionStatusListener;
@@ -539,6 +541,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         WifiInjector.sWifiInjector = mWifiInjector;
         when(mRequestInfo.getPid()).thenReturn(mPid);
         when(mRequestInfo2.getPid()).thenReturn(mPid2);
+        when(mWifiInjector.getContext()).thenReturn(mContext);
         when(mWifiInjector.getUserManager()).thenReturn(mUserManager);
         when(mWifiInjector.getWifiCountryCode()).thenReturn(mWifiCountryCode);
         when(mWifiInjector.getWifiMetrics()).thenReturn(mWifiMetrics);
@@ -13116,5 +13119,50 @@ public class WifiServiceImplTest extends WifiBaseTest {
         setupLohsPermissions();
         mWifiServiceImpl.startLocalOnlyHotspot(mLohsCallback, TEST_PACKAGE_NAME, TEST_FEATURE_ID,
                 customConfig, mExtras, false);
+    }
+
+    /**
+     * Test add and remove listener will go to ActiveModeWarden.
+     */
+    @Test
+    public void testAddRemoveWifiStateChangedListener() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
+        when(mWifiStateChangedListener.asBinder()).thenReturn(mAppBinder);
+        mWifiServiceImpl.addWifiStateChangedListener(mWifiStateChangedListener);
+        mLooper.dispatchAll();
+        verify(mActiveModeWarden).addWifiStateChangedListener(mWifiStateChangedListener);
+        mWifiServiceImpl.removeWifiStateChangedListener(mWifiStateChangedListener);
+        mLooper.dispatchAll();
+        verify(mActiveModeWarden).removeWifiStateChangedListener(mWifiStateChangedListener);
+    }
+
+    /**
+     * Verify that a call to addWifiStateChangedListener throws a SecurityException if the
+     * caller does not have the ACCESS_WIFI_STATE permission.
+     */
+    @Test
+    public void testAddWifiStateChangedListenerThrowsSecurityExceptionOnMissingPermissions() {
+        doThrow(new SecurityException()).when(mContext)
+                .enforceCallingOrSelfPermission(eq(ACCESS_WIFI_STATE),
+                        eq("WifiService"));
+        try {
+            mWifiServiceImpl.addWifiStateChangedListener(mWifiStateChangedListener);
+            fail("expected SecurityException");
+        } catch (SecurityException expected) { }
+    }
+
+    /**
+     * Verify that a call to removeWifiStateChangedListener throws a SecurityException if the caller
+     * does not have the ACCESS_WIFI_STATE permission.
+     */
+    @Test
+    public void testRemoveWifiStateChangedListenerThrowsSecurityExceptionOnMissingPermissions() {
+        doThrow(new SecurityException()).when(mContext)
+                .enforceCallingOrSelfPermission(eq(ACCESS_WIFI_STATE),
+                        eq("WifiService"));
+        try {
+            mWifiServiceImpl.addWifiStateChangedListener(mWifiStateChangedListener);
+            fail("expected SecurityException");
+        } catch (SecurityException expected) { }
     }
 }

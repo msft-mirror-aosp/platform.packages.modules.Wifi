@@ -782,7 +782,7 @@ package android.net.wifi {
     method @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.NETWORK_SETUP_WIZARD, android.Manifest.permission.NETWORK_STACK}) public void forget(int, @Nullable android.net.wifi.WifiManager.ActionListener);
     method @NonNull @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.NETWORK_SETUP_WIZARD}) public java.util.List<android.util.Pair<android.net.wifi.WifiConfiguration,java.util.Map<java.lang.Integer,java.util.List<android.net.wifi.ScanResult>>>> getAllMatchingWifiConfigs(@NonNull java.util.List<android.net.wifi.ScanResult>);
     method @FlaggedApi("com.android.wifi.flags.autojoin_restriction_security_types_api") @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION}) public void getAutojoinDisallowedSecurityTypes(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<int[]>);
-    method @FlaggedApi("com.android.wifi.flags.wep_disabled_in_apm") @NonNull public java.util.List<android.security.advancedprotection.AdvancedProtectionFeature> getAvailableAdvancedProtectionFeatures();
+    method @FlaggedApi("android.security.aapm_api") @NonNull public java.util.List<android.security.advancedprotection.AdvancedProtectionFeature> getAvailableAdvancedProtectionFeatures();
     method @FlaggedApi("com.android.wifi.flags.get_bssid_blocklist_api") @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.NETWORK_SETUP_WIZARD}) public void getBssidBlocklist(@NonNull java.util.List<android.net.wifi.WifiSsid>, @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.util.List<android.net.MacAddress>>);
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.ACCESS_COARSE_LOCATION}) public String getCountryCode();
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.NETWORK_SETTINGS, android.Manifest.permission.NETWORK_SETUP_WIZARD}) public android.net.Network getCurrentNetwork();
@@ -1841,6 +1841,153 @@ package android.net.wifi.twt {
     field public static final int TWT_REASON_CODE_LOCALLY_REQUESTED = 1; // 0x1
     field public static final int TWT_REASON_CODE_PEER_INITIATED = 3; // 0x3
     field public static final int TWT_REASON_CODE_UNKNOWN = 0; // 0x0
+  }
+
+}
+
+package android.net.wifi.usd {
+
+  @FlaggedApi("android.net.wifi.flags.usd") public final class Characteristics implements android.os.Parcelable {
+    method public int describeContents();
+    method public int getMaxMatchFilterLength();
+    method public int getMaxNumberOfPublishSessions();
+    method public int getMaxNumberOfSubscribeSessions();
+    method public int getMaxServiceNameLength();
+    method public int getMaxServiceSpecificInfoLength();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.usd.Characteristics> CREATOR;
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public abstract class Config {
+    method @Nullable public int[] getOperatingFrequenciesMhz();
+    method @NonNull public java.util.List<byte[]> getRxMatchFilter();
+    method @NonNull public byte[] getServiceName();
+    method public int getServiceProtoType();
+    method @Nullable public byte[] getServiceSpecificInfo();
+    method @IntRange(from=0) public int getTtlSeconds();
+    method @NonNull public java.util.List<byte[]> getTxMatchFilter();
+    field public static final int SERVICE_PROTO_TYPE_CSA_MATTER = 1; // 0x1
+    field public static final int SERVICE_PROTO_TYPE_GENERIC = 0; // 0x0
+    field public static final int SUBSCRIBE_TYPE_ACTIVE = 1; // 0x1
+    field public static final int SUBSCRIBE_TYPE_PASSIVE = 0; // 0x0
+    field public static final int TRANSMISSION_TYPE_MULTICAST = 1; // 0x1
+    field public static final int TRANSMISSION_TYPE_UNICAST = 0; // 0x0
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public class DiscoveryResult {
+    method public int getPeerId();
+    method public int getServiceProtoType();
+    method @Nullable public byte[] getServiceSpecificInfo();
+    method public boolean isFsdEnabled();
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public static final class DiscoveryResult.Builder {
+    ctor public DiscoveryResult.Builder(int);
+    method @NonNull public android.net.wifi.usd.DiscoveryResult build();
+    method @NonNull public android.net.wifi.usd.DiscoveryResult.Builder setFsdEnabled(boolean);
+    method @NonNull public android.net.wifi.usd.DiscoveryResult.Builder setServiceProtoType(int);
+    method @NonNull public android.net.wifi.usd.DiscoveryResult.Builder setServiceSpecificInfo(@NonNull byte[]);
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public final class PublishConfig extends android.net.wifi.usd.Config implements android.os.Parcelable {
+    method public int describeContents();
+    method @IntRange(from=0) public int getAnnouncementPeriodMillis();
+    method public int getSolicitedTransmissionType();
+    method public boolean isEventsEnabled();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.usd.PublishConfig> CREATOR;
+  }
+
+  public static final class PublishConfig.Builder {
+    ctor public PublishConfig.Builder(@NonNull String);
+    method @NonNull public android.net.wifi.usd.PublishConfig build();
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setAnnouncementPeriodMillis(@IntRange(from=0) int);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setEventsEnabled(boolean);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setOperatingFrequenciesMhz(@NonNull int[]);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setRxMatchFilter(@NonNull java.util.List<byte[]>);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setServiceProtoType(int);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setServiceSpecificInfo(@NonNull byte[]);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setSolicitedTransmissionType(int);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setTtlSeconds(@IntRange(from=0) int);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setTxMatchFilter(@NonNull java.util.List<byte[]>);
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public class PublishSession {
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void cancel();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void sendMessage(int, @NonNull byte[], @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Boolean>);
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void updatePublish(@NonNull byte[]);
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public class PublishSessionCallback extends android.net.wifi.usd.SessionCallback {
+    ctor public PublishSessionCallback();
+    method public void onPublishFailed(int);
+    method public void onPublishReplied(@NonNull android.net.wifi.usd.DiscoveryResult);
+    method public void onPublishStarted(@NonNull android.net.wifi.usd.PublishSession);
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public abstract class SessionCallback {
+    ctor public SessionCallback();
+    method public void onMessageReceived(int, @Nullable byte[]);
+    method public void onSessionTerminated(int);
+    field public static final int FAILURE_MAX_SESSIONS_REACHED = 3; // 0x3
+    field public static final int FAILURE_NOT_AVAILABLE = 2; // 0x2
+    field public static final int FAILURE_TIMEOUT = 1; // 0x1
+    field public static final int FAILURE_UNKNOWN = 0; // 0x0
+    field public static final int TERMINATION_REASON_NOT_AVAILABLE = 1; // 0x1
+    field public static final int TERMINATION_REASON_UNKNOWN = 0; // 0x0
+    field public static final int TERMINATION_REASON_USER_INITIATED = 2; // 0x2
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public final class SubscribeConfig extends android.net.wifi.usd.Config implements android.os.Parcelable {
+    method public int describeContents();
+    method @IntRange(from=0) public int getQueryPeriodMillis();
+    method @Nullable public int[] getRecommendedOperatingFrequenciesMhz();
+    method public int getSubscribeType();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.usd.SubscribeConfig> CREATOR;
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public static final class SubscribeConfig.Builder {
+    ctor public SubscribeConfig.Builder(@NonNull String);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig build();
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setOperatingFrequenciesMhz(@NonNull int[]);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setQueryPeriodMillis(@IntRange(from=0) int);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setRecommendedOperatingFrequenciesMhz(@NonNull int[]);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setRxMatchFilter(@NonNull java.util.List<byte[]>);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setServiceProtoType(int);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setServiceSpecificInfo(@NonNull byte[]);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setSubscribeType(int);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setTtlSeconds(@IntRange(from=0) int);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setTxMatchFilter(@NonNull java.util.List<byte[]>);
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public class SubscribeSession {
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void cancel();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void sendMessage(int, @NonNull byte[], @NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.lang.Boolean>);
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public class SubscribeSessionCallback extends android.net.wifi.usd.SessionCallback {
+    ctor public SubscribeSessionCallback();
+    method public void onServiceDiscovered(@NonNull android.net.wifi.usd.DiscoveryResult);
+    method public void onSubscribeFailed(int);
+    method public void onSubscribeStarted(@NonNull android.net.wifi.usd.SubscribeSession);
+  }
+
+  @FlaggedApi("android.net.wifi.flags.usd") public class UsdManager {
+    method @Nullable @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public android.net.wifi.usd.Characteristics getCharacteristics();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherAvailable();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isPublisherSupported();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isSubscriberAvailable();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public boolean isSubscriberSupported();
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void publish(@NonNull android.net.wifi.usd.PublishConfig, @NonNull java.util.concurrent.Executor, @NonNull android.net.wifi.usd.PublishSessionCallback);
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void registerAvailabilityCallback(@NonNull java.util.concurrent.Executor, @NonNull android.net.wifi.usd.UsdManager.AvailabilityCallback);
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void subscribe(@NonNull android.net.wifi.usd.SubscribeConfig, @NonNull java.util.concurrent.Executor, @NonNull android.net.wifi.usd.SubscribeSessionCallback);
+    method @RequiresPermission(android.Manifest.permission.MANAGE_WIFI_NETWORK_SELECTION) public void unregisterAvailabilityCallback(@NonNull android.net.wifi.usd.UsdManager.AvailabilityCallback);
+  }
+
+  public static interface UsdManager.AvailabilityCallback {
+    method public default void onPublisherAvailable();
+    method public default void onSubscriberAvailable();
   }
 
 }

@@ -43,6 +43,7 @@ import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_AWARE;
 import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_DIRECT;
 import static android.net.wifi.WifiManager.WIFI_INTERFACE_TYPE_STA;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
+import static android.net.wifi.WifiManager.WifiStateChangedListener;
 import static android.os.Process.WIFI_UID;
 
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_LOCAL_ONLY;
@@ -137,6 +138,7 @@ import android.net.wifi.IWifiLowLatencyLockListener;
 import android.net.wifi.IWifiManager;
 import android.net.wifi.IWifiNetworkSelectionConfigListener;
 import android.net.wifi.IWifiNetworkStateChangedListener;
+import android.net.wifi.IWifiStateChangedListener;
 import android.net.wifi.IWifiVerboseLoggingStatusChangedListener;
 import android.net.wifi.MscsParams;
 import android.net.wifi.QosPolicyParams;
@@ -1688,6 +1690,36 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     }
 
     /**
+     * See {@link WifiManager#addWifiStateChangedListener(Executor, WifiStateChangedListener)}
+     */
+    public void addWifiStateChangedListener(@NonNull IWifiStateChangedListener listener) {
+        enforceAccessPermission();
+        if (listener == null) {
+            throw new IllegalArgumentException("listener must not be null");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("addWifiStateChangedListener uid=%").c(Binder.getCallingUid()).flush();
+        }
+        mWifiThreadRunner.post(() -> mActiveModeWarden.addWifiStateChangedListener(listener),
+                TAG + "#addWifiStateChangedListener");
+    }
+
+    /**
+     * See {@link WifiManager#removeWifiStateChangedListener(WifiStateChangedListener)}
+     */
+    public void removeWifiStateChangedListener(@NonNull IWifiStateChangedListener listener) {
+        enforceAccessPermission();
+        if (listener == null) {
+            throw new IllegalArgumentException("listener must not be null");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("removeWifiStateChangedListener uid=%").c(Binder.getCallingUid()).flush();
+        }
+        mWifiThreadRunner.post(() -> mActiveModeWarden.removeWifiStateChangedListener(listener),
+                TAG + "#removeWifiStateChangedListener");
+    }
+
+    /**
      * see {@link WifiManager#getWifiApState()}
      * @return One of {@link WifiManager#WIFI_AP_STATE_DISABLED},
      *         {@link WifiManager#WIFI_AP_STATE_DISABLING},
@@ -2137,7 +2169,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                             continue;
                         }
                         List<Integer> freqsForBand = ApConfigUtil.getAvailableChannelFreqsForBand(
-                                band, mWifiNative, mResourceCache, true);
+                                band, mWifiNative, null, true);
                         if (freqsForBand != null) {
                             freqs.addAll(freqsForBand);
                             int[] channel = new int[freqsForBand.size()];
