@@ -1132,6 +1132,17 @@ public class WifiManager {
      */
     public static final String EXTRA_PREVIOUS_WIFI_STATE = "previous_wifi_state";
 
+    /** @hide */
+    @IntDef(flag = false, prefix = { "WIFI_STATE_" }, value = {
+            WIFI_STATE_DISABLING,
+            WIFI_STATE_DISABLED,
+            WIFI_STATE_ENABLING,
+            WIFI_STATE_ENABLED,
+            WIFI_STATE_UNKNOWN,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface WifiState {}
+
     /**
      * Wi-Fi is currently being disabled. The state will change to {@link #WIFI_STATE_DISABLED} if
      * it finishes successfully.
@@ -2110,6 +2121,8 @@ public class WifiManager {
             sOnWifiNetworkStateChangedListenerMap = new SparseArray<>();
     private static final SparseArray<IWifiLowLatencyLockListener>
             sWifiLowLatencyLockListenerMap = new SparseArray<>();
+    private static final SparseArray<IWifiStateChangedListener>
+            sWifiStateChangedListenerMap = new SparseArray<>();
 
     /**
      * Multi-link operation (MLO) will allow Wi-Fi devices to operate on multiple links at the same
@@ -5373,6 +5386,108 @@ public class WifiManager {
      */
     public boolean isWifiEnabled() {
         return getWifiState() == WIFI_STATE_ENABLED;
+    }
+
+    /**
+     * Register a callback for Wi-Fi state. See {@link WifiStateChangedListener}.
+     * Caller will receive the event when the Wi-Fi state changes.
+     * Caller can remove a previously registered callback using
+     * {@link WifiManager#removeWifiStateChangedListener(WifiStateChangedListener)}
+     *
+     * @param executor Executor to execute listener callback on
+     * @param listener Listener to register
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_STATE_CHANGED_LISTENER)
+    @RequiresPermission(android.Manifest.permission.ACCESS_WIFI_STATE)
+    public void addWifiStateChangedListener(@NonNull @CallbackExecutor Executor executor,
+            @NonNull WifiStateChangedListener listener) {
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(listener);
+        if (mVerboseLoggingEnabled) {
+            Log.d(TAG, "addWifiStateChangedListener: listener=" + listener
+                    + ", executor=" + executor);
+        }
+        final int listenerIdentifier = System.identityHashCode(listener);
+        synchronized (sWifiStateChangedListenerMap) {
+            try {
+                if (sWifiStateChangedListenerMap.contains(listenerIdentifier)) {
+                    Log.w(TAG, "Same listener already registered");
+                    return;
+                }
+                IWifiStateChangedListener.Stub listenerProxy =
+                        new WifiStateChangedListenerProxy(executor, listener);
+                sWifiStateChangedListenerMap.put(listenerIdentifier, listenerProxy);
+                mService.addWifiStateChangedListener(listenerProxy);
+            } catch (RemoteException e) {
+                sWifiStateChangedListenerMap.remove(listenerIdentifier);
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * Unregisters a WifiStateChangedListener from listening on the current Wi-Fi state.
+     *
+     * @param listener WifiStateChangedListener to unregister
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_STATE_CHANGED_LISTENER)
+    @RequiresPermission(android.Manifest.permission.ACCESS_WIFI_STATE)
+    public void removeWifiStateChangedListener(@NonNull WifiStateChangedListener listener) {
+        Objects.requireNonNull(listener);
+        if (mVerboseLoggingEnabled) {
+            Log.d(TAG, "removeWifiStateChangedListener: listener=" + listener);
+        }
+        final int listenerIdentifier = System.identityHashCode(listener);
+        synchronized (sWifiStateChangedListenerMap) {
+            try {
+                if (!sWifiStateChangedListenerMap.contains(listenerIdentifier)) {
+                    Log.w(TAG, "Unknown external listener " + listenerIdentifier);
+                    return;
+                }
+                mService.removeWifiStateChangedListener(
+                        sWifiStateChangedListenerMap.get(listenerIdentifier));
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            } finally {
+                sWifiStateChangedListenerMap.remove(listenerIdentifier);
+            }
+        }
+    }
+
+    /**
+     * Listener interface for applications to receive updates about the current Wi-Fi enabled state.
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_STATE_CHANGED_LISTENER)
+    public interface WifiStateChangedListener {
+        /**
+         * Called when the Wi-Fi enabled state changes.
+         *
+         * @param state The new Wi-Fi state.
+         */
+        void onWifiStateChanged(@WifiState int state);
+    }
+
+    /**
+     * Listener proxy for WifiStateChangedListener objects.
+     */
+    private static class WifiStateChangedListenerProxy extends IWifiStateChangedListener.Stub {
+        private Executor mExecutor;
+        private WifiStateChangedListener mListener;
+
+        WifiStateChangedListenerProxy(@NonNull Executor executor,
+                @NonNull WifiStateChangedListener listener) {
+            Objects.requireNonNull(executor);
+            Objects.requireNonNull(listener);
+            mExecutor = executor;
+            mListener = listener;
+        }
+
+        @Override
+        public void onWifiStateChanged(@WifiState int state) {
+            Log.i(TAG, "WifiStateChangedListenerProxy: onWifiStateChanged: " + state);
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mListener.onWifiStateChanged(state));
+        }
     }
 
     /**
@@ -13052,16 +13167,18 @@ public class WifiManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_WEP_DISABLED_IN_APM)
+    @FlaggedApi(android.security.Flags.FLAG_AAPM_API)
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     @NonNull
     public List<AdvancedProtectionFeature> getAvailableAdvancedProtectionFeatures() {
         if (!Environment.isSdkAtLeastB()) {
             throw new UnsupportedOperationException();
         }
-        List<AdvancedProtectionFeature> features = List.of(
-        // TODO: b/362586268 Change to AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP
-                new AdvancedProtectionFeature("WEP"));
+        List<AdvancedProtectionFeature> features = new ArrayList<>();
+        if (Flags.wepDisabledInApm()) {
+            // TODO: b/362586268 Change to AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP
+            features.add(new AdvancedProtectionFeature("WEP"));
+        }
         return features;
     }
 }

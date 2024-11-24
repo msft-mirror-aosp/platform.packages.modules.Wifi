@@ -1083,8 +1083,10 @@ public class HostapdHalAidlImp implements IHostapdHal {
         ifaceParams.hwModeParams = prepareHwModeParams(config);
         ifaceParams.channelParams = prepareChannelParamsList(config);
         ifaceParams.usesMlo = isUsingMultiLinkOperation;
-        ifaceParams.instanceIdentities =
-                instanceIdentities.toArray(new String[instanceIdentities.size()]);
+        if (instanceIdentities != null) {
+            ifaceParams.instanceIdentities =
+                    instanceIdentities.toArray(new String[instanceIdentities.size()]);
+        }
         if (ifaceParams.name == null || ifaceParams.hwModeParams == null
                 || ifaceParams.channelParams == null) {
             return null;

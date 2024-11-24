@@ -924,6 +924,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         mRoamingState = new RoamingState(threshold);
         mDisconnectedState = new DisconnectedState(threshold);
 
+        // Code indentation is used to show the hierarchical relationship between states.
         addState(mConnectableState); {
             addState(mConnectingOrConnectedState, mConnectableState); {
                 addState(mL2ConnectingState, mConnectingOrConnectedState);
@@ -2283,9 +2284,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 sb.append(" ");
                 sb.append(Integer.toString(msg.arg2));
                 if (mWifiInfo.getSSID() != null) {
-                    if (mWifiInfo.getSSID() != null) {
-                        sb.append(" ").append(mWifiInfo.getSSID());
-                    }
+                    sb.append(" ").append(mWifiInfo.getSSID());
                 }
                 if (mWifiInfo.getBSSID() != null) {
                     sb.append(" ").append(mWifiInfo.getBSSID());
@@ -2822,9 +2821,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
          * set Tx link speed only if it is valid
          */
         if (newTxLinkSpeed > 0) {
-            if (newTxLinkSpeed != mWifiInfo.getTxLinkSpeedMbps() && SdkLevel.isAtLeastV()) {
-                updateNetworkCapabilities = true;
-            }
             mWifiInfo.setLinkSpeed(newTxLinkSpeed);
             mWifiInfo.setTxLinkSpeedMbps(newTxLinkSpeed);
         }
@@ -2832,9 +2828,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
          * set Rx link speed only if it is valid
          */
         if (newRxLinkSpeed > 0) {
-            if (newRxLinkSpeed != mWifiInfo.getRxLinkSpeedMbps() && SdkLevel.isAtLeastV()) {
-                updateNetworkCapabilities = true;
-            }
             mWifiInfo.setRxLinkSpeedMbps(newRxLinkSpeed);
         }
         if (newFrequency > 0) {
@@ -5128,8 +5121,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 case CMD_CONNECTING_WATCHDOG_TIMER:
                 case WifiMonitor.NETWORK_NOT_FOUND_EVENT:
                 case CMD_ROAM_WATCHDOG_TIMER: {
-                    // no-op: all messages must be handled in the base state in case it was missed
-                    // in one of the child states.
+                    // no-op: all messages must be handled in the base state if they were not
+                    // handled in one of the child states.
                     break;
                 }
                 case CMD_ACCEPT_EAP_SERVER_CERTIFICATE:
@@ -7375,7 +7368,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         @Override
         public void enterImpl() {
             if (mVerboseLoggingEnabled) {
-                log("Enter ConnectedState  mScreenOn=" + mScreenOn);
+                log("Enter ConnectedState mScreenOn=" + mScreenOn);
             }
 
             reportConnectionAttemptEnd(
