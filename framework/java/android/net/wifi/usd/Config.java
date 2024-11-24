@@ -40,6 +40,9 @@ import java.util.Objects;
 @SystemApi
 @FlaggedApi(Flags.FLAG_USD)
 public abstract class Config {
+    /** @hide */
+    public static final int MAX_NUM_OF_OPERATING_FREQUENCIES = 32;
+
     /**
      * Transmission type.
      *
@@ -112,19 +115,21 @@ public abstract class Config {
     private final byte[] mTxMatchFilterTlv;
     private final byte[] mRxMatchFilterTlv;
     private final byte[] mServiceSpecificInfo;
+    private final int[] mOperatingFrequencies;
 
     /**
      * @hide
      */
     public Config(@NonNull byte[] serviceName, int ttlSeconds, int serviceProtoType,
             @Nullable byte[] txMatchFilterTlv, @Nullable byte[] rxMatchFilterTlv,
-            @Nullable byte[] serviceSpecificInfo) {
+            @Nullable byte[] serviceSpecificInfo, @Nullable int[] operatingFrequencies) {
         mServiceName = serviceName;
         mTtlSeconds = ttlSeconds;
         mServiceProtoType = serviceProtoType;
         mTxMatchFilterTlv = txMatchFilterTlv;
         mRxMatchFilterTlv = rxMatchFilterTlv;
         mServiceSpecificInfo = serviceSpecificInfo;
+        mOperatingFrequencies = operatingFrequencies;
     }
 
     /**
@@ -213,13 +218,40 @@ public abstract class Config {
         return mServiceSpecificInfo;
     }
 
+    /**
+     * Get the frequencies where the USD session operates if overridden by {@code
+     * setOperatingFrequenciesMhz(int[])}. If null, the application has not set the operating
+     * frequencies using {@link PublishConfig.Builder#setOperatingFrequenciesMhz(int[])} for the
+     * publisher or {@link SubscribeConfig.Builder#setOperatingFrequenciesMhz(int[])} for the
+     * subscriber.
+     *
+     * <p>If the operating frequencies are not set the default behavior for the publisher and
+     * subscriber is,
+     * <ul>
+     * <li>The publisher defaults to channel 6 (in the 2.4 GHz band) and a list of allowed channels
+     * in the 2.4 GHz and 5 GHz bands for multichannel publishing. Publisher may prioritize the
+     * channel with Access Points having best RSSI.
+     * <li>The subscriber defaults to either channel 6 (in the 2.4 Ghz band) or Station channel or
+     * pick a channel from
+     * {@link SubscribeConfig.Builder#setRecommendedOperatingFrequenciesMhz(int[])} in given order
+     * of preference.
+     * </ul>
+     *
+     * @return an array of frequencies or null
+     */
+    @Nullable
+    public int[] getOperatingFrequenciesMhz() {
+        return mOperatingFrequencies;
+    }
+
     @Override
     public String toString() {
         return "Config{" + "mServiceName=" + Arrays.toString(mServiceName) + ", mTtlSeconds="
                 + mTtlSeconds + ", mServiceProtoType=" + mServiceProtoType + ", mTxMatchFilterTlv="
                 + Arrays.toString(mTxMatchFilterTlv) + ", mRxMatchFilterTlv=" + Arrays.toString(
                 mRxMatchFilterTlv) + ", mServiceSpecificInfo=" + Arrays.toString(
-                mServiceSpecificInfo) + '}';
+                mServiceSpecificInfo) + ", mOperatingFrequencies=" + Arrays.toString(
+                mOperatingFrequencies) + '}';
     }
 
     @Override
@@ -230,7 +262,8 @@ public abstract class Config {
                 && Arrays.equals(mServiceName, config.mServiceName)
                 && Arrays.equals(mTxMatchFilterTlv, config.mTxMatchFilterTlv)
                 && Arrays.equals(mRxMatchFilterTlv, config.mRxMatchFilterTlv)
-                && Arrays.equals(mServiceSpecificInfo, config.mServiceSpecificInfo);
+                && Arrays.equals(mServiceSpecificInfo, config.mServiceSpecificInfo)
+                && Arrays.equals(mOperatingFrequencies, config.mOperatingFrequencies);
     }
 
     @Override
@@ -240,6 +273,7 @@ public abstract class Config {
         result = 31 * result + Arrays.hashCode(mTxMatchFilterTlv);
         result = 31 * result + Arrays.hashCode(mRxMatchFilterTlv);
         result = 31 * result + Arrays.hashCode(mServiceSpecificInfo);
+        result = 31 * result + Arrays.hashCode(mOperatingFrequencies);
         return result;
     }
 }

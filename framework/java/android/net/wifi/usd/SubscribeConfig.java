@@ -21,6 +21,7 @@ import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
+import android.net.wifi.WifiNetworkSpecifier;
 import android.net.wifi.aware.TlvBufferUtils;
 import android.net.wifi.aware.WifiAwareUtils;
 import android.net.wifi.flags.Flags;
@@ -44,23 +45,24 @@ public final class SubscribeConfig extends Config implements Parcelable {
 
     private SubscribeConfig(Builder builder) {
         super(builder.mServiceName, builder.mTtlSeconds, builder.mServiceProtoType,
-                builder.mTxMatchFilterTlv, builder.mRxMatchFilterTlv, builder.mServiceSpecificInfo);
+                builder.mTxMatchFilterTlv, builder.mRxMatchFilterTlv, builder.mServiceSpecificInfo,
+                builder.mOperatingFrequencies);
         mSubscribeType = builder.mSubscribeType;
         mQueryPeriodMillis = builder.mQueryPeriodMillis;
-        mRecommendedFreqList = builder.mRecommendedFreqList;
+        mRecommendedFrequencies = builder.mRecommendedFrequencies;
     }
 
     @SubscribeType
     private final int mSubscribeType;
     private final int mQueryPeriodMillis;
-    private final int[] mRecommendedFreqList;
+    private final int[] mRecommendedFrequencies;
 
     private SubscribeConfig(Parcel in) {
         super(in.createByteArray(), in.readInt(), in.readInt(), in.createByteArray(),
-                in.createByteArray(), in.createByteArray());
+                in.createByteArray(), in.createByteArray(), in.createIntArray());
         mSubscribeType = in.readInt();
         mQueryPeriodMillis = in.readInt();
-        mRecommendedFreqList = in.createIntArray();
+        mRecommendedFrequencies = in.createIntArray();
     }
 
     @Override
@@ -71,9 +73,10 @@ public final class SubscribeConfig extends Config implements Parcelable {
         dest.writeByteArray(getTxMatchFilterTlv());
         dest.writeByteArray(getRxMatchFilterTlv());
         dest.writeByteArray(getServiceSpecificInfo());
+        dest.writeIntArray(getOperatingFrequenciesMhz());
         dest.writeInt(mSubscribeType);
         dest.writeInt(mQueryPeriodMillis);
-        dest.writeIntArray(mRecommendedFreqList);
+        dest.writeIntArray(mRecommendedFrequencies);
     }
 
     @Override
@@ -117,21 +120,21 @@ public final class SubscribeConfig extends Config implements Parcelable {
     }
 
     /**
-     * Gets the recommended frequency list to be used for subscribe. See
-     * {@link Builder#setRecommendedFreqList(int[])}.
+     * Gets the recommended frequency list to be used for subscribe operation. See
+     * {@link Builder#setRecommendedOperatingFrequenciesMhz(int[])}.
      *
      * @return frequency list or null if not set
      */
     @Nullable
-    public int[] getRecommendedFreqList() {
-        return mRecommendedFreqList;
+    public int[] getRecommendedOperatingFrequenciesMhz() {
+        return mRecommendedFrequencies;
     }
 
     @Override
     public String toString() {
         return super.toString() + " SubscribeConfig{" + "mSubscribeType=" + mSubscribeType
-                + ", mQueryPeriodMillis=" + mQueryPeriodMillis + ", mRecommendedFreqList="
-                + Arrays.toString(mRecommendedFreqList) + '}';
+                + ", mQueryPeriodMillis=" + mQueryPeriodMillis + ", mRecommendedFrequencies="
+                + Arrays.toString(mRecommendedFrequencies) + '}';
     }
 
     @Override
@@ -141,13 +144,13 @@ public final class SubscribeConfig extends Config implements Parcelable {
         if (!super.equals(o)) return false;
         return mSubscribeType == that.mSubscribeType
                 && mQueryPeriodMillis == that.mQueryPeriodMillis
-                && Arrays.equals(mRecommendedFreqList, that.mRecommendedFreqList);
+                && Arrays.equals(mRecommendedFrequencies, that.mRecommendedFrequencies);
     }
 
     @Override
     public int hashCode() {
         int result = Objects.hash(super.hashCode(), mSubscribeType, mQueryPeriodMillis);
-        result = 31 * result + Arrays.hashCode(mRecommendedFreqList);
+        result = 31 * result + Arrays.hashCode(mRecommendedFrequencies);
         return result;
     }
 
@@ -158,13 +161,14 @@ public final class SubscribeConfig extends Config implements Parcelable {
     public static final class Builder {
         @SubscribeType private int mSubscribeType = SUBSCRIBE_TYPE_ACTIVE;
         private int mQueryPeriodMillis = 100;
-        private int[] mRecommendedFreqList = null;
+        private int[] mRecommendedFrequencies = null;
         private final byte[] mServiceName;
         private int mTtlSeconds = 3000;
         @ServiceProtoType private int mServiceProtoType = SERVICE_PROTO_TYPE_GENERIC;
         private byte[] mTxMatchFilterTlv = null;
         private byte[] mRxMatchFilterTlv = null;
         private byte[] mServiceSpecificInfo = null;
+        private int[] mOperatingFrequencies = null;
 
         /**
          * Builder for {@link SubscribeConfig}
@@ -303,27 +307,37 @@ public final class SubscribeConfig extends Config implements Parcelable {
         }
 
         /**
-         * Sets the recommended frequency list and returns a reference to this Builder enabling
-         * method chaining.
+         * Sets the recommended frequencies to use in case the framework couldn't pick a default
+         * channel for the subscriber operation. This will be a no-op if
+         * {@link #setOperatingFrequenciesMhz(int[])} is used.
          *
-         * <p>Here is the subscriber channel selection preference order,
-         * <ul>
+         * <p>Here is the default subscriber channel selection preference order with {@code
+         * recommendedFreqList}
+         * <ol>
          * <li>Channel 6 in 2.4 Ghz if there is no multichannel concurrency.
          * <li>Station channel if the station connected on non-DFS/Indoor channel.
          * <li>Pick a channel from {@code recommendedFreqList} if regulatory permits.
          * <li>Pick any available channel
-         * </ul>
+         * </ol>
          *
          * <p>Note: If multiple channels are available for the subscriber, the channel having AP
          * with the best RSSI will be picked.
          *
-         * @param recommendedFreqList the {@code recommendedFreqList} to set
+         * @param recommendedFrequencies the {@code recommendedFreqList} to set
          * @return a reference to this Builder
+         * @throws IllegalArgumentException if frequencies are invalid or the number frequencies
+         * are more than the number of 20 Mhz channels in 2.4 Ghz and 5 Ghz as per regulatory.
          */
         @NonNull
-        public Builder setRecommendedFreqList(@NonNull int[] recommendedFreqList) {
-            Objects.requireNonNull(recommendedFreqList, "recommendedFreqList must not be null");
-            this.mRecommendedFreqList = recommendedFreqList;
+        public Builder setRecommendedOperatingFrequenciesMhz(
+                @NonNull int[] recommendedFrequencies) {
+            Objects.requireNonNull(recommendedFrequencies,
+                    "recommendedFrequencies must not be null");
+            if ((recommendedFrequencies.length > MAX_NUM_OF_OPERATING_FREQUENCIES)
+                    || WifiNetworkSpecifier.validateChannelFrequencyInMhz(recommendedFrequencies)) {
+                throw new IllegalArgumentException("Invalid recommendedFrequencies");
+            }
+            this.mRecommendedFrequencies = recommendedFrequencies.clone();
             return this;
         }
 
@@ -343,7 +357,39 @@ public final class SubscribeConfig extends Config implements Parcelable {
         @NonNull
         public Builder setServiceSpecificInfo(@NonNull byte[] serviceSpecificInfo) {
             Objects.requireNonNull(serviceSpecificInfo, "serviceSpecificInfo must not be null");
-            mServiceSpecificInfo = serviceSpecificInfo;
+            mServiceSpecificInfo = serviceSpecificInfo.clone();
+            return this;
+        }
+
+        /**
+         * Sets the frequencies used for subscribe operation. The subscriber picks one of the
+         * frequencies from this list. This overrides the default channel selection as described
+         * below.
+         *
+         * <p>If null, here is the default subscriber channel selection preference order,
+         * <ol>
+         * <li>Channel 6 in 2.4 Ghz if there is no multichannel concurrency.
+         * <li>Station channel if the station connected on non-DFS/Indoor channel.
+         * <li>Pick a channel from {@link #setRecommendedOperatingFrequenciesMhz(int[])} if
+         * regulatory permits.
+         * <li>Pick any available channel.
+         * </ol>
+         * <p>Note: the dwell time for subscriber operation is calculated internally based on
+         * existing concurrency operation (e.g. Station + USD).
+         *
+         * @param operatingFrequencies frequencies used for subscribe operation
+         * @return a reference to this Builder
+         * @throws IllegalArgumentException if frequencies are invalid or the number frequencies
+         * are more than the number of 20 Mhz channels in 2.4 Ghz and 5 Ghz as per regulatory.
+         */
+        @NonNull
+        public Builder setOperatingFrequenciesMhz(@NonNull int[] operatingFrequencies) {
+            Objects.requireNonNull(operatingFrequencies, "operatingFrequencies must not be null");
+            if ((operatingFrequencies.length > MAX_NUM_OF_OPERATING_FREQUENCIES)
+                    || WifiNetworkSpecifier.validateChannelFrequencyInMhz(operatingFrequencies)) {
+                throw new IllegalArgumentException("Invalid operatingFrequencies");
+            }
+            mOperatingFrequencies = operatingFrequencies.clone();
             return this;
         }
 
