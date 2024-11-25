@@ -1859,6 +1859,7 @@ package android.net.wifi.usd {
   }
 
   @FlaggedApi("android.net.wifi.flags.usd") public abstract class Config {
+    method @Nullable public int[] getOperatingFrequenciesMhz();
     method @NonNull public java.util.List<byte[]> getRxMatchFilter();
     method @NonNull public byte[] getServiceName();
     method public int getServiceProtoType();
@@ -1902,6 +1903,7 @@ package android.net.wifi.usd {
     method @NonNull public android.net.wifi.usd.PublishConfig build();
     method @NonNull public android.net.wifi.usd.PublishConfig.Builder setAnnouncementPeriodMillis(@IntRange(from=0) int);
     method @NonNull public android.net.wifi.usd.PublishConfig.Builder setEventsEnabled(boolean);
+    method @NonNull public android.net.wifi.usd.PublishConfig.Builder setOperatingFrequenciesMhz(@NonNull int[]);
     method @NonNull public android.net.wifi.usd.PublishConfig.Builder setRxMatchFilter(@NonNull java.util.List<byte[]>);
     method @NonNull public android.net.wifi.usd.PublishConfig.Builder setServiceProtoType(int);
     method @NonNull public android.net.wifi.usd.PublishConfig.Builder setServiceSpecificInfo(@NonNull byte[]);
@@ -1939,7 +1941,7 @@ package android.net.wifi.usd {
   @FlaggedApi("android.net.wifi.flags.usd") public final class SubscribeConfig extends android.net.wifi.usd.Config implements android.os.Parcelable {
     method public int describeContents();
     method @IntRange(from=0) public int getQueryPeriodMillis();
-    method @Nullable public int[] getRecommendedFreqList();
+    method @Nullable public int[] getRecommendedOperatingFrequenciesMhz();
     method public int getSubscribeType();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.usd.SubscribeConfig> CREATOR;
@@ -1948,8 +1950,9 @@ package android.net.wifi.usd {
   @FlaggedApi("android.net.wifi.flags.usd") public static final class SubscribeConfig.Builder {
     ctor public SubscribeConfig.Builder(@NonNull String);
     method @NonNull public android.net.wifi.usd.SubscribeConfig build();
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setOperatingFrequenciesMhz(@NonNull int[]);
     method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setQueryPeriodMillis(@IntRange(from=0) int);
-    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setRecommendedFreqList(@NonNull int[]);
+    method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setRecommendedOperatingFrequenciesMhz(@NonNull int[]);
     method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setRxMatchFilter(@NonNull java.util.List<byte[]>);
     method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setServiceProtoType(int);
     method @NonNull public android.net.wifi.usd.SubscribeConfig.Builder setServiceSpecificInfo(@NonNull byte[]);
