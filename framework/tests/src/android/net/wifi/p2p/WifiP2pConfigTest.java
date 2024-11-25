@@ -462,4 +462,27 @@ public class WifiP2pConfigTest {
         assertNotNull(pairingBootstrappingConfig);
         assertEquals(expectedPairingBootstrappingConfig, pairingBootstrappingConfig);
     }
+
+    /**
+     * Verify that a config with the request to authorize a connection request from a peer device
+     * can be built.
+     */
+    @Test
+    public void testBuildConfigWithAuthorizeConnectionFromPeer() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        WifiP2pPairingBootstrappingConfig expectedPairingBootstrappingConfig =
+                new WifiP2pPairingBootstrappingConfig(WifiP2pPairingBootstrappingConfig
+                        .PAIRING_BOOTSTRAPPING_METHOD_OUT_OF_BAND, "1234");
+        WifiP2pConfig c = new WifiP2pConfig.Builder()
+                .setDeviceAddress(MacAddress.fromString(DEVICE_ADDRESS))
+                .setPairingBootstrappingConfig(expectedPairingBootstrappingConfig)
+                .setGroupOperatingFrequency(2437)
+                .setAuthorizeConnectionFromPeer(true)
+                .build();
+        WifiP2pPairingBootstrappingConfig pairingBootstrappingConfig =
+                c.getPairingBootstrappingConfig();
+        assertNotNull(pairingBootstrappingConfig);
+        assertEquals(expectedPairingBootstrappingConfig, pairingBootstrappingConfig);
+        assertTrue(c.isAuthorizeConnectionFromPeer());
+    }
 }
