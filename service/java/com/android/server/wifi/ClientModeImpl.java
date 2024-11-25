@@ -680,12 +680,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     // connected before wrong password failure on this network reached this threshold.
     public static final int THRESHOLD_TO_PERM_WRONG_PASSWORD = 3;
 
-    // Maximum duration to continue to log Wifi usability stats after a data stall is triggered.
-    @VisibleForTesting
-    public static final long DURATION_TO_WAIT_ADD_STATS_AFTER_DATA_STALL_MS = 30 * 1000;
-    private long mDataStallTriggerTimeMs = -1;
-    private int mLastStatusDataStall = WifiIsUnusableEvent.TYPE_UNKNOWN;
-
     @Nullable
     private StateMachineObituary mObituary = null;
 
@@ -4170,9 +4164,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         mWifiMetrics.logStaEvent(mInterfaceName, StaEvent.TYPE_CMD_IP_REACHABILITY_LOST);
         mWifiMetrics.logWifiIsUnusableEvent(mInterfaceName,
                 WifiIsUnusableEvent.TYPE_IP_REACHABILITY_LOST);
-        mWifiMetrics.addToWifiUsabilityStatsList(mInterfaceName,
-                WifiUsabilityStats.LABEL_BAD,
-                WifiUsabilityStats.TYPE_IP_REACHABILITY_LOST, -1);
         if (mWifiGlobals.getIpReachabilityDisconnectEnabled()) {
             handleIpReachabilityLost(lossReason);
         } else {
@@ -6630,9 +6621,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             WifiDiagnostics.REPORT_REASON_REACHABILITY_LOST);
                     mWifiMetrics.logWifiIsUnusableEvent(mInterfaceName,
                             WifiIsUnusableEvent.TYPE_IP_REACHABILITY_LOST);
-                    mWifiMetrics.addToWifiUsabilityStatsList(mInterfaceName,
-                            WifiUsabilityStats.LABEL_BAD,
-                            WifiUsabilityStats.TYPE_IP_REACHABILITY_LOST, -1);
                     if (mWifiGlobals.getIpReachabilityDisconnectEnabled()) {
                         handleIpReachabilityLost(-1);
                     } else {
@@ -6947,24 +6935,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         mWifiScoreReport.getAospScorerPredictionStatusForEvaluation(),
                         mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
                 mWifiScoreReport.clearScorerPredictionStatusForEvaluation();
-            }
-
-            if (mDataStallTriggerTimeMs == -1
-                    && statusDataStall != WifiIsUnusableEvent.TYPE_UNKNOWN) {
-                mDataStallTriggerTimeMs = mClock.getElapsedSinceBootMillis();
-                mLastStatusDataStall = statusDataStall;
-            }
-            if (mDataStallTriggerTimeMs != -1) {
-                long elapsedTime =  mClock.getElapsedSinceBootMillis()
-                        - mDataStallTriggerTimeMs;
-                if (elapsedTime >= DURATION_TO_WAIT_ADD_STATS_AFTER_DATA_STALL_MS) {
-                    mDataStallTriggerTimeMs = -1;
-                    mWifiMetrics.addToWifiUsabilityStatsList(mInterfaceName,
-                            WifiUsabilityStats.LABEL_BAD,
-                            convertToUsabilityStatsTriggerType(mLastStatusDataStall),
-                            -1);
-                    mLastStatusDataStall = WifiIsUnusableEvent.TYPE_UNKNOWN;
-                }
             }
             // Send the update score to network agent.
             mWifiScoreReport.calculateAndReportScore();
