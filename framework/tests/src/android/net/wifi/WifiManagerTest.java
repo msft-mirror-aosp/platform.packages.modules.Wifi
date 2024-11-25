@@ -325,7 +325,7 @@ public class WifiManagerTest {
                 mRunnable.run();
             }
         };
-        mWifiStateChangedListener = state -> mRunnable.run();
+        mWifiStateChangedListener = () -> mRunnable.run();
         if (SdkLevel.isAtLeastS()) {
             mCoexCallback = new CoexCallback() {
                 @Override
@@ -4540,7 +4540,7 @@ public class WifiManagerTest {
         mWifiManager.addWifiStateChangedListener(new SynchronousExecutor(),
                 mWifiStateChangedListener);
         verify(mWifiService).addWifiStateChangedListener(listenerCaptor.capture());
-        listenerCaptor.getValue().onWifiStateChanged(0);
+        listenerCaptor.getValue().onWifiStateChanged();
         verify(mRunnable).run();
     }
 
