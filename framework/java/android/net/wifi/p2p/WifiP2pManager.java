@@ -41,6 +41,9 @@ import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
 import android.net.wifi.p2p.nsd.WifiP2pServiceResponse;
 import android.net.wifi.p2p.nsd.WifiP2pUpnpServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pUpnpServiceResponse;
+import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig;
+import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceResponse;
+import android.net.wifi.util.Environment;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
@@ -170,6 +173,13 @@ public class WifiP2pManager {
     public static final long FEATURE_GROUP_CLIENT_REMOVAL       = 1L << 2;
     /** @hide */
     public static final long FEATURE_GROUP_OWNER_IPV6_LINK_LOCAL_ADDRESS_PROVIDED = 1L << 3;
+    /** @hide */
+    public static final long FEATURE_WIFI_DIRECT_R2 = 1L << 4; // Wi-Fi Direct R2 Support
+    /**
+     * Wi-Fi Direct R1/R2 Compatibility Mode support.
+     * @hide
+     */
+    public static final long FEATURE_PCC_MODE_ALLOW_LEGACY_AND_R2_CONNECTION = 1L << 5;
 
     /**
      * Extra for transporting a WifiP2pConfig
@@ -183,6 +193,23 @@ public class WifiP2pManager {
      */
     public static final String EXTRA_PARAM_KEY_SERVICE_INFO =
             "android.net.wifi.p2p.EXTRA_PARAM_KEY_SERVICE_INFO";
+
+    /**
+     * Extra for transporting Un-synchronized service discovery (USD) based service discovery
+     * configuration.
+     * @hide
+     */
+    public static final String EXTRA_PARAM_KEY_USD_BASED_SERVICE_DISCOVERY_CONFIG =
+            "android.net.wifi.p2p.EXTRA_PARAM_KEY_USD_BASED_SERVICE_DISCOVERY_CONFIG";
+
+    /**
+     * Extra for transporting Un-synchronized service discovery (USD) based local service
+     * advertisement configuration.
+     * @hide
+     */
+    public static final String EXTRA_PARAM_KEY_USD_BASED_LOCAL_SERVICE_ADVERTISEMENT_CONFIG =
+            "android.net.wifi.p2p.EXTRA_PARAM_KEY_USD_BASED_LOCAL_SERVICE_ADVERTISEMENT_CONFIG";
+
     /**
      * Extra for transporting a peer discovery frequency.
      * @hide
@@ -590,6 +617,18 @@ public class WifiP2pManager {
      */
     private static final int WIFI_P2P_VENDOR_ELEMENTS_MAXIMUM_LENGTH = 512;
 
+    /**
+     * Run USD based P2P service discovery with a service discovery configuration.
+     * @hide
+     */
+    public static final int WIFI_P2P_USD_BASED_SERVICE_DISCOVERY = 1;
+
+    /**
+     * Add P2P local service with advertisement configuration.
+     * @hide
+     */
+    public static final int WIFI_P2P_USD_BASED_ADD_LOCAL_SERVICE = 1;
+
     private Context mContext;
 
     IWifiP2pManager mService;
@@ -971,6 +1010,15 @@ public class WifiP2pManager {
          */
         public void onServiceAvailable(int protocolType,
                 byte[] responseData, WifiP2pDevice srcDevice);
+        /**
+        * The requested USD based service response is available.
+        * @param srcDevice source device.
+        * @param usdResponseData {@link WifiP2pUsdBasedServiceResponse}.
+        */
+        @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+        default void onUsdBasedServiceAvailable(@NonNull WifiP2pDevice srcDevice,
+                @NonNull WifiP2pUsdBasedServiceResponse usdResponseData) {
+        }
     }
 
     /**
@@ -2625,6 +2673,60 @@ public class WifiP2pManager {
     }
 
     /**
+     * Start a service discovery advertisement using Un-synchronized service discovery (USD).
+     * Once {@link #startUsdBasedLocalServiceAdvertisement(Channel, WifiP2pServiceInfo,
+     * WifiP2pUsdBasedLocalServiceAdvertisementConfig, ActionListener)} is called, the device will
+     * go to the channel frequency requested via
+     * {@link WifiP2pUsdBasedLocalServiceAdvertisementConfig} and responds to a service discovery
+     * request from a peer.
+     *
+     * <p> The service information is set through
+     * {@link WifiP2pServiceInfo#WifiP2pServiceInfo(WifiP2pUsdBasedServiceConfig)}
+     *
+     * <p> The function call immediately returns after sending a request to start the service
+     * advertisement to the framework. The application is notified of a success or failure to
+     * start service advertisement through listener callbacks {@link ActionListener#onSuccess} or
+     * {@link ActionListener#onFailure}.
+     *
+     * <p>The service information can be cleared with calls to
+     *  {@link #removeLocalService} or {@link #clearLocalServices}.
+     * <p>
+     * The application must have {@link android.Manifest.permission#NEARBY_WIFI_DEVICES} with
+     * android:usesPermissionFlags="neverForLocation". If the application does not declare
+     * android:usesPermissionFlags="neverForLocation", then it must also have
+     * {@link android.Manifest.permission#ACCESS_FINE_LOCATION}.
+     *
+     * @param channel is the channel created at {@link #initialize}
+     * @param servInfo is a local service information.
+     * @param config is the configuration for this service discovery advertisement.
+     * @param listener for callbacks on success or failure. Can be null.
+     */
+    @RequiresPermission(allOf = {
+            android.Manifest.permission.NEARBY_WIFI_DEVICES,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+    }, conditional = true)
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    @SuppressLint("ExecutorRegistration") // initialize creates a channel and requires a Looper
+    public void startUsdBasedLocalServiceAdvertisement(@NonNull Channel channel,
+            @NonNull WifiP2pServiceInfo servInfo,
+            @NonNull WifiP2pUsdBasedLocalServiceAdvertisementConfig config,
+            @Nullable ActionListener listener) {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        checkChannel(channel);
+        Objects.requireNonNull(servInfo, "service info cannot be null");
+        Objects.requireNonNull(config, "Advertisement config cannot be null");
+        Bundle extras = prepareExtrasBundle(channel);
+        extras.putParcelable(EXTRA_PARAM_KEY_SERVICE_INFO, servInfo);
+        extras.putParcelable(EXTRA_PARAM_KEY_USD_BASED_LOCAL_SERVICE_ADVERTISEMENT_CONFIG, config);
+        channel.mAsyncChannel.sendMessage(prepareMessage(ADD_LOCAL_SERVICE,
+                WIFI_P2P_USD_BASED_ADD_LOCAL_SERVICE,
+                channel.putListener(listener), extras, channel.mContext));
+    }
+
+    /**
      * Remove a registered local service added with {@link #addLocalService}
      *
      * <p> The function call immediately returns after sending a request to remove a
@@ -2745,6 +2847,61 @@ public class WifiP2pManager {
         checkChannel(channel);
         Bundle extras = prepareExtrasBundle(channel);
         channel.mAsyncChannel.sendMessage(prepareMessage(DISCOVER_SERVICES, 0,
+                channel.putListener(listener), extras, channel.mContext));
+    }
+
+    /**
+     * Initiate Un-synchronized service discovery (USD) based service discovery. A discovery
+     * process involves scanning for requested services for the purpose of establishing a
+     * connection to a peer that supports an available service using USD protocol.
+     *
+     * This method accepts a {@link WifiP2pUsdBasedServiceDiscoveryConfig} object specifying the
+     * desired parameters for the service discovery. The configuration object allows to specify
+     * either a band or frequency list to scan for service.
+     *
+     * <p> The function call immediately returns after sending a request to start service
+     * discovery to the framework. The application is notified of a success or failure to initiate
+     * discovery through listener callbacks {@link ActionListener#onSuccess} or
+     * {@link ActionListener#onFailure}.
+     *
+     * <p> The USD based services to be discovered are specified with calls to
+     * {@link #addServiceRequest} with the service request information set through
+     * {@link WifiP2pServiceRequest#WifiP2pServiceRequest(WifiP2pUsdBasedServiceConfig)}
+     *
+     * <p>The application is notified of the response against the service discovery request
+     * via {@link ServiceResponseListener#onUsdBasedServiceAvailable(WifiP2pDevice,
+     * WifiP2pUsdBasedServiceResponse)} listener callback registered by
+     * {@link #setServiceResponseListener(Channel, ServiceResponseListener)} .
+     *
+     * <p>
+     * The application must have {@link android.Manifest.permission#NEARBY_WIFI_DEVICES} with
+     * android:usesPermissionFlags="neverForLocation". If the application does not declare
+     * android:usesPermissionFlags="neverForLocation", then it must also have
+     * {@link android.Manifest.permission#ACCESS_FINE_LOCATION}.
+     *
+     * @param channel is the channel created at {@link #initialize}
+     * @param config is the configuration for this USD based service discovery
+     * @param listener for callbacks on success or failure. Can be null.
+     */
+    @RequiresPermission(allOf = {
+            android.Manifest.permission.NEARBY_WIFI_DEVICES,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+    }, conditional = true)
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    @SuppressLint("ExecutorRegistration") // initialize creates a channel and requires a Looper
+    public void discoverUsdBasedServices(@NonNull Channel channel,
+            @NonNull WifiP2pUsdBasedServiceDiscoveryConfig config,
+            @Nullable ActionListener listener) {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        checkChannel(channel);
+        Objects.requireNonNull(config, "Service discovery config cannot be null");
+        Bundle extras = prepareExtrasBundle(channel);
+        extras.putParcelable(EXTRA_PARAM_KEY_USD_BASED_SERVICE_DISCOVERY_CONFIG, config);
+        channel.mAsyncChannel.sendMessage(prepareMessage(DISCOVER_SERVICES,
+                WIFI_P2P_USD_BASED_SERVICE_DISCOVERY,
                 channel.putListener(listener), extras, channel.mContext));
     }
 
@@ -3202,6 +3359,32 @@ public class WifiP2pManager {
     public boolean isGroupOwnerIPv6LinkLocalAddressProvided() {
         return SdkLevel.isAtLeastT()
                 && isFeatureSupported(FEATURE_GROUP_OWNER_IPV6_LINK_LOCAL_ADDRESS_PROVIDED);
+    }
+
+    /**
+     * Check if this device supports Wi-Fi Direct R2 (P2P2).
+     *
+     * @return true if this device supports Wi-Fi Alliance Wi-Fi Direct R2 (Support for P2P2 IE and
+     * establishing connection by using the P2P pairing protocol), false otherwise.
+     * For more details, visit <a href="https://www.wi-fi.org/">https://www.wi-fi.org/</a> and
+     * search for "Wi-Fi Direct" .
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public boolean isWiFiDirectR2Supported() {
+        return isFeatureSupported(FEATURE_WIFI_DIRECT_R2);
+    }
+
+    /**
+     * Check if this device supports P2P Connection Compatibility Mode(R1/R2 compatibility mode).
+     *
+     * @return true if this device supports hosting an autonomous Group Owner which allows
+     * legacy P2P clients and R2 clients to join the group in PCC Mode and also supports connecting
+     * to a Group Owner either using legacy security mode (WPA2-PSK) or R2 mandated security
+     * mode(WPA3-SAE) in PCC Mode.
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public boolean isPccModeSupported() {
+        return isFeatureSupported(FEATURE_PCC_MODE_ALLOW_LEGACY_AND_R2_CONNECTION);
     }
 
     /**

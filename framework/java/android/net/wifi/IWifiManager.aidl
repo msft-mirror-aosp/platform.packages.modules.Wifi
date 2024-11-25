@@ -54,6 +54,7 @@ import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiLowLatencyLockListener;
 import android.net.wifi.IWifiNetworkSelectionConfigListener;
 import android.net.wifi.IWifiNetworkStateChangedListener;
+import android.net.wifi.IWifiStateChangedListener;
 import android.net.wifi.IWifiVerboseLoggingStatusChangedListener;
 import android.net.wifi.MscsParams;
 import android.net.wifi.QosPolicyParams;
@@ -175,6 +176,10 @@ interface IWifiManager {
 
     int getWifiEnabledState();
 
+    void addWifiStateChangedListener(in IWifiStateChangedListener listener);
+
+    void removeWifiStateChangedListener(in IWifiStateChangedListener listener);
+
     void registerDriverCountryCodeChangedListener(
             in IOnWifiDriverCountryCodeChangedListener listener, String packageName,
             String featureId);
@@ -249,7 +254,8 @@ interface IWifiManager {
     boolean validateSoftApConfiguration(in SoftApConfiguration config);
 
     int startLocalOnlyHotspot(in ILocalOnlyHotspotCallback callback, String packageName,
-            String featureId, in SoftApConfiguration customConfig, in Bundle extras);
+            String featureId, in SoftApConfiguration customConfig, in Bundle extras,
+            boolean isCalledFromSystemApi);
 
     void stopLocalOnlyHotspot();
 
