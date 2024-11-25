@@ -187,7 +187,6 @@ import com.android.server.wifi.p2p.WifiP2pServiceImpl;
 import com.android.server.wifi.proto.nano.WifiMetricsProto;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiIsUnusableEvent;
-import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStats;
 import com.android.server.wifi.util.ActionListenerWrapper;
 import com.android.server.wifi.util.NativeUtil;
 import com.android.server.wifi.util.RssiUtilTest;
@@ -6121,8 +6120,6 @@ public class ClientModeImplTest extends WifiBaseTest {
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
         mLooper.dispatchAll();
         verify(mWifiMetrics).updateWifiUsabilityStatsEntries(any(), any(), eq(stats));
-        verify(mWifiMetrics, never()).addToWifiUsabilityStatsList(any(),
-                WifiUsabilityStats.LABEL_BAD, eq(anyInt()), eq(-1));
 
         when(mWifiDataStall.checkDataStallAndThroughputSufficiency(any(), any(), any(), any(),
                 any(), anyLong(), anyLong()))
@@ -6131,12 +6128,6 @@ public class ClientModeImplTest extends WifiBaseTest {
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
         mLooper.dispatchAll();
         verify(mWifiMetrics, times(2)).updateWifiUsabilityStatsEntries(any(), any(), eq(stats));
-        when(mClock.getElapsedSinceBootMillis())
-                .thenReturn(10L + ClientModeImpl.DURATION_TO_WAIT_ADD_STATS_AFTER_DATA_STALL_MS);
-        mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
-        mLooper.dispatchAll();
-        verify(mWifiMetrics).addToWifiUsabilityStatsList(WIFI_IFACE_NAME,
-                WifiUsabilityStats.LABEL_BAD, WifiIsUnusableEvent.TYPE_DATA_STALL_BAD_TX, -1);
     }
 
     /**
@@ -6534,9 +6525,6 @@ public class ClientModeImplTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mWifiMetrics).logWifiIsUnusableEvent(WIFI_IFACE_NAME,
                 WifiIsUnusableEvent.TYPE_IP_REACHABILITY_LOST);
-        verify(mWifiMetrics).addToWifiUsabilityStatsList(WIFI_IFACE_NAME,
-                WifiUsabilityStats.LABEL_BAD,
-                WifiUsabilityStats.TYPE_IP_REACHABILITY_LOST, -1);
     }
 
     /**
@@ -6555,9 +6543,6 @@ public class ClientModeImplTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mWifiMetrics).logWifiIsUnusableEvent(WIFI_IFACE_NAME,
                 WifiIsUnusableEvent.TYPE_IP_REACHABILITY_LOST);
-        verify(mWifiMetrics).addToWifiUsabilityStatsList(WIFI_IFACE_NAME,
-                WifiUsabilityStats.LABEL_BAD,
-                WifiUsabilityStats.TYPE_IP_REACHABILITY_LOST, -1);
     }
 
     /**
@@ -6579,9 +6564,6 @@ public class ClientModeImplTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mWifiMetrics, never()).logWifiIsUnusableEvent(WIFI_IFACE_NAME,
                 WifiIsUnusableEvent.TYPE_IP_REACHABILITY_LOST);
-        verify(mWifiMetrics, never()).addToWifiUsabilityStatsList(WIFI_IFACE_NAME,
-                WifiUsabilityStats.LABEL_BAD,
-                WifiUsabilityStats.TYPE_IP_REACHABILITY_LOST, -1);
     }
 
     /**

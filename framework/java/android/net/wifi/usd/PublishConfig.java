@@ -20,6 +20,7 @@ import android.annotation.FlaggedApi;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.SystemApi;
+import android.net.wifi.WifiNetworkSpecifier;
 import android.net.wifi.aware.TlvBufferUtils;
 import android.net.wifi.aware.WifiAwareUtils;
 import android.net.wifi.flags.Flags;
@@ -46,7 +47,7 @@ public final class PublishConfig extends Config implements Parcelable {
 
     private PublishConfig(Parcel in) {
         super(in.createByteArray(), in.readInt(), in.readInt(), in.createByteArray(),
-                in.createByteArray(), in.createByteArray());
+                in.createByteArray(), in.createByteArray(), in.createIntArray());
         mSolicitedTransmissionType = in.readInt();
         mAnnouncementPeriodMillis = in.readInt();
         mEnableEvents = in.readBoolean();
@@ -68,7 +69,8 @@ public final class PublishConfig extends Config implements Parcelable {
 
     private PublishConfig(Builder builder) {
         super(builder.mServiceName, builder.mTtlSeconds, builder.mServiceProtoType,
-                builder.mTxMatchFilterTlv, builder.mRxMatchFilterTlv, builder.mServiceSpecificInfo);
+                builder.mTxMatchFilterTlv, builder.mRxMatchFilterTlv, builder.mServiceSpecificInfo,
+                builder.mOperatingFrequencies);
         mSolicitedTransmissionType = builder.mSolicitedTransmissionType;
         mAnnouncementPeriodMillis = builder.mAnnouncementPeriodMillis;
         mEnableEvents = builder.mEnableEvents;
@@ -87,6 +89,7 @@ public final class PublishConfig extends Config implements Parcelable {
         dest.writeByteArray(getTxMatchFilterTlv());
         dest.writeByteArray(getRxMatchFilterTlv());
         dest.writeByteArray(getServiceSpecificInfo());
+        dest.writeIntArray(getOperatingFrequenciesMhz());
         dest.writeInt(mSolicitedTransmissionType);
         dest.writeInt(mAnnouncementPeriodMillis);
         dest.writeBoolean(mEnableEvents);
@@ -155,7 +158,7 @@ public final class PublishConfig extends Config implements Parcelable {
         private byte[] mTxMatchFilterTlv = null;
         private byte[] mRxMatchFilterTlv = null;
         private byte[] mServiceSpecificInfo = null;
-
+        private int[] mOperatingFrequencies = null;
 
         /**
          * Builder for {@link PublishConfig}
@@ -332,7 +335,39 @@ public final class PublishConfig extends Config implements Parcelable {
         @NonNull
         public Builder setServiceSpecificInfo(@NonNull byte[] serviceSpecificInfo) {
             Objects.requireNonNull(serviceSpecificInfo, "serviceSpecificInfo must not be null");
-            mServiceSpecificInfo = serviceSpecificInfo;
+            mServiceSpecificInfo = serviceSpecificInfo.clone();
+            return this;
+        }
+
+        /**
+         * Sets the operating frequencies used for publish operation. This overrides the default
+         * channel selection for publish. All frequencies have to be 20 Mhz channel in 2.4 Ghz or
+         * 5 Ghz band per regulation in the geographical location. In {@code operatingFrequencies},
+         * <ul>
+         * <li>The first frequency is the channel used for single channel publish.
+         * <li>Any additional frequencies enable multiple channel publish.
+         * </ul>
+         *
+         * <p>If not set or an empty array is provided, the system defaults to 2437 MHz (channel 6
+         * in the 2.4 GHz band) for single channel publish and a list of allowed channels in the 2.4
+         * GHz and 5 GHz bands for multichannel publishing.
+         *
+         * <p>Note: the dwell time for the single and multi publish channels are defined in the
+         * Wifi Aware Specification Version 4, section 4.5.1 Publisher behavior in USD.
+         *
+         * @param operatingFrequencies frequencies used for publish operation
+         * @return a reference to this Builder
+         * @throws IllegalArgumentException if frequencies are invalid or the number frequencies
+         * are more than the number of 20 Mhz channels in 2.4 Ghz and 5 Ghz as per regulatory.
+         */
+        @NonNull
+        public Builder setOperatingFrequenciesMhz(@NonNull int[] operatingFrequencies) {
+            Objects.requireNonNull(operatingFrequencies, "operatingFrequencies must not be null");
+            if ((operatingFrequencies.length > MAX_NUM_OF_OPERATING_FREQUENCIES)
+                    || WifiNetworkSpecifier.validateChannelFrequencyInMhz(operatingFrequencies)) {
+                throw new IllegalArgumentException("Invalid operatingFrequencies");
+            }
+            mOperatingFrequencies = operatingFrequencies.clone();
             return this;
         }
 
