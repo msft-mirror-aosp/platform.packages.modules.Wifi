@@ -60,42 +60,24 @@
     <string name="wifi_p2p_to_message" msgid="3809923305696994787">"אל:"</string>
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"יש להקליד את קוד האימות הנדרש:"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"קוד אימות:"</string>
-    <!-- no translation found for wifi_p2p_dialog2_sent_title (2336103322429678328) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_sent_title_display_pin (511248898541903515) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_sent_message (2544736217133674163) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_sent_message_display_pin (5017076731258834940) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_sent_positive_button (6464227471745156497) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_title (6897349204607457747) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_title_enter_pin (6431543271224139601) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_title_display_pin (5017007825248741433) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_message (4376275522073306499) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_message_enter_pin (6070908860523284394) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_message_display_pin (5906560549535982131) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_message_countdown (557930403509771814) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_message_enter_pin_countdown (3723666737782219820) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_message_display_pin_countdown (1248395771858360837) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_positive_button (6358592617824573781) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_received_negative_button (4762549789911681138) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_enter_pin_label (7410100924400114335) -->
-    <skip />
-    <!-- no translation found for wifi_p2p_dialog2_display_pin_label (3929561425167093538) -->
-    <skip />
+    <string name="wifi_p2p_dialog2_sent_title" msgid="2336103322429678328">"חיבור בין המכשירים"</string>
+    <string name="wifi_p2p_dialog2_sent_title_display_pin" msgid="511248898541903515">"חיבור בין המכשירים"</string>
+    <string name="wifi_p2p_dialog2_sent_message" msgid="2544736217133674163">"נשלחה הזמנה אל <xliff:g id="DEVICE_NAME">%1$s</xliff:g>."</string>
+    <string name="wifi_p2p_dialog2_sent_message_display_pin" msgid="5017076731258834940">"כדי להתחבר, צריך להזין את קוד האימות הזה במכשיר <xliff:g id="DEVICE_NAME">%1$s</xliff:g>."</string>
+    <string name="wifi_p2p_dialog2_sent_positive_button" msgid="6464227471745156497">"אישור"</string>
+    <string name="wifi_p2p_dialog2_received_title" msgid="6897349204607457747">"חיבור בין המכשירים"</string>
+    <string name="wifi_p2p_dialog2_received_title_enter_pin" msgid="6431543271224139601">"חיבור בין המכשירים"</string>
+    <string name="wifi_p2p_dialog2_received_title_display_pin" msgid="5017007825248741433">"חיבור בין המכשירים"</string>
+    <string name="wifi_p2p_dialog2_received_message" msgid="4376275522073306499">"המכשיר <xliff:g id="DEVICE_NAME">%1$s</xliff:g> מבקש להתחבר למכשיר שלך."</string>
+    <string name="wifi_p2p_dialog2_received_message_enter_pin" msgid="6070908860523284394">"כדי להתחבר, צריך להזין את קוד האימות שמוצג במכשיר <xliff:g id="DEVICE_NAME">%1$s</xliff:g>."</string>
+    <string name="wifi_p2p_dialog2_received_message_display_pin" msgid="5906560549535982131">"המכשיר <xliff:g id="DEVICE_NAME">%1$s</xliff:g> מבקש להתחבר למכשיר שלך באמצעות קוד האימות הבא."</string>
+    <string name="wifi_p2p_dialog2_received_message_countdown" msgid="557930403509771814">"{countdown,plural, =1{מכשיר {device} מבקש להתחבר למכשיר שלך. ניתן לאשר תוך שנייה ({countdown}).}one{מכשיר {device} מבקש להתחבר למכשיר שלך. ניתן לאשר תוך {countdown} שניות.}two{מכשיר {device} מבקש להתחבר למכשיר שלך. ניתן לאשר תוך {countdown} שניות.}other{מכשיר {device} מבקש להתחבר למכשיר שלך. ניתן לאשר תוך {countdown} שניות.}}"</string>
+    <string name="wifi_p2p_dialog2_received_message_enter_pin_countdown" msgid="3723666737782219820">"{countdown,plural, =1{כדי להתחבר, צריך להזין את קוד האימות שמוצג במכשיר {device} תוך שנייה ({countdown}).}one{כדי להתחבר, צריך להזין את קוד האימות שמוצג במכשיר {device} תוך {countdown} שניות.}two{כדי להתחבר, צריך להזין את קוד האימות שמוצג במכשיר {device} תוך {countdown} שניות.}other{כדי להתחבר, צריך להזין את קוד האימות שמוצג במכשיר {device} תוך {countdown} שניות.}}"</string>
+    <string name="wifi_p2p_dialog2_received_message_display_pin_countdown" msgid="1248395771858360837">"{countdown,plural, =1{המכשיר {device} מבקש להתחבר למכשיר שלך באמצעות קוד האימות הבא. ניתן לאשר תוך שנייה ({countdown}).}one{המכשיר {device} מבקש להתחבר למכשיר שלך באמצעות קוד האימות הבא. ניתן לאשר תוך {countdown} שניות.}two{המכשיר {device} מבקש להתחבר למכשיר שלך באמצעות קוד האימות הבא. ניתן לאשר תוך {countdown} שניות.}other{המכשיר {device} מבקש להתחבר למכשיר שלך באמצעות קוד האימות הבא. ניתן לאשר תוך {countdown} שניות.}}"</string>
+    <string name="wifi_p2p_dialog2_received_positive_button" msgid="6358592617824573781">"חיבור"</string>
+    <string name="wifi_p2p_dialog2_received_negative_button" msgid="4762549789911681138">"ביטול"</string>
+    <string name="wifi_p2p_dialog2_enter_pin_label" msgid="7410100924400114335">"קוד אימות"</string>
+    <string name="wifi_p2p_dialog2_display_pin_label" msgid="3929561425167093538">"קוד אימות"</string>
     <string name="wifi_p2p_frequency_conflict_message" msgid="8535404941723941766">"‏המכשיר יתנתק מרשת ה-Wi-Fi באופן זמני כשהוא מחובר אל <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
     <string name="dlg_ok" msgid="254496739491689405">"אישור"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_title" msgid="2344570489693915253">"לא ניתן להתחבר אל <xliff:g id="SSID">%1$s</xliff:g>"</string>
