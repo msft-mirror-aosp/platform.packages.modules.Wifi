@@ -52,7 +52,7 @@
     <string name="wifi_connect_default_application" msgid="8917703737222707062">"Un\'applicazione"</string>
     <string name="accept" msgid="8346431649376483879">"Accetto"</string>
     <string name="decline" msgid="4172251727603762084">"Rifiuto"</string>
-    <string name="ok" msgid="847575529546290102">"OK"</string>
+    <string name="ok" msgid="847575529546290102">"Ok"</string>
     <string name="wifi_p2p_invitation_sent_title" msgid="6552639940428040869">"Invito inviato"</string>
     <string name="wifi_p2p_invitation_to_connect_title" msgid="8917157937652519251">"Invito a connettersi"</string>
     <string name="wifi_p2p_invitation_seconds_remaining" msgid="4214101104506918344">"{0,plural, =1{Accetta entro # secondo.}many{Accetta entro # di secondi.}other{Accetta entro # secondi.}}"</string>
@@ -61,7 +61,7 @@
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"Inserisci il PIN richiesto:"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"PIN:"</string>
     <string name="wifi_p2p_frequency_conflict_message" msgid="8535404941723941766">"Il dispositivo verrà scollegato temporaneamente dalla rete Wi-Fi mentre è connesso a <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
-    <string name="dlg_ok" msgid="254496739491689405">"OK"</string>
+    <string name="dlg_ok" msgid="254496739491689405">"Ok"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_title" msgid="2344570489693915253">"Impossibile connettersi alla rete <xliff:g id="SSID">%1$s</xliff:g>"</string>
     <string name="wifi_cannot_connect_with_randomized_mac_message" msgid="4834133226521813352">"Tocca per cambiare le impostazioni sulla privacy e riprova"</string>
     <string name="wifi_disable_mac_randomization_dialog_title" msgid="2054540994993681606">"Vuoi cambiare l\'impostazione sulla privacy?"</string>
@@ -145,7 +145,7 @@
     <string name="wifi_ca_cert_failed_to_install_ca_cert" msgid="4864192219789736195">"Installazione del certificato non riuscita."</string>
     <string name="wifi_tofu_invalid_cert_chain_title" msgid="332710627417595752">"Impossibile connettersi a <xliff:g id="VALUE">%1$s</xliff:g>"</string>
     <string name="wifi_tofu_invalid_cert_chain_message" msgid="7047987920029432392">"La catena di certificati del server non è valida."</string>
-    <string name="wifi_tofu_invalid_cert_chain_ok_text" msgid="9098567577510279854">"OK"</string>
+    <string name="wifi_tofu_invalid_cert_chain_ok_text" msgid="9098567577510279854">"Ok"</string>
     <string name="wifi_ca_cert_dialog_preT_title" msgid="6916320484037009061">"Impossibile verificare questa rete"</string>
     <string name="wifi_ca_cert_dialog_preT_continue_text" msgid="9118713368838029797">"Mantieni la connessione"</string>
     <string name="wifi_ca_cert_dialog_preT_abort_text" msgid="1331309662999405224">"Disconnettiti ora"</string>
