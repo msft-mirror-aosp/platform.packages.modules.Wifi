@@ -56,7 +56,7 @@ def _setup_wifi_p2p(ad: android_device.AndroidDevice) -> DeviceState:
     asserts.assert_not_equal(
         p2p_device.device_address,
         constants.ANONYMIZED_MAC_ADDRESS,
-        'Failed to get p2p device MAC address, please check permissions '
+        f'{ad} failed to get p2p device MAC address, please check permissions '
         'required by API WifiP2pManager#requestConnectionInfo',
     )
     return DeviceState(
@@ -89,7 +89,7 @@ def _init_wifi_p2p(
     asserts.assert_equal(
         state,
         constants.ExtraWifiState.WIFI_P2P_STATE_ENABLED,
-        f'Failed to initialize Wi-Fi P2P, state: {state}',
+        f'{ad} failed to initialize Wi-Fi P2P, state: {state}',
     )
     return broadcast_receiver
 
@@ -190,23 +190,23 @@ def _find_p2p_device(
     return filtered_peers[0]
 
 
-def _p2p_connect_with_push_button(
+def _p2p_connect(
     requester: DeviceState,
     responder: DeviceState,
-) -> constants.WifiP2pDevice:
-    """Establishes Wi-Fi p2p connection with WPS push button configuration.
+    wps_config: constants.WpsInfo
+) -> None:
+    """Establishes Wi-Fi p2p connection with WPS configuration.
 
-    This initiates p2p connection on requester, accepts invitation on responder,
-    and checks connection status on both devices.
+    This method instructs the requester to initiate a connection request and the
+    responder to accept the connection. It then verifies the connection status
+    on both devices.
 
     Args:
         requester: The requester device.
-        responder: The respodner device.
-
-    Returns:
-        The peer p2p device found on the requester.
+        responder: The responder device.
+        wps_config: The WPS method to establish the connection.
     """
-    logging.info('Establishing a p2p connection through WPS PBC.')
+    logging.info('Establishing a p2p connection through WPS %s.', wps_config)
 
     # Clear events in broadcast receiver.
     _clear_events(requester, constants.WIFI_P2P_PEERS_CHANGED_ACTION)
@@ -214,18 +214,20 @@ def _p2p_connect_with_push_button(
     _clear_events(responder, constants.WIFI_P2P_PEERS_CHANGED_ACTION)
     _clear_events(responder, constants.WIFI_P2P_CONNECTION_CHANGED_ACTION)
 
-    # Send P2P connect invitation from requester.
     config = constants.WifiP2pConfig(
         device_address=responder.p2p_device.device_address,
-        wps_setup=constants.WpsInfo.PBC,
+        wps_setup=wps_config,
     )
     requester.ad.wifi.wifiP2pConnect(config.to_dict())
-    requester.ad.log.info(
-        'Successfully sent P2P connect invitation to responder.'
-    )
-
-    # Click accept button on responder.
-    responder.ad.wifi.wifiP2pAcceptInvitation(requester.p2p_device.device_name)
+    requester.ad.log.info('Sent P2P connect invitation to responder.')
+    if wps_config == constants.WpsInfo.PBC:
+        responder.ad.wifi.wifiP2pAcceptInvitation(requester.p2p_device.device_name)
+    elif wps_config == constants.WpsInfo.DISPLAY:
+        pin = requester.ad.wifi.wifiP2pGetPinCode(responder.p2p_device.device_name)
+        requester.ad.log.info('p2p connection PIN code: %s', pin)
+        responder.ad.wifi.wifiP2pEnterPin(pin,requester.p2p_device.device_name)
+    else:
+        asserts.fail(f'Unsupported WPS configuration: {wps_config}')
     responder.ad.log.info('Accepted connect invitation.')
 
     # Check p2p status on requester.
@@ -419,27 +421,55 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
 
         Steps:
             1. Initialize Wi-Fi p2p on both responder and requester device.
-            2. Initiate p2p discovery. Requester should be able to find
-               the responder.
+            2. Initiate p2p discovery. Verify that the requester finds the
+               responder.
             3. Establish a p2p connection with WPS PBC (push button
-               configuration). Requester initiates a connection request.
-               Responder clicks accept button to accept the connection.
-            4. Stop the connection.
+               configuration). Verify both devices show connection established
+               status.
+            4. Stop the connection. Verify both devices show connection stopped
+               status.
         """
         responder = _setup_wifi_p2p(self.responder_ad)
         requester = _setup_wifi_p2p(self.requester_ad)
 
         requester_peer_p2p_device = _find_p2p_device(requester, responder)
-
         # Make sure that peer is not a group owner (GO) as this is testing
         # against GO negotiation.
         asserts.assert_false(
             requester_peer_p2p_device.is_group_owner,
-            f'{requester} found target responder device with invalid role.'
+            f'{requester.ad} found target responder device with invalid role.'
             ' It should not be group owner.',
         )
 
-        _p2p_connect_with_push_button(requester, responder)
+        _p2p_connect(requester, responder, constants.WpsInfo.PBC)
+
+        _remove_group_and_verify_disconnected(requester, responder)
+
+    def test_group_owner_negotiation_with_pin_button(self) -> None:
+        """Test against group owner negotiation and WPS PIN.
+
+        Steps:
+            1. Initialize Wi-Fi p2p on both responder and requester devices.
+            2. Initiate p2p discovery. Verify that the requester finds the
+               responder.
+            3. Establish a p2p connection using WPS PIN configuration. Verify
+               both devices show connection established status.
+            4. Stop the connection. Verify both devices show connection stopped
+               status.
+        """
+        responder = _setup_wifi_p2p(self.responder_ad)
+        requester = _setup_wifi_p2p(self.requester_ad)
+
+        requester_peer_p2p_device = _find_p2p_device(requester, responder)
+        # Make sure that peer is not a group owner (GO) as this is testing
+        # against GO negotiation.
+        asserts.assert_false(
+            requester_peer_p2p_device.is_group_owner,
+            f'{requester.ad} found target responder device with invalid role.'
+            ' It should not be group owner.',
+        )
+
+        _p2p_connect(requester, responder, constants.WpsInfo.DISPLAY)
 
         _remove_group_and_verify_disconnected(requester, responder)
 
