@@ -728,7 +728,7 @@ package android.net.wifi {
   }
 
   @FlaggedApi("com.android.wifi.flags.wifi_state_changed_listener") public static interface WifiManager.WifiStateChangedListener {
-    method public void onWifiStateChanged(int);
+    method public void onWifiStateChanged();
   }
 
   @Deprecated public abstract static class WifiManager.WpsCallback {

@@ -4334,7 +4334,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(info.getLinkSpeed()).thenReturn(nextRandInt());
         WifiLinkLayerStats stats = start;
         for (int i = 0; i < WifiMetrics.NUM_WIFI_USABILITY_STATS_ENTRIES_PER_WIFI_GOOD; i++) {
-            mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats);
+            mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats, false);
             stats = nextRandomStats(stats);
         }
         return stats;
@@ -4347,8 +4347,8 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(info.getLinkSpeed()).thenReturn(nextRandInt());
         WifiLinkLayerStats stats1 = start;
         WifiLinkLayerStats stats2 = nextRandomStats(stats1);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1, false);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false);
         mWifiMetrics.addToWifiUsabilityStatsList(TEST_IFACE_NAME, WifiUsabilityStats.LABEL_BAD,
                 WifiUsabilityStats.TYPE_DATA_STALL_BAD_TX, -1);
         return nextRandomStats(stats2);
@@ -4381,14 +4381,14 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 2, 55, 15);
         mWifiMetrics.logLinkProbeSuccess(
                 TEST_IFACE_NAME, nextRandInt(), nextRandInt(), nextRandInt(), 12);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1, false);
         mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, 58);
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 3, 56, 15);
         mWifiMetrics.logLinkProbeFailure(TEST_IFACE_NAME, nextRandInt(), nextRandInt(),
                 nextRandInt(), nextRandInt());
         mWifiMetrics.enterDeviceMobilityState(DEVICE_MOBILITY_STATE_HIGH_MVMT);
 
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false);
         assertEquals(stats2.beacon_rx, mWifiMetrics.getTotalBeaconRxCount());
 
         dumpProtoAndDeserialize();
@@ -4451,6 +4451,77 @@ public class WifiMetricsTest extends WifiBaseTest {
         addBadWifiUsabilityStats(new WifiLinkLayerStats());
         dumpProtoAndDeserialize();
         assertEquals(0, mDecodedProto.wifiUsabilityStatsList.length);
+    }
+
+    /**
+     * Verify that records are properly added to mWifiUsabilityStatsEntriesRingBuffer and that the
+     * size does not grow indefinitely.
+     *
+     * @throws Exception
+     */
+    @Test
+    public void testLogAsynchronousEvent() throws Exception {
+        when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 123);
+
+        // Buffer starts out empty.
+        assertEquals(0, mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
+
+        // Check that exactly one record is added and with default subcode.
+        mWifiMetrics.logAsynchronousEvent(TEST_IFACE_NAME,
+                WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED);
+        assertEquals(1, mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
+        WifiUsabilityStatsEntry actual = mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.get(0);
+        assertEquals(123, actual.timeStampMs);
+        assertEquals(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED,
+                actual.captureEventType);
+        assertEquals(-1, actual.captureEventTypeSubcode);
+
+        // Check that exactly one record is added with given subcode.
+        mWifiMetrics.logAsynchronousEvent(TEST_IFACE_NAME,
+                WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_DISABLED, -9876);
+        assertEquals(2, mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
+        actual = mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.get(1);
+        assertEquals(123, actual.timeStampMs);
+        assertEquals(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_DISABLED,
+                actual.captureEventType);
+        assertEquals(-9876, actual.captureEventTypeSubcode);
+
+        // Fill the ring buffer
+        for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE - 2;
+                i++) {
+            mWifiMetrics.logAsynchronousEvent(TEST_IFACE_NAME,
+                    WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED);
+        }
+        assertEquals(WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE,
+                mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
+
+        // Should not grow further.
+        mWifiMetrics.logAsynchronousEvent(TEST_IFACE_NAME,
+                WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED);
+        assertEquals(WifiMetrics.MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE,
+                mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
+    }
+
+    /**
+     * Verify that firmware alerts appear in the ring buffer.
+     */
+    @Test
+    public void testLogFirmwareAlert() throws Exception {
+        when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 123);
+
+        // Buffer starts out empty.
+        assertEquals(0, mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
+
+        // Add record
+        mWifiMetrics.logFirmwareAlert(TEST_IFACE_NAME, 789);
+
+        // Confirm that exactly one record is added and with default subcode.
+        assertEquals(1, mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
+        WifiUsabilityStatsEntry actual = mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.get(0);
+        assertEquals(123, actual.timeStampMs);
+        assertEquals(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_FIRMWARE_ALERT,
+                actual.captureEventType);
+        assertEquals(789, actual.captureEventTypeSubcode);
     }
 
     /**
@@ -4617,7 +4688,7 @@ public class WifiMetricsTest extends WifiBaseTest {
                 ActiveModeManager.ROLE_CLIENT_SECONDARY_LONG_LIVED);
         mModeChangeCallbackArgumentCaptor.getValue()
                 .onActiveModeManagerRoleChanged(concreteClientModeManager);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false);
         verify(mOnWifiUsabilityStatsListener, never()).onWifiUsabilityStats(anyInt(), anyBoolean(),
                 any());
 
@@ -4627,7 +4698,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(concreteClientModeManager.getRole()).thenReturn(ActiveModeManager.ROLE_CLIENT_PRIMARY);
         mModeChangeCallbackArgumentCaptor.getValue()
                 .onActiveModeManagerRoleChanged(concreteClientModeManager);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false);
 
         // Client should get the stats.
         verify(mOnWifiUsabilityStatsListener).onWifiUsabilityStats(anyInt(), anyBoolean(),
@@ -4763,7 +4834,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(info.getRssi()).thenReturn(nextRandInt());
         when(info.getLinkSpeed()).thenReturn(nextRandInt());
         WifiLinkLayerStats linkLayerStats = nextRandomStats(new WifiLinkLayerStats());
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false);
 
         verify(mOnWifiUsabilityStatsListener, never()).onWifiUsabilityStats(anyInt(),
                 anyBoolean(), any());
@@ -4792,7 +4863,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(info.getRssi()).thenReturn(nextRandInt());
         when(info.getLinkSpeed()).thenReturn(nextRandInt());
         WifiLinkLayerStats linkLayerStats = nextRandomStats(new WifiLinkLayerStats());
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, linkLayerStats, false);
 
         // Client should not get any message listener add failed.
         verify(mOnWifiUsabilityStatsListener, never()).onWifiUsabilityStats(anyInt(),
@@ -4812,7 +4883,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         long eventTimeMs = nextRandInt();
         when(mClock.getElapsedSinceBootMillis()).thenReturn(eventTimeMs);
         WifiLinkLayerStats stats1 = nextRandomStats(new WifiLinkLayerStats());
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1, false);
 
         // Firmware alert occurs
         mWifiMetrics.logFirmwareAlert(TEST_IFACE_NAME, 2);
@@ -5691,13 +5762,13 @@ public class WifiMetricsTest extends WifiBaseTest {
                     WifiIsUnusableEvent.TYPE_DATA_STALL_BAD_TX, -1);
         }
         when(mClock.getElapsedSinceBootMillis()).thenReturn(elapsedTimeAfterBreach);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false);
     }
 
     // Simulate adding one LABEL_BAD WifiUsabilityStats
     private void addOneBadWifiUsabilityStats(WifiInfo info) {
         WifiLinkLayerStats stats1 = new WifiLinkLayerStats();
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1, false);
         mWifiMetrics.addToWifiUsabilityStatsList(TEST_IFACE_NAME, WifiUsabilityStats.LABEL_BAD,
                 WifiUsabilityStats.TYPE_DATA_STALL_BAD_TX, -1);
     }
@@ -5707,13 +5778,13 @@ public class WifiMetricsTest extends WifiBaseTest {
         int upper = WifiMetrics.LOW_WIFI_SCORE + 7;
         int lower = WifiMetrics.LOW_WIFI_SCORE - 8;
         mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, upper);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false);
         stats2 = nextRandomStats(stats2);
         long timeMs = 0;
         when(mClock.getElapsedSinceBootMillis()).thenReturn(timeMs);
         // Wifi score breaches low
         mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, lower);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false);
         stats2 = nextRandomStats(stats2);
         return stats2;
     }
@@ -5724,13 +5795,13 @@ public class WifiMetricsTest extends WifiBaseTest {
         int upper = WifiMetrics.LOW_WIFI_USABILITY_SCORE + 7;
         int lower = WifiMetrics.LOW_WIFI_USABILITY_SCORE - 8;
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 1, upper, 30);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false);
         stats2 = nextRandomStats(stats2);
         long timeMs = 0;
         when(mClock.getElapsedSinceBootMillis()).thenReturn(timeMs);
         // Wifi usability score breaches low
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 2, lower, 30);
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false);
         stats2 = nextRandomStats(stats2);
         return stats2;
     }
@@ -5774,7 +5845,7 @@ public class WifiMetricsTest extends WifiBaseTest {
         when(info.getRssi()).thenReturn(nextRandInt());
         when(info.getLinkSpeed()).thenReturn(nextRandInt());
         WifiLinkLayerStats stats1 = nextRandomStats(new WifiLinkLayerStats());
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1);
+        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1, false);
 
         // Add 1 LABEL_GOOD
         WifiLinkLayerStats statsGood = addGoodWifiUsabilityStats(nextRandomStats(stats1));
