@@ -187,6 +187,7 @@ import com.android.server.wifi.p2p.WifiP2pServiceImpl;
 import com.android.server.wifi.proto.nano.WifiMetricsProto;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiIsUnusableEvent;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStatsEntry;
 import com.android.server.wifi.util.ActionListenerWrapper;
 import com.android.server.wifi.util.NativeUtil;
 import com.android.server.wifi.util.RssiUtilTest;
@@ -4142,6 +4143,76 @@ public class ClientModeImplTest extends WifiBaseTest {
     }
 
     /**
+     * Verify that RSSI polling starts/ stops/ one-offs are properly recorded in the capture buffer.
+     */
+    @Test
+    public void testCaptureBufferRssiOnOff() throws Exception {
+        // Log should indicate RSSI polling turned on.
+        mCmi.enableRssiPolling(true);
+        connect();
+        verify(mWifiMetrics).logAsynchronousEvent(
+                eq(WIFI_IFACE_NAME),
+                eq(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED));
+        reset(mWifiMetrics);
+
+        // Normal RSSI polling loop. No events should be logged.
+        mLooper.moveTimeForward(3000);
+        mLooper.dispatchAll();
+        verify(mWifiMetrics, never()).logAsynchronousEvent(anyString(), anyInt());
+        verify(mWifiMetrics, never()).logAsynchronousEvent(anyString(), anyInt(), anyInt());
+        reset(mWifiMetrics);
+
+        // Normal RSSI polling loop. No events should be logged here either.
+        mLooper.moveTimeForward(3000);
+        mLooper.dispatchAll();
+        verify(mWifiMetrics, never()).logAsynchronousEvent(anyString(), anyInt());
+        verify(mWifiMetrics, never()).logAsynchronousEvent(anyString(), anyInt(), anyInt());
+        reset(mWifiMetrics);
+
+        // Turn off RSSI polling. This should show up in the capture buffer.
+        mCmi.enableRssiPolling(false);
+        mLooper.moveTimeForward(3000);
+        mLooper.dispatchAll();
+        verify(mWifiMetrics).logAsynchronousEvent(
+                eq(WIFI_IFACE_NAME),
+                eq(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_DISABLED));
+        reset(mWifiMetrics);
+    }
+
+    /**
+     * Verify that IP reachability problems are recorded in the capture buffer.
+     */
+    @Test
+    public void testCaptureBufferReachabilityLost() throws Exception {
+        // Log should indicate RSSI polling turned on.
+        connect();
+        verify(mWifiMetrics).logAsynchronousEvent(
+                eq(WIFI_IFACE_NAME),
+                eq(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED));
+        reset(mWifiMetrics);
+
+        // Simulate an IP_REACHABILITY_LOST event.
+        mIpClientCallback.onReachabilityLost("CMD_IP_REACHABILITY_LOST");
+        mLooper.dispatchAll();
+        verify(mWifiMetrics).logAsynchronousEvent(
+                eq(WIFI_IFACE_NAME),
+                eq(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_IP_REACHABILITY_LOST),
+                eq(-1));
+        reset(mWifiMetrics);
+
+        // Simulate an IP_REACHABILITY_FAILURE event.
+        ReachabilityLossInfoParcelable lossInfo =
+                new ReachabilityLossInfoParcelable("", ReachabilityLossReason.CONFIRM);
+        mIpClientCallback.onReachabilityFailure(lossInfo);
+        mLooper.dispatchAll();
+        verify(mWifiMetrics).logAsynchronousEvent(
+                eq(WIFI_IFACE_NAME),
+                eq(WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_IP_REACHABILITY_FAILURE),
+                eq(ReachabilityLossReason.CONFIRM));
+        reset(mWifiMetrics);
+    }
+
+    /**
      * Verify link bandwidth update in connected mode
      */
     @Test
@@ -6119,7 +6190,7 @@ public class ClientModeImplTest extends WifiBaseTest {
                 .thenReturn(WifiIsUnusableEvent.TYPE_UNKNOWN);
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
         mLooper.dispatchAll();
-        verify(mWifiMetrics).updateWifiUsabilityStatsEntries(any(), any(), eq(stats));
+        verify(mWifiMetrics).updateWifiUsabilityStatsEntries(any(), any(), eq(stats), eq(false));
 
         when(mWifiDataStall.checkDataStallAndThroughputSufficiency(any(), any(), any(), any(),
                 any(), anyLong(), anyLong()))
@@ -6127,7 +6198,8 @@ public class ClientModeImplTest extends WifiBaseTest {
         when(mClock.getElapsedSinceBootMillis()).thenReturn(10L);
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
         mLooper.dispatchAll();
-        verify(mWifiMetrics, times(2)).updateWifiUsabilityStatsEntries(any(), any(), eq(stats));
+        verify(mWifiMetrics, times(2)).updateWifiUsabilityStatsEntries(any(), any(), eq(stats),
+                eq(false));
     }
 
     /**

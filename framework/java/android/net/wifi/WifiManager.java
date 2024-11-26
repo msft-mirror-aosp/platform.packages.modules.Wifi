@@ -5455,16 +5455,15 @@ public class WifiManager {
     }
 
     /**
-     * Listener interface for applications to receive updates about the current Wi-Fi enabled state.
+     * Listener interface for applications to be notified when the Wi-Fi enabled state changes.
      */
     @FlaggedApi(Flags.FLAG_WIFI_STATE_CHANGED_LISTENER)
     public interface WifiStateChangedListener {
         /**
          * Called when the Wi-Fi enabled state changes.
-         *
-         * @param state The new Wi-Fi state.
+         * The new value can be queried via {@link WifiManager#getWifiState()}.
          */
-        void onWifiStateChanged(@WifiState int state);
+        void onWifiStateChanged();
     }
 
     /**
@@ -5483,10 +5482,10 @@ public class WifiManager {
         }
 
         @Override
-        public void onWifiStateChanged(@WifiState int state) {
-            Log.i(TAG, "WifiStateChangedListenerProxy: onWifiStateChanged: " + state);
+        public void onWifiStateChanged() {
+            Log.i(TAG, "WifiStateChangedListenerProxy: onWifiStateChanged");
             Binder.clearCallingIdentity();
-            mExecutor.execute(() -> mListener.onWifiStateChanged(state));
+            mExecutor.execute(() -> mListener.onWifiStateChanged());
         }
     }
 
