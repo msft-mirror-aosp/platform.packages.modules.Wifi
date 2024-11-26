@@ -190,6 +190,15 @@ flag {
 }
 
 flag {
+    name: "secure_ranging"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add secure ranging support"
+    bug: "364722301"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "mainline_supplicant"
     namespace: "wifi"
     description: "Use the secondary supplicant binary stored in the mainline module"
@@ -221,5 +230,50 @@ flag {
     namespace: "wifi"
     description: "Wep should be disabled in advanced protection mode"
     bug: "362586268"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "bssid_blocklist_for_suggestion"
+    is_exported: true
+    namespace: "wifi"
+    description: "Add BSSID to blocklist for network suggestion"
+    bug: "340263610"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "ap_isolate"
+    is_exported: true
+    namespace: "wifi"
+    description: "Supports Soft AP client isolation configuration"
+    bug: "364333929"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "public_bands_for_lohs"
+    is_exported: true
+    namespace: "wifi"
+    description: "Public bands api for local only hotspot from system api"
+    bug: "362355566"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "wifi_state_changed_listener"
+    is_exported: true
+    namespace: "wifi"
+    description: "Wifi state changed listener API"
+    bug: "349530934"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "p2p_dialog2"
+    is_exported: true
+    namespace: "wifi"
+    description: "Updated P2P dialogs"
+    bug: "349253691"
     is_fixed_read_only: true
 }

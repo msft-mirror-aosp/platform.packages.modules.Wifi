@@ -22,6 +22,27 @@ package android.system.wifi.mainline_supplicant;
  */
 interface IMainlineSupplicant {
     /**
+     * Register an interface for use by USD.
+     *
+     * @param ifaceName Name of the interface (ex. wlan0)
+     * @throws ServiceSpecificException with one of the following values:
+     *         |SupplicantStatusCode.FAILURE_UNKNOWN|
+     *         |SupplicantStatusCode.FAILURE_ARGS_INVALID|
+     */
+    void addUsdInterface(String ifaceName);
+
+    /**
+     * Remove an interface that is being used for USD.
+     *
+     * @param ifaceName Name of the interface (ex. wlan0)
+     * @throws ServiceSpecificException with one of the following values:
+     *         |SupplicantStatusCode.FAILURE_UNKNOWN|
+     *         |SupplicantStatusCode.FAILURE_ARGS_INVALID|
+     *         |SupplicantStatusCode.FAILURE_IFACE_UNKNOWN|
+     */
+    void removeUsdInterface(String ifaceName);
+
+    /**
      * Terminate the service.
      */
     void terminate();

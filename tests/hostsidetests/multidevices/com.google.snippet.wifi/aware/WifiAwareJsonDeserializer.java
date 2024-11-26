@@ -17,25 +17,31 @@
 
 package com.google.snippet.wifi.aware;
 
+import android.net.MacAddress;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
 import android.net.wifi.aware.AwarePairingConfig;
+import android.net.wifi.aware.PeerHandle;
 import android.net.wifi.aware.PublishConfig;
 import android.net.wifi.aware.SubscribeConfig;
 import android.net.wifi.aware.WifiAwareDataPathSecurityConfig;
 import android.net.wifi.aware.WifiAwareNetworkSpecifier;
+import android.net.wifi.rtt.RangingRequest;
+import android.util.Base64;
 
 import androidx.annotation.NonNull;
 
+import com.android.modules.utils.build.SdkLevel;
+
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import com.android.modules.utils.build.SdkLevel;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Deserializes JSONObject into data objects defined in Wi-Fi Aware API.
@@ -45,6 +51,7 @@ public class WifiAwareJsonDeserializer {
     private static final String SERVICE_NAME = "service_name";
     private static final String SERVICE_SPECIFIC_INFO = "service_specific_info";
     private static final String MATCH_FILTER = "match_filter";
+    private static final String MATCH_FILTER_LIST = "MatchFilterList";
     private static final String SUBSCRIBE_TYPE = "subscribe_type";
     private static final String TERMINATE_NOTIFICATION_ENABLED = "terminate_notification_enabled";
     private static final String MAX_DISTANCE_MM = "max_distance_mm";
@@ -69,6 +76,7 @@ public class WifiAwareJsonDeserializer {
     private static final String PORT = "port";
     private static final String TRANSPORT_PROTOCOL = "transport_protocol";
     private static final String DATA_PATH_SECURITY_CONFIG = "data_path_security_config";
+    private static final String CHANNEL_FREQUENCY_M_HZ = "channel_frequency_m_hz";
     //NetworkRequest specific
     private static final String TRANSPORT_TYPE = "transport_type";
     private static final String CAPABILITY = "capability";
@@ -82,6 +90,10 @@ public class WifiAwareJsonDeserializer {
     public static final int WIFI_BAND_5_GHZ = 1;
     /** DFS channels from 5 GHz band only */
     public static final int WIFI_BAND_5_GHZ_DFS_ONLY  = 1;
+
+    // Fields for rangingRequest
+    private static final String RANGING_REQUEST_PEER_IDS = "peer_ids";
+    private static final String RANGING_REQUEST_PEER_MACS = "peer_mac_addresses";
 
 
     private WifiAwareJsonDeserializer() {
@@ -115,6 +127,14 @@ public class WifiAwareJsonDeserializer {
                         .getBytes(StandardCharsets.UTF_8));
             }
             builder.setMatchFilter(matchFilter);
+        }
+        if (jsonObject.has(MATCH_FILTER_LIST)) {
+            byte[] bytes = Base64.decode(
+                    jsonObject.getString(MATCH_FILTER_LIST).getBytes(StandardCharsets.UTF_8),
+                     Base64.DEFAULT);
+
+            List<byte[]> mf = new TlvBufferUtils.TlvIterable(0, 1, bytes).toList();
+            builder.setMatchFilter(mf);
         }
         if (jsonObject.has(SUBSCRIBE_TYPE)) {
             int subscribeType = jsonObject.getInt(SUBSCRIBE_TYPE);
@@ -206,6 +226,13 @@ public class WifiAwareJsonDeserializer {
                         .getBytes(StandardCharsets.UTF_8));
             }
             builder.setMatchFilter(matchFilter);
+        }
+        if (jsonObject.has(MATCH_FILTER_LIST)) {
+            byte[] bytes = Base64.decode(
+                    jsonObject.getString(MATCH_FILTER_LIST).getBytes(StandardCharsets.UTF_8),
+                     Base64.DEFAULT);
+            List<byte[]> mf = new TlvBufferUtils.TlvIterable(0, 1, bytes).toList();
+            builder.setMatchFilter(mf);
         }
         if (jsonObject.has(PUBLISH_TYPE)) {
             int publishType = jsonObject.getInt(PUBLISH_TYPE);
@@ -305,6 +332,9 @@ public class WifiAwareJsonDeserializer {
             builder.setDataPathSecurityConfig(jsonToDataPathSSecurityConfig(
                     jsonObject.getJSONObject(DATA_PATH_SECURITY_CONFIG)));
         }
+        if (jsonObject.has(CHANNEL_FREQUENCY_M_HZ)) {
+            builder.setChannelFrequencyMhz(jsonObject.getInt(CHANNEL_FREQUENCY_M_HZ), true);
+        }
 
         return builder.build();
 
@@ -334,5 +364,43 @@ public class WifiAwareJsonDeserializer {
         }
         return builder.build();
 
+    }
+
+    /**
+     * Converts the ranging request from JSONObject to {@link android.net.wifi.rtt.RangingRequest}.
+     * This converts peer IDs in the request to Wi-Fi Aware peer handles in
+     * {@link #mPeerHandles mPeerHandles}.
+     *
+     * @param jsonObject        The ranging request in JSONObject type.
+     * @param peerHandles       All Wi-Fi Aware peers.
+     * @return The converted ranging request.
+     */
+    public static RangingRequest jsonToRangingRequest(
+            @NonNull JSONObject jsonObject, ConcurrentHashMap<Integer, PeerHandle> peerHandles
+    ) throws JSONException, IllegalArgumentException {
+        RangingRequest.Builder builder = new RangingRequest.Builder();
+        if (jsonObject.has(RANGING_REQUEST_PEER_IDS)) {
+            JSONArray values = jsonObject.getJSONArray(RANGING_REQUEST_PEER_IDS);
+            for (int i = 0; i < values.length(); i++) {
+                int peerId = values.getInt(i);
+                PeerHandle handle = peerHandles.get(peerId);
+                if (handle == null) {
+                    throw new IllegalArgumentException(
+                        "Got an invalid peerId. peerId: " + peerId + ", all peer Handles: "
+                            + peerHandles
+                    );
+                }
+                builder.addWifiAwarePeer(handle);
+            }
+        }
+        if (jsonObject.has(RANGING_REQUEST_PEER_MACS)) {
+            JSONArray values = jsonObject.getJSONArray(RANGING_REQUEST_PEER_MACS);
+            for (int i = 0; i < values.length(); i++) {
+                String macAddressStr = values.getString(i);
+                MacAddress macAddress = MacAddress.fromString(macAddressStr);
+                builder.addWifiAwarePeer(macAddress);
+            }
+        }
+        return builder.build();
     }
 }

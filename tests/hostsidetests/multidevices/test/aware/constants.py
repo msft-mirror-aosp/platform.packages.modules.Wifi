@@ -31,6 +31,7 @@ AWARE_NETWORK_INFO_CLASS_NAME = "android.net.wifi.aware.WifiAwareNetworkInfo"
 SERVICE_NAME = "service_name"
 SERVICE_SPECIFIC_INFO = "service_specific_info"
 MATCH_FILTER = "match_filter"
+MATCH_FILTER_LIST = "MatchFilterList"
 SUBSCRIBE_TYPE = "subscribe_type"
 PUBLISH_TYPE = "publish_type"
 TERMINATE_NOTIFICATION_ENABLED = "terminate_notification_enabled"
@@ -39,6 +40,7 @@ PAIRING_CONFIG = "pairing_config"
 AWARE_NETWORK_INFO_CLASS_NAME = "android.net.wifi.aware.WifiAwareNetworkInfo"
 TTL_SEC = "TtlSec"
 INSTANTMODE_ENABLE = "InstantModeEnabled"
+FEATURE_WIFI_AWARE = "feature:android.hardware.wifi.aware"
 
 #onServiceLost reason code
 EASON_PEER_NOT_VISIBLE = 1
@@ -61,6 +63,7 @@ class WifiAwareTestConstants:
     PMK = "01234567890123456789012345678901"
     # 6 == TCP
     TRANSPORT_PROTOCOL_TCP = 6
+    CHANNEL_IN_MHZ = 5745
 
 
 
@@ -135,6 +138,7 @@ class NetworkCbEventKey(enum.StrEnum):
     CALLBACK_NAME = "callbackName"
     NETWORK_CAPABILITIES = "networkCapabilities"
     TRANSPORT_INFO_CLASS_NAME = "transportInfoClassName"
+    CHANNEL_IN_MHZ = "channelInMhz"
 
 
 @enum.unique
@@ -146,6 +150,39 @@ class NetworkCbName(enum.StrEnum):
     """
     ON_UNAVAILABLE = "onUnavailable"
     ON_CAPABILITIES_CHANGED = "onCapabilitiesChanged"
+
+
+@enum.unique
+class RangingResultCb(enum.StrEnum):
+    """Constant for handling callback of snippet RPC wifiAwareStartRanging."""
+
+    # Callback methods related to RangingResultCallback:
+    # https://developer.android.com/reference/android/net/wifi/rtt/RangingResultCallback
+    CB_METHOD_ON_RANGING_RESULT = "onRangingResults"
+    CB_METHOD_ON_RANGING_FAILURE = "onRangingFailure"
+
+    # Other constants related to snippet implementation.
+    EVENT_NAME_ON_RANGING_RESULT = "WifiRttRangingOnRangingResult"
+    DATA_KEY_CALLBACK_NAME = "callbackName"
+    DATA_KEY_RESULTS = 'results'
+    DATA_KEY_RESULT_STATUS = 'status'
+    DATA_KEY_RESULT_DISTANCE_MM = 'distanceMm'
+    DATA_KEY_RESULT_RSSI = 'rssi'
+    DATA_KEY_PEER_ID = 'peerId'
+    DATA_KEY_MAC = 'mac'
+
+
+@enum.unique
+class RangingResultStatusCode(enum.IntEnum):
+  """Ranging result status code.
+
+  This corresponds to status constants in RangingRequest:
+  https://developer.android.com/reference/android/net/wifi/rtt/RangingResult
+  """
+
+  SUCCESS = 0
+  FAIL = 1
+  RESPONDER_DOES_NOT_SUPPORT_IEEE80211MC = 2
 
 
 @enum.unique
@@ -231,9 +268,9 @@ class SubscribeConfig:
     These configurations correspond to SubscribeConfig in the Android documentation:
     https://developer.android.com/reference/android/net/wifi/aware/SubscribeConfig
     """
-    service_specific_info: bytes
-    match_filter: list[bytes] | None
     subscribe_type: SubscribeType
+    service_specific_info: bytes = WifiAwareTestConstants.SUB_SSI
+    match_filter: list[bytes] | None = (WifiAwareTestConstants.MATCH_FILTER_BYTES, )
     max_distance_mm: int | None = None
     pairing_config: AwarePairingConfig | None = None
     terminate_notification_enabled: bool = True
@@ -267,10 +304,10 @@ class PublishConfig:
     These configurations correspond to PublishConfig in the Android documentation:
     https://developer.android.com/reference/android/net/wifi/aware/PublishConfig
     """
-    service_specific_info: bytes
-    match_filter: list[bytes] | None
     publish_type: PublishType
-    ranging_enabled: bool
+    service_specific_info: bytes = WifiAwareTestConstants.PUB_SSI
+    match_filter: list[bytes] | None = (WifiAwareTestConstants.MATCH_FILTER_BYTES, )
+    ranging_enabled: bool = False
     terminate_notification_enabled: bool = True
     pairing_config: AwarePairingConfig | None = None
     service_name: str = WifiAwareTestConstants.SERVICE_NAME
@@ -291,6 +328,32 @@ class PublishConfig:
             del result["pairing_config"]
         else:
             result["pairing_config"] = self.pairing_config.to_dict()
+        return result
+
+
+@dataclasses.dataclass(frozen=True)
+class RangingRequest:
+    """Wi-Fi RTT Ranging request.
+
+    This class correspond to android.net.wifi.rtt.RangingRequest:
+    https://developer.android.com/reference/android/net/wifi/rtt/RangingRequest
+
+    Attributes:
+        peer_ids: A list of peer IDs that will be converted to peer Handles and
+            passed to RangingRequest on device.
+        peer_mac_addresses: A list of peer MAC addresses that will be passed to
+            RangingRequest on device.
+    """
+
+    peer_ids: list[int] = dataclasses.field(default_factory=list)
+    peer_mac_addresses: list[str] = dataclasses.field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        result = {}
+        if self.peer_ids:
+            result['peer_ids'] = self.peer_ids
+        if self.peer_mac_addresses:
+            result['peer_mac_addresses'] = self.peer_mac_addresses
         return result
 
 
@@ -413,6 +476,7 @@ class WifiAwareNetworkSpecifier:
     transport_protocol: int | None = None
     pmk: str | None = None
     data_path_security_config: WifiAwareDataPathSecurityConfig | None = None
+    channel_frequency_m_hz: int | None = None
 
     def to_dict(self) -> dict:
         result = dataclasses.asdict(self)
@@ -428,6 +492,8 @@ class WifiAwareNetworkSpecifier:
             del result["data_path_security_config"]
         else:
             result["data_path_security_config"] = self.data_path_security_config.to_dict()
+        if not self.channel_frequency_m_hz:
+            del result["channel_frequency_m_hz"]
         return result
 
 

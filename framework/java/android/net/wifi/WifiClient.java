@@ -74,7 +74,7 @@ public final class WifiClient implements Parcelable {
      * Get the reason the client disconnected from the AP.
      *
      * <p>This field is only populated when the WifiClient is returned via
-     * {@code SoftApCallback#onClientsDisconnected}.
+     * {@link WifiManager.SoftApCallback#onClientsDisconnected}.
      * The value {@link DeauthenticationReasonCode#REASON_UNKNOWN} is used as the default value
      * and in the case where a client connects.
      * @return a disconnection reason code to provide information on why the disconnect happened.
