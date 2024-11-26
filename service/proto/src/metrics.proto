@@ -2813,6 +2813,8 @@ message WifiUsabilityStatsEntry {
   // Some capture event types (eg. ip reachability lost) have a code associated
   // with them. This code is stored here.
   optional int32 capture_event_type_subcode = 64;
+
+  optional int32 status_data_stall = 65;
 }
 
 message ContentionTimeStats {
