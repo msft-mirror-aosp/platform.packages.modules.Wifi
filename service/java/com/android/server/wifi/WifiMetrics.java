@@ -497,7 +497,8 @@ public class WifiMetrics {
     // Each WifiUsabilityStatsEntry contains the stats for one instant in time. This LinkedList
     // is used as a ring buffer and contains the history of the most recent
     // MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE WifiUsabilityStatsEntry values.
-    private final LinkedList<WifiUsabilityStatsEntry> mWifiUsabilityStatsEntriesRingBuffer =
+    @VisibleForTesting
+    public final LinkedList<WifiUsabilityStatsEntry> mWifiUsabilityStatsEntriesRingBuffer =
             new LinkedList<>();
     // One WifiUsabilityStats contains a single time series of WifiUsabilityStatsEntry along with
     // some metadata. These LinkedList's below contain sets of time series that are labeled as
@@ -4423,6 +4424,8 @@ public class WifiMetrics {
     public void logFirmwareAlert(String ifaceName, int errorCode) {
         incrementAlertReasonCount(errorCode);
         logWifiIsUnusableEvent(ifaceName, WifiIsUnusableEvent.TYPE_FIRMWARE_ALERT, errorCode);
+        logAsynchronousEvent(ifaceName,
+                WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_FIRMWARE_ALERT, errorCode);
     }
 
     public static final String PROTO_DUMP_ARG = "wifiMetricsProto";
@@ -5291,6 +5294,8 @@ public class WifiMetrics {
         line.append(",max_supported_rx_linkspeed=" + entry.maxSupportedRxLinkspeed);
         line.append(",voip_mode=" + entry.voipMode);
         line.append(",thread_device_role=" + entry.threadDeviceRole);
+        line.append(",capture_event_type=" + entry.captureEventType);
+        line.append(",capture_event_type_subcode=" + entry.captureEventTypeSubcode);
         pw.println(line.toString());
     }
 
@@ -7145,12 +7150,11 @@ public class WifiMetrics {
     /**
      * Extract data from |info| and |stats| to build a WifiUsabilityStatsEntry and then adds it
      * into an internal ring buffer.
-     * @param ifaceName
-     * @param info
-     * @param stats
+     *
+     * oneshot is used to indicate that this call came from CMD_ONESHOT_RSSI_POLL.
      */
     public void updateWifiUsabilityStatsEntries(String ifaceName, WifiInfo info,
-            WifiLinkLayerStats stats) {
+            WifiLinkLayerStats stats, boolean oneshot) {
         // This is only collected for primary STA currently because RSSI polling is disabled for
         // non-primary STAs.
         synchronized (mLock) {
@@ -7575,6 +7579,10 @@ public class WifiMetrics {
                     wifiUsabilityStatsEntry.rateStats[i] = rate;
                 }
             }
+            wifiUsabilityStatsEntry.captureEventType = oneshot
+                    ? WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_ONESHOT_RSSI_POLL
+                    : WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_SYNCHRONOUS;
+
             mWifiUsabilityStatsEntriesRingBuffer.add(wifiUsabilityStatsEntry);
             mWifiUsabilityStatsEntryCounter++;
             if (mScoreBreachLowTimeMillis != -1) {
@@ -8141,6 +8149,32 @@ public class WifiMetrics {
         out.voipMode = s.voipMode;
         out.threadDeviceRole = s.threadDeviceRole;
         return out;
+    }
+
+    /**
+     * Used to log an asynchronous event (such as WiFi disconnect) into the ring buffer.
+     */
+    public void logAsynchronousEvent(String ifaceName, int e, int c) {
+        if (!isPrimary(ifaceName)) {
+            return;
+        }
+        WifiUsabilityStatsEntry wifiUsabilityStatsEntry =
+                mWifiUsabilityStatsEntriesRingBuffer.size()
+                < MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE
+                ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove()
+                .clear();
+        wifiUsabilityStatsEntry.timeStampMs = mClock.getElapsedSinceBootMillis();
+        wifiUsabilityStatsEntry.captureEventType = e;
+        wifiUsabilityStatsEntry.captureEventTypeSubcode = c;
+        mWifiUsabilityStatsEntriesRingBuffer.add(wifiUsabilityStatsEntry);
+    }
+    /**
+     * Used to log an asynchronous event (such as WiFi disconnect) into the ring buffer.
+     *
+     * Helper function when the subcode is not needed.
+     */
+    public void logAsynchronousEvent(String ifaceName, int e) {
+        logAsynchronousEvent(ifaceName, e, -1);
     }
 
     private WifiUsabilityStats createWifiUsabilityStatsWithLabel(int label, int triggerType,

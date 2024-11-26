@@ -21,5 +21,5 @@ package android.net.wifi;
  * @hide
  */
 oneway interface IWifiStateChangedListener {
-    void onWifiStateChanged(int state);
+    void onWifiStateChanged();
 }
