@@ -8186,8 +8186,12 @@ public class WifiMetrics {
     private WifiUsabilityStatsEntry createNewWifiUsabilityStatsEntry(WifiUsabilityStatsEntry s,
             long referenceTimestampMs) {
         WifiUsabilityStatsEntry out = new WifiUsabilityStatsEntry();
+        // Order the fields here according to the ID in
+        // packages/modules/Wifi/service/proto/src/metrics.proto
         // Privacy review suggests not to upload real timestamp
         out.timeStampMs = 0;
+        out.rssi = s.rssi;
+        out.linkSpeedMbps = s.linkSpeedMbps;
         out.totalTxSuccess = s.totalTxSuccess;
         out.totalTxRetries = s.totalTxRetries;
         out.totalTxBad = s.totalTxBad;
@@ -8201,21 +8205,23 @@ public class WifiMetrics {
         out.totalRoamScanTimeMs = s.totalRoamScanTimeMs;
         out.totalPnoScanTimeMs = s.totalPnoScanTimeMs;
         out.totalHotspot2ScanTimeMs = s.totalHotspot2ScanTimeMs;
-        out.rssi = s.rssi;
-        out.linkSpeedMbps = s.linkSpeedMbps;
-        out.totalCcaBusyFreqTimeMs = s.totalCcaBusyFreqTimeMs;
-        out.totalRadioOnFreqTimeMs = s.totalRadioOnFreqTimeMs;
-        out.totalBeaconRx = s.totalBeaconRx;
         out.wifiScore = s.wifiScore;
         out.wifiUsabilityScore = s.wifiUsabilityScore;
         out.seqNumToFramework = s.seqNumToFramework;
+        out.totalCcaBusyFreqTimeMs = s.totalCcaBusyFreqTimeMs;
+        out.totalRadioOnFreqTimeMs = s.totalRadioOnFreqTimeMs;
+        out.totalBeaconRx = s.totalBeaconRx;
         out.predictionHorizonSec = s.predictionHorizonSec;
         out.probeStatusSinceLastUpdate = s.probeStatusSinceLastUpdate;
         out.probeElapsedTimeSinceLastUpdateMs = s.probeElapsedTimeSinceLastUpdateMs;
         out.probeMcsRateSinceLastUpdate = s.probeMcsRateSinceLastUpdate;
         out.rxLinkSpeedMbps = s.rxLinkSpeedMbps;
-        out.isSameBssidAndFreq = s.isSameBssidAndFreq;
         out.seqNumInsideFramework = s.seqNumInsideFramework;
+        out.isSameBssidAndFreq = s.isSameBssidAndFreq;
+        // WifiUsabilityStatsEntry.cellularDataNetworkType (ID: 30) is not implemented
+        // WifiUsabilityStatsEntry.cellularSignalStrengthDbm (ID: 31) is not implemented
+        // WifiUsabilityStatsEntry.cellularSignalStrengthDb (ID: 32) is not implemented
+        // WifiUsabilityStatsEntry.isSameRegisteredCell (ID: 33) is not implemented
         out.deviceMobilityState = s.deviceMobilityState;
         out.timeSliceDutyCycleInPercent = s.timeSliceDutyCycleInPercent;
         out.contentionTimeStats = s.contentionTimeStats;
@@ -8245,6 +8251,8 @@ public class WifiMetrics {
         out.maxSupportedRxLinkspeed = s.maxSupportedRxLinkspeed;
         out.voipMode = s.voipMode;
         out.threadDeviceRole = s.threadDeviceRole;
+        out.captureEventType = s.captureEventType;
+        out.captureEventTypeSubcode = s.captureEventTypeSubcode;
         out.statusDataStall = s.statusDataStall;
         out.timestampOffsetMs = s.timeStampMs - referenceTimestampMs;
         return out;
