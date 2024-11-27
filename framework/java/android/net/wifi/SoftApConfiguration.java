@@ -1817,40 +1817,40 @@ public final class SoftApConfiguration implements Parcelable {
 
         /**
          * Specifies the channels and associated bands for the APs.
-         *
+         * <p>
          * When more than 1 channel is set, this will bring up concurrent APs on the requested
          * channels and bands (if possible).
-         *
+         * <p>
          * Valid channels are country dependent.
-         * The {@link SoftApCapability#getSupportedChannelList(int)} can be used to obtain
+         * The {@code SoftApCapability#getSupportedChannelList(int)} can be used to obtain
          * valid channels in each band.
-         *
+         * <p>
          * Use {@link WifiManager#isBridgedApConcurrencySupported()} to determine
          * whether or not concurrent APs are supported.
          *
          * <p>
          * If not set, the default for the channel is the special value 0 which has the framework
-         * auto-select a valid channel from the band configured with {@link #setBands(int[])}.
-         *
+         * auto-select a valid channel from the band configured with {@code #setBands(int[])}.
+         * <p>
          * The channel auto selection will be offloaded to driver when
-         * {@link SoftApCapability#areFeaturesSupported(long)}
-         * with {@link SoftApCapability.SOFTAP_FEATURE_ACS_OFFLOAD}
+         * {@code SoftApCapability#areFeaturesSupported(long)}
+         * with {@code SoftApCapability.SOFTAP_FEATURE_ACS_OFFLOAD}
          * returns true. The driver will auto select the best channel (e.g. best performance)
-         * based on environment interference. Check {@link SoftApCapability} for more detail.
-         *
-         * Requires the driver to support {@link SoftApCapability.SOFTAP_FEATURE_ACS_OFFLOAD}
+         * based on environment interference. Check {@code SoftApCapability} for more detail.
+         * <p>
+         * Requires the driver to support {@code SoftApCapability.SOFTAP_FEATURE_ACS_OFFLOAD}
          * when multiple bands are configured without specified channel value (i.e. channel is
          * the special value 0). Otherwise,
-         * {@link WifiManager#startTetheredHotspot(SoftApConfiguration)} will report error code
-         * {@link WifiManager#SAP_START_FAILURE_UNSUPPORTED_CONFIGURATION}.
-         *
+         * {@code WifiManager#startTetheredHotspot(SoftApConfiguration)} will report error code
+         * {@code WifiManager#SAP_START_FAILURE_UNSUPPORTED_CONFIGURATION}.
+         * <p>
          * Note: Only supports 2.4GHz + 5GHz bands. If any other band is set, will report error
-         * {@link WifiManager#SAP_START_FAILURE_UNSUPPORTED_CONFIGURATION}.
-         *
+         * {@code WifiManager#SAP_START_FAILURE_UNSUPPORTED_CONFIGURATION}.
+         * <p>
          * The API contains (band, channel) input since the 6GHz band uses the same channel
          * numbering scheme as is used in the 2.4GHz and 5GHz band. Therefore, both are needed to
          * uniquely identify individual channels.
-         *
+         * <p>
          * Reference the Wi-Fi channel numbering and the channelization in IEEE 802.11-2016
          * specifications, section 17.3.8.4.2, 17.3.8.4.3 and Table 15-6.
          *
