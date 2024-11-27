@@ -24,6 +24,7 @@ from mobly import utils
 
 # Package name for the Wi-Fi Aware snippet application
 WIFI_AWARE_SNIPPET_PACKAGE_NAME = "com.google.snippet.wifi.aware"
+WIFI_SNIPPET_PACKAGE_NAME = "com.google.snippet.wifi"
 # Timeout duration for Wi-Fi state change operations
 WAIT_WIFI_STATE_TIME_OUT = datetime.timedelta(seconds=30)
 AWARE_NETWORK_INFO_CLASS_NAME = "android.net.wifi.aware.WifiAwareNetworkInfo"

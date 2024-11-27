@@ -392,13 +392,3 @@ def create_discovery_config(service_name,
     config[constants.TTL_SEC] = ttl
     config[constants.TERMINATE_NOTIFICATION_ENABLED] = term_cb_enable
     return config
-
-def set_screen_on_and_unlock(ad: android_device.AndroidDevice):
-    """Set the screen to stay on and unlock the device.
-
-    Args:
-        ad: AndroidDevice instance.
-    """
-    ad.adb.shell("svc power stayon true")
-    ad.adb.shell("input keyevent KEYCODE_WAKEUP")
-    ad.adb.shell("wm dismiss-keyguard")
