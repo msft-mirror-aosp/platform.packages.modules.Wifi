@@ -84,7 +84,6 @@ flag {
     description: "Add new API to get channel width"
     bug: "335358378"
     is_fixed_read_only: true
-    is_exported: true
 }
 
 flag {
@@ -124,7 +123,6 @@ flag {
     description: "optimize local-only connection API"
     bug: "347117408"
     is_fixed_read_only: true
-    is_exported: true
 }
 
 flag {
