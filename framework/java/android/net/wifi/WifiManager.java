@@ -10327,6 +10327,46 @@ public class WifiManager {
     }
 
     /**
+     * If isFullCapture is true, capture everything in ring buffer
+     *
+     * If isFullCapture is false, extract WifiUsabilityStatsEntries from ring buffer whose
+     * timestamps are within [triggerStartTimeMillis, triggerStopTimeMillis) in WiFiMetrics, and
+     * store them as upload candidates.
+     *
+     * Source of elapsed time since boot will be android.os.SystemClock.elapsedRealtime()
+     *
+     * @param executor The executor on which callback will be invoked.
+     * @param resultsCallback An asynchronous callback that will return a execution result of
+     *                        mWifiMetrics.storeCapturedData
+     * @param triggerType data capture trigger type
+     * @param isFullCapture if we do full capture on ring buffer or not
+     * @param triggerStartTimeMillis data capture start timestamp, elapsed time since boot
+     * @param triggerStopTimeMillis data capture stop timestamp, elapsed time since boot
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.WIFI_UPDATE_USABILITY_STATS_SCORE)
+    public void storeCapturedData(@NonNull @CallbackExecutor Executor executor,
+            @NonNull IntConsumer resultsCallback, int triggerType, boolean isFullCapture,
+            long triggerStartTimeMillis, long triggerStopTimeMillis) {
+        Objects.requireNonNull(executor, "executor cannot be null");
+        Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+        try {
+            mService.storeCapturedData(triggerType, isFullCapture, triggerStartTimeMillis,
+                    triggerStopTimeMillis, new IIntegerListener.Stub() {
+                        @Override
+                        public void onResult(int value) {
+                            Binder.clearCallingIdentity();
+                            executor.execute(() -> {
+                                resultsCallback.accept(value);
+                            });
+                        }
+                    });
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Callback interface for framework to receive network status updates and trigger of updating
      * {@link WifiUsabilityStatsEntry}.
      *
