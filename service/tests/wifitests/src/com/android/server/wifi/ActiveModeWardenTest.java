@@ -18,6 +18,7 @@ package com.android.server.wifi;
 
 import static android.net.wifi.WifiManager.SAP_START_FAILURE_GENERAL;
 import static android.net.wifi.WifiManager.WIFI_AP_STATE_FAILED;
+import static android.net.wifi.WifiManager.WIFI_STATE_DISABLED;
 import static android.net.wifi.WifiManager.WIFI_STATE_DISABLING;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
 
@@ -30,10 +31,10 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TR
 import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_LOCAL_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_SOFTAP_TETHERED;
 import static com.android.server.wifi.ActiveModeWarden.INTERNAL_REQUESTOR_WS;
-import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_STA_BANDS;
 import static com.android.server.wifi.TestUtil.addCapabilitiesToBitset;
 import static com.android.server.wifi.TestUtil.combineBitsets;
 import static com.android.server.wifi.TestUtil.createCapabilityBitset;
+import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_NATIVE_SUPPORTED_STA_BANDS;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -76,6 +77,7 @@ import android.net.Network;
 import android.net.wifi.ISubsystemRestartCallback;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiNetworkStateChangedListener;
+import android.net.wifi.IWifiStateChangedListener;
 import android.net.wifi.SoftApCapability;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SoftApConfiguration.Builder;
@@ -126,6 +128,7 @@ import org.mockito.stubbing.Answer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashMap;
@@ -508,7 +511,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 any(), any(), any(), eq(TEST_WORKSOURCE), eq(softApRole), anyBoolean());
         mTimesCreatedSoftApManager++;
         if (fromState.equals(DISABLED_STATE_STRING)) {
-            verify(mBatteryStats).reportWifiOn();
+            verify(mBatteryStats, atLeastOnce()).reportWifiOn();
         }
         if (softApRole == ROLE_SOFTAP_TETHERED) {
             assertEquals(mSoftApManager, mActiveModeWarden.getTetheredSoftApManager());
@@ -884,6 +887,30 @@ public class ActiveModeWardenTest extends WifiBaseTest {
     }
 
     @Test
+    public void testClientModeChangeRoleDuringTransition() throws Exception {
+        enterClientModeActiveState();
+        verify(mWifiInjector).makeClientModeManager(
+                any(), eq(TEST_WORKSOURCE), eq(ROLE_CLIENT_PRIMARY), anyBoolean());
+
+        // Simulate the primary not fully started by making the role null and targetRole primary.
+        when(mClientModeManager.getRole()).thenReturn(null);
+        when(mClientModeManager.getTargetRole()).thenReturn(ROLE_CLIENT_PRIMARY);
+        List<ClientModeManager> currentCMMs = mActiveModeWarden.getClientModeManagers();
+        assertEquals(1, currentCMMs.size());
+        ConcreteClientModeManager currentCmm = (ConcreteClientModeManager) currentCMMs.get(0);
+        assertTrue(currentCmm.getTargetRole() == ROLE_CLIENT_PRIMARY);
+
+        // toggle wifi off while wifi scanning is on
+        when(mSettingsStore.isScanAlwaysAvailable()).thenReturn(true);
+        when(mSettingsStore.isWifiToggleEnabled()).thenReturn(false);
+        mActiveModeWarden.wifiToggled(TEST_WORKSOURCE);
+        mLooper.dispatchAll();
+
+        // expect transition to scan only mode
+        verify(mClientModeManager).setRole(eq(ROLE_CLIENT_SCAN_ONLY), any());
+    }
+
+    @Test
     public void testPrimaryNotCreatedTwice() throws Exception {
         enterClientModeActiveState();
         verify(mWifiInjector).makeClientModeManager(
@@ -1079,6 +1106,21 @@ public class ActiveModeWardenTest extends WifiBaseTest {
 
         verify(mSoftApStateMachineCallback).onConnectedClientsOrInfoChanged(
                 testInfos, testClients, false);
+    }
+
+    /**
+     * Verifies that ClientsDisconnected event is being passed from SoftApManager
+     * to WifiServiceImpl.
+     */
+    @Test
+    public void callsWifiServiceCallbackOnSoftApClientsDisconnected() throws Exception {
+        List<WifiClient> testClients = new ArrayList<>();
+        enterSoftApActiveMode();
+        mSoftApManagerCallback.onClientsDisconnected(mTestSoftApInfo, testClients);
+        mLooper.dispatchAll();
+
+        verify(mSoftApStateMachineCallback).onClientsDisconnected(
+                mTestSoftApInfo, testClients);
     }
 
     /**
@@ -2672,6 +2714,52 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         // still only started once
         verify(mWifiInjector).makeClientModeManager(
                 any(), eq(TEST_WORKSOURCE), eq(ROLE_CLIENT_PRIMARY), anyBoolean());
+
+        mLooper.moveTimeForward(TEST_WIFI_RECOVERY_DELAY_MS);
+        mLooper.dispatchAll();
+
+        // started again
+        verify(mWifiInjector, times(2)).makeClientModeManager(any(), any(), any(), anyBoolean());
+        assertInEnabledState();
+
+        verify(mSubsystemRestartCallback).onSubsystemRestarting();
+        verify(mSubsystemRestartCallback).onSubsystemRestarted();
+    }
+
+    /**
+     * The command to trigger WiFi restart on Bootup.
+     * WiFi is in connect mode, calls to reset the wifi stack due to connection failures
+     * should trigger a supplicant stop, and subsequently, a driver reload. (Reboot)
+     * Create and start WifiController in EnabledState, start softAP and then
+     * send command to restart WiFi
+     * <p>
+     * Expected: Wi-Fi should be restarted successfully on bootup.
+     */
+    @Test
+    public void testRestartWifiStackInStaConnectEnabledStatewithSap() throws Exception {
+        enableWifi();
+        assertInEnabledState();
+        verify(mWifiInjector).makeClientModeManager(
+                any(), eq(TEST_WORKSOURCE), eq(ROLE_CLIENT_PRIMARY), anyBoolean());
+
+        assertWifiShutDown(() -> {
+            mActiveModeWarden.recoveryRestartWifi(SelfRecovery.REASON_WIFINATIVE_FAILURE,
+                    true);
+            mLooper.dispatchAll();
+            // Complete the stop
+            mClientListener.onStopped(mClientModeManager);
+            mLooper.dispatchAll();
+        });
+
+        verify(mModeChangeCallback).onActiveModeManagerRemoved(mClientModeManager);
+
+        // still only started once
+        verify(mWifiInjector).makeClientModeManager(
+                any(), eq(TEST_WORKSOURCE), eq(ROLE_CLIENT_PRIMARY), anyBoolean());
+
+        // start softAp
+        enterSoftApActiveMode();
+        assertInEnabledState();
 
         mLooper.moveTimeForward(TEST_WIFI_RECOVERY_DELAY_MS);
         mLooper.dispatchAll();
@@ -5454,9 +5542,70 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         when(mockSoftApModeConfiguration.getSoftApConfiguration())
                 .thenReturn(mockSoftApConfiguration);
         when(mSoftApManager.getSoftApModeConfiguration()).thenReturn(mockSoftApModeConfiguration);
-        assertEquals(1, mActiveModeWarden.getNumberOf11beSoftApManager());
+        assertEquals(1, mActiveModeWarden.getCurrentMLDAp());
+        when(mSoftApManager.isBridgedMode()).thenReturn(true);
+        when(mSoftApManager.isUsingMlo()).thenReturn(false);
+        assertEquals(2, mActiveModeWarden.getCurrentMLDAp());
+        when(mSoftApManager.isUsingMlo()).thenReturn(true);
+        assertEquals(1, mActiveModeWarden.getCurrentMLDAp());
         when(mockSoftApConfiguration.isIeee80211beEnabled()).thenReturn(false);
-        assertEquals(0, mActiveModeWarden.getNumberOf11beSoftApManager());
+        assertEquals(0, mActiveModeWarden.getCurrentMLDAp());
     }
 
+    /**
+     * Verifies that registered remote WifiStateChangedListeners are notified when the Wifi state
+     * changes.
+     */
+    @Test
+    public void testRegisteredWifiStateChangedListenerIsNotifiedWhenWifiStateChanges()
+            throws RemoteException {
+        // Start off ENABLED
+        mActiveModeWarden.setWifiStateForApiCalls(WIFI_STATE_ENABLED);
+
+        // Registering should give the current state of ENABLED.
+        IWifiStateChangedListener remoteCallback1 = mock(IWifiStateChangedListener.class);
+        when(remoteCallback1.asBinder()).thenReturn(mock(IBinder.class));
+        IWifiStateChangedListener remoteCallback2 = mock(IWifiStateChangedListener.class);
+        when(remoteCallback2.asBinder()).thenReturn(mock(IBinder.class));
+        mActiveModeWarden.addWifiStateChangedListener(remoteCallback1);
+        mActiveModeWarden.addWifiStateChangedListener(remoteCallback2);
+
+        // Change the state to DISABLED and verify the listeners were called.
+        final int newState = WIFI_STATE_DISABLED;
+        mActiveModeWarden.setWifiStateForApiCalls(newState);
+
+        verify(remoteCallback1, times(1)).onWifiStateChanged();
+        verify(remoteCallback2, times(1)).onWifiStateChanged();
+
+        // Duplicate wifi state should not notify the callbacks again.
+        mActiveModeWarden.setWifiStateForApiCalls(newState);
+        mActiveModeWarden.setWifiStateForApiCalls(newState);
+        mActiveModeWarden.setWifiStateForApiCalls(newState);
+
+        verify(remoteCallback1, times(1)).onWifiStateChanged();
+        verify(remoteCallback2, times(1)).onWifiStateChanged();
+    }
+
+    /**
+     * Verifies that unregistered remote WifiStateChangedListeners are not notified when the Wifi
+     * state changes.
+     */
+    @Test
+    public void testUnregisteredWifiStateChangedListenerIsNotNotifiedWhenWifiStateChanges()
+            throws RemoteException {
+        IWifiStateChangedListener remoteCallback1 = mock(IWifiStateChangedListener.class);
+        when(remoteCallback1.asBinder()).thenReturn(mock(IBinder.class));
+        IWifiStateChangedListener remoteCallback2 = mock(IWifiStateChangedListener.class);
+        when(remoteCallback2.asBinder()).thenReturn(mock(IBinder.class));
+        mActiveModeWarden.addWifiStateChangedListener(remoteCallback1);
+        mActiveModeWarden.addWifiStateChangedListener(remoteCallback2);
+        mActiveModeWarden.removeWifiStateChangedListener(remoteCallback1);
+        mActiveModeWarden.removeWifiStateChangedListener(remoteCallback2);
+
+        final int newState = WIFI_STATE_ENABLED;
+        mActiveModeWarden.setWifiStateForApiCalls(newState);
+
+        verify(remoteCallback1, never()).onWifiStateChanged();
+        verify(remoteCallback2, never()).onWifiStateChanged();
+    }
 }

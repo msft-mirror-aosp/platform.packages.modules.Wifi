@@ -47,6 +47,7 @@ import android.net.Network;
 import android.net.wifi.ISubsystemRestartCallback;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiNetworkStateChangedListener;
+import android.net.wifi.IWifiStateChangedListener;
 import android.net.wifi.SoftApCapability;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SoftApState;
@@ -153,6 +154,8 @@ public class ActiveModeWarden {
             new RemoteCallbackList<>();
     private final RemoteCallbackList<IWifiNetworkStateChangedListener>
             mWifiNetworkStateChangedListeners = new RemoteCallbackList<>();
+    private final RemoteCallbackList<IWifiStateChangedListener> mWifiStateChangedListeners =
+            new RemoteCallbackList<>();
 
     private boolean mIsMultiplePrimaryBugreportTaken = false;
     private boolean mIsShuttingdown = false;
@@ -212,7 +215,10 @@ public class ActiveModeWarden {
                 if (mVerboseLoggingEnabled) {
                     Log.d(TAG, "setting wifi state to: " + newState);
                 }
-                mWifiState.set(newState);
+                if (mWifiState.get() != newState) {
+                    mWifiState.set(newState);
+                    notifyRemoteWifiStateChangedListeners();
+                }
                 break;
             default:
                 Log.d(TAG, "attempted to set an invalid state: " + newState);
@@ -266,6 +272,32 @@ public class ActiveModeWarden {
         for (ClientModeManager cmm : mClientModeManagers) {
             cmm.onIdleModeChanged(isIdle);
         }
+    }
+
+    /**
+     * See {@link WifiManager#addWifiStateChangedListener(Executor, WifiStateChangedListener)}
+     */
+    public void addWifiStateChangedListener(@NonNull IWifiStateChangedListener listener) {
+        mWifiStateChangedListeners.register(listener);
+    }
+
+    /**
+     * See {@link WifiManager#removeWifiStateChangedListener(WifiStateChangedListener)}
+     */
+    public void removeWifiStateChangedListener(@NonNull IWifiStateChangedListener listener) {
+        mWifiStateChangedListeners.unregister(listener);
+    }
+
+    private void notifyRemoteWifiStateChangedListeners() {
+        final int itemCount = mWifiStateChangedListeners.beginBroadcast();
+        for (int i = 0; i < itemCount; i++) {
+            try {
+                mWifiStateChangedListeners.getBroadcastItem(i).onWifiStateChanged();
+            } catch (RemoteException e) {
+                Log.e(TAG, "onWifiStateChanged: remote exception -- " + e);
+            }
+        }
+        mWifiStateChangedListeners.finishBroadcast();
     }
 
     /**
@@ -1372,7 +1404,9 @@ public class ActiveModeWarden {
         Log.d(TAG, "Switching all client mode managers");
         for (ConcreteClientModeManager clientModeManager : mClientModeManagers) {
             if (clientModeManager.getRole() != ROLE_CLIENT_PRIMARY
-                    && clientModeManager.getRole() != ROLE_CLIENT_SCAN_ONLY) {
+                    && clientModeManager.getRole() != ROLE_CLIENT_SCAN_ONLY
+                    && clientModeManager.getTargetRole() != ROLE_CLIENT_PRIMARY
+                    && clientModeManager.getTargetRole() != ROLE_CLIENT_SCAN_ONLY) {
                 continue;
             }
             if (!switchPrimaryOrScanOnlyClientModeManagerRole(clientModeManager)) {
@@ -2700,6 +2734,28 @@ public class ActiveModeWarden {
                         // onStopped will move the state machine to "DisabledState".
                         break;
                     }
+                    case CMD_RECOVERY_RESTART_WIFI_CONTINUE: {
+                        log("received CMD_RECOVERY_RESTART_WIFI_CONTINUE when already in "
+                                + "mEnabledState");
+                        // This could happen when SoftAp is turned on before recovery is complete.
+                        // Simply make sure the primary CMM is on in this case.
+                        if (shouldEnableSta() && !hasPrimaryOrScanOnlyModeManager()) {
+                            startPrimaryOrScanOnlyClientModeManager(
+                                    // Assumes user toggled it on from settings before.
+                                    mFacade.getSettingsWorkSource(mContext));
+                        }
+                        int numCallbacks = mRestartCallbacks.beginBroadcast();
+                        for (int i = 0; i < numCallbacks; i++) {
+                            try {
+                                mRestartCallbacks.getBroadcastItem(i).onSubsystemRestarted();
+                            } catch (RemoteException e) {
+                                Log.e(TAG, "Failure calling onSubsystemRestarted" + e);
+                            }
+                        }
+                        mRestartCallbacks.finishBroadcast();
+                        mWifiInjector.getSelfRecovery().onRecoveryCompleted();
+                        break;
+                    }
                     default:
                         return NOT_HANDLED;
                 }
@@ -2929,19 +2985,24 @@ public class ActiveModeWarden {
     }
 
     /**
-     * Returns the number of 11be SoftApManagers which are being operated.
+     * Returns the number of multiple link devices (MLD) which are being operated.
      */
-    public int getNumberOf11beSoftApManager() {
+    public int getCurrentMLDAp() {
         if (!SdkLevel.isAtLeastT()) {
             return 0;
         }
-        int numberOf11beSoftApManager = 0;
+        int numberMLD = 0;
         for (SoftApManager manager : mSoftApManagers) {
             if (manager.isStarted() && manager.getSoftApModeConfiguration()
                     .getSoftApConfiguration().isIeee80211beEnabled()) {
-                numberOf11beSoftApManager++;
+                if (manager.isBridgedMode() && !manager.isUsingMlo()) {
+                    // Non MLO bridged mode, it occupies two MLD APs.
+                    numberMLD += 2;
+                } else {
+                    numberMLD++;
+                }
             }
         }
-        return numberOf11beSoftApManager;
+        return numberMLD;
     }
 }

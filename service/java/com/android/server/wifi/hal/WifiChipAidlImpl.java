@@ -27,6 +27,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
 import android.hardware.wifi.AfcChannelAllowance;
+import android.hardware.wifi.ApIfaceParams;
 import android.hardware.wifi.AvailableAfcChannelInfo;
 import android.hardware.wifi.AvailableAfcFrequencyInfo;
 import android.hardware.wifi.IWifiApIface;
@@ -132,7 +133,11 @@ public class WifiChipAidlImpl implements IWifiChip {
             try {
                 if (!checkIfaceAndLogFailure(methodStr)) return null;
                 IWifiApIface iface;
-                if (WifiHalAidlImpl.isServiceVersionAtLeast(2) && !vendorData.isEmpty()) {
+                if (WifiHalAidlImpl.isServiceVersionAtLeast(3)) {
+                    iface = mWifiChip.createApOrBridgedApIfaceWithParams(prepareApIfaceParams(
+                            IfaceConcurrencyType.AP, vendorData,
+                            false /* usesMlo */));
+                } else if (WifiHalAidlImpl.isServiceVersionAtLeast(2) && !vendorData.isEmpty()) {
                     android.hardware.wifi.common.OuiKeyedData[] halVendorData =
                             HalAidlUtil.frameworkToHalOuiKeyedDataList(vendorData);
                     iface = mWifiChip.createApOrBridgedApIface(
@@ -150,18 +155,34 @@ public class WifiChipAidlImpl implements IWifiChip {
         }
     }
 
+    private ApIfaceParams prepareApIfaceParams(int ifaceType,
+            @NonNull List<OuiKeyedData> vendorData, boolean usesMlo)
+            throws IllegalArgumentException {
+        ApIfaceParams ifaceParams = new ApIfaceParams();
+        ifaceParams.ifaceType = ifaceType;
+        ifaceParams.vendorData =
+                    HalAidlUtil.frameworkToHalOuiKeyedDataList(vendorData);
+        ifaceParams.usesMlo = usesMlo;
+        return ifaceParams;
+    }
+
     /**
      * See comments for {@link IWifiChip#createBridgedApIface(List)}
      */
     @Override
     @Nullable
-    public WifiApIface createBridgedApIface(@NonNull List<OuiKeyedData> vendorData) {
+    public WifiApIface createBridgedApIface(@NonNull List<OuiKeyedData> vendorData,
+            boolean isUsingMultiLinkOperation) {
         final String methodStr = "createBridgedApIface";
         synchronized (mLock) {
             try {
                 if (!checkIfaceAndLogFailure(methodStr)) return null;
                 IWifiApIface iface;
-                if (WifiHalAidlImpl.isServiceVersionAtLeast(2) && !vendorData.isEmpty()) {
+                if (WifiHalAidlImpl.isServiceVersionAtLeast(3)) {
+                    iface = mWifiChip.createApOrBridgedApIfaceWithParams(prepareApIfaceParams(
+                            IfaceConcurrencyType.AP_BRIDGED, vendorData,
+                            isUsingMultiLinkOperation));
+                } else if (WifiHalAidlImpl.isServiceVersionAtLeast(2) && !vendorData.isEmpty()) {
                     android.hardware.wifi.common.OuiKeyedData[] halVendorData =
                             HalAidlUtil.frameworkToHalOuiKeyedDataList(vendorData);
                     iface = mWifiChip.createApOrBridgedApIface(
@@ -1613,6 +1634,9 @@ public class WifiChipAidlImpl implements IWifiChip {
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.T2LM_NEGOTIATION)) {
             features.set(WifiManager.WIFI_FEATURE_T2LM_NEGOTIATION);
+        }
+        if (bitmapContains(halFeatureSet, FeatureSetMask.MLO_SAP)) {
+            features.set(WifiManager.WIFI_FEATURE_SOFTAP_MLO);
         }
         return features;
     }

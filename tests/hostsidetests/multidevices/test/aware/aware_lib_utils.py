@@ -33,6 +33,7 @@ _WAIT_DOZE_MODE_IN_SEC = 5
 _TIMEOUT_INTERVAL_IN_SEC = 1
 _WAIT_WIFI_STATE_TIME_OUT = datetime.timedelta(seconds=10)
 _WAIT_TIME_SEC = 3
+_CONTROL_WIFI_TIMEOUT_SEC = 10
 
 
 def callback_no_response(
@@ -64,21 +65,37 @@ def callback_no_response(
 class CallBackError(Exception):
   """Error raised when there is a problem to get callback response."""
 
+def control_wifi(
+        ad: android_device.AndroidDevice,
+        wifi_state: bool,
+):
+    """Control Android Wi-Fi status.
 
-def control_wifi(ad: android_device.AndroidDevice,
-                 wifi_state: bool):
-  """Control Android Wi-Fi status.
+    Args:
+      ad: Android test device.
+      wifi_state: True if or Wi-Fi on False if Wi-Fi off.
+      timeout_seconds: Maximum wait time (seconds), default is 10 seconds.
 
-  Args:
-    ad: Android test device.
-    wifi_state: True if or Wifi on False if WiFi off.
-  """
-  if _check_wifi_status(ad) != wifi_state:
+    Raises:
+      TimeoutError: If the Wi-Fi state cannot be set within the timeout (in seconds).
+    """
+    if _check_wifi_status(ad) == wifi_state:
+        return
     if wifi_state:
-      ad.adb.shell("svc wifi enable")
+        ad.adb.shell("svc wifi enable")
     else:
-      ad.adb.shell("svc wifi disable")
+        ad.adb.shell("svc wifi disable")
+    start_time = time.time()
+    while True:
+        if _check_wifi_status(ad) == wifi_state:
+            return
+        # Check for timeout
+        if time.time() - start_time > _CONTROL_WIFI_TIMEOUT_SEC:
+            raise TimeoutError(
+                f"Failed to set Wi-Fi state to {wifi_state} within {_CONTROL_WIFI_TIMEOUT_SEC} seconds."
+            )
 
+        time.sleep(1)  # Wait for a second before checking again
 
 def _check_wifi_status(ad: android_device.AndroidDevice):
   """Check Android Wi-Fi status.
@@ -323,3 +340,65 @@ def reset_device_statistics(ad: android_device.AndroidDevice,):
     ad: device to be reset
   """
   ad.adb.shell("cmd wifiaware native_cb get_cb_count --reset")
+
+def get_aware_capabilities(ad: android_device.AndroidDevice):
+    """Get the Wi-Fi Aware capabilities from the specified device. The
+  capabilities are a dictionary keyed by aware_const.CAP_* keys.
+
+  Args:
+    ad: the Android device
+  Returns: the capability dictionary.
+  """
+    return json.loads(ad.adb.shell('cmd wifiaware state_mgr get_capabilities'))
+
+def create_discovery_config(service_name,
+                            p_type=None,
+                            s_type=None,
+                            ssi=None,
+                            match_filter=None,
+                            match_filter_list=None,
+                            ttl=0,
+                            term_cb_enable=True,
+                            instant_mode=None):
+    """Create a publish discovery configuration based on input parameters.
+
+    Args:
+        service_name: Service name - required
+        d_type: Discovery type (publish or subscribe constants)
+        ssi: Supplemental information - defaults to None
+        match_filter, match_filter_list: The match_filter, only one mechanism can
+                                     be used to specify. Defaults to None.
+        ttl: Time-to-live - defaults to 0 (i.e. non-self terminating)
+        term_cb_enable: True (default) to enable callback on termination, False
+                      means that no callback is called when session terminates.
+        instant_mode: set the band to use instant communication mode, 2G or 5G
+    Returns:
+        publish discovery configuration object.
+    """
+    config = {}
+    config[constants.SERVICE_NAME] = service_name
+    if p_type is not None:
+      config[constants.PUBLISH_TYPE] = p_type
+    if s_type is not None:
+      config[constants.SUBSCRIBE_TYPE] = s_type
+    if ssi is not None:
+        config[constants.SERVICE_SPECIFIC_INFO] = ssi
+    if match_filter is not None:
+        config[constants.MATCH_FILTER] = match_filter
+    if match_filter_list is not None:
+        config[constants.MATCH_FILTER_LIST] = match_filter_list
+    if instant_mode is not None:
+        config[constants.INSTANTMODE_ENABLE] = instant_mode
+    config[constants.TTL_SEC] = ttl
+    config[constants.TERMINATE_NOTIFICATION_ENABLED] = term_cb_enable
+    return config
+
+def set_screen_on_and_unlock(ad: android_device.AndroidDevice):
+    """Set the screen to stay on and unlock the device.
+
+    Args:
+        ad: AndroidDevice instance.
+    """
+    ad.adb.shell("svc power stayon true")
+    ad.adb.shell("input keyevent KEYCODE_WAKEUP")
+    ad.adb.shell("wm dismiss-keyguard")
