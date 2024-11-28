@@ -160,6 +160,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiIsUnusableEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStats;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStatsEntry;
 import com.android.server.wifi.util.ActionListenerWrapper;
 import com.android.server.wifi.util.InformationElementUtil;
 import com.android.server.wifi.util.NativeUtil;
@@ -679,12 +680,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     // Disable a network permanently due to wrong password even if the network had successfully
     // connected before wrong password failure on this network reached this threshold.
     public static final int THRESHOLD_TO_PERM_WRONG_PASSWORD = 3;
-
-    // Maximum duration to continue to log Wifi usability stats after a data stall is triggered.
-    @VisibleForTesting
-    public static final long DURATION_TO_WAIT_ADD_STATS_AFTER_DATA_STALL_MS = 30 * 1000;
-    private long mDataStallTriggerTimeMs = -1;
-    private int mLastStatusDataStall = WifiIsUnusableEvent.TYPE_UNKNOWN;
 
     @Nullable
     private StateMachineObituary mObituary = null;
@@ -4170,9 +4165,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         mWifiMetrics.logStaEvent(mInterfaceName, StaEvent.TYPE_CMD_IP_REACHABILITY_LOST);
         mWifiMetrics.logWifiIsUnusableEvent(mInterfaceName,
                 WifiIsUnusableEvent.TYPE_IP_REACHABILITY_LOST);
-        mWifiMetrics.addToWifiUsabilityStatsList(mInterfaceName,
-                WifiUsabilityStats.LABEL_BAD,
-                WifiUsabilityStats.TYPE_IP_REACHABILITY_LOST, -1);
         if (mWifiGlobals.getIpReachabilityDisconnectEnabled()) {
             handleIpReachabilityLost(lossReason);
         } else {
@@ -6486,6 +6478,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             mRssiPollToken++;
             if (mEnableRssiPolling) {
                 sendMessage(CMD_RSSI_POLL, mRssiPollToken, 0);
+                mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                        WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED);
             } else {
                 updateLinkLayerStatsRssiAndScoreReport();
             }
@@ -6630,9 +6624,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             WifiDiagnostics.REPORT_REASON_REACHABILITY_LOST);
                     mWifiMetrics.logWifiIsUnusableEvent(mInterfaceName,
                             WifiIsUnusableEvent.TYPE_IP_REACHABILITY_LOST);
-                    mWifiMetrics.addToWifiUsabilityStatsList(mInterfaceName,
-                            WifiUsabilityStats.LABEL_BAD,
-                            WifiUsabilityStats.TYPE_IP_REACHABILITY_LOST, -1);
+                    mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                            WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_IP_REACHABILITY_LOST, -1);
                     if (mWifiGlobals.getIpReachabilityDisconnectEnabled()) {
                         handleIpReachabilityLost(-1);
                     } else {
@@ -6644,6 +6637,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     if (!isFromCurrentIpClientCallbacks(message)) break;
                     mWifiDiagnostics.triggerBugReportDataCapture(
                             WifiDiagnostics.REPORT_REASON_REACHABILITY_FAILURE);
+                    mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                            WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_IP_REACHABILITY_FAILURE,
+                            ((ReachabilityLossInfoParcelable) message.obj).reason);
                     handleIpReachabilityFailure((ReachabilityLossInfoParcelable) message.obj);
                     break;
                 }
@@ -6705,7 +6701,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 }
                 case CMD_ONESHOT_RSSI_POLL: {
                     if (!mEnableRssiPolling) {
-                        updateLinkLayerStatsRssiDataStallScoreReport();
+                        updateLinkLayerStatsRssiDataStallScoreReport(true);
                     }
                     break;
                 }
@@ -6717,7 +6713,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         break;
                     }
                     if (message.arg1 == mRssiPollToken) {
-                        updateLinkLayerStatsRssiDataStallScoreReport();
+                        updateLinkLayerStatsRssiDataStallScoreReport(false);
                         mWifiScoreCard.noteSignalPoll(mWifiInfo);
                         // Update the polling interval as needed before sending the delayed message
                         // so that the next polling can happen after the updated interval
@@ -6749,10 +6745,14 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         updateLinkLayerStatsRssiSpeedFrequencyCapabilities(txBytes, rxBytes);
                         sendMessageDelayed(obtainMessage(CMD_RSSI_POLL, mRssiPollToken, 0),
                                 mWifiGlobals.getPollRssiIntervalMillis());
+                        mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                                WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED);
                     }
                     else {
                         mRssiMonitor.setShortPollRssiInterval();
                         removeMessages(CMD_RSSI_POLL);
+                        mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                                WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_DISABLED);
                     }
                     break;
                 }
@@ -6912,8 +6912,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
 
         /**
          * Fetches link stats, updates Wifi Data Stall, Score Card and Score Report.
+         *
+         * oneshot indicates that this update request came from CMD_ONESHOT_RSSI_POLL.
          */
-        private WifiLinkLayerStats updateLinkLayerStatsRssiDataStallScoreReport() {
+        private WifiLinkLayerStats updateLinkLayerStatsRssiDataStallScoreReport(boolean oneshot) {
             // Get Info and continue polling
             long txBytes;
             long rxBytes;
@@ -6937,7 +6939,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             // mWifiMetrics.logScorerPredictionResult
             mWifiMetrics.updateWiFiEvaluationAndScorerStats(mWifiScoreReport.getLingering(),
                     mWifiInfo, mLastConnectionCapabilities);
-            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats);
+            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats, oneshot,
+                    statusDataStall);
             if (getClientRoleForMetrics(getConnectedWifiConfiguration())
                     == WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
                 mWifiMetrics.logScorerPredictionResult(mWifiInjector.hasActiveModem(),
@@ -6947,24 +6950,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         mWifiScoreReport.getAospScorerPredictionStatusForEvaluation(),
                         mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation());
                 mWifiScoreReport.clearScorerPredictionStatusForEvaluation();
-            }
-
-            if (mDataStallTriggerTimeMs == -1
-                    && statusDataStall != WifiIsUnusableEvent.TYPE_UNKNOWN) {
-                mDataStallTriggerTimeMs = mClock.getElapsedSinceBootMillis();
-                mLastStatusDataStall = statusDataStall;
-            }
-            if (mDataStallTriggerTimeMs != -1) {
-                long elapsedTime =  mClock.getElapsedSinceBootMillis()
-                        - mDataStallTriggerTimeMs;
-                if (elapsedTime >= DURATION_TO_WAIT_ADD_STATS_AFTER_DATA_STALL_MS) {
-                    mDataStallTriggerTimeMs = -1;
-                    mWifiMetrics.addToWifiUsabilityStatsList(mInterfaceName,
-                            WifiUsabilityStats.LABEL_BAD,
-                            convertToUsabilityStatsTriggerType(mLastStatusDataStall),
-                            -1);
-                    mLastStatusDataStall = WifiIsUnusableEvent.TYPE_UNKNOWN;
-                }
             }
             // Send the update score to network agent.
             mWifiScoreReport.calculateAndReportScore();

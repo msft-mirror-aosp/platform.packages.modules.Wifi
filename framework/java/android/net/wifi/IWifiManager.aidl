@@ -549,4 +549,7 @@ interface IWifiManager {
     void setAutojoinDisallowedSecurityTypes(int restrictions, in Bundle extras);
 
     void getAutojoinDisallowedSecurityTypes(in IIntegerListener listener, in Bundle extras);
+
+    void storeCapturedData(int triggerType, boolean isFullCapture, long triggerStartTimeMillis,
+            long triggerStopTimeMillis, in IIntegerListener listener);
 }
