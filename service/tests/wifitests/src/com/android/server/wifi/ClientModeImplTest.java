@@ -6190,7 +6190,8 @@ public class ClientModeImplTest extends WifiBaseTest {
                 .thenReturn(WifiIsUnusableEvent.TYPE_UNKNOWN);
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
         mLooper.dispatchAll();
-        verify(mWifiMetrics).updateWifiUsabilityStatsEntries(any(), any(), eq(stats), eq(false));
+        verify(mWifiMetrics).updateWifiUsabilityStatsEntries(any(), any(), eq(stats), eq(false),
+                anyInt());
 
         when(mWifiDataStall.checkDataStallAndThroughputSufficiency(any(), any(), any(), any(),
                 any(), anyLong(), anyLong()))
@@ -6199,7 +6200,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
         mLooper.dispatchAll();
         verify(mWifiMetrics, times(2)).updateWifiUsabilityStatsEntries(any(), any(), eq(stats),
-                eq(false));
+                eq(false), anyInt());
     }
 
     /**

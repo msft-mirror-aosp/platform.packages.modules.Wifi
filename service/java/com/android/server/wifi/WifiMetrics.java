@@ -5296,6 +5296,7 @@ public class WifiMetrics {
         line.append(",thread_device_role=" + entry.threadDeviceRole);
         line.append(",capture_event_type=" + entry.captureEventType);
         line.append(",capture_event_type_subcode=" + entry.captureEventTypeSubcode);
+        line.append(",status_data_stall=" + entry.statusDataStall);
         pw.println(line.toString());
     }
 
@@ -7148,13 +7149,35 @@ public class WifiMetrics {
     }
 
     /**
+     * If isFullCapture is true, capture everything in ring buffer
+     *
+     * If isFullCapture is false, extract WifiUsabilityStatsEntries from ring buffer whose
+     * timestamps are within [triggerStartTimeMillis, triggerStopTimeMillis) and store them as
+     * upload candidates.
+     *
+     * @param triggerType data capture trigger type
+     * @param isFullCapture if we do full capture on ring buffer or not
+     * @param triggerStartTimeMillis data capture start timestamp, elapsed time since boot
+     * @param triggerStopTimeMillis data capture stop timestamp, elapsed time since boot
+     * @return error code, 0 is success
+     */
+    public int storeCapturedData(int triggerType, boolean isFullCapture,
+            long triggerStartTimeMillis, long triggerStopTimeMillis) {
+        // TODO: Implement how to extract WifiUsabilityStatsEntries from ring buffer whose
+        // timestamps are within [triggerStartTimeMillis, triggerStopTimeMillis]
+        Log.d(TAG, "storeCapturedData: triggerType=" + triggerType
+                + ", isFullCapture=" + isFullCapture);
+        return 0;
+    }
+
+    /**
      * Extract data from |info| and |stats| to build a WifiUsabilityStatsEntry and then adds it
      * into an internal ring buffer.
      *
      * oneshot is used to indicate that this call came from CMD_ONESHOT_RSSI_POLL.
      */
     public void updateWifiUsabilityStatsEntries(String ifaceName, WifiInfo info,
-            WifiLinkLayerStats stats, boolean oneshot) {
+            WifiLinkLayerStats stats, boolean oneshot, int statusDataStall) {
         // This is only collected for primary STA currently because RSSI polling is disabled for
         // non-primary STAs.
         synchronized (mLock) {
@@ -7549,6 +7572,7 @@ public class WifiMetrics {
                         mWifiDataStall.getTxTransmittedBytes();
                     wifiUsabilityStatsEntry.rxTransmittedBytes =
                         mWifiDataStall.getRxTransmittedBytes();
+                    wifiUsabilityStatsEntry.statusDataStall = statusDataStall;
                 }
             }
             if (mWifiSettingsStore != null) {
@@ -7932,7 +7956,7 @@ public class WifiMetrics {
                 s.isThroughputPredictorDownstreamSufficient,
                 s.isThroughputPredictorUpstreamSufficient, s.isBluetoothConnected,
                 s.uwbAdapterState, s.isLowLatencyActivated, s.maxSupportedTxLinkspeed,
-                s.maxSupportedRxLinkspeed, s.voipMode, s.threadDeviceRole
+                s.maxSupportedRxLinkspeed, s.voipMode, s.threadDeviceRole, s.statusDataStall
         );
     }
 
@@ -8148,6 +8172,7 @@ public class WifiMetrics {
         out.maxSupportedRxLinkspeed = s.maxSupportedRxLinkspeed;
         out.voipMode = s.voipMode;
         out.threadDeviceRole = s.threadDeviceRole;
+        out.statusDataStall = s.statusDataStall;
         return out;
     }
 

@@ -20,6 +20,7 @@ import static com.android.server.wifi.proto.WifiStatsLog.WIFI_THREAD_TASK_EXECUT
 
 import android.annotation.NonNull;
 import android.os.Message;
+import android.os.SystemClock;
 import android.os.Trace;
 import android.util.LocalLog;
 
@@ -75,11 +76,11 @@ public abstract class RunnerState extends State {
             Trace.traceBegin(Trace.TRACE_TAG_NETWORK, signatureToLog);
         }
 
-        long startTime = System.currentTimeMillis();
+        long startTime = SystemClock.uptimeMillis();
         // TODO(b/295398783): Support deferMessage and sendMessageAtFrontOfQueue where when is 0;
         long scheduleLatency = message.getWhen() != 0 ? startTime - message.getWhen() : 0;
         boolean ret = processMessageImpl(message);
-        long runTime = System.currentTimeMillis() - startTime;
+        long runTime = SystemClock.uptimeMillis() - startTime;
         if (traceEvent) {
             Trace.traceEnd(Trace.TRACE_TAG_NETWORK);
         }
@@ -100,9 +101,9 @@ public abstract class RunnerState extends State {
         if (traceEvent) {
             Trace.traceBegin(Trace.TRACE_TAG_NETWORK, signatureToLog);
         }
-        long startTime = System.currentTimeMillis();
+        long startTime = SystemClock.uptimeMillis();
         enterImpl();
-        long runTime = System.currentTimeMillis() - startTime;
+        long runTime = SystemClock.uptimeMillis() - startTime;
         if (traceEvent) {
             Trace.traceEnd(Trace.TRACE_TAG_NETWORK);
         }
@@ -121,9 +122,9 @@ public abstract class RunnerState extends State {
         if (traceEvent) {
             Trace.traceBegin(Trace.TRACE_TAG_NETWORK, signatureToLog);
         }
-        long startTime = System.currentTimeMillis();
+        long startTime = SystemClock.uptimeMillis();
         exitImpl();
-        long runTime = System.currentTimeMillis() - startTime;
+        long runTime = SystemClock.uptimeMillis() - startTime;
         if (traceEvent) {
             Trace.traceEnd(Trace.TRACE_TAG_NETWORK);
         }
