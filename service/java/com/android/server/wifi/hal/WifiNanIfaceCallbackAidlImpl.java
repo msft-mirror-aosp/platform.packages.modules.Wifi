@@ -47,6 +47,7 @@ import android.hardware.wifi.NanStatus;
 import android.hardware.wifi.NanStatusCode;
 import android.hardware.wifi.NanSuspensionModeChangeInd;
 import android.hardware.wifi.NpkSecurityAssociation;
+import android.hardware.wifi.RttResult;
 import android.net.MacAddress;
 import android.net.wifi.OuiKeyedData;
 import android.net.wifi.aware.AwarePairingConfig;
@@ -682,6 +683,9 @@ public class WifiNanIfaceCallbackAidlImpl extends IWifiNanIfaceEventCallback.Stu
                 WifiNanIface.NanStatusCode.fromAidl(event.reasonCode.status), event.comeBackDelay,
                 event.cookie);
     }
+
+    @Override
+    public void notifyRangingResults(RttResult[] results, byte discoverySessionId) { }
 
     private int convertAidlBootstrappingResponseCodeToFramework(int aidlCode) {
         switch (aidlCode) {
