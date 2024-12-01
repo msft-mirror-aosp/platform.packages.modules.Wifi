@@ -5455,16 +5455,15 @@ public class WifiManager {
     }
 
     /**
-     * Listener interface for applications to receive updates about the current Wi-Fi enabled state.
+     * Listener interface for applications to be notified when the Wi-Fi enabled state changes.
      */
     @FlaggedApi(Flags.FLAG_WIFI_STATE_CHANGED_LISTENER)
     public interface WifiStateChangedListener {
         /**
          * Called when the Wi-Fi enabled state changes.
-         *
-         * @param state The new Wi-Fi state.
+         * The new value can be queried via {@link WifiManager#getWifiState()}.
          */
-        void onWifiStateChanged(@WifiState int state);
+        void onWifiStateChanged();
     }
 
     /**
@@ -5483,10 +5482,10 @@ public class WifiManager {
         }
 
         @Override
-        public void onWifiStateChanged(@WifiState int state) {
-            Log.i(TAG, "WifiStateChangedListenerProxy: onWifiStateChanged: " + state);
+        public void onWifiStateChanged() {
+            Log.i(TAG, "WifiStateChangedListenerProxy: onWifiStateChanged");
             Binder.clearCallingIdentity();
-            mExecutor.execute(() -> mListener.onWifiStateChanged(state));
+            mExecutor.execute(() -> mListener.onWifiStateChanged());
         }
     }
 
@@ -10324,6 +10323,46 @@ public class WifiManager {
         } catch (NumberFormatException e) {
             Log.e(TAG, "Cannot parse DPP channel list");
             return new SparseArray<>();
+        }
+    }
+
+    /**
+     * If isFullCapture is true, capture everything in ring buffer
+     *
+     * If isFullCapture is false, extract WifiUsabilityStatsEntries from ring buffer whose
+     * timestamps are within [triggerStartTimeMillis, triggerStopTimeMillis) in WiFiMetrics, and
+     * store them as upload candidates.
+     *
+     * Source of elapsed time since boot will be android.os.SystemClock.elapsedRealtime()
+     *
+     * @param executor The executor on which callback will be invoked.
+     * @param resultsCallback An asynchronous callback that will return a execution result of
+     *                        mWifiMetrics.storeCapturedData
+     * @param triggerType data capture trigger type
+     * @param isFullCapture if we do full capture on ring buffer or not
+     * @param triggerStartTimeMillis data capture start timestamp, elapsed time since boot
+     * @param triggerStopTimeMillis data capture stop timestamp, elapsed time since boot
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.WIFI_UPDATE_USABILITY_STATS_SCORE)
+    public void storeCapturedData(@NonNull @CallbackExecutor Executor executor,
+            @NonNull IntConsumer resultsCallback, int triggerType, boolean isFullCapture,
+            long triggerStartTimeMillis, long triggerStopTimeMillis) {
+        Objects.requireNonNull(executor, "executor cannot be null");
+        Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+        try {
+            mService.storeCapturedData(triggerType, isFullCapture, triggerStartTimeMillis,
+                    triggerStopTimeMillis, new IIntegerListener.Stub() {
+                        @Override
+                        public void onResult(int value) {
+                            Binder.clearCallingIdentity();
+                            executor.execute(() -> {
+                                resultsCallback.accept(value);
+                            });
+                        }
+                    });
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
         }
     }
 
