@@ -279,11 +279,6 @@ public class ActiveModeWarden {
      */
     public void addWifiStateChangedListener(@NonNull IWifiStateChangedListener listener) {
         mWifiStateChangedListeners.register(listener);
-        try {
-            listener.onWifiStateChanged(mWifiState.get());
-        } catch (RemoteException e) {
-            Log.e(TAG, "onWifiStateChanged: remote exception -- " + e);
-        }
     }
 
     /**
@@ -294,11 +289,10 @@ public class ActiveModeWarden {
     }
 
     private void notifyRemoteWifiStateChangedListeners() {
-        final int state = mWifiState.get();
         final int itemCount = mWifiStateChangedListeners.beginBroadcast();
         for (int i = 0; i < itemCount; i++) {
             try {
-                mWifiStateChangedListeners.getBroadcastItem(i).onWifiStateChanged(state);
+                mWifiStateChangedListeners.getBroadcastItem(i).onWifiStateChanged();
             } catch (RemoteException e) {
                 Log.e(TAG, "onWifiStateChanged: remote exception -- " + e);
             }

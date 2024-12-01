@@ -7733,6 +7733,29 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         return mSettingsStore.handleWifiScoringEnabled(enabled);
     }
 
+    /**
+     * See {@link android.net.wifi.WifiManager#storeCapturedData(Executor, IntConsumer, int,
+     * booloan, long, long)}.
+     */
+    @Override
+    public void storeCapturedData(int triggerType, boolean isFullCapture,
+            long triggerStartTimeMillis, long triggerStopTimeMillis,
+            @NonNull IIntegerListener listener) {
+        if (listener == null) {
+            throw new IllegalArgumentException("listener should not be null");
+        }
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.WIFI_UPDATE_USABILITY_STATS_SCORE, "WifiService");
+        mWifiThreadRunner.post(() -> {
+            try {
+                listener.onResult(mWifiMetrics.storeCapturedData(triggerType, isFullCapture,
+                        triggerStartTimeMillis, triggerStopTimeMillis));
+            } catch (RemoteException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }, TAG + "#storeCapturedData");
+    }
+
     @VisibleForTesting
     static boolean isValidBandForGetUsableChannels(@WifiScanner.WifiBand int band) {
         switch (band) {

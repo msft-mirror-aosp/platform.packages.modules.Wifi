@@ -325,7 +325,7 @@ public class WifiManagerTest {
                 mRunnable.run();
             }
         };
-        mWifiStateChangedListener = state -> mRunnable.run();
+        mWifiStateChangedListener = () -> mRunnable.run();
         if (SdkLevel.isAtLeastS()) {
             mCoexCallback = new CoexCallback() {
                 @Override
@@ -2582,7 +2582,7 @@ public class WifiManagerTest {
                         100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 1, 100, 10,
                         100, 27, contentionTimeStats, rateStats, radioStats, 101, true, true, true,
                         0, 10, 10, true, linkStats, 1, 0, 10, 20, 1, 2, 1, 1, 1, 1, false, 0,
-                        false, 100, 100, 1, 3));
+                        false, 100, 100, 1, 3, 1));
         verify(mOnWifiUsabilityStatsListener).onWifiUsabilityStats(anyInt(), anyBoolean(),
                 any(WifiUsabilityStatsEntry.class));
     }
@@ -4540,7 +4540,7 @@ public class WifiManagerTest {
         mWifiManager.addWifiStateChangedListener(new SynchronousExecutor(),
                 mWifiStateChangedListener);
         verify(mWifiService).addWifiStateChangedListener(listenerCaptor.capture());
-        listenerCaptor.getValue().onWifiStateChanged(0);
+        listenerCaptor.getValue().onWifiStateChanged();
         verify(mRunnable).run();
     }
 
