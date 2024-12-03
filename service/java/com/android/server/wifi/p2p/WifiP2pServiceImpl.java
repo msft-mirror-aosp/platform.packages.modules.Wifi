@@ -664,6 +664,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 case WifiP2pManager.REMOVE_EXTERNAL_APPROVER:
                 case WifiP2pManager.SET_CONNECTION_REQUEST_RESULT:
                 case WifiP2pManager.SET_VENDOR_ELEMENTS:
+                case WifiP2pManager.GET_DIR_INFO:
+                case WifiP2pManager.VALIDATE_DIR_INFO:
                     mP2pStateMachine.sendMessage(Message.obtain(msg));
                     break;
                 default:
@@ -1917,6 +1919,10 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     return "WifiP2pManager.SET_VENDOR_ELEMENTS";
                 case P2P_REJECTION_RESUME_AFTER_DELAY:
                     return "P2P_REJECTION_RESUME_AFTER_DELAY";
+                case WifiP2pManager.GET_DIR_INFO:
+                    return "WifiP2pManager.GET_DIR_INFO";
+                case WifiP2pManager.VALIDATE_DIR_INFO:
+                    return "WifiP2pManager.VALIDATE_DIR_INFO";
                 case RunnerState.STATE_ENTER_CMD:
                     return "Enter";
                 case RunnerState.STATE_EXIT_CMD:
@@ -3562,7 +3568,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     case SET_MIRACAST_MODE:
                         mWifiNative.setMiracastMode(message.arg1);
                         break;
-                    case WifiP2pManager.START_LISTEN:
+                    case WifiP2pManager.START_LISTEN: {
                         String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
                         if (packageName == null) {
                             replyToMessage(message, WifiP2pManager.START_LISTEN_FAILED);
@@ -3579,10 +3585,10 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                 .getBundle(WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE);
                         WifiP2pExtListenParams extListenParams = SdkLevel.isAtLeastV()
                                 && (listenType == WifiP2pManager.WIFI_P2P_EXT_LISTEN_WITH_PARAMS)
-                                        ? extras.getParcelable(
-                                                WifiP2pManager.EXTRA_PARAM_KEY_EXT_LISTEN_PARAMS,
-                                                WifiP2pExtListenParams.class)
-                                        : null;
+                                ? extras.getParcelable(
+                                WifiP2pManager.EXTRA_PARAM_KEY_EXT_LISTEN_PARAMS,
+                                WifiP2pExtListenParams.class)
+                                : null;
                         boolean hasPermission;
                         if (isPlatformOrTargetSdkLessThanT(packageName, uid)) {
                             hasPermission = mWifiPermissionsUtil.checkCanAccessWifiDirect(
@@ -3613,6 +3619,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             replyToMessage(message, WifiP2pManager.START_LISTEN_FAILED);
                         }
                         break;
+                    }
                     case WifiP2pManager.STOP_LISTEN:
                         mLastCallerInfoManager.put(WifiManager.API_P2P_STOP_LISTENING,
                                 Process.myTid(), message.sendingUid, 0,
@@ -3673,6 +3680,37 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         }
                         updateP2pChannels();
                         break;
+                    case WifiP2pManager.GET_DIR_INFO: {
+                        String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
+                        if (packageName == null) {
+                            replyToMessage(message, WifiP2pManager.GET_DIR_INFO_FAILED);
+                            break;
+                        }
+                        if (!Environment.isSdkAtLeastB()
+                                || !checkNearbyDevicesPermission(message, "GET_DIR_INFO")) {
+                            replyToMessage(message, WifiP2pManager.GET_DIR_INFO_FAILED);
+                            break;
+                        }
+                        // TODO implementation
+                        replyToMessage(message, WifiP2pManager.RESPONSE_GET_DIR_INFO, null);
+                        break;
+                    }
+                    case WifiP2pManager.VALIDATE_DIR_INFO: {
+                        String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
+                        if (packageName == null) {
+                            replyToMessage(message, WifiP2pManager.VALIDATE_DIR_INFO_FAILED);
+                            break;
+                        }
+                        if (!Environment.isSdkAtLeastB()
+                                || !checkNearbyDevicesPermission(message,
+                                "VALIDATE_DIR_INFO")) {
+                            replyToMessage(message, WifiP2pManager.VALIDATE_DIR_INFO_FAILED);
+                            break;
+                        }
+                        // TODO implementation
+                        replyToMessage(message, WifiP2pManager.RESPONSE_VALIDATE_DIR_INFO, 0);
+                        break;
+                    }
                     default:
                         return NOT_HANDLED;
                 }
