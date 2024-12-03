@@ -45,5 +45,5 @@ interface IMainlineSupplicant {
     /**
      * Terminate the service.
      */
-    void terminate();
+    oneway void terminate();
 }
