@@ -17,31 +17,25 @@
 package android.system.wifi.mainline_supplicant;
 
 /**
- * Enum values indicating the status of any supplicant operation.
+ * Service protocols that use USD.
  */
-enum SupplicantStatusCode {
+@Backing(type="int")
+enum UsdServiceProtoType {
     /**
-     * No errors.
+     * Unknown service type.
      */
-    SUCCESS = 0,
+    UNKNOWN = 0,
+
     /**
-     * Unknown failure occurred.
+     * Generic service.
      */
-    FAILURE_UNKNOWN = 1,
+    GENERIC = 1,
+
     /**
-     * One of the provided arguments is invalid.
+     * CSA (Connectivity Standards Alliance) Matter.
+     *
+     * Note: CSA Matter is an open-source, royalty-free standard for smart home technology that
+     * allows devices to work with any Matter-certified ecosystem.
      */
-    FAILURE_ARGS_INVALID = 2,
-    /**
-     * Interface with the provided name already exists.
-     */
-    FAILURE_IFACE_EXISTS = 3,
-    /**
-     * Interface with the provided name does not exist.
-     */
-    FAILURE_IFACE_UNKNOWN = 4,
-    /**
-     * Operation is not supported by the service.
-     */
-    FAILURE_UNSUPPORTED = 5,
+    CSA_MATTER = 2,
 }
