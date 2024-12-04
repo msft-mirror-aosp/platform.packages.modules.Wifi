@@ -13220,4 +13220,25 @@ public class WifiManager {
         }
         return features;
     }
+
+    /**
+     * When the device is connected to a network suggested by calling app
+     * {@link #addNetworkSuggestions(List)}, this API provide a way to avoid the current connection
+     * without {@link #removeNetworkSuggestions(List)}. The disallowed network will be disconnected
+     * or roam to other networks.
+     * App can only use this API to control the current connected network
+     * which was suggested by this app.
+     *
+     * @param blockingOption Option to change for the network blocking {@link BlockingOption}
+     */
+    @FlaggedApi(Flags.FLAG_BSSID_BLOCKLIST_FOR_SUGGESTION)
+    @RequiresPermission(CHANGE_WIFI_STATE)
+    public void disallowCurrentSuggestedNetwork(@NonNull BlockingOption blockingOption) {
+        Objects.requireNonNull(blockingOption, "blockingOption cannot be null");
+        try {
+            mService.disallowCurrentSuggestedNetwork(blockingOption, mContext.getOpPackageName());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
 }
