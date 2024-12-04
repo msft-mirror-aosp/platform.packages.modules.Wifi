@@ -27,6 +27,7 @@ from mobly import utils
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import callback_handler_v2
 from mobly.snippet import errors
+import wifi_test_utils
 
 from direct import constants
 
@@ -407,6 +408,11 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
 
     def _setup_device(self, ad: android_device.AndroidDevice) -> DeviceState:
         ad.load_snippet('wifi', constants.WIFI_SNIPPET_PACKAGE_NAME)
+        wifi_test_utils.set_screen_on_and_unlock(ad)
+        # Clear all saved Wi-Fi networks.
+        ad.wifi.wifiDisable()
+        ad.wifi.wifiClearConfiguredNetworks()
+        ad.wifi.wifiEnable()
 
     def test_group_owner_negotiation_with_push_button(self) -> None:
         """Test against group owner negotiation and WPS PBC (push button).
