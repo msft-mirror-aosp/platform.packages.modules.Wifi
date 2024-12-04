@@ -33,6 +33,7 @@ import android.net.wifi.aware.PeerHandle;
 import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.util.Log;
 
 import androidx.annotation.RequiresApi;
 
@@ -41,6 +42,7 @@ import com.android.wifi.flags.Flags;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -156,6 +158,47 @@ public final class RangingResult implements Parcelable {
         private  int mSecureHeLtfProtocolVersion;
         private byte[] mPasnComebackCookie = null;
         private long mPasnComebackAfterMillis = UNSPECIFIED;
+
+        /**
+         * Constructs a Builder with default values (see {@link Builder}).
+         */
+        public Builder() {}
+
+        /**
+         * Constructs a Builder initialized from an existing {@link RangingResult} instance.
+         *
+         * @hide
+         */
+        public Builder(@NonNull RangingResult other) {
+            if (other == null) {
+                Log.e(TAG, "Cannot provide a null RangingResult");
+                return;
+            }
+
+            mStatus = other.mStatus;
+            mMac = other.mMac;
+            mPeerHandle = other.mPeerHandle;
+            mDistanceMm = other.mDistanceMm;
+            mDistanceStdDevMm = other.mDistanceStdDevMm;
+            mRssi = other.mRssi;
+            mNumAttemptedMeasurements = other.mNumAttemptedMeasurements;
+            mNumSuccessfulMeasurements = other.mNumSuccessfulMeasurements;
+            if (other.mLci != null) mLci = other.mLci.clone();
+            if (other.mLcr != null) mLcr = other.mLcr.clone();
+            mResponderLocation = new ResponderLocation(mLci, mLcr);
+            mTimestamp = other.mTimestamp;
+            mIs80211mcMeasurement = other.mIs80211mcMeasurement;
+            mFrequencyMHz = other.mFrequencyMHz;
+            mPacketBw = other.mPacketBw;
+            mIs80211azNtbMeasurement = other.mIs80211azNtbMeasurement;
+            mNtbMinMeasurementTime = other.mNtbMinMeasurementTime;
+            mNtbMaxMeasurementTime = other.mNtbMaxMeasurementTime;
+            mI2rTxLtfRepetitions = other.mI2rTxLtfRepetitions;
+            mR2iTxLtfRepetitions = other.mR2iTxLtfRepetitions;
+            mNumTxSpatialStreams = other.mNumTxSpatialStreams;
+            mNumRxSpatialStreams = other.mNumRxSpatialStreams;
+            mVendorData = new ArrayList<>(other.mVendorData);
+        }
 
         /**
          * Sets the Range result status.
