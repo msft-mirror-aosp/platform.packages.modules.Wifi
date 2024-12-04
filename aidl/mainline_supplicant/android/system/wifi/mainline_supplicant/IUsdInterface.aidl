@@ -239,4 +239,81 @@ interface IUsdInterface {
          */
         PublishTransmissionType transmissionType;
     }
+
+    /**
+     * Retrieve capabilities related to Unsynchronized Service Discovery (USD).
+     *
+     * @return Instance of |UsdCapabilities| containing the capability info.
+     */
+    UsdCapabilities getUsdCapabilities();
+
+    /**
+     * Start a USD publish session. Triggers a response via |IUsdCallback.onPublishStarted|
+     * if successful, or |IUsdCallback.onPublishConfigFailed| if failed.
+     *
+     * @param cmdId Identifier for this request. Will be returned in the callback to identify
+     *              the request.
+     * @param usdPublishConfig Parameters for the requested publish session.
+     * @throws ServiceSpecificException with one of the following values:
+     *         |SupplicantStatusCode.FAILURE_UNKNOWN|
+     *         |SupplicantStatusCode.FAILURE_UNSUPPORTED|
+     */
+    void startUsdPublish(in int cmdId, in PublishConfig usdPublishConfig);
+
+    /**
+     * Start a USD subscribe session. Triggers a response via |IUsdCallback.onSubscribeStarted|
+     * if successful, or |IUsdCallback.onSubscribeConfigFailed| if failed.
+     *
+     * @param cmdId Identifier for this request. Will be returned in the callback to identify
+     *              the request.
+     * @param usdSubscribeConfig Parameters for the requested subscribe session.
+     * @throws ServiceSpecificException with one of the following values:
+     *         |SupplicantStatusCode.FAILURE_UNKNOWN|
+     *         |SupplicantStatusCode.FAILURE_UNSUPPORTED|
+     */
+    void startUsdSubscribe(in int cmdId, in SubscribeConfig usdSubscribeConfig);
+
+    /**
+     * Update the service-specific info for an active publish session.
+     *
+     * @param publishId Identifier for the active publish session.
+     * @param serviceSpecificInfo Byte array containing the service-specific info. Note that the
+     *                            maximum info length is |UsdCapabilities.maxLocalSsiLengthBytes|.
+     * @throws ServiceSpecificException with one of the following values:
+     *         |SupplicantStatusCode.FAILURE_UNKNOWN|
+     *         |SupplicantStatusCode.FAILURE_UNSUPPORTED|
+     */
+    void updateUsdPublish(in int publishId, in byte[] serviceSpecificInfo);
+
+    /**
+     * Cancel an existing USD publish session. |IUsdCallback.onPublishTerminated|
+     * will be called upon completion.
+     *
+     * @param publishId Identifier for the publish session to cancel.
+     * @throws ServiceSpecificException with one of the following values:
+     *         |SupplicantStatusCode.FAILURE_UNKNOWN|
+     *         |SupplicantStatusCode.FAILURE_UNSUPPORTED|
+     */
+    void cancelUsdPublish(in int publishId);
+
+    /**
+     * Cancel an existing USD subscribe session.
+     * |IUsdCallback.onSubscribeTerminated| will be called upon completion.
+     *
+     * @param subscribeId Identifier for the subscribe session to cancel.
+     * @throws ServiceSpecificException with one of the following values:
+     *         |SupplicantStatusCode.FAILURE_UNKNOWN|
+     *         |SupplicantStatusCode.FAILURE_UNSUPPORTED|
+     */
+    void cancelUsdSubscribe(in int subscribeId);
+
+    /**
+     * Send a message to a peer device across an active USD link.
+     *
+     * @param messageInfo Information for the message to be sent.
+     * @throws ServiceSpecificException with one of the following values:
+     *         |SupplicantStatusCode.FAILURE_UNKNOWN|
+     *         |SupplicantStatusCode.FAILURE_UNSUPPORTED|
+     */
+    void sendUsdMessage(in UsdMessageInfo messageInfo);
 }

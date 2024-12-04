@@ -92,4 +92,80 @@ interface IUsdCallback {
          */
         INVALID_ARGS = 3
     }
+
+    /**
+     * Called in response to |IUsdInterface.startPublish| to indicate that the
+     * publish session was started successfully.
+     *
+     * @param cmdId Identifier for the original request.
+     * @param publishId Identifier for the publish session.
+     */
+    void onPublishStarted(in int cmdId, in int publishId);
+
+    /**
+     * Called in response to |IUsdInterface.startSubscribe| to indicate that the
+     * subscribe session was started successfully.
+     *
+     * @param cmdId Identifier for the original request.
+     * @param subscribeId Identifier for the subscribe session.
+     */
+    void onSubscribeStarted(in int cmdId, in int subscribeId);
+
+    /**
+     * Called in response to |IUsdInterface.startPublish| to indicate that the
+     * publish session could not be configured.
+     *
+     * @param cmdId Identifier for the original request.
+     */
+    void onPublishConfigFailed(in int cmdId);
+
+    /**
+     * Called in response to |IUsdInterface.startSubscribe| to indicate that the
+     * subscribe session could not be configured.
+     *
+     * @param cmdId Identifier for the original request.
+     */
+    void onSubscribeConfigFailed(in int cmdId);
+
+    /**
+     * Called in response to |IUsdInterface.cancelPublish| to indicate that the session
+     * was cancelled successfully. May also be called unsolicited if the session terminated
+     * by supplicant.
+     *
+     * @param publishId Identifier for the publish session.
+     * @param reasonCode Code indicating the reason for the session cancellation.
+     */
+    void onPublishTerminated(in int publishId, in UsdReasonCode reasonCode);
+
+    /**
+     * Called in response to |IUsdInterface.cancelSubscribe| to indicate that the session
+     * was cancelled successfully. May also be called unsolicited if the session terminated
+     * by supplicant.
+     *
+     * @param subscribeId Identifier for the subscribe session.
+     * @param reasonCode Code indicating the reason for the session cancellation.
+     */
+    void onSubscribeTerminated(in int subscribeId, in UsdReasonCode reasonCode);
+
+    /**
+     * Indicates that the publisher sent solicited publish message to the subscriber.
+     *
+     * @param info Instance of |UsdServiceDiscoveryInfo| containing information about the reply.
+     */
+    void onPublishReplied(in UsdServiceDiscoveryInfo info);
+
+    /**
+     * Indicates that a publisher was discovered. Only called if this device is acting as a
+     * subscriber.
+     *
+     * @param info Instance of |UsdServiceDiscoveryInfo| containing information about the service.
+     */
+    void onServiceDiscovered(in UsdServiceDiscoveryInfo info);
+
+    /**
+     * Indicates that a message was received on an active USD link.
+     *
+     * @param messageInfo Information about the message that was received.
+     */
+    void onMessageReceived(in UsdMessageInfo messageInfo);
 }
