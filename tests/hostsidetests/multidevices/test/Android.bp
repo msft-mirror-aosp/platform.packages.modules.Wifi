@@ -28,6 +28,11 @@ python_library_host {
     libs: ["wifi_aware_constants"],
 }
 
+python_library_host {
+    name: "wifi_test_utils",
+    srcs: ["wifi_test_utils.py"],
+}
+
 python_defaults {
     name: "CtsWifiMultiDevicePythonDefaults",
     libs: [
@@ -64,11 +69,12 @@ python_test_host {
     name: "WifiAwareManagerTestCases",
     main: "aware/wifi_aware_manager_test.py",
     srcs: ["aware/wifi_aware_manager_test.py"],
-    device_common_data: [":wifi_aware_snippet_new"],
+    device_common_data: [":wifi_mobly_snippet"],
     libs: [
         "aware_lib_utils",
         "mobly",
         "wifi_aware_constants",
+        "wifi_test_utils",
     ],
     test_suites: [
         "general-tests",
@@ -112,6 +118,7 @@ python_test_host {
     libs: [
         "mobly",
         "wifi_direct_constants",
+        "wifi_test_utils",
     ],
     device_common_data: [":wifi_mobly_snippet"],
     test_options: {
