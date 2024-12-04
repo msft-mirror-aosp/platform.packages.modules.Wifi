@@ -69,6 +69,12 @@ public final class WifiP2pPairingBootstrappingConfig implements Parcelable {
      */
     public static final int PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PASSPHRASE = 1 << 4;
 
+    /**
+     * Pairing bootstrapping done out of band (For example: Over Bluetooth LE.
+     * Refer Wi-Fi Alliance Wi-Fi Direct R2 specification Section 3.9 for the details).
+     */
+    public static final int PAIRING_BOOTSTRAPPING_METHOD_OUT_OF_BAND = 1 << 5;
+
 
     /** @hide */
     @IntDef(flag = true, prefix = {"PAIRING_BOOTSTRAPPING_METHOD_"}, value = {
@@ -77,6 +83,7 @@ public final class WifiP2pPairingBootstrappingConfig implements Parcelable {
             PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE,
             PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PINCODE,
             PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PASSPHRASE,
+            PAIRING_BOOTSTRAPPING_METHOD_OUT_OF_BAND,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface PairingBootstrappingMethod {

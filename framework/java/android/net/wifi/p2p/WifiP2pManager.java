@@ -51,6 +51,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.OutcomeReceiver;
 import android.os.RemoteException;
 import android.text.TextUtils;
 import android.util.CloseGuard;
@@ -629,6 +630,13 @@ public class WifiP2pManager {
      */
     public static final int WIFI_P2P_USD_BASED_ADD_LOCAL_SERVICE = 1;
 
+    /**
+     * Extra for transporting DIR Information.
+     * @hide
+     */
+    public static final String EXTRA_PARAM_KEY_DIR_INFO =
+            "android.net.wifi.p2p.EXTRA_PARAM_KEY_DIR_INFO";
+
     private Context mContext;
 
     IWifiP2pManager mService;
@@ -904,6 +912,20 @@ public class WifiP2pManager {
     /** @hide */
     public static final int RESPONSE_GET_LISTEN_STATE                 = BASE + 118;
 
+    /** @hide */
+    public static final int GET_DIR_INFO                              = BASE + 119;
+    /** @hide */
+    public static final int GET_DIR_INFO_FAILED                       = BASE + 120;
+    /** @hide */
+    public static final int RESPONSE_GET_DIR_INFO                     = BASE + 121;
+
+    /** @hide */
+    public static final int VALIDATE_DIR_INFO                         = BASE + 122;
+    /** @hide */
+    public static final int VALIDATE_DIR_INFO_FAILED                  = BASE + 123;
+    /** @hide */
+    public static final int RESPONSE_VALIDATE_DIR_INFO                = BASE + 124;
+
     private static final SparseArray<IWifiP2pListener> sWifiP2pListenerMap = new SparseArray<>();
     /**
      * Create a new WifiP2pManager instance. Applications use
@@ -944,6 +966,14 @@ public class WifiP2pManager {
      * request.
      */
     public static final int NO_SERVICE_REQUESTS = 3;
+
+    /**
+     * Passed with {@link ActionListener#onFailure}.
+     * Indicates that the operation failed due to calling app doesn't have permission to call the
+     * API.
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public static final int NO_PERMISSION = 4;
 
     /** Interface for callback invocation when framework channel is lost */
     public interface ChannelListener {
@@ -1950,6 +1980,31 @@ public class WifiP2pManager {
                                     .onPinGenerated(deviceAddress, pin);
                         }
                         break;
+                    case RESPONSE_GET_DIR_INFO:
+                        if (listener != null) {
+                            if (Flags.wifiDirectR2()) {
+                                ((WifiP2pDirInfoListener) listener)
+                                        .onDirInfoReceived((WifiP2pDirInfo) message.obj);
+                            }
+                        }
+                        break;
+                    case GET_DIR_INFO_FAILED:
+                        if (listener != null) {
+                            ((WifiP2pDirInfoListener) listener)
+                                    .onFailure(message.arg1);
+                        }
+                        break;
+                    case RESPONSE_VALIDATE_DIR_INFO:
+                        if (listener != null) {
+                            ((WifiP2pDirInfoValidationListener) listener)
+                                    .onDirInfoValidation(message.arg1 == 1);
+                        }
+                        break;
+                    case VALIDATE_DIR_INFO_FAILED:
+                        if (listener != null) {
+                            ((WifiP2pDirInfoValidationListener) listener)
+                                    .onFailure(message.arg1);
+                        }
                     default:
                         Log.d(TAG, "Ignored " + message);
                         break;
@@ -3834,5 +3889,187 @@ public class WifiP2pManager {
      */
     public static int getP2pMaxAllowedVendorElementsLengthBytes() {
         return WIFI_P2P_VENDOR_ELEMENTS_MAXIMUM_LENGTH;
+    }
+
+    private static Exception reasonCodeToException(int reason) {
+        if (reason == ERROR) {
+            return new IllegalStateException("Internal error");
+        } else if (reason == BUSY) {
+            return new IllegalStateException("Framework is busy");
+        } else if (Flags.wifiDirectR2() && reason == NO_PERMISSION) {
+            return new SecurityException("Application doesn't have required permission");
+        } else {
+            return new IllegalStateException();
+        }
+    }
+
+    /**
+     * Interface for callback invocation in response to {@link #requestDirInfo}.
+     * @hide
+     */
+    public interface WifiP2pDirInfoListener {
+        /**
+         * The callback to indicate that the system searched for DIR information.
+         * @param dirInfo {@link WifiP2pDirInfo} if exists, otherwise null.
+         */
+        void onDirInfoReceived(@Nullable WifiP2pDirInfo dirInfo);
+
+        /**
+         * The operation failed.
+         * @param reason The reason for failure.
+         */
+        void onFailure(int reason);
+    }
+
+    /**
+     * Get the Device Identity Resolution (DIR) Information.
+     * See {@link WifiP2pDirInfo} for details
+     *
+     * Note: The results callback returns null if the device doesn't have any persistent group
+     * with device identity key information.
+     *
+     * <p>
+     * Use {@link #isWiFiDirectR2Supported()} to determine whether the device supports
+     * this feature. If {@link #isWiFiDirectR2Supported()} return {@code false} then
+     * this method will throw {@link UnsupportedOperationException}.
+     * <p>
+     * The application must have {@link android.Manifest.permission#NEARBY_WIFI_DEVICES} with
+     * android:usesPermissionFlags="neverForLocation". If the application does not declare
+     * android:usesPermissionFlags="neverForLocation", then it must also have
+     * {@link android.Manifest.permission#ACCESS_FINE_LOCATION}.
+     *
+     * @param c               It is the channel created at {@link #initialize}.
+     * @param executor        The executor on which callback will be invoked.
+     * @param callback        An OutcomeReceiver callback for receiving {@link WifiP2pDirInfo} via
+     *                        {@link OutcomeReceiver#onResult(Object)}. This callback will return
+     *                        null when DIR info doesn't exist.
+     *                        When this API call fails due to permission issues, state machine
+     *                        is busy etc., {@link OutcomeReceiver#onError(Throwable)} is called.
+     */
+    @RequiresPermission(allOf = {
+            android.Manifest.permission.NEARBY_WIFI_DEVICES,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+    }, conditional = true)
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public void requestDirInfo(@NonNull Channel c, @NonNull @CallbackExecutor Executor executor,
+            @NonNull OutcomeReceiver<WifiP2pDirInfo, Exception> callback) {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        if (!isWiFiDirectR2Supported()) {
+            throw new UnsupportedOperationException();
+        }
+        Objects.requireNonNull(c, "channel cannot be null and needs to be initialized)");
+        Objects.requireNonNull(executor, "executor cannot be null");
+        Objects.requireNonNull(callback, "callback cannot be null");
+        Bundle extras = prepareExtrasBundle(c);
+        c.mAsyncChannel.sendMessage(prepareMessage(GET_DIR_INFO, 0,
+                c.putListener(new WifiP2pDirInfoListener() {
+                    @Override
+                    public void onDirInfoReceived(WifiP2pDirInfo result) {
+                        Binder.clearCallingIdentity();
+                        executor.execute(() -> {
+                            callback.onResult(result);
+                        });
+                    }
+
+                    @Override
+                    public void onFailure(int reason) {
+                        Binder.clearCallingIdentity();
+                        executor.execute(() -> {
+                            callback.onError(reasonCodeToException(reason));
+                        });
+                    }
+                }), extras, c.mContext));
+    }
+
+    /**
+     * Interface for callback invocation when the received DIR information is validated
+     * in response to {@link #validateDirInfo}.
+     * @hide
+     */
+    public interface WifiP2pDirInfoValidationListener {
+        /**
+         * The requested DIR information is validated.
+         * @param result True if a match is found, false otherwise.
+         */
+        void onDirInfoValidation(boolean result);
+
+        /**
+         * The operation failed.
+         * @param reason The reason for failure.
+         */
+        void onFailure(int reason);
+    }
+
+    /**
+     * Validate the Device Identity Resolution (DIR) Information of a P2P device.
+     * See {@link WifiP2pDirInfo} for details.
+     * Framework takes the {@link WifiP2pDirInfo} and derives a set of Tag values based on
+     * the cached Device Identity Keys (DevIK) of all paired peers saved in the device.
+     * If a derived Tag value matches the Tag value received in the {@link WifiP2pDirInfo}, the
+     * device is identified as a paired peer and returns true.
+     *
+     * <p>
+     * Use {@link #isWiFiDirectR2Supported()} to determine whether the device supports
+     * this feature. If {@link #isWiFiDirectR2Supported()} return {@code false} then
+     * this method will throw {@link UnsupportedOperationException}.
+     * <p>
+     * The application must have {@link android.Manifest.permission#NEARBY_WIFI_DEVICES} with
+     * android:usesPermissionFlags="neverForLocation". If the application does not declare
+     * android:usesPermissionFlags="neverForLocation", then it must also have
+     * {@link android.Manifest.permission#ACCESS_FINE_LOCATION}.
+     *
+     * @param c               It is the channel created at {@link #initialize}.
+     * @param dirInfo         {@link WifiP2pDirInfo} to validate.
+     * @param executor        The executor on which callback will be invoked.
+     * @param callback        An OutcomeReceiver callback for receiving the result via
+     *                        {@link OutcomeReceiver#onResult(Object)} indicating whether the DIR
+     *                        info of P2P device is of a paired device. {code true} for paired,
+     *                        {@code false} for not paired.
+     *                        When this API call fails due to permission issues, state machine
+     *                        is busy etc., {@link OutcomeReceiver#onError(Throwable)} is called.
+     */
+    @RequiresPermission(allOf = {
+            android.Manifest.permission.NEARBY_WIFI_DEVICES,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+    }, conditional = true)
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    public void validateDirInfo(@NonNull Channel c, @NonNull WifiP2pDirInfo dirInfo,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull OutcomeReceiver<Boolean, Exception> callback) {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        if (!isWiFiDirectR2Supported()) {
+            throw new UnsupportedOperationException();
+        }
+        Objects.requireNonNull(c, "channel cannot be null and needs to be initialized)");
+        Objects.requireNonNull(dirInfo, "dirInfo cannot be null");
+        Objects.requireNonNull(executor, "executor cannot be null");
+        Objects.requireNonNull(callback, "resultsCallback cannot be null");
+        Bundle extras = prepareExtrasBundle(c);
+
+        extras.putParcelable(EXTRA_PARAM_KEY_DIR_INFO, dirInfo);
+        c.mAsyncChannel.sendMessage(prepareMessage(VALIDATE_DIR_INFO, 0,
+                c.putListener(new WifiP2pDirInfoValidationListener() {
+                    @Override
+                    public void onDirInfoValidation(boolean result) {
+                        Binder.clearCallingIdentity();
+                        executor.execute(() -> {
+                            callback.onResult(result);
+                        });
+                    }
+
+                    @Override
+                    public void onFailure(int reason) {
+                        Binder.clearCallingIdentity();
+                        executor.execute(() -> {
+                            callback.onError(reasonCodeToException(reason));
+                        });
+                    }
+                }), extras, c.mContext));
     }
 }
