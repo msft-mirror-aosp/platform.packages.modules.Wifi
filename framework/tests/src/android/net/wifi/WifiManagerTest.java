@@ -4560,4 +4560,13 @@ public class WifiManagerTest {
     public void testRemoveWifiStateChangedListenerWithNullListener() throws Exception {
         mWifiManager.removeWifiStateChangedListener(null);
     }
+
+    @Test
+    public void testDisallowCurrentSuggestedNetwork() throws RemoteException {
+        assertThrows(NullPointerException.class,
+                () -> mWifiManager.disallowCurrentSuggestedNetwork(null));
+        BlockingOption option = new BlockingOption.Builder(100).build();
+        mWifiManager.disallowCurrentSuggestedNetwork(option);
+        verify(mWifiService).disallowCurrentSuggestedNetwork(eq(option), eq(TEST_PACKAGE_NAME));
+    }
 }
