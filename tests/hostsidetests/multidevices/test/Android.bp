@@ -104,3 +104,24 @@ python_test_host {
         },
     },
 }
+
+python_test_host {
+    name: "WifiDirectGoNegTests",
+    main: "direct/group_owner_negotiation_test.py",
+    srcs: ["direct/group_owner_negotiation_test.py"],
+    libs: [
+        "mobly",
+        "wifi_direct_constants",
+    ],
+    device_common_data: [":wifi_mobly_snippet"],
+    test_options: {
+        unit_test: false,
+        tags: ["mobly"],
+    },
+    test_suites: ["general-tests"],
+    version: {
+        py3: {
+            embedded_launcher: true,
+        },
+    },
+}
