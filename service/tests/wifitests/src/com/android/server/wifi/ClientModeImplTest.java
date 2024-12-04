@@ -44,6 +44,7 @@ import static com.android.server.wifi.ClientModeImpl.CMD_PRE_DHCP_ACTION;
 import static com.android.server.wifi.ClientModeImpl.CMD_PRE_DHCP_ACTION_COMPLETE;
 import static com.android.server.wifi.ClientModeImpl.CMD_UNWANTED_NETWORK;
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
+import static com.android.server.wifi.WifiBlocklistMonitor.REASON_APP_DISALLOW;
 import static com.android.server.wifi.WifiSettingsConfigStore.SECONDARY_WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.TestUtil.createCapabilityBitset;
@@ -124,6 +125,7 @@ import android.net.networkstack.aidl.ip.ReachabilityLossInfoParcelable;
 import android.net.networkstack.aidl.ip.ReachabilityLossReason;
 import android.net.vcn.VcnManager;
 import android.net.vcn.VcnNetworkPolicyResult;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.IActionListener;
 import android.net.wifi.MloLink;
 import android.net.wifi.ScanResult;
@@ -11277,5 +11279,16 @@ public class ClientModeImplTest extends WifiBaseTest {
         } else {
             verify(mWifiGlobals, never()).enableWpa3SaeH2eSupport();
         }
+    }
+
+    @Test
+    public void testBlockNetwork() throws Exception {
+        connect();
+        BlockingOption option = new BlockingOption.Builder(100)
+                .setBlockingBssidOnly(true).build();
+        mCmi.blockNetwork(option);
+        verify(mWifiBlocklistMonitor).blockBssidForDurationMs(eq(TEST_BSSID_STR), any(),
+                eq(100 * 1000L), eq(REASON_APP_DISALLOW), eq(0));
+        verify(mWifiBlocklistMonitor).updateAndGetBssidBlocklistForSsids(any());
     }
 }
