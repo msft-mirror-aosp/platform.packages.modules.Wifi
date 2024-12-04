@@ -500,6 +500,31 @@ public class WifiP2pGroup implements Parcelable {
         mVendorData = new ArrayList<>(vendorData);
     }
 
+    /**
+     * Returns the BSSID, if this device is the group owner of the P2P group supporting Wi-Fi
+     * Direct R2 protocol.
+     * <p>
+     * The interface address of a Wi-Fi Direct R2 supported device is randomized. So for every
+     * group owner session a randomized interface address will be returned.
+     * <p>
+     * The BSSID returned will be {@code null}, if this device is a client device or a group owner
+     * which doesn't support Wi-Fi Direct R2 protocol.
+     * @return the BSSID.
+     */
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @FlaggedApi(Flags.FLAG_WIFI_DIRECT_R2)
+    @Nullable
+    public MacAddress getGroupOwnerBssid() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        if (isGroupOwner() && getSecurityType() == SECURITY_TYPE_WPA3_SAE
+                && interfaceAddress != null) {
+            return MacAddress.fromBytes(interfaceAddress);
+        }
+        return null;
+    }
+
     public String toString() {
         StringBuffer sbuf = new StringBuffer();
         sbuf.append("network: ").append(mNetworkName);

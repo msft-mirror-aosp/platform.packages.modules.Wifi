@@ -22,6 +22,7 @@ import android.annotation.Nullable;
 import android.net.DhcpResultsParcelable;
 import android.net.MacAddress;
 import android.net.Network;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.WifiAnnotations;
 import android.net.wifi.WifiConfiguration;
@@ -370,4 +371,9 @@ public interface ClientMode {
      * Notify changes in PowerManager#isDeviceIdleMode
      */
     void onIdleModeChanged(boolean isIdle);
+
+    /**
+     * Block current connect network and add to blocklist
+     */
+    void blockNetwork(BlockingOption option);
 }
