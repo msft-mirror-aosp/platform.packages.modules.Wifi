@@ -1795,6 +1795,8 @@ public class SoftApManager implements ActiveModeManager {
                 if (mSoftApCallback != null) {
                     if (Flags.softapDisconnectReason() && !isConnected) {
                         // Client successfully disconnected, should also notify callback
+                        mWifiMetrics.reportOnClientsDisconnected(client.getDisconnectReason(),
+                                mRequestorWs);
                         mSoftApCallback.onClientsDisconnected(
                                 currentInfoWithClientsChanged,
                                 ImmutableList.of(client));
