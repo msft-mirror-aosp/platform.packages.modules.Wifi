@@ -393,7 +393,8 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
         final String methodStr = "getCachedScanData";
         synchronized (mLock) {
             try {
-                if (!checkIfaceAndLogFailure(methodStr)) return null;
+                if (!isServiceVersionAtLeast(2)
+                        || !checkIfaceAndLogFailure(methodStr)) return null;
                 CachedScanData scanData = mWifiStaIface.getCachedScanData();
                 return halToFrameworkCachedScanData(scanData);
             } catch (RemoteException e) {

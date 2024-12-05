@@ -68,6 +68,7 @@ import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.twt.TwtRequest;
 import android.net.wifi.twt.TwtSession;
 import android.net.wifi.twt.TwtSessionCallback;
+import android.net.wifi.util.Environment;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
@@ -79,6 +80,7 @@ import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.WorkSource;
 import android.os.connectivity.WifiActivityEnergyInfo;
+import android.security.advancedprotection.AdvancedProtectionFeature;
 import android.telephony.SubscriptionInfo;
 import android.text.TextUtils;
 import android.util.ArraySet;
@@ -1130,6 +1132,17 @@ public class WifiManager {
      */
     public static final String EXTRA_PREVIOUS_WIFI_STATE = "previous_wifi_state";
 
+    /** @hide */
+    @IntDef(flag = false, prefix = { "WIFI_STATE_" }, value = {
+            WIFI_STATE_DISABLING,
+            WIFI_STATE_DISABLED,
+            WIFI_STATE_ENABLING,
+            WIFI_STATE_ENABLED,
+            WIFI_STATE_UNKNOWN,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface WifiState {}
+
     /**
      * Wi-Fi is currently being disabled. The state will change to {@link #WIFI_STATE_DISABLED} if
      * it finishes successfully.
@@ -2108,6 +2121,8 @@ public class WifiManager {
             sOnWifiNetworkStateChangedListenerMap = new SparseArray<>();
     private static final SparseArray<IWifiLowLatencyLockListener>
             sWifiLowLatencyLockListenerMap = new SparseArray<>();
+    private static final SparseArray<IWifiStateChangedListener>
+            sWifiStateChangedListenerMap = new SparseArray<>();
 
     /**
      * Multi-link operation (MLO) will allow Wi-Fi devices to operate on multiple links at the same
@@ -5374,6 +5389,107 @@ public class WifiManager {
     }
 
     /**
+     * Register a callback for Wi-Fi state. See {@link WifiStateChangedListener}.
+     * Caller will receive the event when the Wi-Fi state changes.
+     * Caller can remove a previously registered callback using
+     * {@link WifiManager#removeWifiStateChangedListener(WifiStateChangedListener)}
+     *
+     * @param executor Executor to execute listener callback on
+     * @param listener Listener to register
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_STATE_CHANGED_LISTENER)
+    @RequiresPermission(android.Manifest.permission.ACCESS_WIFI_STATE)
+    public void addWifiStateChangedListener(@NonNull @CallbackExecutor Executor executor,
+            @NonNull WifiStateChangedListener listener) {
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(listener);
+        if (mVerboseLoggingEnabled) {
+            Log.d(TAG, "addWifiStateChangedListener: listener=" + listener
+                    + ", executor=" + executor);
+        }
+        final int listenerIdentifier = System.identityHashCode(listener);
+        synchronized (sWifiStateChangedListenerMap) {
+            try {
+                if (sWifiStateChangedListenerMap.contains(listenerIdentifier)) {
+                    Log.w(TAG, "Same listener already registered");
+                    return;
+                }
+                IWifiStateChangedListener.Stub listenerProxy =
+                        new WifiStateChangedListenerProxy(executor, listener);
+                sWifiStateChangedListenerMap.put(listenerIdentifier, listenerProxy);
+                mService.addWifiStateChangedListener(listenerProxy);
+            } catch (RemoteException e) {
+                sWifiStateChangedListenerMap.remove(listenerIdentifier);
+                throw e.rethrowFromSystemServer();
+            }
+        }
+    }
+
+    /**
+     * Unregisters a WifiStateChangedListener from listening on the current Wi-Fi state.
+     *
+     * @param listener WifiStateChangedListener to unregister
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_STATE_CHANGED_LISTENER)
+    @RequiresPermission(android.Manifest.permission.ACCESS_WIFI_STATE)
+    public void removeWifiStateChangedListener(@NonNull WifiStateChangedListener listener) {
+        Objects.requireNonNull(listener);
+        if (mVerboseLoggingEnabled) {
+            Log.d(TAG, "removeWifiStateChangedListener: listener=" + listener);
+        }
+        final int listenerIdentifier = System.identityHashCode(listener);
+        synchronized (sWifiStateChangedListenerMap) {
+            try {
+                if (!sWifiStateChangedListenerMap.contains(listenerIdentifier)) {
+                    Log.w(TAG, "Unknown external listener " + listenerIdentifier);
+                    return;
+                }
+                mService.removeWifiStateChangedListener(
+                        sWifiStateChangedListenerMap.get(listenerIdentifier));
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            } finally {
+                sWifiStateChangedListenerMap.remove(listenerIdentifier);
+            }
+        }
+    }
+
+    /**
+     * Listener interface for applications to be notified when the Wi-Fi enabled state changes.
+     */
+    @FlaggedApi(Flags.FLAG_WIFI_STATE_CHANGED_LISTENER)
+    public interface WifiStateChangedListener {
+        /**
+         * Called when the Wi-Fi enabled state changes.
+         * The new value can be queried via {@link WifiManager#getWifiState()}.
+         */
+        void onWifiStateChanged();
+    }
+
+    /**
+     * Listener proxy for WifiStateChangedListener objects.
+     */
+    private static class WifiStateChangedListenerProxy extends IWifiStateChangedListener.Stub {
+        private Executor mExecutor;
+        private WifiStateChangedListener mListener;
+
+        WifiStateChangedListenerProxy(@NonNull Executor executor,
+                @NonNull WifiStateChangedListener listener) {
+            Objects.requireNonNull(executor);
+            Objects.requireNonNull(listener);
+            mExecutor = executor;
+            mListener = listener;
+        }
+
+        @Override
+        public void onWifiStateChanged() {
+            Log.i(TAG, "WifiStateChangedListenerProxy: onWifiStateChanged");
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mListener.onWifiStateChanged());
+        }
+    }
+
+    /**
      * Calculates the level of the signal. This should be used any time a signal
      * is being shown.
      *
@@ -5866,8 +5982,36 @@ public class WifiManager {
     public void startLocalOnlyHotspot(LocalOnlyHotspotCallback callback,
             @Nullable Handler handler) {
         Executor executor = handler == null ? null : new HandlerExecutor(handler);
-        startLocalOnlyHotspotInternal(null, executor, callback);
+        startLocalOnlyHotspotInternal(null, executor, callback, false);
     }
+
+   /**
+     * Starts a local-only hotspot with a specific configuration applied. See
+     * {@link #startLocalOnlyHotspot(LocalOnlyHotspotCallback, Handler)}.
+     *
+     * Since custom configuration settings may be incompatible with each other, the hotspot started
+     * through this method cannot coexist with another hotspot created through
+     * {@link #startLocalOnlyHotspot(LocalOnlyHotspotCallback, Handler)}. If this is attempted,
+     * the first hotspot request wins and others receive
+     * {@link LocalOnlyHotspotCallback#ERROR_GENERIC} through
+     * {@link LocalOnlyHotspotCallback#onFailed}.
+     *
+     * @param config Custom configuration for the hotspot. See {@link SoftApConfiguration}.
+     * @param executor Executor to run callback methods on.
+     * @param callback LocalOnlyHotspotCallback for the application to receive updates about
+     * operating status.
+     */
+    @RequiresPermission(allOf = {CHANGE_WIFI_STATE, NEARBY_WIFI_DEVICES})
+    @FlaggedApi(Flags.FLAG_PUBLIC_BANDS_FOR_LOHS)
+    public void startLocalOnlyHotspotWithConfiguration(@NonNull SoftApConfiguration config,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull LocalOnlyHotspotCallback callback) {
+        Objects.requireNonNull(config);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+        startLocalOnlyHotspotInternal(config, executor, callback, false);
+    }
+
 
     /**
      * Starts a local-only hotspot with a specific configuration applied. See
@@ -5897,7 +6041,7 @@ public class WifiManager {
             @Nullable @CallbackExecutor Executor executor,
             @Nullable LocalOnlyHotspotCallback callback) {
         Objects.requireNonNull(config);
-        startLocalOnlyHotspotInternal(config, executor, callback);
+        startLocalOnlyHotspotInternal(config, executor, callback, true);
     }
 
     /**
@@ -5911,7 +6055,8 @@ public class WifiManager {
     private void startLocalOnlyHotspotInternal(
             @Nullable SoftApConfiguration config,
             @Nullable @CallbackExecutor Executor executor,
-            @Nullable LocalOnlyHotspotCallback callback) {
+            @Nullable LocalOnlyHotspotCallback callback,
+            boolean isCalledFromSystemApi) {
         if (executor == null) {
             executor = mContext.getMainExecutor();
         }
@@ -5927,7 +6072,7 @@ public class WifiManager {
                             mContext.getAttributionSource());
                 }
                 int returnCode = mService.startLocalOnlyHotspot(proxy, packageName, featureId,
-                        config, extras);
+                        config, extras, isCalledFromSystemApi);
                 if (returnCode != LocalOnlyHotspotCallback.REQUEST_REGISTERED) {
                     // Send message to the proxy to make sure we call back on the correct thread
                     proxy.onHotspotFailed(returnCode);
@@ -6774,6 +6919,17 @@ public class WifiManager {
                 @SapClientBlockedReason int blockedReason) {
             // Do nothing: can be used to ask user to update client to allowed list or blocked list.
         }
+
+        /**
+         * Called when clients disconnect from a soft AP instance.
+         *
+         * @param info The {@link SoftApInfo} of the AP.
+         * @param clients The clients that have disconnected from the AP instance specified by
+         *                {@code info}.
+         */
+        @FlaggedApi(Flags.FLAG_SOFTAP_DISCONNECT_REASON)
+        default void onClientsDisconnected(@NonNull SoftApInfo info,
+                @NonNull List<WifiClient> clients) {}
     }
 
     /**
@@ -6950,6 +7106,18 @@ public class WifiManager {
             mExecutor.execute(() -> {
                 mCallback.onBlockedClientConnecting(client, blockedReason);
             });
+        }
+
+        @Override
+        public void onClientsDisconnected(SoftApInfo info, List<WifiClient> clients) {
+            if (mVerboseLoggingEnabled) {
+                Log.v(TAG, "SoftApCallbackProxy on mode " + mIpMode
+                        + ", onClientsDisconnected: info =" + info
+                        + " with clients = " + clients);
+            }
+
+            Binder.clearCallingIdentity();
+            mExecutor.execute(() -> mCallback.onClientsDisconnected(info, clients));
         }
     }
 
@@ -10159,6 +10327,46 @@ public class WifiManager {
     }
 
     /**
+     * If isFullCapture is true, capture everything in ring buffer
+     *
+     * If isFullCapture is false, extract WifiUsabilityStatsEntries from ring buffer whose
+     * timestamps are within [triggerStartTimeMillis, triggerStopTimeMillis) in WiFiMetrics, and
+     * store them as upload candidates.
+     *
+     * Source of elapsed time since boot will be android.os.SystemClock.elapsedRealtime()
+     *
+     * @param executor The executor on which callback will be invoked.
+     * @param resultsCallback An asynchronous callback that will return a execution result of
+     *                        mWifiMetrics.storeCapturedData
+     * @param triggerType data capture trigger type
+     * @param isFullCapture if we do full capture on ring buffer or not
+     * @param triggerStartTimeMillis data capture start timestamp, elapsed time since boot
+     * @param triggerStopTimeMillis data capture stop timestamp, elapsed time since boot
+     * @hide
+     */
+    @RequiresPermission(android.Manifest.permission.WIFI_UPDATE_USABILITY_STATS_SCORE)
+    public void storeCapturedData(@NonNull @CallbackExecutor Executor executor,
+            @NonNull IntConsumer resultsCallback, int triggerType, boolean isFullCapture,
+            long triggerStartTimeMillis, long triggerStopTimeMillis) {
+        Objects.requireNonNull(executor, "executor cannot be null");
+        Objects.requireNonNull(resultsCallback, "resultsCallback cannot be null");
+        try {
+            mService.storeCapturedData(triggerType, isFullCapture, triggerStartTimeMillis,
+                    triggerStopTimeMillis, new IIntegerListener.Stub() {
+                        @Override
+                        public void onResult(int value) {
+                            Binder.clearCallingIdentity();
+                            executor.execute(() -> {
+                                resultsCallback.accept(value);
+                            });
+                        }
+                    });
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Callback interface for framework to receive network status updates and trigger of updating
      * {@link WifiUsabilityStatsEntry}.
      *
@@ -12982,6 +13190,53 @@ public class WifiManager {
                     });
                 }
             }, extras);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Indicates what {@link AdvancedProtectionFeature} are supported over Wi-Fi.
+     *
+     * The {@link AdvancedProtectionFeature} is the advanced protection feature
+     * providing protections which works when Android Advanced Protection Mode (AAPM)
+     * is enabled.
+     *
+     * @return a list of the supported features.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.security.Flags.FLAG_AAPM_API)
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    @NonNull
+    public List<AdvancedProtectionFeature> getAvailableAdvancedProtectionFeatures() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException();
+        }
+        List<AdvancedProtectionFeature> features = new ArrayList<>();
+        if (Flags.wepDisabledInApm()) {
+            // TODO: b/362586268 Change to AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP
+            features.add(new AdvancedProtectionFeature("WEP"));
+        }
+        return features;
+    }
+
+    /**
+     * When the device is connected to a network suggested by calling app
+     * {@link #addNetworkSuggestions(List)}, this API provide a way to avoid the current connection
+     * without {@link #removeNetworkSuggestions(List)}. The disallowed network will be disconnected
+     * or roam to other networks.
+     * App can only use this API to control the current connected network
+     * which was suggested by this app.
+     *
+     * @param blockingOption Option to change for the network blocking {@link BlockingOption}
+     */
+    @FlaggedApi(Flags.FLAG_BSSID_BLOCKLIST_FOR_SUGGESTION)
+    @RequiresPermission(CHANGE_WIFI_STATE)
+    public void disallowCurrentSuggestedNetwork(@NonNull BlockingOption blockingOption) {
+        Objects.requireNonNull(blockingOption, "blockingOption cannot be null");
+        try {
+            mService.disallowCurrentSuggestedNetwork(blockingOption, mContext.getOpPackageName());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

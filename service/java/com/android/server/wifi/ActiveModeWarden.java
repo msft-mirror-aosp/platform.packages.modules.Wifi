@@ -47,6 +47,7 @@ import android.net.Network;
 import android.net.wifi.ISubsystemRestartCallback;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiNetworkStateChangedListener;
+import android.net.wifi.IWifiStateChangedListener;
 import android.net.wifi.SoftApCapability;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SoftApState;
@@ -153,6 +154,8 @@ public class ActiveModeWarden {
             new RemoteCallbackList<>();
     private final RemoteCallbackList<IWifiNetworkStateChangedListener>
             mWifiNetworkStateChangedListeners = new RemoteCallbackList<>();
+    private final RemoteCallbackList<IWifiStateChangedListener> mWifiStateChangedListeners =
+            new RemoteCallbackList<>();
 
     private boolean mIsMultiplePrimaryBugreportTaken = false;
     private boolean mIsShuttingdown = false;
@@ -212,7 +215,10 @@ public class ActiveModeWarden {
                 if (mVerboseLoggingEnabled) {
                     Log.d(TAG, "setting wifi state to: " + newState);
                 }
-                mWifiState.set(newState);
+                if (mWifiState.get() != newState) {
+                    mWifiState.set(newState);
+                    notifyRemoteWifiStateChangedListeners();
+                }
                 break;
             default:
                 Log.d(TAG, "attempted to set an invalid state: " + newState);
@@ -266,6 +272,32 @@ public class ActiveModeWarden {
         for (ClientModeManager cmm : mClientModeManagers) {
             cmm.onIdleModeChanged(isIdle);
         }
+    }
+
+    /**
+     * See {@link WifiManager#addWifiStateChangedListener(Executor, WifiStateChangedListener)}
+     */
+    public void addWifiStateChangedListener(@NonNull IWifiStateChangedListener listener) {
+        mWifiStateChangedListeners.register(listener);
+    }
+
+    /**
+     * See {@link WifiManager#removeWifiStateChangedListener(WifiStateChangedListener)}
+     */
+    public void removeWifiStateChangedListener(@NonNull IWifiStateChangedListener listener) {
+        mWifiStateChangedListeners.unregister(listener);
+    }
+
+    private void notifyRemoteWifiStateChangedListeners() {
+        final int itemCount = mWifiStateChangedListeners.beginBroadcast();
+        for (int i = 0; i < itemCount; i++) {
+            try {
+                mWifiStateChangedListeners.getBroadcastItem(i).onWifiStateChanged();
+            } catch (RemoteException e) {
+                Log.e(TAG, "onWifiStateChanged: remote exception -- " + e);
+            }
+        }
+        mWifiStateChangedListeners.finishBroadcast();
     }
 
     /**
@@ -1372,7 +1404,9 @@ public class ActiveModeWarden {
         Log.d(TAG, "Switching all client mode managers");
         for (ConcreteClientModeManager clientModeManager : mClientModeManagers) {
             if (clientModeManager.getRole() != ROLE_CLIENT_PRIMARY
-                    && clientModeManager.getRole() != ROLE_CLIENT_SCAN_ONLY) {
+                    && clientModeManager.getRole() != ROLE_CLIENT_SCAN_ONLY
+                    && clientModeManager.getTargetRole() != ROLE_CLIENT_PRIMARY
+                    && clientModeManager.getTargetRole() != ROLE_CLIENT_SCAN_ONLY) {
                 continue;
             }
             if (!switchPrimaryOrScanOnlyClientModeManagerRole(clientModeManager)) {

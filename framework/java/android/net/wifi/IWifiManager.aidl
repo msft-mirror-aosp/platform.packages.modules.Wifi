@@ -20,6 +20,7 @@ import android.net.DhcpInfo;
 import android.net.DhcpOption;
 import android.net.Network;
 import android.net.TetheringManager.TetheringRequest;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -54,6 +55,7 @@ import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.IWifiLowLatencyLockListener;
 import android.net.wifi.IWifiNetworkSelectionConfigListener;
 import android.net.wifi.IWifiNetworkStateChangedListener;
+import android.net.wifi.IWifiStateChangedListener;
 import android.net.wifi.IWifiVerboseLoggingStatusChangedListener;
 import android.net.wifi.MscsParams;
 import android.net.wifi.QosPolicyParams;
@@ -175,6 +177,10 @@ interface IWifiManager {
 
     int getWifiEnabledState();
 
+    void addWifiStateChangedListener(in IWifiStateChangedListener listener);
+
+    void removeWifiStateChangedListener(in IWifiStateChangedListener listener);
+
     void registerDriverCountryCodeChangedListener(
             in IOnWifiDriverCountryCodeChangedListener listener, String packageName,
             String featureId);
@@ -249,7 +255,8 @@ interface IWifiManager {
     boolean validateSoftApConfiguration(in SoftApConfiguration config);
 
     int startLocalOnlyHotspot(in ILocalOnlyHotspotCallback callback, String packageName,
-            String featureId, in SoftApConfiguration customConfig, in Bundle extras);
+            String featureId, in SoftApConfiguration customConfig, in Bundle extras,
+            boolean isCalledFromSystemApi);
 
     void stopLocalOnlyHotspot();
 
@@ -543,4 +550,9 @@ interface IWifiManager {
     void setAutojoinDisallowedSecurityTypes(int restrictions, in Bundle extras);
 
     void getAutojoinDisallowedSecurityTypes(in IIntegerListener listener, in Bundle extras);
+
+    void disallowCurrentSuggestedNetwork(in BlockingOption option, String packageName);
+
+    void storeCapturedData(int triggerType, boolean isFullCapture, long triggerStartTimeMillis,
+            long triggerStopTimeMillis, in IIntegerListener listener);
 }
