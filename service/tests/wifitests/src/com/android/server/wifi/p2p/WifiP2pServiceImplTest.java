@@ -109,6 +109,7 @@ import android.net.wifi.p2p.WifiP2pProvDiscEvent;
 import android.net.wifi.p2p.WifiP2pWfdInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
+import android.net.wifi.util.Environment;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
@@ -8635,5 +8636,49 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         // P2P is really disabled when wifi is off.
         verify(mWifiNative).teardownInterface();
         verify(mWifiMonitor).stopMonitoring(anyString());
+    }
+
+    /**
+     * Verify {@link WifiP2pManager#GET_DIR_INFO} message.
+     */
+    @Test
+    public void testGetDirInfo() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(false);
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.GET_DIR_INFO);
+        assertTrue(mClientHandler.hasMessages(WifiP2pManager.GET_DIR_INFO_FAILED));
+
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(true);
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.GET_DIR_INFO);
+
+        verify(mClientHandler, times(2)).sendMessage(mMessageCaptor.capture());
+        List<Message> messages = mMessageCaptor.getAllValues();
+        assertEquals(WifiP2pManager.GET_DIR_INFO_FAILED, messages.get(0).what);
+        assertEquals(WifiP2pManager.RESPONSE_GET_DIR_INFO, messages.get(1).what);
+    }
+
+    /**
+     * Verify {@link WifiP2pManager#VALIDATE_DIR_INFO} message.
+     */
+    @Test
+    public void testValidateDirInfo() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(false);
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.VALIDATE_DIR_INFO);
+        assertTrue(mClientHandler.hasMessages(WifiP2pManager.VALIDATE_DIR_INFO_FAILED));
+
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(true);
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.VALIDATE_DIR_INFO);
+
+        verify(mClientHandler, times(2)).sendMessage(mMessageCaptor.capture());
+        List<Message> messages = mMessageCaptor.getAllValues();
+        assertEquals(WifiP2pManager.VALIDATE_DIR_INFO_FAILED, messages.get(0).what);
+        assertEquals(WifiP2pManager.RESPONSE_VALIDATE_DIR_INFO, messages.get(1).what);
     }
 }

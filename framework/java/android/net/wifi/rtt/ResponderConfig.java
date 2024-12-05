@@ -1125,7 +1125,7 @@ public final class ResponderConfig implements Parcelable {
      *
      * @hide
      */
-    static int translateFromScanResultToLocalChannelWidth(
+    public static int translateFromScanResultToLocalChannelWidth(
             @WifiAnnotations.ChannelWidth int scanResultChannelWidth) {
         switch (scanResultChannelWidth) {
             case ScanResult.CHANNEL_WIDTH_20MHZ:
@@ -1154,7 +1154,8 @@ public final class ResponderConfig implements Parcelable {
      *
      * @hide
      */
-    static int translateFromLocalToScanResultChannelWidth(@ChannelWidth int localChannelWidth) {
+    public static int translateFromLocalToScanResultChannelWidth(
+            @ChannelWidth int localChannelWidth) {
         switch (localChannelWidth) {
             case CHANNEL_WIDTH_20MHZ:
                 return ScanResult.CHANNEL_WIDTH_20MHZ;
@@ -1182,7 +1183,7 @@ public final class ResponderConfig implements Parcelable {
      *
      * @hide
      */
-    static int translateFromScanResultToLocalPreamble(
+    public static int translateFromScanResultToLocalPreamble(
             @WifiAnnotations.PreambleType int scanResultPreamble) {
         switch (scanResultPreamble) {
             case ScanResult.PREAMBLE_LEGACY:
@@ -1209,7 +1210,7 @@ public final class ResponderConfig implements Parcelable {
      *
      * @hide
      */
-    static int translateFromLocalToScanResultPreamble(@PreambleType int localPreamble) {
+    public static int translateFromLocalToScanResultPreamble(@PreambleType int localPreamble) {
         switch (localPreamble) {
             case PREAMBLE_LEGACY:
                 return ScanResult.PREAMBLE_LEGACY;
