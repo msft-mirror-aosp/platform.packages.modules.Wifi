@@ -16,6 +16,7 @@
 package com.android.server.wifi;
 
 import android.annotation.NonNull;
+import android.annotation.SuppressLint;
 import android.hardware.wifi.hostapd.ApInfo;
 import android.hardware.wifi.hostapd.BandMask;
 import android.hardware.wifi.hostapd.ChannelBandwidth;
@@ -41,6 +42,7 @@ import android.net.wifi.SoftApInfo;
 import android.net.wifi.WifiAnnotations;
 import android.net.wifi.WifiContext;
 import android.net.wifi.WifiManager;
+import android.net.wifi.util.Environment;
 import android.net.wifi.util.WifiResourceCache;
 import android.os.Handler;
 import android.os.IBinder;
@@ -57,6 +59,7 @@ import com.android.server.wifi.WifiNative.SoftApHalCallback;
 import com.android.server.wifi.util.ApConfigUtil;
 import com.android.server.wifi.util.HalAidlUtil;
 import com.android.server.wifi.util.NativeUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.io.PrintWriter;
@@ -233,7 +236,8 @@ public class HostapdHalAidlImp implements IHostapdHal {
      */
     @Override
     public boolean addAccessPoint(@NonNull String ifaceName, @NonNull SoftApConfiguration config,
-            boolean isMetered, Runnable onFailureListener) {
+            boolean isMetered, boolean isUsingMultiLinkOperation, List<String> instanceIdentities,
+            Runnable onFailureListener) {
         synchronized (mLock) {
             final String methodStr = "addAccessPoint";
             Log.d(TAG, methodStr + ": " + ifaceName);
@@ -241,7 +245,8 @@ public class HostapdHalAidlImp implements IHostapdHal {
                 return false;
             }
             try {
-                IfaceParams ifaceParams = prepareIfaceParams(ifaceName, config);
+                IfaceParams ifaceParams = prepareIfaceParams(ifaceName, config,
+                        isUsingMultiLinkOperation, instanceIdentities);
                 NetworkParams nwParams = prepareNetworkParams(isMetered, config);
                 if (ifaceParams == null || nwParams == null) {
                     Log.e(TAG, "addAccessPoint parameters could not be prepared.");
@@ -1030,6 +1035,7 @@ public class HostapdHalAidlImp implements IHostapdHal {
         };
     }
 
+    @SuppressLint("NewApi")
     private NetworkParams prepareNetworkParams(boolean isMetered,
             SoftApConfiguration config) {
         NetworkParams nwParams = new NetworkParams();
@@ -1059,6 +1065,9 @@ public class HostapdHalAidlImp implements IHostapdHal {
         nwParams.encryptionType = getEncryptionType(config);
         nwParams.passphrase = (config.getPassphrase() != null)
                     ? config.getPassphrase() : "";
+        if (Flags.apIsolate() && isServiceVersionAtLeast(3) && Environment.isSdkAtLeastB()) {
+            nwParams.isClientIsolationEnabled = config.isClientIsolationEnabled();
+        }
 
         if (nwParams.ssid == null || nwParams.passphrase == null) {
             return null;
@@ -1066,12 +1075,18 @@ public class HostapdHalAidlImp implements IHostapdHal {
         return nwParams;
     }
 
-    private IfaceParams prepareIfaceParams(String ifaceName, SoftApConfiguration config)
+    private IfaceParams prepareIfaceParams(String ifaceName, SoftApConfiguration config,
+            boolean isUsingMultiLinkOperation, List<String> instanceIdentities)
             throws IllegalArgumentException {
         IfaceParams ifaceParams = new IfaceParams();
         ifaceParams.name = ifaceName;
         ifaceParams.hwModeParams = prepareHwModeParams(config);
         ifaceParams.channelParams = prepareChannelParamsList(config);
+        ifaceParams.usesMlo = isUsingMultiLinkOperation;
+        if (instanceIdentities != null) {
+            ifaceParams.instanceIdentities =
+                    instanceIdentities.toArray(new String[instanceIdentities.size()]);
+        }
         if (ifaceParams.name == null || ifaceParams.hwModeParams == null
                 || ifaceParams.channelParams == null) {
             return null;
