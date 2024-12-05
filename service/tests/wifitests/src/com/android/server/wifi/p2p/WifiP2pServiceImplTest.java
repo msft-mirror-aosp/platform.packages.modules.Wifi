@@ -109,6 +109,7 @@ import android.net.wifi.p2p.WifiP2pProvDiscEvent;
 import android.net.wifi.p2p.WifiP2pWfdInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
+import android.net.wifi.util.Environment;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
@@ -1456,7 +1457,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         when(mWifiInjector.getWifiP2pConnection()).thenReturn(mWifiP2pConnection);
 
         when(mWifiDialogManager.createP2pInvitationReceivedDialog(any(), anyBoolean(), any(),
-                anyInt(), any(), any())).thenReturn(mDialogHandle);
+                anyInt(), anyInt(), any(), any())).thenReturn(mDialogHandle);
         when(mWifiDialogManager.createP2pInvitationSentDialog(any(), any(), anyInt()))
                 .thenReturn(mDialogHandle);
         when(mWifiInjector.getClock()).thenReturn(mClock);
@@ -6782,7 +6783,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         } else {
             verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
                     eq(pdEvent.device.deviceName), eq(false), eq(pdEvent.pin),
-                    anyInt(), any(), any());
+                    anyInt(), anyInt(), any(), any());
             verify(mDialogHandle).launchDialog();
         }
     }
@@ -7306,8 +7307,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
             verify(mAlertDialog).show();
         } else {
             verify(mWifiDialogManager).createP2pInvitationReceivedDialog(anyString(), anyBoolean(),
-                    any(), eq(Display.DEFAULT_DISPLAY), any(), any());
-            verify(mDialogHandle).launchDialog(P2P_INVITATION_RECEIVED_TIMEOUT_MS);
+                    any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS), eq(Display.DEFAULT_DISPLAY),
+                    any(), any());
+            verify(mDialogHandle).launchDialog();
         }
     }
 
@@ -7334,8 +7336,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
 
         sendNegotiationRequestEvent(config);
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(anyString(),
-                anyBoolean(), any(), eq(someNonDefaultDisplayId), any(), any());
-        verify(mDialogHandle).launchDialog(P2P_INVITATION_RECEIVED_TIMEOUT_MS);
+                anyBoolean(), any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS),
+                eq(someNonDefaultDisplayId), any(), any());
+        verify(mDialogHandle).launchDialog();
     }
 
     /**
@@ -7362,8 +7365,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         // "simple" client connect (no display ID)
         sendNegotiationRequestEvent(config);
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(anyString(), anyBoolean(),
-                any(), eq(Display.DEFAULT_DISPLAY), any(), any());
-        verify(mDialogHandle).launchDialog(P2P_INVITATION_RECEIVED_TIMEOUT_MS);
+                any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS), eq(Display.DEFAULT_DISPLAY), any(),
+                any());
+        verify(mDialogHandle).launchDialog();
     }
 
     private void verifySetVendorElement(boolean isP2pActivated, boolean shouldSucceed,
@@ -8138,7 +8142,7 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
 
         mockEnterGroupCreatedState();
 
-        // The first provision discvoery request triggers the dialog.
+        // The first provision discovery request triggers the dialog.
         WifiP2pProvDiscEvent pdEvent = new WifiP2pProvDiscEvent();
         pdEvent.device = mTestWifiP2pDevice;
         sendSimpleMsg(null, WifiP2pMonitor.P2P_PROV_DISC_PBC_REQ_EVENT,
@@ -8146,8 +8150,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
 
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
                 eq(mTestWifiP2pDevice.deviceAddress), anyBoolean(),
-                any(), anyInt(), any(), any());
-        verify(mDialogHandle).launchDialog(P2P_INVITATION_RECEIVED_TIMEOUT_MS);
+                any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS), anyInt(), any(), any());
+        verify(mDialogHandle).launchDialog();
 
         // Handle it programmatically.
         sendSimpleMsg(null, WifiP2pServiceImpl.PEER_CONNECTION_USER_REJECT);
@@ -8160,10 +8164,10 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         reset(mWifiDialogManager);
         reset(mDialogHandle);
         verify(mWifiDialogManager, never()).createP2pInvitationReceivedDialog(
-                any(), anyBoolean(), any(), anyInt(), any(), any());
+                any(), anyBoolean(), any(), anyInt(), anyInt(), any(), any());
 
         when(mWifiDialogManager.createP2pInvitationReceivedDialog(any(), anyBoolean(), any(),
-                anyInt(), any(), any())).thenReturn(mDialogHandle);
+                anyInt(), anyInt(), any(), any())).thenReturn(mDialogHandle);
         when(mWifiDialogManager.createP2pInvitationSentDialog(any(), any(), anyInt()))
                 .thenReturn(mDialogHandle);
         when(mClock.getElapsedSinceBootMillis()).thenReturn(P2P_PEER_AUTH_TIMEOUT_MS + 1L);
@@ -8175,8 +8179,8 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         // Another dialog should be triggered.
         verify(mWifiDialogManager).createP2pInvitationReceivedDialog(
                 eq(mTestWifiP2pDevice.deviceAddress), anyBoolean(),
-                any(), anyInt(), any(), any());
-        verify(mDialogHandle).launchDialog(P2P_INVITATION_RECEIVED_TIMEOUT_MS);
+                any(), eq(P2P_INVITATION_RECEIVED_TIMEOUT_MS), anyInt(), any(), any());
+        verify(mDialogHandle).launchDialog();
     }
 
     @Test
@@ -8632,5 +8636,49 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
         // P2P is really disabled when wifi is off.
         verify(mWifiNative).teardownInterface();
         verify(mWifiMonitor).stopMonitoring(anyString());
+    }
+
+    /**
+     * Verify {@link WifiP2pManager#GET_DIR_INFO} message.
+     */
+    @Test
+    public void testGetDirInfo() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(false);
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.GET_DIR_INFO);
+        assertTrue(mClientHandler.hasMessages(WifiP2pManager.GET_DIR_INFO_FAILED));
+
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(true);
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.GET_DIR_INFO);
+
+        verify(mClientHandler, times(2)).sendMessage(mMessageCaptor.capture());
+        List<Message> messages = mMessageCaptor.getAllValues();
+        assertEquals(WifiP2pManager.GET_DIR_INFO_FAILED, messages.get(0).what);
+        assertEquals(WifiP2pManager.RESPONSE_GET_DIR_INFO, messages.get(1).what);
+    }
+
+    /**
+     * Verify {@link WifiP2pManager#VALIDATE_DIR_INFO} message.
+     */
+    @Test
+    public void testValidateDirInfo() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        forceP2pEnabled(mClient1);
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(false);
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.VALIDATE_DIR_INFO);
+        assertTrue(mClientHandler.hasMessages(WifiP2pManager.VALIDATE_DIR_INFO_FAILED));
+
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(true);
+        sendSimpleMsg(mClientMessenger, WifiP2pManager.VALIDATE_DIR_INFO);
+
+        verify(mClientHandler, times(2)).sendMessage(mMessageCaptor.capture());
+        List<Message> messages = mMessageCaptor.getAllValues();
+        assertEquals(WifiP2pManager.VALIDATE_DIR_INFO_FAILED, messages.get(0).what);
+        assertEquals(WifiP2pManager.RESPONSE_VALIDATE_DIR_INFO, messages.get(1).what);
     }
 }

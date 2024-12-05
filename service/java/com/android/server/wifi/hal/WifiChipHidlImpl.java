@@ -120,7 +120,8 @@ public class WifiChipHidlImpl implements IWifiChip {
      */
     @Override
     @Nullable
-    public WifiApIface createBridgedApIface(@NonNull List<OuiKeyedData> vendorData) {
+    public WifiApIface createBridgedApIface(@NonNull List<OuiKeyedData> vendorData,
+            boolean isUsingMultiLinkOperation) {
         String methodStr = "createBridgedApIface";
         return validateAndCall(methodStr, null,
                 () -> createBridgedApIfaceInternal(methodStr));

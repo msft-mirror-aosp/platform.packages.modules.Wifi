@@ -28,7 +28,6 @@ import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WAPI;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SUITE_B;
-import static android.os.Build.VERSION.SDK_INT;
 
 import static com.android.server.wifi.TestUtil.createCapabilityBitset;
 
@@ -66,7 +65,6 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.test.MockAnswerUtil;
 import android.content.Context;
-import android.hardware.wifi.V1_0.WifiChannelWidthInMhz;
 import android.hardware.wifi.supplicant.AnqpData;
 import android.hardware.wifi.supplicant.AssociationRejectionData;
 import android.hardware.wifi.supplicant.BssTmData;
@@ -103,6 +101,7 @@ import android.hardware.wifi.supplicant.StaIfaceReasonCode;
 import android.hardware.wifi.supplicant.StaIfaceStatusCode;
 import android.hardware.wifi.supplicant.SupplicantStateChangeData;
 import android.hardware.wifi.supplicant.SupplicantStatusCode;
+import android.hardware.wifi.supplicant.WifiChannelWidthInMhz;
 import android.hardware.wifi.supplicant.WifiTechnology;
 import android.hardware.wifi.supplicant.WpaDriverCapabilitiesMask;
 import android.hardware.wifi.supplicant.WpsConfigError;
@@ -123,6 +122,7 @@ import android.net.wifi.WifiManager;
 import android.net.wifi.WifiMigration;
 import android.net.wifi.WifiSsid;
 import android.net.wifi.flags.Flags;
+import android.net.wifi.util.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -3451,7 +3451,7 @@ public class SupplicantStaIfaceHalAidlImplTest extends WifiBaseTest {
      */
     @Test
     public void testLegacyKeystoreMigration() throws Exception {
-        assumeTrue(SDK_INT >= 36);
+        assumeTrue(Environment.isSdkAtLeastB());
         executeAndValidateInitializationSequence();
         assertFalse(mDut.mHasMigratedLegacyKeystoreAliases);
 
