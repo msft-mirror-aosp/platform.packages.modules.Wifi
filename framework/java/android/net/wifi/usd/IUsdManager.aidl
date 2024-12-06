@@ -30,8 +30,6 @@ import android.net.wifi.usd.SubscribeConfig;
  * {@hide}
  */
 interface IUsdManager {
-    boolean isSubscriberSupported();
-    boolean isPublisherSupported();
     boolean isSubscriberAvailable();
     boolean isPublisherAvailable();
     void registerAvailabilityCallback(IAvailabilityCallback callback);
