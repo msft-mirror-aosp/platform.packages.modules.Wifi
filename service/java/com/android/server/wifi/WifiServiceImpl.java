@@ -350,6 +350,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
     private final WifiSettingsConfigStore mSettingsConfigStore;
     private final WifiResourceCache mResourceCache;
+    private boolean mIsUsdSupported = false;
 
     /**
      * Callback for use with LocalOnlyHotspot to unregister requesting applications upon death.
@@ -626,6 +627,11 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         mAfcManager = mWifiInjector.getAfcManager();
         mTwtManager = mWifiInjector.getTwtManager();
         mWepNetworkUsageController = mWifiInjector.getWepNetworkUsageController();
+        if (Environment.isSdkAtLeastB()) {
+            mIsUsdSupported = mContext.getResources().getBoolean(
+                    mContext.getResources().getIdentifier("config_deviceSupportsWifiUsd", "bool",
+                            "android"));
+        }
     }
 
     /**
@@ -9164,6 +9170,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 () -> mActiveModeWarden.getPrimaryClientModeManager().blockNetwork(option),
                 "disallowCurrentSuggestedNetwork");
     }
+
     /**
      * See {@link WifiManager#isUsdSubscriberSupported()}
      */
@@ -9175,6 +9182,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         int uid = getMockableCallingUid();
         if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
             throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        if (!mIsUsdSupported) {
+            return false;
         }
         // USDSubscriber is not supported.
         return false;
@@ -9192,8 +9202,10 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
             throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
         }
+        if (!mIsUsdSupported) {
+            return false;
+        }
         // USDPublisher is not supported.
         return false;
     }
-
 }
