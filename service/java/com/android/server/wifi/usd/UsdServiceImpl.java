@@ -86,32 +86,6 @@ public class UsdServiceImpl extends IUsdManager.Stub {
     }
 
     /**
-     * See {@link UsdManager#isSubscriberSupported()}
-     */
-    @Override
-    public boolean isSubscriberSupported() {
-        int uid = getMockableCallingUid();
-        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
-            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
-        }
-        // Subscriber is not supported.
-        return false;
-    }
-
-    /**
-     * See {@link UsdManager#isPublisherSupported()}
-     */
-    @Override
-    public boolean isPublisherSupported() {
-        int uid = getMockableCallingUid();
-        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
-            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
-        }
-        // Publisher is not supported.
-        return false;
-    }
-
-    /**
      * See {@link UsdManager#isSubscriberAvailable()}
      */
     @Override

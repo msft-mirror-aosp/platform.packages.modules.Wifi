@@ -356,6 +356,7 @@ def create_discovery_config(service_name,
                             s_type=None,
                             ssi=None,
                             match_filter=None,
+                            match_filter_list=None,
                             ttl=0,
                             term_cb_enable=True,
                             instant_mode=None):
@@ -384,18 +385,10 @@ def create_discovery_config(service_name,
         config[constants.SERVICE_SPECIFIC_INFO] = ssi
     if match_filter is not None:
         config[constants.MATCH_FILTER] = match_filter
+    if match_filter_list is not None:
+        config[constants.MATCH_FILTER_LIST] = match_filter_list
     if instant_mode is not None:
         config[constants.INSTANTMODE_ENABLE] = instant_mode
     config[constants.TTL_SEC] = ttl
     config[constants.TERMINATE_NOTIFICATION_ENABLED] = term_cb_enable
     return config
-
-def set_screen_on_and_unlock(ad: android_device.AndroidDevice):
-    """Set the screen to stay on and unlock the device.
-
-    Args:
-        ad: AndroidDevice instance.
-    """
-    ad.adb.shell("svc power stayon true")
-    ad.adb.shell("input keyevent KEYCODE_WAKEUP")
-    ad.adb.shell("wm dismiss-keyguard")

@@ -33,6 +33,8 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SCAN_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_LONG_LIVED;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TRANSIENT;
+import static com.android.server.wifi.WifiBlocklistMonitor.REASON_APP_DISALLOW;
+import static com.android.server.wifi.WifiConfigManager.LINK_CONFIGURATION_BSSID_MATCH_LENGTH;
 import static com.android.server.wifi.WifiSettingsConfigStore.SECONDARY_WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY;
@@ -85,6 +87,7 @@ import android.net.shared.ProvisioningConfiguration;
 import android.net.shared.ProvisioningConfiguration.ScanResultInfo;
 import android.net.vcn.VcnManager;
 import android.net.vcn.VcnNetworkPolicyResult;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.MloLink;
 import android.net.wifi.ScanResult;
@@ -160,6 +163,7 @@ import com.android.server.wifi.proto.nano.WifiMetricsProto;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.StaEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiIsUnusableEvent;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStats;
+import com.android.server.wifi.proto.nano.WifiMetricsProto.WifiUsabilityStatsEntry;
 import com.android.server.wifi.util.ActionListenerWrapper;
 import com.android.server.wifi.util.InformationElementUtil;
 import com.android.server.wifi.util.NativeUtil;
@@ -6477,6 +6481,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             mRssiPollToken++;
             if (mEnableRssiPolling) {
                 sendMessage(CMD_RSSI_POLL, mRssiPollToken, 0);
+                mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                        WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED);
             } else {
                 updateLinkLayerStatsRssiAndScoreReport();
             }
@@ -6621,6 +6627,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             WifiDiagnostics.REPORT_REASON_REACHABILITY_LOST);
                     mWifiMetrics.logWifiIsUnusableEvent(mInterfaceName,
                             WifiIsUnusableEvent.TYPE_IP_REACHABILITY_LOST);
+                    mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                            WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_IP_REACHABILITY_LOST, -1);
                     if (mWifiGlobals.getIpReachabilityDisconnectEnabled()) {
                         handleIpReachabilityLost(-1);
                     } else {
@@ -6632,6 +6640,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     if (!isFromCurrentIpClientCallbacks(message)) break;
                     mWifiDiagnostics.triggerBugReportDataCapture(
                             WifiDiagnostics.REPORT_REASON_REACHABILITY_FAILURE);
+                    mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                            WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_IP_REACHABILITY_FAILURE,
+                            ((ReachabilityLossInfoParcelable) message.obj).reason);
                     handleIpReachabilityFailure((ReachabilityLossInfoParcelable) message.obj);
                     break;
                 }
@@ -6693,7 +6704,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 }
                 case CMD_ONESHOT_RSSI_POLL: {
                     if (!mEnableRssiPolling) {
-                        updateLinkLayerStatsRssiDataStallScoreReport();
+                        updateLinkLayerStatsRssiDataStallScoreReport(true);
                     }
                     break;
                 }
@@ -6705,7 +6716,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         break;
                     }
                     if (message.arg1 == mRssiPollToken) {
-                        updateLinkLayerStatsRssiDataStallScoreReport();
+                        updateLinkLayerStatsRssiDataStallScoreReport(false);
                         mWifiScoreCard.noteSignalPoll(mWifiInfo);
                         // Update the polling interval as needed before sending the delayed message
                         // so that the next polling can happen after the updated interval
@@ -6737,10 +6748,14 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         updateLinkLayerStatsRssiSpeedFrequencyCapabilities(txBytes, rxBytes);
                         sendMessageDelayed(obtainMessage(CMD_RSSI_POLL, mRssiPollToken, 0),
                                 mWifiGlobals.getPollRssiIntervalMillis());
+                        mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                                WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED);
                     }
                     else {
                         mRssiMonitor.setShortPollRssiInterval();
                         removeMessages(CMD_RSSI_POLL);
+                        mWifiMetrics.logAsynchronousEvent(mInterfaceName,
+                                WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_DISABLED);
                     }
                     break;
                 }
@@ -6900,8 +6915,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
 
         /**
          * Fetches link stats, updates Wifi Data Stall, Score Card and Score Report.
+         *
+         * oneshot indicates that this update request came from CMD_ONESHOT_RSSI_POLL.
          */
-        private WifiLinkLayerStats updateLinkLayerStatsRssiDataStallScoreReport() {
+        private WifiLinkLayerStats updateLinkLayerStatsRssiDataStallScoreReport(boolean oneshot) {
             // Get Info and continue polling
             long txBytes;
             long rxBytes;
@@ -6925,7 +6942,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             // mWifiMetrics.logScorerPredictionResult
             mWifiMetrics.updateWiFiEvaluationAndScorerStats(mWifiScoreReport.getLingering(),
                     mWifiInfo, mLastConnectionCapabilities);
-            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats);
+            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats, oneshot,
+                    statusDataStall);
             if (getClientRoleForMetrics(getConnectedWifiConfiguration())
                     == WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
                 mWifiMetrics.logScorerPredictionResult(mWifiInjector.hasActiveModem(),
@@ -8881,5 +8899,39 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         if (isPrimary()) {
             mWifiInjector.getActiveModeWarden().updateCurrentConnectionInfo();
         }
+    }
+
+    @Override
+    public void blockNetwork(BlockingOption option) {
+        if (mLastNetworkId == WifiConfiguration.INVALID_NETWORK_ID) {
+            Log.e(TAG, "Calling blockNetwork when disconnected");
+            return;
+        }
+        WifiConfiguration configuration = mWifiConfigManager.getConfiguredNetwork(mLastNetworkId);
+        if (configuration == null) {
+            Log.e(TAG, "No available config for networkId: " + mLastNetworkId);
+            return;
+        }
+        if (mLastBssid == null) {
+            Log.e(TAG, "No available BSSID for networkId: " + mLastNetworkId);
+            return;
+        }
+        if (option.isBlockingBssidOnly()) {
+            mWifiBlocklistMonitor.blockBssidForDurationMs(mLastBssid,
+                    mWifiConfigManager.getConfiguredNetwork(mLastNetworkId),
+                    option.getBlockingTimeSeconds() * 1000L, REASON_APP_DISALLOW, 0);
+        } else {
+            ScanDetailCache scanDetailCache = mWifiConfigManager
+                    .getScanDetailCacheForNetwork(mLastNetworkId);
+            for (String bssid : scanDetailCache.keySet()) {
+                if (bssid.regionMatches(true, 0, mLastBssid, 0,
+                        LINK_CONFIGURATION_BSSID_MATCH_LENGTH)) {
+                    mWifiBlocklistMonitor.blockBssidForDurationMs(bssid,
+                            mWifiConfigManager.getConfiguredNetwork(mLastNetworkId),
+                            option.getBlockingTimeSeconds() * 1000L, REASON_APP_DISALLOW, 0);
+                }
+            }
+        }
+        mWifiBlocklistMonitor.updateAndGetBssidBlocklistForSsids(Set.of(configuration.SSID));
     }
 }

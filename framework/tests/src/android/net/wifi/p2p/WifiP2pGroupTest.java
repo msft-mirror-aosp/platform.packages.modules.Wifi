@@ -20,6 +20,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import android.net.InetAddresses;
 import android.net.MacAddress;
@@ -52,6 +53,8 @@ public class WifiP2pGroupTest {
     private static final int FREQUENCY = 5300;
     private static final String CLIENT_1_DEV_ADDRESS = "aa:bb:cc:dd:ee:01";
     private static final String CLIENT_2_DEV_ADDRESS = "aa:bb:cc:dd:ee:02";
+    private static final byte[] GROUP_OWNER_INTERFACE_ADDRESS =
+            { 0x00, 0x11, 0x22, 0x33, 0x44, 0x55 };
     private static final WifiP2pDevice CLIENT_1 = new WifiP2pDevice(CLIENT_1_DEV_ADDRESS);
     private static final WifiP2pDevice CLIENT_2 = new WifiP2pDevice(CLIENT_2_DEV_ADDRESS);
     private static final MacAddress CLIENT_1_INTERFACE_MAC_ADDRESS =
@@ -143,5 +146,17 @@ public class WifiP2pGroupTest {
         }
         assertEquals(group.toString(), fromParcel.toString());
 
+    }
+
+    /** Verify {@link WifiP2pGroup#getGroupOwnerBssid()} */
+    @Test
+    public void testGetGroupOwnerBssid() throws Exception {
+        assumeTrue(Environment.isSdkAtLeastB());
+        WifiP2pGroup group = new WifiP2pGroup();
+        group.setIsGroupOwner(true);
+        group.interfaceAddress = GROUP_OWNER_INTERFACE_ADDRESS;
+        group.setSecurityType(WifiP2pGroup.SECURITY_TYPE_WPA3_SAE);
+        assertEquals(MacAddress.fromBytes(GROUP_OWNER_INTERFACE_ADDRESS),
+                group.getGroupOwnerBssid());
     }
 }

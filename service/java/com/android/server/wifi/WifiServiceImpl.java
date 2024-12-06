@@ -103,6 +103,7 @@ import android.net.Uri;
 import android.net.ip.IpClientUtil;
 import android.net.thread.ThreadNetworkController;
 import android.net.thread.ThreadNetworkManager;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -7733,6 +7734,29 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         return mSettingsStore.handleWifiScoringEnabled(enabled);
     }
 
+    /**
+     * See {@link android.net.wifi.WifiManager#storeCapturedData(Executor, IntConsumer, int,
+     * booloan, long, long)}.
+     */
+    @Override
+    public void storeCapturedData(int triggerType, boolean isFullCapture,
+            long triggerStartTimeMillis, long triggerStopTimeMillis,
+            @NonNull IIntegerListener listener) {
+        if (listener == null) {
+            throw new IllegalArgumentException("listener should not be null");
+        }
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.WIFI_UPDATE_USABILITY_STATS_SCORE, "WifiService");
+        mWifiThreadRunner.post(() -> {
+            try {
+                listener.onResult(mWifiMetrics.storeCapturedData(triggerType, isFullCapture,
+                        triggerStartTimeMillis, triggerStopTimeMillis));
+            } catch (RemoteException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }, TAG + "#storeCapturedData");
+    }
+
     @VisibleForTesting
     static boolean isValidBandForGetUsableChannels(@WifiScanner.WifiBand int band) {
         switch (band) {
@@ -9114,4 +9138,61 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             }
         }, TAG + "#getAutojoinDisallowedSecurityTypes");
     }
+
+    @Override
+    public void disallowCurrentSuggestedNetwork(@NonNull BlockingOption option,
+            @NonNull String packageName) {
+        Objects.requireNonNull(option, "blockingOption cannot be null");
+        int callingUid = Binder.getCallingUid();
+        mWifiPermissionsUtil.checkPackage(callingUid, packageName);
+        if (enforceChangePermission(packageName) != MODE_ALLOWED) {
+            throw new SecurityException("Caller does not hold CHANGE_WIFI_STATE permission");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("disallowCurrentSuggestedNetwork:  Uid=% Package Name=%").c(
+                    callingUid).c(option.toString()).flush();
+        }
+        if (mActiveModeWarden.getWifiState() != WIFI_STATE_ENABLED) {
+            return;
+        }
+        WifiInfo info = mActiveModeWarden.getConnectionInfo();
+        if (!packageName.equals(info.getRequestingPackageName())) {
+            return;
+        }
+        mWifiThreadRunner.post(
+                () -> mActiveModeWarden.getPrimaryClientModeManager().blockNetwork(option),
+                "disallowCurrentSuggestedNetwork");
+    }
+    /**
+     * See {@link WifiManager#isUsdSubscriberSupported()}
+     */
+    @Override
+    public boolean isUsdSubscriberSupported() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException("SDK level too old");
+        }
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        // USDSubscriber is not supported.
+        return false;
+    }
+
+    /**
+     * See {@link WifiManager#isUsdPublisherSupported()}
+     */
+    @Override
+    public boolean isUsdPublisherSupported() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException("SDK level too old");
+        }
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        // USDPublisher is not supported.
+        return false;
+    }
+
 }

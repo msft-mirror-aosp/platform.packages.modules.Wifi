@@ -2578,6 +2578,32 @@ message WifiUsabilityStatsEntry {
     NETWORK_TYPE_NR = 7;
   }
 
+  enum CaptureEventType {
+    // Unknown event
+    CAPTURE_EVENT_TYPE_UNKNOWN = 0;
+
+    // This is a synchronous event
+    CAPTURE_EVENT_TYPE_SYNCHRONOUS = 1;
+
+    // RSSI polling turned on
+    CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED = 2;
+
+    // RSSI polling turned off
+    CAPTURE_EVENT_TYPE_RSSI_POLLING_DISABLED = 3;
+
+    // Data sample came from CMD_ONESHOT_RSSI_POLL
+    CAPTURE_EVENT_TYPE_ONESHOT_RSSI_POLL = 4;
+
+    // IP reachability lost
+    CAPTURE_EVENT_TYPE_IP_REACHABILITY_LOST = 5;
+
+    // IP reachability failure
+    CAPTURE_EVENT_TYPE_IP_REACHABILITY_FAILURE = 6;
+
+    // Firmware alert
+    CAPTURE_EVENT_TYPE_FIRMWARE_ALERT = 7;
+  }
+
   // Absolute milliseconds from device boot when these stats were sampled
   optional int64 time_stamp_ms = 1;
 
@@ -2780,6 +2806,15 @@ message WifiUsabilityStatsEntry {
 
   // Device Role of thread. Refers to ThreadNetworkController@DeviceRole
   optional int32 thread_device_role = 62;
+
+  // Capture buffer event type
+  optional CaptureEventType capture_event_type = 63;
+
+  // Some capture event types (eg. ip reachability lost) have a code associated
+  // with them. This code is stored here.
+  optional int32 capture_event_type_subcode = 64;
+
+  optional int32 status_data_stall = 65;
 }
 
 message ContentionTimeStats {

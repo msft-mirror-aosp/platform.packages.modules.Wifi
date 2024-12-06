@@ -28,6 +28,11 @@ python_library_host {
     libs: ["wifi_aware_constants"],
 }
 
+python_library_host {
+    name: "wifi_test_utils",
+    srcs: ["wifi_test_utils.py"],
+}
+
 python_defaults {
     name: "CtsWifiMultiDevicePythonDefaults",
     libs: [
@@ -64,11 +69,12 @@ python_test_host {
     name: "WifiAwareManagerTestCases",
     main: "aware/wifi_aware_manager_test.py",
     srcs: ["aware/wifi_aware_manager_test.py"],
-    device_common_data: [":wifi_aware_snippet_new"],
+    device_common_data: [":wifi_mobly_snippet"],
     libs: [
         "aware_lib_utils",
         "mobly",
         "wifi_aware_constants",
+        "wifi_test_utils",
     ],
     test_suites: [
         "general-tests",
@@ -93,6 +99,28 @@ python_test_host {
         "wifi_direct_constants",
     ],
     device_common_data: [":wifi_direct_mobly_snippet"],
+    test_options: {
+        unit_test: false,
+        tags: ["mobly"],
+    },
+    test_suites: ["general-tests"],
+    version: {
+        py3: {
+            embedded_launcher: true,
+        },
+    },
+}
+
+python_test_host {
+    name: "WifiDirectGoNegTests",
+    main: "direct/group_owner_negotiation_test.py",
+    srcs: ["direct/group_owner_negotiation_test.py"],
+    libs: [
+        "mobly",
+        "wifi_direct_constants",
+        "wifi_test_utils",
+    ],
+    device_common_data: [":wifi_mobly_snippet"],
     test_options: {
         unit_test: false,
         tags: ["mobly"],
