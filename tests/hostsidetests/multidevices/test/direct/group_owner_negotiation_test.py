@@ -79,17 +79,19 @@ def _init_wifi_p2p(
         corresponding to Wi-Fi p2p intents received on device.
     """
     broadcast_receiver = ad.wifi.wifiP2pInitialize()
-    init_event = broadcast_receiver.waitAndGet(
+
+    def _is_p2p_enabled(event):
+        return (
+            event.data[constants.EXTRA_WIFI_STATE]
+            == constants.ExtraWifiState.WIFI_P2P_STATE_ENABLED
+        )
+
+    # Wait until receiving the "p2p enabled" event. We might receive a
+    # "p2p disabled" event before that.
+    broadcast_receiver.waitForEvent(
         event_name=constants.WIFI_P2P_STATE_CHANGED_ACTION,
+        predicate=_is_p2p_enabled,
         timeout=_DEFAULT_TIMEOUT.total_seconds(),
-    )
-    state = constants.ExtraWifiState(
-        init_event.data[constants.EXTRA_WIFI_STATE]
-    )
-    asserts.assert_equal(
-        state,
-        constants.ExtraWifiState.WIFI_P2P_STATE_ENABLED,
-        f'{ad} failed to initialize Wi-Fi P2P, state: {state}',
     )
     return broadcast_receiver
 
@@ -383,10 +385,14 @@ def _clear_events(device: DeviceState, event_name):
 
 def _teardown_wifi_p2p(ad: android_device.AndroidDevice):
     """Destroys all resources initialized in `_setup_wifi_p2p`."""
-    ad.wifi.wifiP2pStopPeerDiscovery()
-    ad.wifi.wifiP2pCancelConnect()
-    ad.wifi.wifiP2pRemoveGroup()
-    ad.wifi.p2pClose()
+    try:
+        ad.wifi.wifiP2pStopPeerDiscovery()
+        ad.wifi.wifiP2pCancelConnect()
+        ad.wifi.wifiP2pRemoveGroup()
+    finally:
+        # Make sure to call `p2pClose`, otherwise `_setup_wifi_p2p` won't be
+        # able to run again.
+        ad.wifi.p2pClose()
 
 
 class GroupOwnerNegotiationTest(base_test.BaseTestClass):
