@@ -9163,4 +9163,36 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 () -> mActiveModeWarden.getPrimaryClientModeManager().blockNetwork(option),
                 "disallowCurrentSuggestedNetwork");
     }
+    /**
+     * See {@link WifiManager#isUsdSubscriberSupported()}
+     */
+    @Override
+    public boolean isUsdSubscriberSupported() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException("SDK level too old");
+        }
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        // USDSubscriber is not supported.
+        return false;
+    }
+
+    /**
+     * See {@link WifiManager#isUsdPublisherSupported()}
+     */
+    @Override
+    public boolean isUsdPublisherSupported() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException("SDK level too old");
+        }
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        // USDPublisher is not supported.
+        return false;
+    }
+
 }
