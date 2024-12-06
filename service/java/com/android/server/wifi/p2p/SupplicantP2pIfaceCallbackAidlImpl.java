@@ -17,10 +17,12 @@
 package com.android.server.wifi.p2p;
 
 import static com.android.net.module.util.Inet4AddressUtils.intToInet4AddressHTL;
+import static com.android.wifi.flags.Flags.wifiDirectR2;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.hardware.wifi.supplicant.ISupplicantP2pIfaceCallback;
+import android.hardware.wifi.supplicant.KeyMgmtMask;
 import android.hardware.wifi.supplicant.P2pClientEapolIpAddressInfo;
 import android.hardware.wifi.supplicant.P2pDeviceFoundEventParams;
 import android.hardware.wifi.supplicant.P2pGoNegotiationReqEventParams;
@@ -44,6 +46,7 @@ import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pProvDiscEvent;
 import android.net.wifi.p2p.WifiP2pWfdInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceResponse;
+import android.net.wifi.util.Environment;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -272,7 +275,7 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
             boolean isPersistent) {
         onGroupStarted(groupIfName, isGroupOwner, ssid, frequency, psk, passphrase, goDeviceAddress,
                 isPersistent, /* goInterfaceAddress */ null, /*p2pClientIpInfo */ null,
-                /* vendorData */ null);
+                /* vendorData */ null, 0);
     }
 
     /**
@@ -283,9 +286,13 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
     @Override
     public void onGroupStartedWithParams(P2pGroupStartedEventParams groupStartedEventParams) {
         List<OuiKeyedData> vendorData = null;
+        int keyMgmtMask = 0;
         if (mServiceVersion >= 3 && groupStartedEventParams.vendorData != null) {
             vendorData = HalAidlUtil.halToFrameworkOuiKeyedDataList(
                     groupStartedEventParams.vendorData);
+        }
+        if (mServiceVersion >= 4) {
+            keyMgmtMask = groupStartedEventParams.keyMgmtMask;
         }
         onGroupStarted(groupStartedEventParams.groupInterfaceName,
                 groupStartedEventParams.isGroupOwner, groupStartedEventParams.ssid,
@@ -294,14 +301,16 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
                 groupStartedEventParams.isPersistent, groupStartedEventParams.goInterfaceAddress,
                 groupStartedEventParams.isP2pClientEapolIpAddressInfoPresent
                         ? groupStartedEventParams.p2pClientIpInfo : null,
-                vendorData);
+                vendorData,
+                keyMgmtMask);
     }
 
     private void onGroupStarted(String groupIfName, boolean isGroupOwner, byte[] ssid,
             int frequency, byte[] psk, String passphrase, byte[] goDeviceAddress,
             boolean isPersistent, byte[] goInterfaceAddress,
             P2pClientEapolIpAddressInfo p2pClientIpInfo,
-            @Nullable List<OuiKeyedData> vendorData) {
+            @Nullable List<OuiKeyedData> vendorData,
+            int keyMgmtMask) {
         if (groupIfName == null) {
             Log.e(TAG, "Missing group interface name.");
             return;
@@ -362,7 +371,27 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
             group.setVendorData(vendorData);
         }
 
+        if (Environment.isSdkAtLeastB()
+                && wifiDirectR2()) {
+            group.setSecurityType(convertHalKeyMgmtMaskToP2pGroupSecurityType(keyMgmtMask));
+        }
+
         mMonitor.broadcastP2pGroupStarted(mInterface, group);
+    }
+
+    private @WifiP2pGroup.SecurityType int convertHalKeyMgmtMaskToP2pGroupSecurityType(
+            int keyMgmtMask) {
+        if (keyMgmtMask == KeyMgmtMask.WPA_PSK) {
+            return WifiP2pGroup.SECURITY_TYPE_WPA2_PSK;
+        } else if (keyMgmtMask == KeyMgmtMask.SAE) {
+            return WifiP2pGroup.SECURITY_TYPE_WPA3_SAE;
+        } else if ((keyMgmtMask & (KeyMgmtMask.SAE | KeyMgmtMask.WPA_PSK))
+                == (KeyMgmtMask.SAE | KeyMgmtMask.WPA_PSK)) {
+            return WifiP2pGroup.SECURITY_TYPE_WPA3_COMPATIBILITY;
+        } else {
+            Log.e(TAG, "Unknown Key management mask: " + keyMgmtMask);
+            return WifiP2pGroup.SECURITY_TYPE_UNKNOWN;
+        }
     }
 
     /**
