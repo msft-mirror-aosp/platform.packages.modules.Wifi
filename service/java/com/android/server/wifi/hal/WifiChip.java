@@ -37,6 +37,7 @@ import com.android.server.wifi.util.NativeUtil;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.BitSet;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -555,16 +556,17 @@ public class WifiChip {
     }
 
     /**
-     * See comments for {@link IWifiChip#createBridgedApIface(List)}
+     * See comments for {@link IWifiChip#createBridgedApIface(List, boolean)}
      */
     @Nullable
-    public WifiApIface createBridgedApIface(@NonNull List<OuiKeyedData> vendorData) {
+    public WifiApIface createBridgedApIface(@NonNull List<OuiKeyedData> vendorData,
+            boolean isUsingMultiLinkOperation) {
         if (vendorData == null) {
             Log.e(TAG, "createBridgedApIface received null vendorData");
             return null;
         }
         return validateAndCall("createBridgedApIface", null,
-                () -> mWifiChip.createBridgedApIface(vendorData));
+                () -> mWifiChip.createBridgedApIface(vendorData, isUsingMultiLinkOperation));
     }
 
     /**
@@ -657,16 +659,16 @@ public class WifiChip {
     /**
      * See comments for {@link IWifiChip#getCapabilitiesBeforeIfacesExist()}
      */
-    public Response<Long> getCapabilitiesBeforeIfacesExist() {
-        return validateAndCall("getCapabilitiesBeforeIfacesExist", new Response<>(0L),
+    public Response<BitSet> getCapabilitiesBeforeIfacesExist() {
+        return validateAndCall("getCapabilitiesBeforeIfacesExist", new Response<>(new BitSet()),
                 () -> mWifiChip.getCapabilitiesBeforeIfacesExist());
     }
 
     /**
      * See comments for {@link IWifiChip#getCapabilitiesAfterIfacesExist()}
      */
-    public Response<Long> getCapabilitiesAfterIfacesExist() {
-        return validateAndCall("getCapabilitiesAfterIfacesExist", new Response<>(0L),
+    public Response<BitSet> getCapabilitiesAfterIfacesExist() {
+        return validateAndCall("getCapabilitiesAfterIfacesExist", new Response<>(new BitSet()),
                 () -> mWifiChip.getCapabilitiesAfterIfacesExist());
     }
 
