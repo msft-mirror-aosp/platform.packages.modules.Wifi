@@ -16,13 +16,19 @@
 
 package com.android.server.wifi.mainline_supplicant;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.net.wifi.util.Environment;
+import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.system.wifi.mainline_supplicant.IMainlineSupplicant;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
+
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Allows us to bring up, tear down, and make calls into the mainline supplicant process.
@@ -33,16 +39,55 @@ import com.android.internal.annotations.VisibleForTesting;
 public class MainlineSupplicant {
     private static final String TAG = "MainlineSupplicant";
     private static final String MAINLINE_SUPPLICANT_SERVICE_NAME = "wifi_mainline_supplicant";
+    private static final long WAIT_FOR_DEATH_TIMEOUT_MS = 50L;
 
     private IMainlineSupplicant mIMainlineSupplicant;
     private final Object mLock = new Object();
+    private SupplicantDeathRecipient mDeathRecipient;
+    private CountDownLatch mWaitForDeathLatch;
 
-    public MainlineSupplicant() {}
+    public MainlineSupplicant() {
+        mDeathRecipient = new SupplicantDeathRecipient();
+    }
 
     @VisibleForTesting
     protected IMainlineSupplicant getNewServiceBinderMockable() {
         return IMainlineSupplicant.Stub.asInterface(
                 ServiceManagerWrapper.waitForService(MAINLINE_SUPPLICANT_SERVICE_NAME));
+    }
+
+    private @Nullable IBinder getCurrentServiceBinder() {
+        synchronized (mLock) {
+            if (mIMainlineSupplicant == null) {
+                return null;
+            }
+            return mIMainlineSupplicant.asBinder();
+        }
+    }
+
+    private class SupplicantDeathRecipient implements IBinder.DeathRecipient {
+        @Override
+        public void binderDied() {
+        }
+
+        @Override
+        public void binderDied(@NonNull IBinder who) {
+            synchronized (mLock) {
+                IBinder currentBinder = getCurrentServiceBinder();
+                Log.i(TAG, "Death notification received. who=" + who
+                        + ", currentBinder=" + currentBinder);
+                if (currentBinder == null || currentBinder != who) {
+                    Log.i(TAG, "Ignoring stale death notification");
+                    return;
+                }
+                if (mWaitForDeathLatch != null) {
+                    // Latch indicates that this event was triggered by stopService
+                    mWaitForDeathLatch.countDown();
+                }
+                mIMainlineSupplicant = null;
+                Log.i(TAG, "Service death was handled successfully");
+            }
+        }
     }
 
     /**
@@ -60,11 +105,21 @@ public class MainlineSupplicant {
                 Log.i(TAG, "Service has already been started");
                 return true;
             }
+
             mIMainlineSupplicant = getNewServiceBinderMockable();
             if (mIMainlineSupplicant == null) {
                 Log.e(TAG, "Unable to retrieve binder from the ServiceManager");
                 return false;
             }
+
+            try {
+                mWaitForDeathLatch = null;
+                mIMainlineSupplicant.asBinder().linkToDeath(mDeathRecipient, /* flags= */  0);
+            } catch (RemoteException e) {
+                handleRemoteException(e, "startService");
+                return false;
+            }
+
             Log.i(TAG, "Service was started successfully");
             return true;
         }
@@ -89,16 +144,25 @@ public class MainlineSupplicant {
                 Log.i(TAG, "Service has already been stopped");
                 return;
             }
-            final String methodName = "stopService";
             try {
+                Log.i(TAG, "Attempting to stop the service");
+                mWaitForDeathLatch = new CountDownLatch(1);
                 mIMainlineSupplicant.terminate();
-                Log.i(TAG, "Service was terminated successfully");
-            } catch (ServiceSpecificException e) {
-                handleServiceSpecificException(e, methodName);
             } catch (RemoteException e) {
-                handleRemoteException(e, methodName);
+                handleRemoteException(e, "stopService");
+                return;
             }
-            mIMainlineSupplicant = null;
+        }
+
+        // Wait for latch to confirm the service death
+        try {
+            if (mWaitForDeathLatch.await(WAIT_FOR_DEATH_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                Log.i(TAG, "Service death confirmation was received");
+            } else {
+                Log.e(TAG, "Timed out waiting for confirmation of service death");
+            }
+        } catch (InterruptedException e) {
+            Log.e(TAG, "Failed to wait for service death");
         }
     }
 
