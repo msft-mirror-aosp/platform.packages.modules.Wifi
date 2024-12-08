@@ -33,6 +33,8 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SCAN_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_LONG_LIVED;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TRANSIENT;
+import static com.android.server.wifi.WifiBlocklistMonitor.REASON_APP_DISALLOW;
+import static com.android.server.wifi.WifiConfigManager.LINK_CONFIGURATION_BSSID_MATCH_LENGTH;
 import static com.android.server.wifi.WifiSettingsConfigStore.SECONDARY_WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY;
@@ -85,6 +87,7 @@ import android.net.shared.ProvisioningConfiguration;
 import android.net.shared.ProvisioningConfiguration.ScanResultInfo;
 import android.net.vcn.VcnManager;
 import android.net.vcn.VcnNetworkPolicyResult;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.MloLink;
 import android.net.wifi.ScanResult;
@@ -8896,5 +8899,39 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         if (isPrimary()) {
             mWifiInjector.getActiveModeWarden().updateCurrentConnectionInfo();
         }
+    }
+
+    @Override
+    public void blockNetwork(BlockingOption option) {
+        if (mLastNetworkId == WifiConfiguration.INVALID_NETWORK_ID) {
+            Log.e(TAG, "Calling blockNetwork when disconnected");
+            return;
+        }
+        WifiConfiguration configuration = mWifiConfigManager.getConfiguredNetwork(mLastNetworkId);
+        if (configuration == null) {
+            Log.e(TAG, "No available config for networkId: " + mLastNetworkId);
+            return;
+        }
+        if (mLastBssid == null) {
+            Log.e(TAG, "No available BSSID for networkId: " + mLastNetworkId);
+            return;
+        }
+        if (option.isBlockingBssidOnly()) {
+            mWifiBlocklistMonitor.blockBssidForDurationMs(mLastBssid,
+                    mWifiConfigManager.getConfiguredNetwork(mLastNetworkId),
+                    option.getBlockingTimeSeconds() * 1000L, REASON_APP_DISALLOW, 0);
+        } else {
+            ScanDetailCache scanDetailCache = mWifiConfigManager
+                    .getScanDetailCacheForNetwork(mLastNetworkId);
+            for (String bssid : scanDetailCache.keySet()) {
+                if (bssid.regionMatches(true, 0, mLastBssid, 0,
+                        LINK_CONFIGURATION_BSSID_MATCH_LENGTH)) {
+                    mWifiBlocklistMonitor.blockBssidForDurationMs(bssid,
+                            mWifiConfigManager.getConfiguredNetwork(mLastNetworkId),
+                            option.getBlockingTimeSeconds() * 1000L, REASON_APP_DISALLOW, 0);
+                }
+            }
+        }
+        mWifiBlocklistMonitor.updateAndGetBssidBlocklistForSsids(Set.of(configuration.SSID));
     }
 }
