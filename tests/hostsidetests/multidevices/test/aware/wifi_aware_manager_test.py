@@ -30,11 +30,12 @@ from mobly import utils
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import callback_handler_v2
 from mobly.snippet import callback_event
+import wifi_test_utils
 
 from aware import constants
 from aware import aware_lib_utils
 
-PACKAGE_NAME = constants.WIFI_AWARE_SNIPPET_PACKAGE_NAME
+PACKAGE_NAME = constants.WIFI_SNIPPET_PACKAGE_NAME
 _DEFAULT_TIMEOUT = constants.WAIT_WIFI_STATE_TIME_OUT.total_seconds()
 _REQUEST_NETWORK_TIMEOUT_MS = 15 * 1000
 _MSG_ID_SUB_TO_PUB = random.randint(1000, 5000)
@@ -48,7 +49,7 @@ _IS_SESSION_INIT = constants.DiscoverySessionCallbackParamsType.IS_SESSION_INIT
 _TRANSPORT_TYPE_WIFI_AWARE = (
     constants.NetworkCapabilities.Transport.TRANSPORT_WIFI_AWARE
 )
-_LARGE_ENOUGH_DISTANCE_MM = 10000  # 10 meters
+_LARGE_ENOUGH_DISTANCE_MM = 100000  # 100 meters
 _MIN_RSSI = -100
 _WAIT_SEC_FOR_RTT_INITIATOR_RESPONDER_SWITCH = 5
 
@@ -99,7 +100,7 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
                 not device.wifi_aware_snippet.wifiAwareIsSupported(),
                 f'{device} does not support Wi-Fi Aware.',
             )
-            aware_lib_utils.set_screen_on_and_unlock(device)
+            wifi_test_utils.set_screen_on_and_unlock(device)
             asserts.abort_all_if(
                 not device.wifi_aware_snippet.wifiAwareIsAvailable(),
                 f'{device} Wi-Fi Aware is not available.',
