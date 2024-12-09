@@ -122,44 +122,6 @@ public class UsdManager {
     }
 
     /**
-     * Return whether subscriber is supported or not.
-     */
-    @RequiresPermission(MANAGE_WIFI_NETWORK_SELECTION)
-    public boolean isSubscriberSupported() {
-        if (!Environment.isSdkAtLeastB()) {
-            throw new UnsupportedOperationException();
-        }
-        try {
-            return mService.isSubscriberSupported();
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Return whether publish is supported or not.
-     * <p>
-     * The publisher support is controlled by an overlay config_wifiUsdPublisherSupported.
-     * By default, the feature will be disabled because the publisher operation impacts other
-     * concurrency operation such as Station. The USD publisher switches channels and dwells a
-     * longer time (500 milliseconds to 1 second) on non-home channel which disrupts other
-     * concurrency operation.
-     *
-     * @return true if publisher feature is supported, otherwise false.
-     */
-    @RequiresPermission(MANAGE_WIFI_NETWORK_SELECTION)
-    public boolean isPublisherSupported() {
-        if (!Environment.isSdkAtLeastB()) {
-            throw new UnsupportedOperationException();
-        }
-        try {
-            return mService.isPublisherSupported();
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
      * Checks if the subscriber feature is currently available or not. Due to concurrent operations
      * such as Station, SoftAP, Wi-Fi Aware, Wi-Fi Direct ..etc. the subscriber functionality
      * may not be available.

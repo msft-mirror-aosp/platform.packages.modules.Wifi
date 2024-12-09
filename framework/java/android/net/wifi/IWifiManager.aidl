@@ -20,6 +20,7 @@ import android.net.DhcpInfo;
 import android.net.DhcpOption;
 import android.net.Network;
 import android.net.TetheringManager.TetheringRequest;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -550,6 +551,10 @@ interface IWifiManager {
 
     void getAutojoinDisallowedSecurityTypes(in IIntegerListener listener, in Bundle extras);
 
+    void disallowCurrentSuggestedNetwork(in BlockingOption option, String packageName);
+
     void storeCapturedData(int triggerType, boolean isFullCapture, long triggerStartTimeMillis,
             long triggerStopTimeMillis, in IIntegerListener listener);
+    boolean isUsdSubscriberSupported();
+    boolean isUsdPublisherSupported();
 }
