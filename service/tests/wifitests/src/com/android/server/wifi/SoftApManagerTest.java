@@ -262,7 +262,7 @@ public class SoftApManagerTest extends WifiBaseTest {
     /** Old callback event from wificond */
     private void mockChannelSwitchEvent(int frequency, int bandwidth) {
         mSoftApHalCallbackCaptor.getValue().onInfoChanged(
-                TEST_INTERFACE_NAME, frequency, bandwidth, 0, null, Collections.emptyList());
+                TEST_INTERFACE_NAME, frequency, bandwidth, 0, null, null, Collections.emptyList());
     }
 
     /** New callback event from hostapd */
@@ -271,7 +271,8 @@ public class SoftApManagerTest extends WifiBaseTest {
                 ? apInfo.getVendorData() : Collections.emptyList();
         mSoftApHalCallbackCaptor.getValue().onInfoChanged(
                 apInfo.getApInstanceIdentifier(), apInfo.getFrequency(), apInfo.getBandwidth(),
-                apInfo.getWifiStandardInternal(), apInfo.getBssidInternal(), vendorData);
+                apInfo.getWifiStandardInternal(), apInfo.getBssidInternal(),
+                apInfo.getMldAddress(), vendorData);
         mTestSoftApInfoMap.put(apInfo.getApInstanceIdentifier(), apInfo);
         mTestWifiClientsMap.put(apInfo.getApInstanceIdentifier(), new ArrayList<WifiClient>());
     }
