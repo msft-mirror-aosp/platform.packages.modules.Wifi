@@ -606,6 +606,7 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
         mInOrder.verify(mSupplicantStaIfaceHal).getWpaDriverFeatureSet(ifaceName);
         mInOrder.verify(mWifiVendorHal).getSupportedFeatureSet(ifaceName);
         mInOrder.verify(mWifiVendorHal).getTwtCapabilities(ifaceName);
+        mInOrder.verify(mSupplicantStaIfaceHal).getUsdCapabilities(ifaceName);
         mInOrder.verify(mWifiVendorHal).getUsableChannels(anyInt(), anyInt(), anyInt());
     }
 
@@ -634,6 +635,7 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
         mInOrder.verify(mSupplicantStaIfaceHal).getWpaDriverFeatureSet(ifaceName);
         mInOrder.verify(mWifiVendorHal).getSupportedFeatureSet(ifaceName);
         mInOrder.verify(mWifiVendorHal).getTwtCapabilities(ifaceName);
+        mInOrder.verify(mSupplicantStaIfaceHal).getUsdCapabilities(ifaceName);
         mInOrder.verify(mWifiVendorHal).getUsableChannels(anyInt(), anyInt(), anyInt());
         mInOrder.verify(mWifiVendorHal).enableStaChannelForPeerNetwork(anyBoolean(), anyBoolean());
     }
@@ -647,6 +649,7 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
         mInOrder.verify(mSupplicantStaIfaceHal).getWpaDriverFeatureSet(ifaceName);
         mInOrder.verify(mWifiVendorHal).getSupportedFeatureSet(ifaceName);
         mInOrder.verify(mWifiVendorHal).getTwtCapabilities(ifaceName);
+        mInOrder.verify(mSupplicantStaIfaceHal).getUsdCapabilities(ifaceName);
         mInOrder.verify(mWifiVendorHal).getUsableChannels(anyInt(), anyInt(), anyInt());
     }
 
@@ -1408,6 +1411,7 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
             mInOrder.verify(mSupplicantStaIfaceHal).getWpaDriverFeatureSet(ifaceName);
             mInOrder.verify(mWifiVendorHal).getSupportedFeatureSet(ifaceName);
             mInOrder.verify(mWifiVendorHal).getTwtCapabilities(ifaceName);
+            mInOrder.verify(mSupplicantStaIfaceHal).getUsdCapabilities(ifaceName);
             mInOrder.verify(mWifiVendorHal).getUsableChannels(anyInt(), anyInt(), anyInt());
         }
     }
@@ -1884,6 +1888,7 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
         mInOrder.verify(mSupplicantStaIfaceHal).getWpaDriverFeatureSet(ifaceName);
         mInOrder.verify(mWifiVendorHal).getSupportedFeatureSet(ifaceName);
         mInOrder.verify(mWifiVendorHal).getTwtCapabilities(ifaceName);
+        mInOrder.verify(mSupplicantStaIfaceHal).getUsdCapabilities(ifaceName);
         mInOrder.verify(mWifiVendorHal).getUsableChannels(anyInt(), anyInt(), anyInt());
         mInOrder.verify(mWifiVendorHal).enableStaChannelForPeerNetwork(anyBoolean(), anyBoolean());
     }
@@ -2100,6 +2105,7 @@ public class WifiNativeInterfaceManagementTest extends WifiBaseTest {
         mInOrder.verify(mSupplicantStaIfaceHal).getWpaDriverFeatureSet(ifaceName);
         mInOrder.verify(mWifiVendorHal).getSupportedFeatureSet(ifaceName);
         mInOrder.verify(mWifiVendorHal).getTwtCapabilities(ifaceName);
+        mInOrder.verify(mSupplicantStaIfaceHal).getUsdCapabilities(ifaceName);
         mInOrder.verify(mWifiVendorHal).getUsableChannels(anyInt(), anyInt(), anyInt());
     }
 

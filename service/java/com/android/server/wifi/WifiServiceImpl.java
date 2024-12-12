@@ -9187,8 +9187,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         if (!mIsUsdSupported) {
             return false;
         }
-        // USDSubscriber is not supported.
-        return false;
+        return mWifiNative.isUsdSubscriberSupported();
     }
 
     /**
@@ -9206,7 +9205,6 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         if (!mIsUsdSupported) {
             return false;
         }
-        // USDPublisher is not supported.
-        return false;
+        return mWifiNative.isUsdPublisherSupported();
     }
 }
