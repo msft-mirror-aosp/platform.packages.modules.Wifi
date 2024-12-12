@@ -9721,6 +9721,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
         Intent intent = new Intent(Intent.ACTION_LOCALE_CHANGED);
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
+        verify(mResourceCache).handleLocaleChange();
         verify(mWifiNotificationManager).createNotificationChannels();
         verify(mWifiNetworkSuggestionsManager).resetNotification();
         verify(mWifiCarrierInfoManager).resetNotification();
