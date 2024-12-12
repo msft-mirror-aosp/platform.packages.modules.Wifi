@@ -75,6 +75,7 @@ python_test_host {
         "mobly",
         "wifi_aware_constants",
         "wifi_test_utils",
+        "platform-test-py-annotations",
     ],
     test_suites: [
         "general-tests",
@@ -133,6 +134,7 @@ python_test_host {
         "wifi_direct_constants",
         "wifi_test_utils",
         "wifi_direct_test_utils",
+        "platform-test-py-annotations",
     ],
     device_common_data: [":wifi_mobly_snippet"],
     test_options: {
