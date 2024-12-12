@@ -112,9 +112,13 @@ python_test_host {
 }
 
 python_test_host {
-    name: "WifiDirectGoNegTests",
-    main: "direct/group_owner_negotiation_test.py",
-    srcs: ["direct/group_owner_negotiation_test.py"],
+    name: "CtsWifiDirectTestCases",
+    main: "direct/cts_wifi_direct_test_suite.py",
+    srcs: [
+        "direct/group_owner_negotiation_test.py",
+        "direct/group_owner_test.py",
+        "direct/cts_wifi_direct_test_suite.py",
+    ],
     libs: [
         "mobly",
         "wifi_direct_constants",
