@@ -422,7 +422,10 @@ public class HostapdHalAidlImp implements IHostapdHal {
                     callback.onInfoChanged(info.apIfaceInstance, info.freqMhz,
                             mapHalChannelBandwidthToSoftApInfo(info.channelBandwidth),
                             mapHalGenerationToWifiStandard(info.generation),
-                            MacAddress.fromBytes(info.apIfaceInstanceMacAddress), vendorData);
+                            MacAddress.fromBytes(info.apIfaceInstanceMacAddress),
+                            (Flags.mloSap() && info.mldMacAddress != null)
+                                    ? MacAddress.fromBytes(info.mldMacAddress) : null,
+                            vendorData);
                 }
                 mActiveInstances.add(info.apIfaceInstance);
             } catch (IllegalArgumentException iae) {
