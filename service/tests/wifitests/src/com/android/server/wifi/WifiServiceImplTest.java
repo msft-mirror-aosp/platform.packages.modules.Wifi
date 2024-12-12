@@ -6574,6 +6574,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
         mLooper.dispatchAll();
 
+        verify(mResourceCache).reset();
         verify(mWifiConfigManager).resetSimNetworks();
         verify(mWifiConfigManager).stopRestrictingAutoJoinToSubscriptionId();
         verify(mSimRequiredNotifier, never()).dismissSimRequiredNotification();
@@ -6602,6 +6603,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
         mLooper.dispatchAll();
 
+        verify(mResourceCache).reset();
         verify(mWifiConfigManager, never()).resetSimNetworks();
         verify(mPasspointManager, never()).resetSimPasspointNetwork();
         verify(mWifiNetworkSuggestionsManager, never()).resetSimNetworkSuggestions();
@@ -6629,6 +6631,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
         mLooper.dispatchAll();
 
+        verify(mResourceCache).reset();
         verify(mWifiConfigManager).resetSimNetworks();
         verify(mWifiConfigManager).stopRestrictingAutoJoinToSubscriptionId();
         verify(mSimRequiredNotifier, never()).dismissSimRequiredNotification();
