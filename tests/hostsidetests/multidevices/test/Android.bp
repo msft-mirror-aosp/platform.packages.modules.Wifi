@@ -90,6 +90,15 @@ python_library_host {
     srcs: ["direct/constants.py"],
 }
 
+python_library_host {
+    name: "wifi_direct_test_utils",
+    srcs: ["direct/p2p_utils.py"],
+    libs: [
+        "wifi_direct_constants",
+        "mobly",
+    ],
+}
+
 python_test_host {
     name: "WifiDirectMoblyTests",
     main: "direct/wifi_direct_test.py",
@@ -123,6 +132,7 @@ python_test_host {
         "mobly",
         "wifi_direct_constants",
         "wifi_test_utils",
+        "wifi_direct_test_utils",
     ],
     device_common_data: [":wifi_mobly_snippet"],
     test_options: {
