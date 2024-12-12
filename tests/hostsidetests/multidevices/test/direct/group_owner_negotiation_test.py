@@ -17,6 +17,7 @@
 from collections.abc import Sequence
 import logging
 
+from android.platform.test.annotations import ApiTest
 from mobly import asserts
 from mobly import base_test
 from mobly import records
@@ -56,6 +57,10 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
         ad.wifi.wifiClearConfiguredNetworks()
         ad.wifi.wifiEnable()
 
+    @ApiTest([
+        'android.net.wifi.p2p.WifiP2pManager#connect(android.net.wifi.p2p.WifiP2pManager.Channel, android.net.wifi.p2p.WifiP2pConfig, android.net.wifi.p2p.WifiP2pManager.ActionListener)',
+        'android.net.wifi.p2p.WifiP2pManager#discoverPeers(android.net.wifi.p2p.WifiP2pManager.Channel, android.net.wifi.p2p.WifiP2pManager.ActionListener)',
+    ])
     def test_group_owner_negotiation_with_push_button(self) -> None:
         """Test against group owner negotiation and WPS PBC (push button).
 
@@ -87,6 +92,10 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
 
         p2p_utils.remove_group_and_verify_disconnected(requester, responder)
 
+    @ApiTest([
+        'android.net.wifi.p2p.WifiP2pManager#connect(android.net.wifi.p2p.WifiP2pManager.Channel, android.net.wifi.p2p.WifiP2pConfig, android.net.wifi.p2p.WifiP2pManager.ActionListener)',
+        'android.net.wifi.p2p.WifiP2pManager#discoverPeers(android.net.wifi.p2p.WifiP2pManager.Channel, android.net.wifi.p2p.WifiP2pManager.ActionListener)',
+    ])
     def test_group_owner_negotiation_with_pin_button(self) -> None:
         """Test against group owner negotiation and WPS PIN.
 
