@@ -237,6 +237,86 @@ public class WifiP2pManagerSnippet implements Snippet {
     }
 
     /**
+     * Get p2p connect PIN code after calling {@link wifiP2pConnect} with WPS PIN.
+     *
+     * @param deviceName The name of the device to connect.
+     * @return The generated PIN as a String.
+     */
+    @Rpc(description = "Get p2p connect PIN code after calling wifiP2pConnect with WPS PIN.")
+    public String wifiP2pGetPinCode(String deviceName) throws Throwable {
+        // Wait for the 'Invitation sent' dialog to appear
+        if (!mUiDevice.wait(Until.hasObject(By.text("Invitation sent")),
+                UI_ACTION_LONG_TIMEOUT_MS)) {
+            throw new WifiP2pManagerException(
+                    "Invitation sent dialog did not appear within timeout.");
+        }
+        if (!mUiDevice.wait(Until.hasObject(By.text(deviceName)), UI_ACTION_SHORT_TIMEOUT_MS)) {
+            throw new WifiP2pManagerException(
+                    "The connect invitation is not triggered by expected peer device.");
+        }
+        // Find the UI lement with text='PIN:'
+        UiObject2 pinLabel = mUiDevice.findObject(By.text("PIN:"));
+        if (pinLabel == null) {
+            throw new WifiP2pManagerException("PIN label not found.");
+        }
+        // Get the sibling UI element that contains the PIN code. Use regex pattern "\d+" as PIN
+        // code must be composed entirely of numbers.
+        Pattern pattern = Pattern.compile("\\d+");
+        UiObject2 pinValue = pinLabel.getParent().findObject(By.text(pattern));
+        if (pinValue == null) {
+            throw new WifiP2pManagerException("Failed to find Pin code UI element.");
+        }
+        String pinCode = pinValue.getText();
+        Log.d("Retrieved PIN code: " + pinCode);
+        // Click 'OK' to close the PIN code alert
+        UiObject2 okButton = mUiDevice.findObject(By.text("OK").clazz(Button.class));
+        if (okButton == null) {
+            throw new WifiP2pManagerException(
+                "OK button not found in the p2p connection invitation pop-up window.");
+        }
+        okButton.click();
+        Log.d("Closed the p2p connect invitation pop-up window.");
+        return pinCode;
+    }
+
+    /**
+     * Enters the given PIN code to accept a P2P connection invitation.
+     *
+     * @param pinCode The PIN to enter.
+     * @param deviceName The name of the device that initiated the connection.
+     */
+    @Rpc(description = "Enter the PIN code to accept a P2P connection invitation.")
+    public void wifiP2pEnterPin(String pinCode, String deviceName) throws WifiP2pManagerException {
+        // Wait for the 'Invitation to connect' dialog to appear
+        if (!mUiDevice.wait(Until.hasObject(By.textContains("Invitation to connect")),
+                UI_ACTION_LONG_TIMEOUT_MS)) {
+            throw new WifiP2pManagerException(
+                    "Invitation to connect dialog did not appear within timeout.");
+        }
+        if (!mUiDevice.wait(Until.hasObject(By.text(deviceName)), UI_ACTION_SHORT_TIMEOUT_MS)) {
+            throw new WifiP2pManagerException(
+                    "The connect invitation is not triggered by expected peer device.");
+        }
+        // Find the PIN entry field
+        UiObject2 pinEntryField = mUiDevice.findObject(By.focused(true));
+        if (pinEntryField == null) {
+            throw new WifiP2pManagerException("PIN entry field not found.");
+        }
+        // Enter the PIN code
+        pinEntryField.setText(pinCode);
+        Log.d("Entered PIN code: " + pinCode);
+        // Accept the invitation
+        Pattern acceptPattern = Pattern.compile("(ACCEPT|OK|Accept)", Pattern.CASE_INSENSITIVE);
+        UiObject2 acceptButton = mUiDevice.findObject(By.clazz(Button.class).text(acceptPattern));
+        if (acceptButton == null) {
+            throw new WifiP2pManagerException(
+                    "Failed to find accept button for p2p connect invitation.");
+        }
+        acceptButton.click();
+        Log.d("Accepted the connection.");
+    }
+
+    /**
      * Remove the current p2p group.
      *
      * @return The event posted by the callback methods of {@link ActionListener}.
@@ -249,7 +329,9 @@ public class WifiP2pManagerSnippet implements Snippet {
         return waitActionListenerResult(callbackId);
     }
 
-    /** Request the number of persistent p2p group. */
+    /**
+     * Request the number of persistent p2p group.
+     */
     @AsyncRpc(description = "Request the number of persistent p2p group")
     public void wifiP2pRequestPersistentGroupInfo(String callbackId) throws Throwable {
         checkChannel();
@@ -275,9 +357,9 @@ public class WifiP2pManagerSnippet implements Snippet {
      * the app can be removed.
      */
     @Rpc(
-            description =
-                    "Close the current P2P connection and indicate to the P2P service that"
-                            + " connections created by the app can be removed.")
+            description = "Close the current P2P connection and indicate to the P2P service that"
+                    + " connections created by the app can be removed."
+    )
     public void p2pClose() {
         if (mChannel == null) {
             Log.d("Channel has already closed, skip WifiP2pManager.Channel.close()");
@@ -468,7 +550,7 @@ public class WifiP2pManagerSnippet implements Snippet {
         }
         if (result == ACTION_LISTENER_ON_FAILURE) {
             throw new WifiP2pManagerException(
-                "Action failed with reason code: " + eventData.getInt(EVENT_KEY_REASON)
+                    "Action failed with reason code: " + eventData.getInt(EVENT_KEY_REASON)
             );
         }
         throw new WifiP2pManagerException("Action got unknown event: " + eventData.toString());

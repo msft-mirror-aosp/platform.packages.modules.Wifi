@@ -4391,8 +4391,29 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0);
         assertEquals(stats2.beacon_rx, mWifiMetrics.getTotalBeaconRxCount());
 
-        dumpProtoAndDeserialize();
-        // TODO (b/377723852) Add more verifications when new data capture is implemented
+        assertEquals(2, mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.size());
+        WifiUsabilityStatsEntry result1 = mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.get(0);
+        WifiUsabilityStatsEntry result2 = mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.get(1);
+
+        assertUsabilityStatsAssignment(info, stats1, result1);
+        assertUsabilityStatsAssignment(info, stats2, result2);
+        assertEquals(2, result1.seqNumToFramework);
+        assertEquals(3, result2.seqNumToFramework);
+        assertEquals(0, result1.seqNumInsideFramework);
+        assertEquals(1, result2.seqNumInsideFramework);
+        assertEquals(60, result1.wifiScore);
+        assertEquals(58, result2.wifiScore);
+        assertEquals(55, result1.wifiUsabilityScore);
+        assertEquals(56, result2.wifiUsabilityScore);
+        assertEquals(15, result1.predictionHorizonSec);
+        assertEquals(true, result1.isSameBssidAndFreq);
+        assertEquals(android.net.wifi.WifiUsabilityStatsEntry.PROBE_STATUS_SUCCESS,
+                result1.probeStatusSinceLastUpdate);
+        assertEquals(android.net.wifi.WifiUsabilityStatsEntry.PROBE_STATUS_FAILURE,
+                result2.probeStatusSinceLastUpdate);
+        assertEquals(12, result1.probeElapsedTimeSinceLastUpdateMs);
+        assertEquals(true, result1.isCellularDataAvailable);
+        assertEquals(false, result2.isThroughputSufficient);
     }
 
     private WifiLinkLayerStats createNewWifiLinkLayerStats() {
@@ -4872,28 +4893,6 @@ public class WifiMetricsTest extends WifiBaseTest {
         // Client should not get any message listener add failed.
         verify(mOnWifiUsabilityStatsListener, never()).onWifiUsabilityStats(anyInt(),
                 anyBoolean(), any());
-    }
-
-    /**
-     * Verify that the label and the triggerType of Wifi usability stats are saved correctly
-     * during firmware alert is triggered.
-     * @throws Exception
-     */
-    @Test
-    public void verifyFirmwareAlertUpdatesWifiUsabilityMetrics() throws Exception {
-        WifiInfo info = mock(WifiInfo.class);
-        when(info.getRssi()).thenReturn(nextRandInt());
-        when(info.getLinkSpeed()).thenReturn(nextRandInt());
-        long eventTimeMs = nextRandInt();
-        when(mClock.getElapsedSinceBootMillis()).thenReturn(eventTimeMs);
-        WifiLinkLayerStats stats1 = nextRandomStats(new WifiLinkLayerStats());
-        mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1, false, 0);
-
-        // Firmware alert occurs
-        mWifiMetrics.logFirmwareAlert(TEST_IFACE_NAME, 2);
-
-        dumpProtoAndDeserialize();
-        // TODO(b/377723852) Verify asynchronous events are logged correctly
     }
 
     /**

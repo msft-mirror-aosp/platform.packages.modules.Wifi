@@ -328,7 +328,8 @@ public class SoftApManager implements ActiveModeManager {
         public void onInfoChanged(String apIfaceInstance, int frequency,
                 @WifiAnnotations.Bandwidth int bandwidth,
                 @WifiAnnotations.WifiStandard int generation,
-                MacAddress apIfaceInstanceMacAddress,
+                @Nullable MacAddress apIfaceInstanceMacAddress,
+                @Nullable MacAddress mldAddress,
                 @NonNull List<OuiKeyedData> vendorData) {
             SoftApInfo apInfo = new SoftApInfo();
             apInfo.setFrequency(frequency);
@@ -336,6 +337,9 @@ public class SoftApManager implements ActiveModeManager {
             apInfo.setWifiStandard(generation);
             if (apIfaceInstanceMacAddress != null) {
                 apInfo.setBssid(apIfaceInstanceMacAddress);
+            }
+            if (mldAddress != null) {
+                apInfo.setMldAddress(mldAddress);
             }
             apInfo.setApInstanceIdentifier(apIfaceInstance != null
                     ? apIfaceInstance : mApInterfaceName);
