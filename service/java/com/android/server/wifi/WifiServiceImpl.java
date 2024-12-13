@@ -736,6 +736,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                         public void onReceive(Context context, Intent intent) {
                             Log.d(TAG, "locale changed");
                             resetNotificationManager();
+                            mResourceCache.handleLocaleChange();
                         }
                     },
                     new IntentFilter(Intent.ACTION_LOCALE_CHANGED),
