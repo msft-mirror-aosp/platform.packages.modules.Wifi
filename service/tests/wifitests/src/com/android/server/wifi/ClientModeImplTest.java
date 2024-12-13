@@ -6732,6 +6732,8 @@ public class ClientModeImplTest extends WifiBaseTest {
     public void testOnNetworkPermanentlyDisabled() throws Exception {
         connect();
 
+        // Verify connection failure related disable reason should not trigger disconnect because
+        // this could be from another STA
         WifiConfiguration disabledNetwork = new WifiConfiguration();
         disabledNetwork.networkId = FRAMEWORK_NETWORK_ID;
         for (WifiConfigManager.OnNetworkUpdateListener listener : mConfigUpdateListenerCaptor
@@ -6740,7 +6742,15 @@ public class ClientModeImplTest extends WifiBaseTest {
                 WifiConfiguration.NetworkSelectionStatus.DISABLED_BY_WRONG_PASSWORD);
         }
         mLooper.dispatchAll();
+        verify(mWifiNative, never()).disconnect(WIFI_IFACE_NAME);
 
+        // Verify that the network is disconnect if the profile is disabled by wifi API call
+        for (WifiConfigManager.OnNetworkUpdateListener listener : mConfigUpdateListenerCaptor
+                .getAllValues()) {
+            listener.onNetworkPermanentlyDisabled(disabledNetwork,
+                    WifiConfiguration.NetworkSelectionStatus.DISABLED_BY_WIFI_MANAGER);
+        }
+        mLooper.dispatchAll();
         verify(mWifiNative).disconnect(WIFI_IFACE_NAME);
     }
 
