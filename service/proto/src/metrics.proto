@@ -3114,7 +3114,7 @@ message ScanResultWithSameFreq {
   optional int32 rssi = 2;
 
   // The center frequency of the primary 20 MHz frequency (in MHz) of the channel
-  optional int32 frequencyMhz = 3;
+  optional int32 frequency_mhz = 3;
 }
 
 message WifiUsabilityStats {
