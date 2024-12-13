@@ -17,9 +17,11 @@
 package com.android.server.wifi;
 
 import static android.net.util.KeepalivePacketDataUtil.parseTcpKeepalivePacketData;
+import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_BY_WIFI_MANAGER;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_NONE;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_NO_INTERNET_PERMANENT;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_NO_INTERNET_TEMPORARY;
+import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_TRANSITION_DISABLE_INDICATION;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_UNWANTED_LOW_RSSI;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_FILS_SHA256;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_FILS_SHA384;
@@ -1302,24 +1304,11 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         }
 
         @Override
-        public void onNetworkTemporarilyDisabled(WifiConfiguration config, int disableReason) {
-            if (disableReason == DISABLED_NO_INTERNET_TEMPORARY) return;
-            if (config.networkId == mTargetNetworkId || config.networkId == mLastNetworkId) {
-                // Disconnect and let autojoin reselect a new network
-                mFrameworkDisconnectReasonOverride = WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_TEMP_DISABLED;
-                sendMessageAtFrontOfQueue(CMD_DISCONNECT,
-                        StaEvent.DISCONNECT_NETWORK_TEMPORARY_DISABLED);
-            }
-
-        }
-
-        @Override
         public void onNetworkPermanentlyDisabled(WifiConfiguration config, int disableReason) {
-            // For DISABLED_NO_INTERNET_PERMANENT we do not need to remove the network
-            // because supplicant won't be trying to reconnect. If this is due to a
-            // preventAutomaticReconnect request from ConnectivityService, that service
-            // will disconnect as appropriate.
-            if (disableReason == DISABLED_NO_INTERNET_PERMANENT) return;
+            if (disableReason != DISABLED_BY_WIFI_MANAGER
+                    && disableReason != DISABLED_TRANSITION_DISABLE_INDICATION) {
+                return;
+            }
             if (config.networkId == mTargetNetworkId || config.networkId == mLastNetworkId) {
                 // Disconnect and let autojoin reselect a new network
                 mFrameworkDisconnectReasonOverride = WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_PERM_DISABLED;
