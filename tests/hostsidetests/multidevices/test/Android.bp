@@ -75,6 +75,7 @@ python_test_host {
         "mobly",
         "wifi_aware_constants",
         "wifi_test_utils",
+        "platform-test-py-annotations",
     ],
     test_suites: [
         "general-tests",
@@ -88,6 +89,15 @@ python_test_host {
 python_library_host {
     name: "wifi_direct_constants",
     srcs: ["direct/constants.py"],
+}
+
+python_library_host {
+    name: "wifi_direct_test_utils",
+    srcs: ["direct/p2p_utils.py"],
+    libs: [
+        "wifi_direct_constants",
+        "mobly",
+    ],
 }
 
 python_test_host {
@@ -112,13 +122,19 @@ python_test_host {
 }
 
 python_test_host {
-    name: "WifiDirectGoNegTests",
-    main: "direct/group_owner_negotiation_test.py",
-    srcs: ["direct/group_owner_negotiation_test.py"],
+    name: "CtsWifiDirectTestCases",
+    main: "direct/cts_wifi_direct_test_suite.py",
+    srcs: [
+        "direct/group_owner_negotiation_test.py",
+        "direct/group_owner_test.py",
+        "direct/cts_wifi_direct_test_suite.py",
+    ],
     libs: [
         "mobly",
         "wifi_direct_constants",
         "wifi_test_utils",
+        "wifi_direct_test_utils",
+        "platform-test-py-annotations",
     ],
     device_common_data: [":wifi_mobly_snippet"],
     test_options: {
