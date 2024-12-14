@@ -17,31 +17,27 @@
 package android.system.wifi.mainline_supplicant;
 
 /**
- * Enum values indicating the status of any supplicant operation.
+ * Information for sending a USD message.
  */
-enum SupplicantStatusCode {
+parcelable UsdMessageInfo {
     /**
-     * No errors.
+     * Identifier for this device, retrieved from |ServiceDiscoveryInfo|.
      */
-    SUCCESS = 0,
+    int ownId;
+
     /**
-     * Unknown failure occurred.
+     * Identifier for the peer device, retrieved from |ServiceDiscoveryInfo|.
      */
-    FAILURE_UNKNOWN = 1,
+    int peerId;
+
     /**
-     * One of the provided arguments is invalid.
+     * MAC address for the peer device.
      */
-    FAILURE_ARGS_INVALID = 2,
+    byte[6] peerMacAddress;
+
     /**
-     * Interface with the provided name already exists.
+     * Message contents. Note that the maximum message length is
+     * |UsdCapabilities.maxLocalSsiLengthBytes|.
      */
-    FAILURE_IFACE_EXISTS = 3,
-    /**
-     * Interface with the provided name does not exist.
-     */
-    FAILURE_IFACE_UNKNOWN = 4,
-    /**
-     * Operation is not supported by the service.
-     */
-    FAILURE_UNSUPPORTED = 5,
+    byte[] message;
 }
