@@ -267,6 +267,7 @@ import com.android.server.wifi.util.ApConfigUtil;
 import com.android.server.wifi.util.LastCallerInfoManager;
 import com.android.server.wifi.util.WifiPermissionsUtil;
 import com.android.server.wifi.util.WifiPermissionsWrapper;
+import com.android.server.wifi.util.WorkSourceHelper;
 import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
@@ -376,8 +377,6 @@ public class WifiServiceImplTest extends WifiBaseTest {
     private WifiThreadRunner mWifiThreadRunner;
     private PowerManager mPowerManager;
     private PhoneStateListener mPhoneStateListener;
-    private int mPid;
-    private int mPid2 = Process.myPid();
     private OsuProvider mOsuProvider;
     private SoftApCallbackInternal mStateMachineSoftApCallback;
     private SoftApCallbackInternal mLohsApCallback;
@@ -515,6 +514,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
     @Captor ArgumentCaptor<List> mListCaptor;
     @Mock TwtManager mTwtManager;
     @Mock WifiResourceCache mResourceCache;
+    @Mock WorkSourceHelper mWorkSourceHelper;
 
     @Rule
     // For frameworks
@@ -540,8 +540,8 @@ public class WifiServiceImplTest extends WifiBaseTest {
         when(mResourceCache.getInteger(R.integer.config_wifiHardwareSoftapMaxClientCount))
                 .thenReturn(10);
         WifiInjector.sWifiInjector = mWifiInjector;
-        when(mRequestInfo.getPid()).thenReturn(mPid);
-        when(mRequestInfo2.getPid()).thenReturn(mPid2);
+        when(mRequestInfo.getPid()).thenReturn(TEST_PID);
+        when(mRequestInfo2.getPid()).thenReturn(TEST_PID2);
         when(mWifiInjector.getContext()).thenReturn(mContext);
         when(mWifiInjector.getUserManager()).thenReturn(mUserManager);
         when(mWifiInjector.getWifiCountryCode()).thenReturn(mWifiCountryCode);
@@ -572,6 +572,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 .thenReturn(mWifiDeviceStateChangeManager);
         when(mWifiInjector.getWifiSettingsBackupRestore()).thenReturn(mWifiSettingsBackupRestore);
         when(mWifiInjector.getBackupRestoreController()).thenReturn(mBackupRestoreController);
+        when(mWifiInjector.makeWsHelper(any())).thenReturn(mWorkSourceHelper);
         when(mHandlerThread.getThreadHandler()).thenReturn(new Handler(mLooper.getLooper()));
         when(mHandlerThread.getLooper()).thenReturn(mLooper.getLooper());
         when(mContext.getResources()).thenReturn(mResources);
@@ -774,6 +775,9 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mWifiConfig.networkId = TEST_NETWORK_ID;
 
         setup24GhzSupported();
+        SoftApConfiguration lohsConfig = createValidSoftApConfiguration();
+        when(mWifiApConfigStore.generateLocalOnlyHotspotConfig(
+                eq(mContext), eq(null), any())).thenReturn(lohsConfig);
     }
 
     /**
@@ -3826,9 +3830,8 @@ public class WifiServiceImplTest extends WifiBaseTest {
      */
     @Test
     public void testStopLocalOnlyHotspotDoesNothingWithRemainingRequest() throws Exception {
-
         // register a request that will remain after the stopLOHS call
-        mWifiServiceImpl.registerLOHSForTest(mPid, mRequestInfo);
+        mWifiServiceImpl.registerLOHSForTest(TEST_PID, mRequestInfo);
         mLooper.dispatchAll();
         setupLocalOnlyHotspot();
         // Since we are calling with the same pid, the second register call will be removed
@@ -3946,7 +3949,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 .build();
 
         setupForCustomLohs();
-        mWifiServiceImpl.registerLOHSForTest(mPid,
+        mWifiServiceImpl.registerLOHSForTest(TEST_PID,
                 new LocalOnlyHotspotRequestInfo(mLooper.getLooper(), new WorkSource(),
                         sharedCallback, WifiServiceImplTest::nopDeathCallback, null));
         assertThat(mWifiServiceImpl.startLocalOnlyHotspot(exclusiveCallback, TEST_PACKAGE_NAME,
@@ -3958,15 +3961,18 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
     @Test
     public void testCustomLohs_ExclusiveBeforeShared() {
+        when(mWorkSourceHelper.getRequestorWsPriority())
+                .thenReturn(WorkSourceHelper.PRIORITY_SYSTEM);
         mLooper.startAutoDispatch();
         FakeLohsCallback sharedCallback = new FakeLohsCallback();
         FakeLohsCallback exclusiveCallback = new FakeLohsCallback();
         SoftApConfiguration exclusiveConfig = new SoftApConfiguration.Builder()
                 .setSsid("customSsid")
                 .build();
-
+        when(mWifiApConfigStore.generateLocalOnlyHotspotConfig(
+                eq(mContext), eq(exclusiveConfig), any())).thenReturn(exclusiveConfig);
         setupForCustomLohs();
-        mWifiServiceImpl.registerLOHSForTest(mPid,
+        mWifiServiceImpl.registerLOHSForTest(TEST_PID,
                 new LocalOnlyHotspotRequestInfo(mLooper.getLooper(), new WorkSource(),
                         exclusiveCallback, WifiServiceImplTest::nopDeathCallback, exclusiveConfig));
         stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
@@ -4114,7 +4120,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
         // registering a request directly from the test will not trigger a message to start
         // softap mode
-        mWifiServiceImpl.registerLOHSForTest(mPid, mRequestInfo);
+        mWifiServiceImpl.registerLOHSForTest(TEST_PID, mRequestInfo);
         mLooper.dispatchAll();
 
         setupLocalOnlyHotspot();
@@ -13181,5 +13187,121 @@ public class WifiServiceImplTest extends WifiBaseTest {
             mWifiServiceImpl.addWifiStateChangedListener(mWifiStateChangedListener);
             fail("expected SecurityException");
         } catch (SecurityException expected) { }
+    }
+
+    @Test
+    public void testCustomLohs_NotExclusive5GConfigButNewRequestorLowerPriority() {
+        when(mFeatureFlags.publicBandsForLohs()).thenReturn(true);
+        when(mWorkSourceHelper.getRequestorWsPriority())
+                .thenReturn(WorkSourceHelper.PRIORITY_FG_APP)
+                .thenReturn(WorkSourceHelper.PRIORITY_BG);
+        setupForCustomLohs();
+        setup5GhzSupported();
+        SoftApConfiguration custom5GBandConfig = new SoftApConfiguration.Builder()
+                .setSsid("TestAp")
+                .setBand(SoftApConfiguration.BAND_5GHZ)
+                .build();
+        when(mWifiApConfigStore.generateLocalOnlyHotspotConfig(
+                any(), any(), any())).thenReturn(custom5GBandConfig);
+        when(mRequestInfo.getCustomConfig()).thenReturn(custom5GBandConfig);
+        when(mRequestInfo2.getCustomConfig()).thenReturn(null);
+        mLooper.startAutoDispatch();
+        assertThat(mWifiServiceImpl.registerLOHSForTest(TEST_PID, mRequestInfo))
+                .isEqualTo(REQUEST_REGISTERED);
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
+        // Test second requestor gets fail since it has lower priority
+        assertThat(mWifiServiceImpl.registerLOHSForTest(TEST_PID2, mRequestInfo2))
+                .isEqualTo(ERROR_GENERIC);
+    }
+
+    @Test
+    public void testCustomLohs_NotExclusive2GConfigSharedEvenIfNewRequestorLowerPriority()
+            throws Exception {
+        when(mFeatureFlags.publicBandsForLohs()).thenReturn(true);
+        when(mWorkSourceHelper.getRequestorWsPriority())
+                .thenReturn(WorkSourceHelper.PRIORITY_FG_APP)
+                .thenReturn(WorkSourceHelper.PRIORITY_BG);
+        setupForCustomLohs();
+        SoftApConfiguration custom2GBandConfig = new SoftApConfiguration.Builder()
+                .setSsid("TestAp")
+                .setBand(SoftApConfiguration.BAND_2GHZ)
+                .build();
+        when(mWifiApConfigStore.generateLocalOnlyHotspotConfig(
+                any(), any(), any())).thenReturn(custom2GBandConfig);
+        when(mRequestInfo.getCustomConfig()).thenReturn(custom2GBandConfig);
+        when(mRequestInfo2.getCustomConfig()).thenReturn(null);
+        mLooper.startAutoDispatch();
+        assertThat(mWifiServiceImpl.registerLOHSForTest(TEST_PID, mRequestInfo))
+                .isEqualTo(REQUEST_REGISTERED);
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
+        mLooper.startAutoDispatch();
+        // Test second requestor gets registered even if it has lower priority
+        assertThat(mWifiServiceImpl.registerLOHSForTest(TEST_PID2, mRequestInfo2))
+                .isEqualTo(REQUEST_REGISTERED);
+        verify(mRequestInfo, never()).unlinkDeathRecipient();
+        verify(mRequestInfo2).sendHotspotStartedMessage(eq(custom2GBandConfig));
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
+    }
+
+    @Test
+    public void testCustomLohs_NotExclusive5GConfigButNewRequestorHihgerPriority()
+            throws Exception {
+        when(mFeatureFlags.publicBandsForLohs()).thenReturn(true);
+        when(mWorkSourceHelper.getRequestorWsPriority())
+                .thenReturn(WorkSourceHelper.PRIORITY_FG_APP) // first requestor
+                .thenReturn(WorkSourceHelper.PRIORITY_FG_APP) // new requestor
+                .thenReturn(WorkSourceHelper.PRIORITY_BG); // first requestor to BG
+        setupForCustomLohs();
+        setup5GhzSupported();
+        SoftApConfiguration custom5GBandConfig = new SoftApConfiguration.Builder()
+                .setSsid("TestAp")
+                .setBand(SoftApConfiguration.BAND_5GHZ)
+                .build();
+        when(mWifiApConfigStore.generateLocalOnlyHotspotConfig(
+                any(), any(), any())).thenReturn(custom5GBandConfig);
+        when(mRequestInfo.getCustomConfig()).thenReturn(custom5GBandConfig);
+        when(mRequestInfo2.getCustomConfig()).thenReturn(null);
+        mLooper.startAutoDispatch();
+        assertThat(mWifiServiceImpl.registerLOHSForTest(TEST_PID, mRequestInfo))
+                .isEqualTo(REQUEST_REGISTERED);
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
+        mLooper.startAutoDispatch();
+        // Test second requestor gets succeeded since it has higher priority
+        assertThat(mWifiServiceImpl.registerLOHSForTest(TEST_PID2, mRequestInfo2))
+                .isEqualTo(REQUEST_REGISTERED);
+        // Make sure first requestor dead since it was replaced by second requestor.
+        verify(mRequestInfo).sendHotspotFailedMessage(eq(ERROR_INCOMPATIBLE_MODE));
+        verify(mRequestInfo).unlinkDeathRecipient();
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
+    }
+
+    @Test
+    public void testCustomLohs_NotExclusive2GConfigSharedWhenNewRequestorHihgerPriority()
+            throws Exception {
+        when(mFeatureFlags.publicBandsForLohs()).thenReturn(true);
+        when(mWorkSourceHelper.getRequestorWsPriority())
+                .thenReturn(WorkSourceHelper.PRIORITY_BG)
+                .thenReturn(WorkSourceHelper.PRIORITY_FG_APP);
+        setupForCustomLohs();
+        SoftApConfiguration custom2GBandConfig = new SoftApConfiguration.Builder()
+                .setSsid("TestAp")
+                .setBand(SoftApConfiguration.BAND_2GHZ)
+                .build();
+        when(mWifiApConfigStore.generateLocalOnlyHotspotConfig(
+                any(), any(), any())).thenReturn(custom2GBandConfig);
+        when(mRequestInfo.getCustomConfig()).thenReturn(custom2GBandConfig);
+        when(mRequestInfo2.getCustomConfig()).thenReturn(null);
+        mLooper.startAutoDispatch();
+        assertThat(mWifiServiceImpl.registerLOHSForTest(TEST_PID, mRequestInfo))
+                .isEqualTo(REQUEST_REGISTERED);
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
+        mLooper.startAutoDispatch();
+        // Test second requestor gets succeeded since it has higher priority
+        assertThat(mWifiServiceImpl.registerLOHSForTest(TEST_PID2, mRequestInfo2))
+                .isEqualTo(REQUEST_REGISTERED);
+        // Make sure first requestor still alive since 2.4G can be shared.
+        verify(mRequestInfo2).sendHotspotStartedMessage(eq(custom2GBandConfig));
+        verify(mRequestInfo, never()).unlinkDeathRecipient();
+        stopAutoDispatchWithDispatchAllBeforeStopAndIgnoreExceptions(mLooper);
     }
 }
