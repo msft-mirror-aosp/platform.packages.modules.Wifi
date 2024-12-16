@@ -152,10 +152,10 @@ public class WifiFrameworkInitializer {
         if (Flags.usd() && Environment.isSdkAtLeastB()) {
             SystemServiceRegistry.registerContextAwareService(
                     Context.WIFI_USD_SERVICE,
-                    UsdManager.class,
-                    (context, serviceBinder) -> {
-                        if (!context.getPackageManager().hasSystemFeature(
-                                PackageManager.FEATURE_WIFI)) {
+                    UsdManager.class, (context, serviceBinder) -> {
+                        if (!context.getResources().getBoolean(
+                                context.getResources().getIdentifier("config_deviceSupportsWifiUsd",
+                                        "bool", "android"))) {
                             return null;
                         }
                         IUsdManager service = IUsdManager.Stub.asInterface(serviceBinder);

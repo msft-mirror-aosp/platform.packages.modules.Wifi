@@ -60,14 +60,14 @@
     <string name="wifi_p2p_to_message" msgid="3809923305696994787">"Para:"</string>
     <string name="wifi_p2p_enter_pin_message" msgid="5200220251738047620">"Escribe o PIN obrigatorio:"</string>
     <string name="wifi_p2p_show_pin_message" msgid="1000091690967930798">"PIN:"</string>
-    <string name="wifi_p2p_dialog2_sent_title" msgid="2336103322429678328">"Conexión co dispositivo"</string>
-    <string name="wifi_p2p_dialog2_sent_title_display_pin" msgid="511248898541903515">"Conexión co dispositivo"</string>
+    <string name="wifi_p2p_dialog2_sent_title" msgid="2336103322429678328">"Conexión entre dispositivos"</string>
+    <string name="wifi_p2p_dialog2_sent_title_display_pin" msgid="511248898541903515">"Conexión entre dispositivos"</string>
     <string name="wifi_p2p_dialog2_sent_message" msgid="2544736217133674163">"Invitación enviada a <xliff:g id="DEVICE_NAME">%1$s</xliff:g>."</string>
     <string name="wifi_p2p_dialog2_sent_message_display_pin" msgid="5017076731258834940">"Para establecer a conexión, mete este PIN en <xliff:g id="DEVICE_NAME">%1$s</xliff:g>."</string>
     <string name="wifi_p2p_dialog2_sent_positive_button" msgid="6464227471745156497">"Aceptar"</string>
-    <string name="wifi_p2p_dialog2_received_title" msgid="6897349204607457747">"Conexión co dispositivo"</string>
-    <string name="wifi_p2p_dialog2_received_title_enter_pin" msgid="6431543271224139601">"Conexión co dispositivo"</string>
-    <string name="wifi_p2p_dialog2_received_title_display_pin" msgid="5017007825248741433">"Conexión co dispositivo"</string>
+    <string name="wifi_p2p_dialog2_received_title" msgid="6897349204607457747">"Conexión entre dispositivos"</string>
+    <string name="wifi_p2p_dialog2_received_title_enter_pin" msgid="6431543271224139601">"Conexión entre dispositivos"</string>
+    <string name="wifi_p2p_dialog2_received_title_display_pin" msgid="5017007825248741433">"Conexión entre dispositivos"</string>
     <string name="wifi_p2p_dialog2_received_message" msgid="4376275522073306499">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> quere conectarse ao teu dispositivo."</string>
     <string name="wifi_p2p_dialog2_received_message_enter_pin" msgid="6070908860523284394">"Para establecer a conexión, mete o PIN que aparece en <xliff:g id="DEVICE_NAME">%1$s</xliff:g>."</string>
     <string name="wifi_p2p_dialog2_received_message_display_pin" msgid="5906560549535982131">"<xliff:g id="DEVICE_NAME">%1$s</xliff:g> quere conectarse ao teu dispositivo co seguinte PIN."</string>

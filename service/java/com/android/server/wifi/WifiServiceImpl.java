@@ -103,6 +103,7 @@ import android.net.Uri;
 import android.net.ip.IpClientUtil;
 import android.net.thread.ThreadNetworkController;
 import android.net.thread.ThreadNetworkManager;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -349,6 +350,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
     private final WifiSettingsConfigStore mSettingsConfigStore;
     private final WifiResourceCache mResourceCache;
+    private boolean mIsUsdSupported = false;
 
     /**
      * Callback for use with LocalOnlyHotspot to unregister requesting applications upon death.
@@ -625,6 +627,11 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         mAfcManager = mWifiInjector.getAfcManager();
         mTwtManager = mWifiInjector.getTwtManager();
         mWepNetworkUsageController = mWifiInjector.getWepNetworkUsageController();
+        if (Environment.isSdkAtLeastB()) {
+            mIsUsdSupported = mContext.getResources().getBoolean(
+                    mContext.getResources().getIdentifier("config_deviceSupportsWifiUsd", "bool",
+                            "android"));
+        }
     }
 
     /**
@@ -735,6 +742,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                         public void onReceive(Context context, Intent intent) {
                             Log.d(TAG, "locale changed");
                             resetNotificationManager();
+                            mResourceCache.handleLocaleChange();
                         }
                     },
                     new IntentFilter(Intent.ACTION_LOCALE_CHANGED),
@@ -802,6 +810,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     }
 
     private void resetCarrierNetworks(@ClientModeImpl.ResetSimReason int resetReason) {
+        mResourceCache.reset();
         Log.d(TAG, "resetting carrier networks since SIM was changed");
         if (resetReason == RESET_SIM_REASON_SIM_INSERTED) {
             // clear all SIM related notifications since some action was taken to address
@@ -7733,6 +7742,29 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         return mSettingsStore.handleWifiScoringEnabled(enabled);
     }
 
+    /**
+     * See {@link android.net.wifi.WifiManager#storeCapturedData(Executor, IntConsumer, int,
+     * booloan, long, long)}.
+     */
+    @Override
+    public void storeCapturedData(int triggerType, boolean isFullCapture,
+            long triggerStartTimeMillis, long triggerStopTimeMillis,
+            @NonNull IIntegerListener listener) {
+        if (listener == null) {
+            throw new IllegalArgumentException("listener should not be null");
+        }
+        mContext.enforceCallingOrSelfPermission(
+                android.Manifest.permission.WIFI_UPDATE_USABILITY_STATS_SCORE, "WifiService");
+        mWifiThreadRunner.post(() -> {
+            try {
+                listener.onResult(mWifiMetrics.storeCapturedData(triggerType, isFullCapture,
+                        triggerStartTimeMillis, triggerStopTimeMillis));
+            } catch (RemoteException e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
+        }, TAG + "#storeCapturedData");
+    }
+
     @VisibleForTesting
     static boolean isValidBandForGetUsableChannels(@WifiScanner.WifiBand int band) {
         switch (band) {
@@ -9113,5 +9145,68 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 Log.e(TAG, e.getMessage(), e);
             }
         }, TAG + "#getAutojoinDisallowedSecurityTypes");
+    }
+
+    @Override
+    public void disallowCurrentSuggestedNetwork(@NonNull BlockingOption option,
+            @NonNull String packageName) {
+        Objects.requireNonNull(option, "blockingOption cannot be null");
+        int callingUid = Binder.getCallingUid();
+        mWifiPermissionsUtil.checkPackage(callingUid, packageName);
+        if (enforceChangePermission(packageName) != MODE_ALLOWED) {
+            throw new SecurityException("Caller does not hold CHANGE_WIFI_STATE permission");
+        }
+        if (mVerboseLoggingEnabled) {
+            mLog.info("disallowCurrentSuggestedNetwork:  Uid=% Package Name=%").c(
+                    callingUid).c(option.toString()).flush();
+        }
+        if (mActiveModeWarden.getWifiState() != WIFI_STATE_ENABLED) {
+            return;
+        }
+        WifiInfo info = mActiveModeWarden.getConnectionInfo();
+        if (!packageName.equals(info.getRequestingPackageName())) {
+            return;
+        }
+        mWifiThreadRunner.post(
+                () -> mActiveModeWarden.getPrimaryClientModeManager().blockNetwork(option),
+                "disallowCurrentSuggestedNetwork");
+    }
+
+    /**
+     * See {@link WifiManager#isUsdSubscriberSupported()}
+     */
+    @Override
+    public boolean isUsdSubscriberSupported() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException("SDK level too old");
+        }
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        if (!mIsUsdSupported) {
+            return false;
+        }
+        // USDSubscriber is not supported.
+        return false;
+    }
+
+    /**
+     * See {@link WifiManager#isUsdPublisherSupported()}
+     */
+    @Override
+    public boolean isUsdPublisherSupported() {
+        if (!Environment.isSdkAtLeastB()) {
+            throw new UnsupportedOperationException("SDK level too old");
+        }
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+        if (!mIsUsdSupported) {
+            return false;
+        }
+        // USDPublisher is not supported.
+        return false;
     }
 }

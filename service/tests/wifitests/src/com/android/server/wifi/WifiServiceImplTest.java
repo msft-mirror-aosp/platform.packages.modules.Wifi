@@ -149,6 +149,7 @@ import android.net.Network;
 import android.net.NetworkStack;
 import android.net.TetheringManager;
 import android.net.Uri;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.IActionListener;
 import android.net.wifi.IBooleanListener;
@@ -6573,6 +6574,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
         mLooper.dispatchAll();
 
+        verify(mResourceCache).reset();
         verify(mWifiConfigManager).resetSimNetworks();
         verify(mWifiConfigManager).stopRestrictingAutoJoinToSubscriptionId();
         verify(mSimRequiredNotifier, never()).dismissSimRequiredNotification();
@@ -6601,6 +6603,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
         mLooper.dispatchAll();
 
+        verify(mResourceCache).reset();
         verify(mWifiConfigManager, never()).resetSimNetworks();
         verify(mPasspointManager, never()).resetSimPasspointNetwork();
         verify(mWifiNetworkSuggestionsManager, never()).resetSimNetworkSuggestions();
@@ -6628,6 +6631,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
         mLooper.dispatchAll();
 
+        verify(mResourceCache).reset();
         verify(mWifiConfigManager).resetSimNetworks();
         verify(mWifiConfigManager).stopRestrictingAutoJoinToSubscriptionId();
         verify(mSimRequiredNotifier, never()).dismissSimRequiredNotification();
@@ -9720,6 +9724,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
 
         Intent intent = new Intent(Intent.ACTION_LOCALE_CHANGED);
         mBroadcastReceiverCaptor.getValue().onReceive(mContext, intent);
+        verify(mResourceCache).handleLocaleChange();
         verify(mWifiNotificationManager).createNotificationChannels();
         verify(mWifiNetworkSuggestionsManager).resetNotification();
         verify(mWifiCarrierInfoManager).resetNotification();
@@ -13119,6 +13124,18 @@ public class WifiServiceImplTest extends WifiBaseTest {
         setupLohsPermissions();
         mWifiServiceImpl.startLocalOnlyHotspot(mLohsCallback, TEST_PACKAGE_NAME, TEST_FEATURE_ID,
                 customConfig, mExtras, false);
+    }
+
+    @Test
+    public void testDisallowCurrentSuggestedNetwork() {
+        BlockingOption blockingOption = new BlockingOption.Builder(100).build();
+        WifiInfo info = new WifiInfo();
+        info.setRequestingPackageName(TEST_PACKAGE_NAME);
+        when(mActiveModeWarden.getWifiState()).thenReturn(WIFI_STATE_ENABLED);
+        when(mActiveModeWarden.getConnectionInfo()).thenReturn(info);
+        mWifiServiceImpl.disallowCurrentSuggestedNetwork(blockingOption, TEST_PACKAGE_NAME);
+        mLooper.dispatchAll();
+        verify(mClientModeManager).blockNetwork(eq(blockingOption));
     }
 
     /**

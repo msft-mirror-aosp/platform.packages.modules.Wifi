@@ -229,7 +229,6 @@ public class WifiConfigManager {
      * Link networks only if the bssid in scan results for the networks match in the first
      * 16 ASCII chars in the bssid string. For example = "af:de:56;34:15:7"
      */
-    @VisibleForTesting
     public static final int LINK_CONFIGURATION_BSSID_MATCH_LENGTH = 16;
     /**
      * Log tag for this class.

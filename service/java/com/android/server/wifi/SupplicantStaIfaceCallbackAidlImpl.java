@@ -56,6 +56,8 @@ import android.hardware.wifi.supplicant.StaIfaceCallbackState;
 import android.hardware.wifi.supplicant.StaIfaceReasonCode;
 import android.hardware.wifi.supplicant.StaIfaceStatusCode;
 import android.hardware.wifi.supplicant.SupplicantStateChangeData;
+import android.hardware.wifi.supplicant.UsdMessageInfo;
+import android.hardware.wifi.supplicant.UsdServiceDiscoveryInfo;
 import android.hardware.wifi.supplicant.WpsConfigError;
 import android.hardware.wifi.supplicant.WpsErrorIndication;
 import android.net.MacAddress;
@@ -668,6 +670,33 @@ class SupplicantStaIfaceCallbackAidlImpl extends ISupplicantStaIfaceCallback.Stu
             Log.e(TAG, "onDppSuccess callback is null");
         }
     }
+
+    @Override
+    public void onUsdPublishStarted(int cmdId, int publishId) { }
+
+    @Override
+    public void onUsdSubscribeStarted(int cmdId, int subscribeId) { }
+
+    @Override
+    public void onUsdPublishConfigFailed(int cmdId) { }
+
+    @Override
+    public void onUsdSubscribeConfigFailed(int cmdId) { }
+
+    @Override
+    public void onUsdPublishTerminated(int publishId, int reasonCode) { }
+
+    @Override
+    public void onUsdSubscribeTerminated(int subscribeId, int reasonCode) { }
+
+    @Override
+    public void onUsdPublishReplied(UsdServiceDiscoveryInfo info) { }
+
+    @Override
+    public void onUsdServiceDiscovered(UsdServiceDiscoveryInfo info) { }
+
+    @Override
+    public void onUsdMessageReceived(UsdMessageInfo messageInfo) { }
 
     private @MboOceConstants.BtmResponseStatus int halToFrameworkBtmResponseStatus(int status) {
         switch (status) {

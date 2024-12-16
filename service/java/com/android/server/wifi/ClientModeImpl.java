@@ -17,9 +17,11 @@
 package com.android.server.wifi;
 
 import static android.net.util.KeepalivePacketDataUtil.parseTcpKeepalivePacketData;
+import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_BY_WIFI_MANAGER;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_NONE;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_NO_INTERNET_PERMANENT;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_NO_INTERNET_TEMPORARY;
+import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_TRANSITION_DISABLE_INDICATION;
 import static android.net.wifi.WifiConfiguration.NetworkSelectionStatus.DISABLED_UNWANTED_LOW_RSSI;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_FILS_SHA256;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_FILS_SHA384;
@@ -33,6 +35,8 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SCAN_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_LONG_LIVED;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TRANSIENT;
+import static com.android.server.wifi.WifiBlocklistMonitor.REASON_APP_DISALLOW;
+import static com.android.server.wifi.WifiConfigManager.LINK_CONFIGURATION_BSSID_MATCH_LENGTH;
 import static com.android.server.wifi.WifiSettingsConfigStore.SECONDARY_WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY;
@@ -85,6 +89,7 @@ import android.net.shared.ProvisioningConfiguration;
 import android.net.shared.ProvisioningConfiguration.ScanResultInfo;
 import android.net.vcn.VcnManager;
 import android.net.vcn.VcnNetworkPolicyResult;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.IWifiConnectedNetworkScorer;
 import android.net.wifi.MloLink;
 import android.net.wifi.ScanResult;
@@ -1299,24 +1304,11 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         }
 
         @Override
-        public void onNetworkTemporarilyDisabled(WifiConfiguration config, int disableReason) {
-            if (disableReason == DISABLED_NO_INTERNET_TEMPORARY) return;
-            if (config.networkId == mTargetNetworkId || config.networkId == mLastNetworkId) {
-                // Disconnect and let autojoin reselect a new network
-                mFrameworkDisconnectReasonOverride = WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_TEMP_DISABLED;
-                sendMessageAtFrontOfQueue(CMD_DISCONNECT,
-                        StaEvent.DISCONNECT_NETWORK_TEMPORARY_DISABLED);
-            }
-
-        }
-
-        @Override
         public void onNetworkPermanentlyDisabled(WifiConfiguration config, int disableReason) {
-            // For DISABLED_NO_INTERNET_PERMANENT we do not need to remove the network
-            // because supplicant won't be trying to reconnect. If this is due to a
-            // preventAutomaticReconnect request from ConnectivityService, that service
-            // will disconnect as appropriate.
-            if (disableReason == DISABLED_NO_INTERNET_PERMANENT) return;
+            if (disableReason != DISABLED_BY_WIFI_MANAGER
+                    && disableReason != DISABLED_TRANSITION_DISABLE_INDICATION) {
+                return;
+            }
             if (config.networkId == mTargetNetworkId || config.networkId == mLastNetworkId) {
                 // Disconnect and let autojoin reselect a new network
                 mFrameworkDisconnectReasonOverride = WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__DISCONNECT_PERM_DISABLED;
@@ -6939,7 +6931,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             // mWifiMetrics.logScorerPredictionResult
             mWifiMetrics.updateWiFiEvaluationAndScorerStats(mWifiScoreReport.getLingering(),
                     mWifiInfo, mLastConnectionCapabilities);
-            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats, oneshot);
+            mWifiMetrics.updateWifiUsabilityStatsEntries(mInterfaceName, mWifiInfo, stats, oneshot,
+                    statusDataStall);
             if (getClientRoleForMetrics(getConnectedWifiConfiguration())
                     == WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
                 mWifiMetrics.logScorerPredictionResult(mWifiInjector.hasActiveModem(),
@@ -8895,5 +8888,39 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         if (isPrimary()) {
             mWifiInjector.getActiveModeWarden().updateCurrentConnectionInfo();
         }
+    }
+
+    @Override
+    public void blockNetwork(BlockingOption option) {
+        if (mLastNetworkId == WifiConfiguration.INVALID_NETWORK_ID) {
+            Log.e(TAG, "Calling blockNetwork when disconnected");
+            return;
+        }
+        WifiConfiguration configuration = mWifiConfigManager.getConfiguredNetwork(mLastNetworkId);
+        if (configuration == null) {
+            Log.e(TAG, "No available config for networkId: " + mLastNetworkId);
+            return;
+        }
+        if (mLastBssid == null) {
+            Log.e(TAG, "No available BSSID for networkId: " + mLastNetworkId);
+            return;
+        }
+        if (option.isBlockingBssidOnly()) {
+            mWifiBlocklistMonitor.blockBssidForDurationMs(mLastBssid,
+                    mWifiConfigManager.getConfiguredNetwork(mLastNetworkId),
+                    option.getBlockingTimeSeconds() * 1000L, REASON_APP_DISALLOW, 0);
+        } else {
+            ScanDetailCache scanDetailCache = mWifiConfigManager
+                    .getScanDetailCacheForNetwork(mLastNetworkId);
+            for (String bssid : scanDetailCache.keySet()) {
+                if (bssid.regionMatches(true, 0, mLastBssid, 0,
+                        LINK_CONFIGURATION_BSSID_MATCH_LENGTH)) {
+                    mWifiBlocklistMonitor.blockBssidForDurationMs(bssid,
+                            mWifiConfigManager.getConfiguredNetwork(mLastNetworkId),
+                            option.getBlockingTimeSeconds() * 1000L, REASON_APP_DISALLOW, 0);
+                }
+            }
+        }
+        mWifiBlocklistMonitor.updateAndGetBssidBlocklistForSsids(Set.of(configuration.SSID));
     }
 }

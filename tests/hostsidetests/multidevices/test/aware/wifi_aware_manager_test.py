@@ -22,6 +22,7 @@ import sys
 import time
 from typing import Tuple, Any
 
+from android.platform.test.annotations import ApiTest
 from mobly import asserts
 from mobly import base_test
 from mobly import records
@@ -30,11 +31,12 @@ from mobly import utils
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import callback_handler_v2
 from mobly.snippet import callback_event
+import wifi_test_utils
 
 from aware import constants
 from aware import aware_lib_utils
 
-PACKAGE_NAME = constants.WIFI_AWARE_SNIPPET_PACKAGE_NAME
+PACKAGE_NAME = constants.WIFI_SNIPPET_PACKAGE_NAME
 _DEFAULT_TIMEOUT = constants.WAIT_WIFI_STATE_TIME_OUT.total_seconds()
 _REQUEST_NETWORK_TIMEOUT_MS = 15 * 1000
 _MSG_ID_SUB_TO_PUB = random.randint(1000, 5000)
@@ -48,7 +50,7 @@ _IS_SESSION_INIT = constants.DiscoverySessionCallbackParamsType.IS_SESSION_INIT
 _TRANSPORT_TYPE_WIFI_AWARE = (
     constants.NetworkCapabilities.Transport.TRANSPORT_WIFI_AWARE
 )
-_LARGE_ENOUGH_DISTANCE_MM = 10000  # 10 meters
+_LARGE_ENOUGH_DISTANCE_MM = 100000  # 100 meters
 _MIN_RSSI = -100
 _WAIT_SEC_FOR_RTT_INITIATOR_RESPONDER_SWITCH = 5
 
@@ -99,7 +101,7 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
                 not device.wifi_aware_snippet.wifiAwareIsSupported(),
                 f'{device} does not support Wi-Fi Aware.',
             )
-            aware_lib_utils.set_screen_on_and_unlock(device)
+            wifi_test_utils.set_screen_on_and_unlock(device)
             asserts.abort_all_if(
                 not device.wifi_aware_snippet.wifiAwareIsAvailable(),
                 f'{device} Wi-Fi Aware is not available.',
@@ -112,6 +114,11 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             raise_on_exception=True,
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.PublishConfig.Builder#setPublishType(int)',
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+    ])
     def test_data_path_open_unsolicited_pub_and_passive_sub(self) -> None:
         """Test OPEN Wi-Fi Aware network with unsolicited publish and passive subscribe.
 
@@ -137,6 +144,12 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             ),
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.PublishConfig.Builder#setPublishType(int)',
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#setPskPassphrase(String)',
+    ])
     def test_data_path_passphrase_unsolicited_pub_and_passive_sub(self) -> None:
         """Test Wi-Fi Aware network with passphrase, unsolicited publish, and passive subscribe.
 
@@ -169,6 +182,12 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             )
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.PublishConfig.Builder#setPublishType(int)',
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#setPmk(byte[])',
+    ])
     def test_data_path_pmk_unsolicited_pub_and_passive_sub(self) -> None:
         """Test Wi-Fi Aware network using PMK with unsolicited publish and passive subscribe.
 
@@ -203,6 +222,11 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             )
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.PublishConfig.Builder#setPublishType(int)',
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+    ])
     def test_data_path_open_solicited_pub_and_active_sub(self) -> None:
         """Test OPEN Wi-Fi Aware network with solicited publish and active subscribe.
 
@@ -229,6 +253,12 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
 
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.PublishConfig.Builder#setPublishType(int)',
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#setPskPassphrase(String)',
+    ])
     def test_data_path_passphrase_solicited_pub_and_active_sub(self) -> None:
         """Test password-protected Wi-Fi Aware network with solicited publish and active subscribe.
 
@@ -261,6 +291,12 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             )
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.PublishConfig.Builder#setPublishType(int)',
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#setPmk(byte[])',
+    ])
     def test_data_path_pmk_solicited_pub_and_active_sub(self) -> None:
         """Test Wi-Fi Aware network using PMK with solicited publish and active subscribe.
 
@@ -295,6 +331,11 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             )
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#Builder(android.net.wifi.aware.PublishDiscoverySession)',
+    ])
     def test_data_path_open_unsolicited_pub_accept_any_and_passive_sub(self) -> None:
         """Test OPEN Wi-Fi Aware with unsolicited publish (accept any peer) and passive subscribe.
 
@@ -320,6 +361,12 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             is_pub_accept_any_peer=True,
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#Builder(android.net.wifi.aware.PublishDiscoverySession)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#setPskPassphrase(String)',
+    ])
     def test_data_path_passphrase_unsolicited_pub_accept_any_and_passive_sub(self) -> None:
         """Test Wi-Fi Aware with passphrase unsolicited publish (accept any), and passive subscribe.
 
@@ -352,6 +399,13 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             is_pub_accept_any_peer=True,
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#Builder(android.net.wifi.aware.PublishDiscoverySession)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#setPmk(byte[])',
+        'android.net.NetworkCapabilities#TRANSPORT_WIFI_AWARE',
+    ])
     def test_data_path_pmk_unsolicited_pub_accept_any_and_passive_sub(self) -> None:
         """Test Wi-Fi Aware with PMK, unsolicited publish (accept any), and passive subscribe.
 
@@ -386,6 +440,12 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             is_pub_accept_any_peer=True,
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#Builder(android.net.wifi.aware.PublishDiscoverySession)',
+        'android.net.NetworkCapabilities#TRANSPORT_WIFI_AWARE',
+    ])
     def test_data_path_open_solicited_pub_accept_any_active_sub(self) -> None:
         """Test Wi-Fi Aware with open network, solicited publish (accept any), and active subscribe.
 
@@ -411,7 +471,13 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             is_pub_accept_any_peer=True,
         )
 
-    def test_data_passphrase_solicited_pub_accept_any_and_active_sub(self) -> None:
+    @ApiTest(apis=[
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#Builder(android.net.wifi.aware.PublishDiscoverySession)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#setPskPassphrase(String)',
+    ])
+    def test_data_path_passphrase_solicited_pub_accept_any_and_active_sub(self) -> None:
         """Test Wi-Fi Aware with passphrase, solicited publish (accept any), and active subscribe.
 
         Steps:
@@ -443,6 +509,12 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             is_pub_accept_any_peer=True,
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.aware.SubscribeConfig.Builder#setSubscribeType(int)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#build()',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#Builder(android.net.wifi.aware.PublishDiscoverySession)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#setPmk(byte[])',
+    ])
     def test_data_path_pmk_solicited_pub_accept_any_and_active_sub(self) -> None:
         """Test Wi-Fi Aware with PMK, solicited publish (accept any), and active subscribe.
 
@@ -478,6 +550,15 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             is_pub_accept_any_peer=True,
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.rtt.RangingRequest.Builder#addWifiAwarePeer(android.net.wifi.aware.PeerHandle)',
+        'android.net.wifi.aware.PublishConfig.Builder#setRangingEnabled(boolean)',
+        'android.net.wifi.aware.SubscribeConfig.Builder#setMaxDistanceMm(int)',
+        'android.net.wifi.rtt.WifiRttManager#startRanging(android.net.wifi.rtt.RangingRequest, java.util.concurrent.Executor, android.net.wifi.rtt.RangingResultCallback)',
+        'android.net.wifi.aware.WifiAwareManager#attach(android.net.wifi.aware.AttachCallback, android.net.wifi.aware.IdentityChangedListener, android.os.Handler)',
+        'android.net.wifi.aware.WifiAwareSession#publish(android.net.wifi.aware.PublishConfig, android.net.wifi.aware.DiscoverySessionCallback, android.os.Handler)',
+        'android.net.wifi.aware.WifiAwareSession#subscrible(android.net.wifi.aware.SubscribeConfig, android.net.wifi.aware.DiscoverySessionCallback, android.os.Handler)',
+    ])
     def test_discovery_ranging_to_peer_handle(self) -> None:
         """Test ranging to a Wi-Fi Aware peer handle.
 
@@ -523,6 +604,15 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             constants.RangingRequest(peer_ids=[self.subscriber_peer]),
         )
 
+    @ApiTest(apis=[
+        'android.net.wifi.rtt.RangingRequest.Builder#addWifiAwarePeer(android.net.MacAddress)',
+        'android.net.wifi.aware.PublishConfig.Builder#setRangingEnabled(boolean)',
+        'android.net.wifi.aware.SubscribeConfig.Builder#setMaxDistanceMm(int)',
+        'android.net.wifi.rtt.WifiRttManager#startRanging(android.net.wifi.rtt.RangingRequest, java.util.concurrent.Executor, android.net.wifi.rtt.RangingResultCallback)',
+        'android.net.wifi.aware.WifiAwareManager#attach(android.net.wifi.aware.AttachCallback, android.net.wifi.aware.IdentityChangedListener, android.os.Handler)',
+        'android.net.wifi.aware.WifiAwareSession#publish(android.net.wifi.aware.PublishConfig, android.net.wifi.aware.DiscoverySessionCallback, android.os.Handler)',
+        'android.net.wifi.aware.WifiAwareSession#subscrible(android.net.wifi.aware.SubscribeConfig, android.net.wifi.aware.DiscoverySessionCallback, android.os.Handler)',
+    ])
     def test_discovery_ranging_to_peer_mac_address(self) -> None:
         """Test ranging to a Wi-Fi Aware peer mac address.
 
@@ -568,6 +658,11 @@ class WifiAwareManagerTest(base_test.BaseTestClass):
             constants.RangingRequest(peer_mac_addresses=[self.publisher_mac]),
         )
 
+
+    @ApiTest(apis=[
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#Builder(android.net.wifi.aware.DiscoverySession, android.net.wifi.aware.PeerHandle)',
+        'android.net.wifi.aware.WifiAwareNetworkSpecifier.Builder#setChannelFrequencyMhz(int, boolean)',
+    ])
     def test_data_path_force_channel_setup(self):
         """ Test Wi-Fi Aware with PMK, force channel publish, and subscribe.
 

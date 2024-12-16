@@ -44,6 +44,7 @@ import static com.android.server.wifi.ClientModeImpl.CMD_PRE_DHCP_ACTION;
 import static com.android.server.wifi.ClientModeImpl.CMD_PRE_DHCP_ACTION_COMPLETE;
 import static com.android.server.wifi.ClientModeImpl.CMD_UNWANTED_NETWORK;
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
+import static com.android.server.wifi.WifiBlocklistMonitor.REASON_APP_DISALLOW;
 import static com.android.server.wifi.WifiSettingsConfigStore.SECONDARY_WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.TestUtil.createCapabilityBitset;
@@ -124,6 +125,7 @@ import android.net.networkstack.aidl.ip.ReachabilityLossInfoParcelable;
 import android.net.networkstack.aidl.ip.ReachabilityLossReason;
 import android.net.vcn.VcnManager;
 import android.net.vcn.VcnNetworkPolicyResult;
+import android.net.wifi.BlockingOption;
 import android.net.wifi.IActionListener;
 import android.net.wifi.MloLink;
 import android.net.wifi.ScanResult;
@@ -6190,7 +6192,8 @@ public class ClientModeImplTest extends WifiBaseTest {
                 .thenReturn(WifiIsUnusableEvent.TYPE_UNKNOWN);
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
         mLooper.dispatchAll();
-        verify(mWifiMetrics).updateWifiUsabilityStatsEntries(any(), any(), eq(stats), eq(false));
+        verify(mWifiMetrics).updateWifiUsabilityStatsEntries(any(), any(), eq(stats), eq(false),
+                anyInt());
 
         when(mWifiDataStall.checkDataStallAndThroughputSufficiency(any(), any(), any(), any(),
                 any(), anyLong(), anyLong()))
@@ -6199,7 +6202,7 @@ public class ClientModeImplTest extends WifiBaseTest {
         mCmi.sendMessage(ClientModeImpl.CMD_RSSI_POLL, 1);
         mLooper.dispatchAll();
         verify(mWifiMetrics, times(2)).updateWifiUsabilityStatsEntries(any(), any(), eq(stats),
-                eq(false));
+                eq(false), anyInt());
     }
 
     /**
@@ -6729,6 +6732,8 @@ public class ClientModeImplTest extends WifiBaseTest {
     public void testOnNetworkPermanentlyDisabled() throws Exception {
         connect();
 
+        // Verify connection failure related disable reason should not trigger disconnect because
+        // this could be from another STA
         WifiConfiguration disabledNetwork = new WifiConfiguration();
         disabledNetwork.networkId = FRAMEWORK_NETWORK_ID;
         for (WifiConfigManager.OnNetworkUpdateListener listener : mConfigUpdateListenerCaptor
@@ -6737,7 +6742,15 @@ public class ClientModeImplTest extends WifiBaseTest {
                 WifiConfiguration.NetworkSelectionStatus.DISABLED_BY_WRONG_PASSWORD);
         }
         mLooper.dispatchAll();
+        verify(mWifiNative, never()).disconnect(WIFI_IFACE_NAME);
 
+        // Verify that the network is disconnect if the profile is disabled by wifi API call
+        for (WifiConfigManager.OnNetworkUpdateListener listener : mConfigUpdateListenerCaptor
+                .getAllValues()) {
+            listener.onNetworkPermanentlyDisabled(disabledNetwork,
+                    WifiConfiguration.NetworkSelectionStatus.DISABLED_BY_WIFI_MANAGER);
+        }
+        mLooper.dispatchAll();
         verify(mWifiNative).disconnect(WIFI_IFACE_NAME);
     }
 
@@ -11276,5 +11289,16 @@ public class ClientModeImplTest extends WifiBaseTest {
         } else {
             verify(mWifiGlobals, never()).enableWpa3SaeH2eSupport();
         }
+    }
+
+    @Test
+    public void testBlockNetwork() throws Exception {
+        connect();
+        BlockingOption option = new BlockingOption.Builder(100)
+                .setBlockingBssidOnly(true).build();
+        mCmi.blockNetwork(option);
+        verify(mWifiBlocklistMonitor).blockBssidForDurationMs(eq(TEST_BSSID_STR), any(),
+                eq(100 * 1000L), eq(REASON_APP_DISALLOW), eq(0));
+        verify(mWifiBlocklistMonitor).updateAndGetBssidBlocklistForSsids(any());
     }
 }
