@@ -1177,8 +1177,29 @@ public class WifiNativeTest extends WifiBaseTest {
     @Test
     public void testRemoveIfaceInstanceFromBridgedApIface() throws Exception {
         mWifiNative.removeIfaceInstanceFromBridgedApIface(
-                "br_" + WIFI_IFACE_NAME, WIFI_IFACE_NAME);
+                "br_" + WIFI_IFACE_NAME, WIFI_IFACE_NAME, false);
+        verify(mHostapdHal, never()).removeLinkFromMultipleLinkBridgedApIface(anyString(),
+                anyString());
         verify(mWifiVendorHal).removeIfaceInstanceFromBridgedApIface(
+                "br_" + WIFI_IFACE_NAME, WIFI_IFACE_NAME);
+
+        // verify removeLinkFromMultipleLinkBridgedApIface never call when flags is not enabled.
+        when(Flags.mloSap()).thenReturn(false);
+        mWifiNative.removeIfaceInstanceFromBridgedApIface(
+                "br_" + WIFI_IFACE_NAME, WIFI_IFACE_NAME, true);
+        verify(mHostapdHal, never()).removeLinkFromMultipleLinkBridgedApIface(anyString(),
+                anyString());
+        verify(mWifiVendorHal, times(2)).removeIfaceInstanceFromBridgedApIface(
+                "br_" + WIFI_IFACE_NAME, WIFI_IFACE_NAME);
+
+        // verify removeLinkFromMultipleLinkBridgedApIface will be called when feature flag
+        // is enabled.
+        when(Flags.mloSap()).thenReturn(true);
+        mWifiNative.removeIfaceInstanceFromBridgedApIface(
+                "br_" + WIFI_IFACE_NAME, WIFI_IFACE_NAME, true);
+        verify(mHostapdHal).removeLinkFromMultipleLinkBridgedApIface("br_" + WIFI_IFACE_NAME,
+                WIFI_IFACE_NAME);
+        verify(mWifiVendorHal, times(3)).removeIfaceInstanceFromBridgedApIface(
                 "br_" + WIFI_IFACE_NAME, WIFI_IFACE_NAME);
     }
 

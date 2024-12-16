@@ -1197,9 +1197,33 @@ public class HostapdHalAidlImp implements IHostapdHal {
     /**
      * Dump information about the AIDL implementation.
      *
-     * TODO (b/202302891) Log version information once we freeze the AIDL interface
      */
     public void dump(PrintWriter pw) {
-        pw.println("AIDL interface version: 1 (initial)");
+        pw.println("AIDL interface version: " + mServiceVersion);
+    }
+
+    /**
+     * See comments for
+     * {@link IHostapdHal#removeLinkFromMultipleLinkBridgedApIface(String, String)}.
+     */
+    public void removeLinkFromMultipleLinkBridgedApIface(@NonNull String ifaceName,
+            @NonNull String apIfaceInstance) {
+        if (!isServiceVersionAtLeast(3)) {
+            return;
+        }
+        synchronized (mLock) {
+            final String methodStr = "removeLinkFromMultipleLinkBridgedApIface";
+            if (!checkHostapdAndLogFailure(methodStr)) {
+                return;
+            }
+            Log.i(TAG, "Remove link: " + apIfaceInstance + " from AP iface: " + ifaceName);
+            try {
+                mIHostapd.removeLinkFromMultipleLinkBridgedApIface(ifaceName, apIfaceInstance);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+            }
+        }
     }
 }
