@@ -511,7 +511,7 @@ public final class ResponderConfig implements Parcelable {
         }
         return new SecureRangingConfig.Builder(pasnConfigBuilder.build())
                 .setSecureHeLtfEnabled(scanResult.isSecureHeLtfSupported())
-                .setRangingFrameProtectionEnabled(true)
+                .setRangingFrameProtectionEnabled(scanResult.isRangingFrameProtectionRequired())
                 .build();
     }
 
@@ -1027,6 +1027,7 @@ public final class ResponderConfig implements Parcelable {
         dest.writeInt(preamble);
         dest.writeLong(mNtbMinMeasurementTime);
         dest.writeLong(mNtbMaxMeasurementTime);
+        dest.writeParcelable(mSecureRangingConfig, flags);
     }
 
     public static final @android.annotation.NonNull Creator<ResponderConfig> CREATOR = new Creator<ResponderConfig>() {
@@ -1048,7 +1049,7 @@ public final class ResponderConfig implements Parcelable {
                 peerHandle = new PeerHandle(in.readInt());
             }
 
-            return new ResponderConfig.Builder()
+            ResponderConfig.Builder builder = new Builder()
                     .setMacAddress(macAddress)
                     .setPeerHandle(peerHandle)
                     .setResponderType(in.readInt())
@@ -1060,8 +1061,15 @@ public final class ResponderConfig implements Parcelable {
                     .setCenterFreq1Mhz(in.readInt())
                     .setPreamble(in.readInt())
                     .setNtbMinTimeBetweenMeasurementsMicros(in.readLong())
-                    .setNtbMaxTimeBetweenMeasurementsMicros(in.readLong())
-                    .build();
+                    .setNtbMaxTimeBetweenMeasurementsMicros(in.readLong());
+            SecureRangingConfig secureRangingConfig = in.readParcelable(
+                    SecureRangingConfig.class.getClassLoader());
+
+            if (secureRangingConfig != null) {
+                builder.setSecureRangingConfig(secureRangingConfig);
+            }
+            return builder.build();
+
         }
     };
 
@@ -1084,14 +1092,15 @@ public final class ResponderConfig implements Parcelable {
                 && centerFreq1 == lhs.centerFreq1 && preamble == lhs.preamble
                 && supports80211azNtb == lhs.supports80211azNtb
                 && mNtbMinMeasurementTime == lhs.mNtbMinMeasurementTime
-                && mNtbMaxMeasurementTime == lhs.mNtbMaxMeasurementTime;
+                && mNtbMaxMeasurementTime == lhs.mNtbMaxMeasurementTime
+                && Objects.equals(mSecureRangingConfig, lhs.mSecureRangingConfig);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(macAddress, peerHandle, responderType, supports80211mc, channelWidth,
                 frequency, centerFreq0, centerFreq1, preamble, supports80211azNtb,
-                mNtbMinMeasurementTime, mNtbMaxMeasurementTime);
+                mNtbMinMeasurementTime, mNtbMaxMeasurementTime, mSecureRangingConfig);
     }
 
     @Override
