@@ -1421,11 +1421,16 @@ public class WifiNative {
      *
      * @param ifaceName Name of the iface.
      * @param apIfaceInstance The identity of the ap instance.
+     * @param isMloAp true when current access point is using multiple link operation.
      * @return true if the operation succeeded, false if there is an error in Hal.
      */
     public boolean removeIfaceInstanceFromBridgedApIface(@NonNull String ifaceName,
-            @NonNull String apIfaceInstance) {
+            @NonNull String apIfaceInstance, boolean isMloAp) {
         synchronized (mLock) {
+            if (isMloAp && mHostapdHal != null && Flags.mloSap()) {
+                mHostapdHal.removeLinkFromMultipleLinkBridgedApIface(ifaceName,
+                        apIfaceInstance);
+            }
             if (mWifiVendorHal.isVendorHalSupported()) {
                 return mWifiVendorHal.removeIfaceInstanceFromBridgedApIface(ifaceName,
                         apIfaceInstance);
