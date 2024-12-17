@@ -2387,6 +2387,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
      */
     @Test
     public void testStartTetheredHotspotRequestWithPermissions() {
+        assumeTrue(Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA);
         TetheringManager.TetheringRequest request = new TetheringManager.TetheringRequest.Builder(
                 TetheringManager.TETHERING_WIFI).build();
         mWifiServiceImpl.startTetheredHotspotRequest(request,
@@ -2394,6 +2395,27 @@ public class WifiServiceImplTest extends WifiBaseTest {
         verify(mActiveModeWarden).startSoftAp(mSoftApModeConfigCaptor.capture(),
                 eq(new WorkSource(Binder.getCallingUid(), TEST_PACKAGE_NAME)));
         assertNull(mSoftApModeConfigCaptor.getValue().getSoftApConfiguration());
+        assertThat(mSoftApModeConfigCaptor.getValue().getTetheringRequest()).isEqualTo(request);
+        verify(mLastCallerInfoManager).put(eq(WifiManager.API_TETHERED_HOTSPOT), anyInt(),
+                anyInt(), anyInt(), anyString(), eq(true));
+    }
+
+    /**
+     * Verify startTetheredHotspot with TetheringRequest use the TetheringRequest's config.
+     */
+    @Test
+    public void testStartTetheredHotspotRequestWithSoftApConfiguration() {
+        assumeTrue(Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA);
+        SoftApConfiguration config = createValidSoftApConfiguration();
+        TetheringManager.TetheringRequest request = new TetheringManager.TetheringRequest.Builder(
+                TetheringManager.TETHERING_WIFI)
+                .setSoftApConfiguration(config)
+                .build();
+        mWifiServiceImpl.startTetheredHotspotRequest(request,
+                mClientSoftApCallback, TEST_PACKAGE_NAME);
+        verify(mActiveModeWarden).startSoftAp(mSoftApModeConfigCaptor.capture(),
+                eq(new WorkSource(Binder.getCallingUid(), TEST_PACKAGE_NAME)));
+        assertThat(mSoftApModeConfigCaptor.getValue().getSoftApConfiguration()).isEqualTo(config);
         assertThat(mSoftApModeConfigCaptor.getValue().getTetheringRequest()).isEqualTo(request);
         verify(mLastCallerInfoManager).put(eq(WifiManager.API_TETHERED_HOTSPOT), anyInt(),
                 anyInt(), anyInt(), anyString(), eq(true));

@@ -1980,7 +1980,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
         mLog.info("startTetheredHotspot uid=%").c(callingUid).flush();
         startTetheredHotspotInternal(new SoftApModeConfiguration(
-                WifiManager.IFACE_IP_MODE_TETHERED, null /* config */,
+                WifiManager.IFACE_IP_MODE_TETHERED,
+                com.android.net.flags.Flags.tetheringWithSoftApConfig()
+                        ? request.getSoftApConfiguration() : null,
                 mTetheredSoftApTracker.getSoftApCapability(),
                 mCountryCode.getCountryCode(), request), callingUid, packageName, callback);
     }

@@ -183,7 +183,7 @@ public class SoftApManagerTest extends WifiBaseTest {
     private static final int[] ALLOWED_6G_FREQS = {5945, 5965};
     private static final int[] ALLOWED_60G_FREQS = {58320, 60480}; // ch# 1, 2
     private static final WorkSource TEST_WORKSOURCE = new WorkSource();
-    private SoftApConfiguration mDefaultApConfig = createDefaultApConfig();
+    private SoftApConfiguration mPersistentApConfig;
 
     private static final TetheringManager.TetheringRequest TEST_TETHERING_REQUEST =
             new TetheringManager.TetheringRequest.Builder(TetheringManager.TETHERING_WIFI).build();
@@ -475,7 +475,8 @@ public class SoftApManagerTest extends WifiBaseTest {
         mTestSoftApCapability.setSupportedChannelList(
                 SoftApConfiguration.BAND_5GHZ, TEST_SUPPORTED_5G_CHANNELS);
         mTestSoftApCapability.setCountryCode(TEST_COUNTRY_CODE);
-        when(mWifiApConfigStore.getApConfiguration()).thenReturn(mDefaultApConfig);
+        mPersistentApConfig = createDefaultApConfig();
+        when(mWifiApConfigStore.getApConfiguration()).thenReturn(mPersistentApConfig);
         when(mWifiNative.isHalStarted()).thenReturn(true);
 
         mTestSoftApInfoMap.clear();
@@ -1039,7 +1040,7 @@ public class SoftApManagerTest extends WifiBaseTest {
                         SoftApManager.START_RESULT_FAILURE_ADD_AP_HOSTAPD);
 
         SoftApModeConfiguration softApModeConfig =
-                new SoftApModeConfiguration(WifiManager.IFACE_IP_MODE_TETHERED, mDefaultApConfig,
+                new SoftApModeConfiguration(WifiManager.IFACE_IP_MODE_TETHERED, mPersistentApConfig,
                 mTestSoftApCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
 
         mSoftApManager = createSoftApManager(
@@ -2158,7 +2159,7 @@ public class SoftApManagerTest extends WifiBaseTest {
 
         mockSoftApInfoUpdateAndVerifyAfterSapStarted(false, true);
 
-        SoftApConfiguration newConfig = new SoftApConfiguration.Builder(mDefaultApConfig)
+        SoftApConfiguration newConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setAutoShutdownEnabled(false)
                 .build();
         mSoftApManager.updateConfiguration(newConfig);
@@ -2172,7 +2173,7 @@ public class SoftApManagerTest extends WifiBaseTest {
     @Test
     public void schedulesTimeoutTimerOnTimeoutToggleChangeWhenNoClients() throws Exception {
         // start with timeout toggle disabled
-        mDefaultApConfig = new SoftApConfiguration.Builder(mDefaultApConfig)
+        mPersistentApConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setAutoShutdownEnabled(false)
                 .build();
         SoftApModeConfiguration apConfig =
@@ -2194,7 +2195,7 @@ public class SoftApManagerTest extends WifiBaseTest {
         verify(mAlarmManager.getAlarmManager(), never()).setExact(anyInt(), anyLong(),
                 any(), any(), any());
 
-        SoftApConfiguration newConfig = new SoftApConfiguration.Builder(mDefaultApConfig)
+        SoftApConfiguration newConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setAutoShutdownEnabled(true)
                 .build();
         mSoftApManager.updateConfiguration(newConfig);
@@ -2209,7 +2210,7 @@ public class SoftApManagerTest extends WifiBaseTest {
     @Test
     public void doesNotScheduleTimeoutTimerOnStartWhenTimeoutIsDisabled() throws Exception {
         // start with timeout toggle disabled
-        mDefaultApConfig = new SoftApConfiguration.Builder(mDefaultApConfig)
+        mPersistentApConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setAutoShutdownEnabled(false)
                 .build();
         SoftApModeConfiguration apConfig =
@@ -2232,7 +2233,7 @@ public class SoftApManagerTest extends WifiBaseTest {
     public void doesNotScheduleTimeoutTimerWhenAllClientsDisconnectButTimeoutIsDisabled()
             throws Exception {
         // start with timeout toggle disabled
-        mDefaultApConfig = new SoftApConfiguration.Builder(mDefaultApConfig)
+        mPersistentApConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setAutoShutdownEnabled(false)
                 .build();
         SoftApModeConfiguration apConfig =
@@ -2375,7 +2376,7 @@ public class SoftApManagerTest extends WifiBaseTest {
     @Test
     public void setMacFailureWhenRandomMac() throws Exception {
         SoftApConfiguration.Builder randomizedBssidConfigBuilder =
-                new SoftApConfiguration.Builder(mDefaultApConfig)
+                new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setBssid(TEST_CLIENT_MAC_ADDRESS);
         if (SdkLevel.isAtLeastS()) {
             randomizedBssidConfigBuilder.setMacRandomizationSetting(
@@ -2487,7 +2488,7 @@ public class SoftApManagerTest extends WifiBaseTest {
         int[] dual_bands = {SoftApConfiguration.BAND_2GHZ ,
                 SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ};
         Builder configBuilder = new SoftApConfiguration.Builder(
-                config != null ? config : mDefaultApConfig);
+                config != null ? config : mPersistentApConfig);
         configBuilder.setBands(dual_bands);
         return configBuilder.build();
     }
@@ -2520,12 +2521,12 @@ public class SoftApManagerTest extends WifiBaseTest {
         SoftApConfiguration randomizedBssidConfig = null;
         InOrder order = inOrder(mCallback, mWifiNative);
 
-        SoftApConfiguration config = softApConfig.getSoftApConfiguration();
+        final SoftApConfiguration config = softApConfig.getSoftApConfiguration();
         if (expectedConfig == null) {
             if (config == null) {
                 // Only generate randomized mac for default config since test case doesn't care it.
                 SoftApConfiguration.Builder randomizedBssidConfigBuilder =
-                        new SoftApConfiguration.Builder(mDefaultApConfig)
+                        new SoftApConfiguration.Builder(mPersistentApConfig)
                         .setBssid(TEST_INTERFACE_MAC_ADDRESS);
                 if (SdkLevel.isAtLeastS()) {
                     randomizedBssidConfigBuilder.setMacRandomizationSetting(
@@ -2691,7 +2692,7 @@ public class SoftApManagerTest extends WifiBaseTest {
         // Verify the bands we get from getSoftApModeConfiguration() match the original bands
         // we passed in.
         assertThat(mSoftApManager.getSoftApModeConfiguration().getSoftApConfiguration().getBands())
-                .isEqualTo(config != null ? config.getBands() : mDefaultApConfig.getBands());
+                .isEqualTo(config != null ? config.getBands() : mPersistentApConfig.getBands());
         if (SdkLevel.isAtLeastS()) {
             SparseIntArray actualChannels =
                     mSoftApManager
@@ -2699,7 +2700,7 @@ public class SoftApManagerTest extends WifiBaseTest {
                             .getSoftApConfiguration()
                             .getChannels();
             SparseIntArray expectedChannels =
-                    config != null ? config.getChannels() : mDefaultApConfig.getChannels();
+                    config != null ? config.getChannels() : mPersistentApConfig.getChannels();
             assertThat(actualChannels.size()).isEqualTo(expectedChannels.size());
             for (int band : actualChannels.copyKeys()) {
                 assertThat(actualChannels.get(band)).isEqualTo(actualChannels.get(band));
@@ -2768,7 +2769,7 @@ public class SoftApManagerTest extends WifiBaseTest {
         noClientControlCapability.setMaxSupportedClients(1);
         noClientControlCapability.setCountryCode(TEST_COUNTRY_CODE);
         SoftApConfiguration softApConfig = new SoftApConfiguration.Builder(
-                mDefaultApConfig).setMaxNumberOfClients(1).build();
+                mPersistentApConfig).setMaxNumberOfClients(1).build();
 
         SoftApModeConfiguration apConfig =
                 new SoftApModeConfiguration(WifiManager.IFACE_IP_MODE_TETHERED, softApConfig,
@@ -2797,7 +2798,7 @@ public class SoftApManagerTest extends WifiBaseTest {
         SoftApCapability noSaeCapability = new SoftApCapability(testSoftApFeature);
         noSaeCapability.setCountryCode(TEST_COUNTRY_CODE);
         SoftApConfiguration softApConfig = new SoftApConfiguration.Builder(
-                mDefaultApConfig).setPassphrase(TEST_PASSWORD,
+                mPersistentApConfig).setPassphrase(TEST_PASSWORD,
                 SoftApConfiguration.SECURITY_TYPE_WPA3_SAE).build();
 
         SoftApModeConfiguration apConfig =
@@ -2870,7 +2871,7 @@ public class SoftApManagerTest extends WifiBaseTest {
                 SoftApConfiguration.BAND_2GHZ, TEST_SUPPORTED_24G_CHANNELS);
         testCapability.setSupportedChannelList(
                 SoftApConfiguration.BAND_5GHZ, TEST_SUPPORTED_5G_CHANNELS);
-        SoftApConfiguration softApConfig = new SoftApConfiguration.Builder(mDefaultApConfig)
+        SoftApConfiguration softApConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setChannels(dual_channels)
                 .build();
         SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
@@ -3056,7 +3057,7 @@ public class SoftApManagerTest extends WifiBaseTest {
     public void testBssidUpdatedWhenSoftApInfoUpdate() throws Exception {
         MacAddress testBssid = MacAddress.fromString("aa:bb:cc:11:22:33");
         SoftApConfiguration.Builder customizedBssidConfigBuilder = new SoftApConfiguration
-                .Builder(mDefaultApConfig).setBssid(testBssid);
+                .Builder(mPersistentApConfig).setBssid(testBssid);
         if (SdkLevel.isAtLeastS()) {
             customizedBssidConfigBuilder.setMacRandomizationSetting(
                     SoftApConfiguration.RANDOMIZATION_NONE);
@@ -4379,13 +4380,35 @@ public class SoftApManagerTest extends WifiBaseTest {
         int[] dual_bands = {SoftApConfiguration.BAND_2GHZ,
                 SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ};
 
-        SoftApConfiguration config = new SoftApConfiguration.Builder().setSsid(TEST_SSID)
-                .setSsid(TEST_SSID)
+        mPersistentApConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setBand(SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ
                         | SoftApConfiguration.BAND_6GHZ)
                 .build();
-        SoftApConfiguration dualBandConfig = new SoftApConfiguration.Builder(config)
+        when(mWifiApConfigStore.getApConfiguration()).thenReturn(mPersistentApConfig);
+        SoftApConfiguration dualBandConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setBands(dual_bands)
+                .build();
+
+        SoftApCapability no6GhzCapability = new SoftApCapability(mTestSoftApCapability);
+        no6GhzCapability.setSupportedChannelList(WifiScanner.WIFI_BAND_6_GHZ, new int[0]);
+        SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
+                WifiManager.IFACE_IP_MODE_TETHERED, null,
+                no6GhzCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
+        startSoftApAndVerifyEnabled(apConfig, dualBandConfig, false);
+    }
+
+    @Test
+    public void testStartSoftApDoesNotAutoUpgradeTo2g5gDbsWhenConfigIsSpecified() throws Exception {
+        assumeTrue(SdkLevel.isAtLeastS());
+        when(mResourceCache.getBoolean(
+                R.bool.config_wifiSoftapUpgradeTetheredTo2g5gBridgedIfBandsAreSubset))
+                .thenReturn(true);
+        SoftApConfiguration config = new SoftApConfiguration.Builder(mPersistentApConfig)
+                .setBand(SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ
+                        | SoftApConfiguration.BAND_6GHZ)
+                .build();
+        SoftApConfiguration expected = new SoftApConfiguration.Builder(config)
+                .setBand(SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ)
                 .build();
 
         SoftApCapability no6GhzCapability = new SoftApCapability(mTestSoftApCapability);
@@ -4393,7 +4416,7 @@ public class SoftApManagerTest extends WifiBaseTest {
         SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
                 WifiManager.IFACE_IP_MODE_TETHERED, config,
                 no6GhzCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
-        startSoftApAndVerifyEnabled(apConfig, dualBandConfig, false);
+        startSoftApAndVerifyEnabled(apConfig, expected, false);
     }
 
     @Test
@@ -4404,21 +4427,20 @@ public class SoftApManagerTest extends WifiBaseTest {
         when(mResourceCache.getBoolean(
                 R.bool.config_wifiSoftapUpgradeTetheredTo2g5gBridgedIfBandsAreSubset))
                 .thenReturn(true);
-
-        SoftApConfiguration config = new SoftApConfiguration.Builder().setSsid(TEST_SSID)
-                .setSsid(TEST_SSID)
-                .setPassphrase("somepassword", SoftApConfiguration.SECURITY_TYPE_WPA3_SAE)
+        mPersistentApConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setBand(SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ
                         | SoftApConfiguration.BAND_6GHZ)
+                .setPassphrase("somepassword", SoftApConfiguration.SECURITY_TYPE_WPA3_SAE)
                 .build();
+        when(mWifiApConfigStore.getApConfiguration()).thenReturn(mPersistentApConfig);
 
         SoftApCapability with6GhzCapability = new SoftApCapability(mTestSoftApCapability);
         with6GhzCapability.setSupportedChannelList(
                 SoftApConfiguration.BAND_6GHZ, new int[]{5, 21});
         SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
-                WifiManager.IFACE_IP_MODE_TETHERED, config,
+                WifiManager.IFACE_IP_MODE_TETHERED, null,
                 with6GhzCapability, TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
-        startSoftApAndVerifyEnabled(apConfig, config, false);
+        startSoftApAndVerifyEnabled(apConfig, mPersistentApConfig, false);
     }
 
     @Test
@@ -4433,19 +4455,19 @@ public class SoftApManagerTest extends WifiBaseTest {
         int[] dual_bands = {SoftApConfiguration.BAND_2GHZ,
                 SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ};
 
-        SoftApConfiguration config = new SoftApConfiguration.Builder().setSsid(TEST_SSID)
-                .setSsid(TEST_SSID)
+        mPersistentApConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setBand(SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ
                         | SoftApConfiguration.BAND_6GHZ)
                 .build();
-        SoftApConfiguration dualBandConfig = new SoftApConfiguration.Builder(config)
+        when(mWifiApConfigStore.getApConfiguration()).thenReturn(mPersistentApConfig);
+        SoftApConfiguration dualBandConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setBands(dual_bands)
                 .build();
 
         when(mWifiNative.getChannelsForBand(WifiScanner.WIFI_BAND_6_GHZ))
                 .thenReturn(new int[0]);
         SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
-                WifiManager.IFACE_IP_MODE_TETHERED, config,
+                WifiManager.IFACE_IP_MODE_TETHERED, null,
                 mTestSoftApCapability, "Not " + TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
         startSoftApAndVerifyEnabled(apConfig, dualBandConfig, false);
     }
@@ -4463,18 +4485,18 @@ public class SoftApManagerTest extends WifiBaseTest {
                 R.bool.config_wifiSoftapUpgradeTetheredTo2g5gBridgedIfBandsAreSubset))
                 .thenReturn(true);
 
-        SoftApConfiguration config = new SoftApConfiguration.Builder().setSsid(TEST_SSID)
-                .setSsid(TEST_SSID)
-                .setPassphrase("somepassword", SoftApConfiguration.SECURITY_TYPE_WPA3_SAE)
+        mPersistentApConfig = new SoftApConfiguration.Builder(mPersistentApConfig)
                 .setBand(SoftApConfiguration.BAND_2GHZ | SoftApConfiguration.BAND_5GHZ
                         | SoftApConfiguration.BAND_6GHZ)
+                .setPassphrase("somepassword", SoftApConfiguration.SECURITY_TYPE_WPA3_SAE)
                 .build();
+        when(mWifiApConfigStore.getApConfiguration()).thenReturn(mPersistentApConfig);
 
         when(mWifiNative.getChannelsForBand(WifiScanner.WIFI_BAND_6_GHZ))
                 .thenReturn(ALLOWED_6G_FREQS);
         SoftApModeConfiguration apConfig = new SoftApModeConfiguration(
-                WifiManager.IFACE_IP_MODE_TETHERED, config,
+                WifiManager.IFACE_IP_MODE_TETHERED, null,
                 mTestSoftApCapability, "Not " + TEST_COUNTRY_CODE, TEST_TETHERING_REQUEST);
-        startSoftApAndVerifyEnabled(apConfig, config, false);
+        startSoftApAndVerifyEnabled(apConfig);
     }
 }
