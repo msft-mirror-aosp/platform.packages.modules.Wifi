@@ -2309,6 +2309,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
 
                     mWifiService.setPerSsidRoamingMode(wifiSsid, mode, SHELL_PACKAGE_NAME);
                     return 0;
+                case "set-scan-throttling-enabled":
+                    mWifiService.setScanThrottleEnabled(
+                            getNextArgRequiredTrueOrFalse("enabled", "disabled"));
+                    return 0;
                 default:
                     return handleDefaultCommands(cmd);
             }
@@ -3405,6 +3409,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Sets the roaming mode for the given SSID.");
         pw.println("    -x - Specifies the SSID as hex digits instead of plain text.");
         pw.println("    Example: set-ssid-roaming-mode test_ssid aggressive");
+        pw.println("  set-scan-throttling-enabled enabled|disabled");
+        pw.println("    Set wifi scan throttling for 3P apps enabled or disabled.");
     }
 
     @Override
