@@ -610,6 +610,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         // take snapshot of ActiveModeManagers
         Collection<ActiveModeManager> activeModeManagers =
                 mActiveModeWarden.getActiveModeManagers();
+        ClientModeManager primaryCmm = mActiveModeWarden.getPrimaryClientModeManagerNullable();
 
         List<Integer> expectedStopInvocationCounts = activeModeManagers
                 .stream()
@@ -617,6 +618,9 @@ public class ActiveModeWardenTest extends WifiBaseTest {
                 .collect(Collectors.toList());
 
         r.run();
+        if (times > 0 && primaryCmm != null) {
+            assertEquals(WIFI_STATE_DISABLING, mActiveModeWarden.getWifiState());
+        }
 
         List<Integer> actualStopInvocationCounts = activeModeManagers
                 .stream()

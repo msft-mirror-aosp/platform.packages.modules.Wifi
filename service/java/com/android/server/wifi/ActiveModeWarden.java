@@ -1373,6 +1373,9 @@ public class ActiveModeWarden {
     private void stopAllClientModeManagers() {
         Log.d(TAG, "Shutting down all client mode managers");
         for (ConcreteClientModeManager clientModeManager : getClientModeManagersPrimaryLast()) {
+            if (clientModeManager.getRole() == ROLE_CLIENT_PRIMARY) {
+                setWifiStateForApiCalls(WIFI_STATE_DISABLING);
+            }
             clientModeManager.stop();
         }
     }
@@ -1505,6 +1508,9 @@ public class ActiveModeWarden {
     private void shutdownWifi() {
         Log.d(TAG, "Shutting down all mode managers");
         for (ActiveModeManager manager : getActiveModeManagers()) {
+            if (manager.getRole() == ROLE_CLIENT_PRIMARY) {
+                setWifiStateForApiCalls(WIFI_STATE_DISABLING);
+            }
             manager.stop();
         }
     }
