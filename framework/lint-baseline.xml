@@ -822,7 +822,7 @@
         errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/WifiManager.java"
-            line="6786"
+            line="6800"
             column="17"/>
     </issue>
 
@@ -833,7 +833,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/WifiManager.java"
-            line="8075"
+            line="8089"
             column="37"/>
     </issue>
 
@@ -844,7 +844,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/WifiManager.java"
-            line="8082"
+            line="8096"
             column="37"/>
     </issue>
 
@@ -855,7 +855,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/WifiManager.java"
-            line="8089"
+            line="8103"
             column="37"/>
     </issue>
 
@@ -866,7 +866,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/WifiManager.java"
-            line="12607"
+            line="12652"
             column="37"/>
     </issue>
 
@@ -877,7 +877,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/WifiManager.java"
-            line="12617"
+            line="12662"
             column="37"/>
     </issue>
 
@@ -888,7 +888,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/WifiManager.java"
-            line="12630"
+            line="12675"
             column="37"/>
     </issue>
 
@@ -921,7 +921,7 @@
         errorLine2="                                              ~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pGroup.java"
-            line="456"
+            line="468"
             column="47"/>
     </issue>
 
@@ -932,40 +932,40 @@
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pGroup.java"
-            line="496"
+            line="508"
             column="21"/>
     </issue>
 
     <issue
         id="FlaggedApi"
-        message="Method `onStateChanged()` is a flagged API and should be inside an `if (Flags.androidVWifiApi())` check (or annotate the surrounding method `onStateChanged` with `@FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API) to transfer requirement to caller`)"
-        errorLine1="            mExecutor.execute(() -> mListener.onStateChanged(p2pEnabled));"
-        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        message="Method `onP2pStateChanged()` is a flagged API and should be inside an `if (Flags.androidVWifiApi())` check (or annotate the surrounding method `onP2pStateChanged` with `@FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API) to transfer requirement to caller`)"
+        errorLine1="            mExecutor.execute(() -> mListener.onP2pStateChanged(state));"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1423"
+            line="1484"
             column="37"/>
     </issue>
 
     <issue
         id="FlaggedApi"
         message="Method `onDiscoveryStateChanged()` is a flagged API and should be inside an `if (Flags.androidVWifiApi())` check (or annotate the surrounding method `onDiscoveryStateChanged` with `@FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API) to transfer requirement to caller`)"
-        errorLine1="            mExecutor.execute(() -> mListener.onDiscoveryStateChanged(started));"
-        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="            mExecutor.execute(() -> mListener.onDiscoveryStateChanged(state));"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1429"
+            line="1490"
             column="37"/>
     </issue>
 
     <issue
         id="FlaggedApi"
         message="Method `onListenStateChanged()` is a flagged API and should be inside an `if (Flags.androidVWifiApi())` check (or annotate the surrounding method `onListenStateChanged` with `@FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API) to transfer requirement to caller`)"
-        errorLine1="            mExecutor.execute(() -> mListener.onListenStateChanged(started));"
-        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="            mExecutor.execute(() -> mListener.onListenStateChanged(state));"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1435"
+            line="1496"
             column="37"/>
     </issue>
 
@@ -976,7 +976,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1441"
+            line="1502"
             column="37"/>
     </issue>
 
@@ -987,7 +987,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1447"
+            line="1508"
             column="37"/>
     </issue>
 
@@ -998,7 +998,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1453"
+            line="1514"
             column="37"/>
     </issue>
 
@@ -1009,7 +1009,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1459"
+            line="1520"
             column="37"/>
     </issue>
 
@@ -1020,18 +1020,18 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1465"
+            line="1526"
             column="37"/>
     </issue>
 
     <issue
         id="FlaggedApi"
         message="Method `onGroupCreationFailed()` is a flagged API and should be inside an `if (Flags.androidVWifiApi())` check (or annotate the surrounding method `onGroupCreationFailed` with `@FlaggedApi(Flags.FLAG_ANDROID_V_WIFI_API) to transfer requirement to caller`)"
-        errorLine1="            mExecutor.execute(() -> mListener.onGroupCreationFailed());"
-        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        errorLine1="            mExecutor.execute(() -> mListener.onGroupCreationFailed(reason));"
+        errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1471"
+            line="1532"
             column="37"/>
     </issue>
 
@@ -1042,7 +1042,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1477"
+            line="1538"
             column="37"/>
     </issue>
 
@@ -1053,7 +1053,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1483"
+            line="1544"
             column="37"/>
     </issue>
 
@@ -1064,7 +1064,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1489"
+            line="1550"
             column="37"/>
     </issue>
 
@@ -1075,7 +1075,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1495"
+            line="1556"
             column="37"/>
     </issue>
 
@@ -1086,7 +1086,7 @@
         errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="1501"
+            line="1562"
             column="37"/>
     </issue>
 
@@ -1097,7 +1097,7 @@
         errorLine2="                                                                         ~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="2068"
+            line="2129"
             column="74"/>
     </issue>
 
@@ -1108,7 +1108,7 @@
         errorLine2="                                                                         ~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="2113"
+            line="2174"
             column="74"/>
     </issue>
 
@@ -1119,7 +1119,7 @@
         errorLine2="                                                                         ~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="packages/modules/Wifi/framework/java/android/net/wifi/p2p/WifiP2pManager.java"
-            line="2163"
+            line="2224"
             column="74"/>
     </issue>
 
