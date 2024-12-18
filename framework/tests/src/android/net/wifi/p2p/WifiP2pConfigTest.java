@@ -477,12 +477,12 @@ public class WifiP2pConfigTest {
                 .setDeviceAddress(MacAddress.fromString(DEVICE_ADDRESS))
                 .setPairingBootstrappingConfig(expectedPairingBootstrappingConfig)
                 .setGroupOperatingFrequency(2437)
-                .setAuthorizeConnectionFromPeer(true)
+                .setAuthorizeConnectionFromPeerEnabled(true)
                 .build();
         WifiP2pPairingBootstrappingConfig pairingBootstrappingConfig =
                 c.getPairingBootstrappingConfig();
         assertNotNull(pairingBootstrappingConfig);
         assertEquals(expectedPairingBootstrappingConfig, pairingBootstrappingConfig);
-        assertTrue(c.isAuthorizeConnectionFromPeer());
+        assertTrue(c.isAuthorizeConnectionFromPeerEnabled());
     }
 }

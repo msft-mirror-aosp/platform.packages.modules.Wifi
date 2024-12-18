@@ -1295,7 +1295,7 @@ package android.net.wifi.p2p {
     method @FlaggedApi("com.android.wifi.flags.wifi_direct_r2") @Nullable public android.net.wifi.p2p.WifiP2pPairingBootstrappingConfig getPairingBootstrappingConfig();
     method @Nullable public String getPassphrase();
     method @FlaggedApi("com.android.wifi.flags.wifi_direct_r2") public int getPccModeConnectionType();
-    method @FlaggedApi("com.android.wifi.flags.wifi_direct_r2") public boolean isAuthorizeConnectionFromPeer();
+    method @FlaggedApi("com.android.wifi.flags.wifi_direct_r2") public boolean isAuthorizeConnectionFromPeerEnabled();
     method @FlaggedApi("com.android.wifi.flags.wifi_direct_r2") public void setGroupOwnerVersion(int);
     method public void writeToParcel(android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.net.wifi.p2p.WifiP2pConfig> CREATOR;
@@ -1322,7 +1322,7 @@ package android.net.wifi.p2p {
     ctor public WifiP2pConfig.Builder();
     method @NonNull public android.net.wifi.p2p.WifiP2pConfig build();
     method @NonNull public android.net.wifi.p2p.WifiP2pConfig.Builder enablePersistentMode(boolean);
-    method @FlaggedApi("com.android.wifi.flags.wifi_direct_r2") @NonNull public android.net.wifi.p2p.WifiP2pConfig.Builder setAuthorizeConnectionFromPeer(boolean);
+    method @FlaggedApi("com.android.wifi.flags.wifi_direct_r2") @NonNull public android.net.wifi.p2p.WifiP2pConfig.Builder setAuthorizeConnectionFromPeerEnabled(boolean);
     method @NonNull public android.net.wifi.p2p.WifiP2pConfig.Builder setDeviceAddress(@Nullable android.net.MacAddress);
     method @NonNull public android.net.wifi.p2p.WifiP2pConfig.Builder setGroupClientIpProvisioningMode(int);
     method @NonNull public android.net.wifi.p2p.WifiP2pConfig.Builder setGroupOperatingBand(int);
