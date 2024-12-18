@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package com.android.server.wifi;
+package com.android.server.wifi.b2b;
 
-import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -29,8 +28,11 @@ import android.net.wifi.WifiSsid;
 
 import androidx.test.filters.SmallTest;
 
-import com.android.modules.utils.build.SdkLevel;
-import com.android.server.wifi.b2b.WifiRoamingModeManager;
+import com.android.server.wifi.ActiveModeWarden;
+import com.android.server.wifi.ClientModeManager;
+import com.android.server.wifi.WifiBaseTest;
+import com.android.server.wifi.WifiNative;
+import com.android.server.wifi.WifiRoamingConfigStore;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -67,7 +69,6 @@ public class WifiRoamingModeManagerTest extends WifiBaseTest {
 
     @Test
     public void testSetPerSsidRoamingMode() {
-        assumeTrue(SdkLevel.isAtLeastV());
         when(mWifiRoamingConfigStore.getRoamingMode(CURRENT_SSID)).thenReturn(
                 TEST_ROAMING_MODE);
         mWifiRoamingModeManager.setPerSsidRoamingMode(WifiSsid.fromString(CURRENT_SSID),
@@ -80,7 +81,6 @@ public class WifiRoamingModeManagerTest extends WifiBaseTest {
 
     @Test
     public void testRemovePerSsidRoamingMode() {
-        assumeTrue(SdkLevel.isAtLeastV());
         mWifiRoamingModeManager.removePerSsidRoamingMode(WifiSsid.fromString(TEST_SSID), false);
         verify(mWifiRoamingConfigStore).removeRoamingMode(TEST_SSID, false);
         verify(mActiveModeWarden).getConnectionInfo();
@@ -90,7 +90,6 @@ public class WifiRoamingModeManagerTest extends WifiBaseTest {
 
     @Test
     public void testGetPerSsidRoamingMode() {
-        assumeTrue(SdkLevel.isAtLeastV());
         mWifiRoamingModeManager.getPerSsidRoamingModes(false);
         verify(mWifiRoamingConfigStore).getPerSsidRoamingModes(false);
         verify(mActiveModeWarden, never()).getConnectionInfo();

@@ -16,7 +16,14 @@
 
 package com.android.server.wifi.hal;
 
+import static android.hardware.wifi.WifiChannelWidthInMhz.WIDTH_160;
+import static android.hardware.wifi.WifiChannelWidthInMhz.WIDTH_320;
+import static android.hardware.wifi.WifiChannelWidthInMhz.WIDTH_40;
+import static android.hardware.wifi.WifiChannelWidthInMhz.WIDTH_80;
+import static android.hardware.wifi.WifiChannelWidthInMhz.WIDTH_80P80;
 import static android.net.wifi.CoexUnsafeChannel.POWER_CAP_NONE;
+
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -32,6 +39,7 @@ import android.hardware.wifi.IWifiChip.LatencyMode;
 import android.hardware.wifi.IWifiChip.MultiStaUseCase;
 import android.hardware.wifi.IWifiChip.TxPowerScenario;
 import android.hardware.wifi.IWifiChip.UsableChannelFilter;
+import android.hardware.wifi.IWifiChip.VoipMode;
 import android.hardware.wifi.IWifiChipEventCallback;
 import android.hardware.wifi.IWifiNanIface;
 import android.hardware.wifi.IWifiP2pIface;
@@ -52,6 +60,8 @@ import android.hardware.wifi.WifiStatusCode;
 import android.hardware.wifi.WifiUsableChannel;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.OuiKeyedData;
+import android.net.wifi.ScanResult;
+import android.net.wifi.WifiAnnotations;
 import android.net.wifi.WifiAvailableChannel;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiScanner;
@@ -70,6 +80,7 @@ import com.android.server.wifi.util.HalAidlUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.List;
 
 /**
@@ -83,6 +94,7 @@ public class WifiChipAidlImpl implements IWifiChip {
     private final Object mLock = new Object();
     private Context mContext;
     private SsidTranslator mSsidTranslator;
+    private long mHalFeatureSet;
 
     public WifiChipAidlImpl(@NonNull android.hardware.wifi.IWifiChip chip,
             @NonNull Context context, @NonNull SsidTranslator ssidTranslator) {
@@ -380,7 +392,7 @@ public class WifiChipAidlImpl implements IWifiChip {
      * See comments for {@link IWifiChip#getCapabilitiesBeforeIfacesExist()}
      */
     @Override
-    public WifiChip.Response<Long> getCapabilitiesBeforeIfacesExist() {
+    public WifiChip.Response<BitSet> getCapabilitiesBeforeIfacesExist() {
         final String methodStr = "getCapabilitiesBeforeIfacesExist";
         return getCapabilitiesInternal(methodStr);
     }
@@ -389,20 +401,20 @@ public class WifiChipAidlImpl implements IWifiChip {
      * See comments for {@link IWifiChip#getCapabilitiesAfterIfacesExist()}
      */
     @Override
-    public WifiChip.Response<Long> getCapabilitiesAfterIfacesExist() {
+    public WifiChip.Response<BitSet> getCapabilitiesAfterIfacesExist() {
         final String methodStr = "getCapabilitiesAfterIfacesExist";
         return getCapabilitiesInternal(methodStr);
     }
 
-    private WifiChip.Response<Long> getCapabilitiesInternal(String methodStr) {
+    private WifiChip.Response<BitSet> getCapabilitiesInternal(String methodStr) {
         // getCapabilities uses the same logic in AIDL, regardless of whether the call
         // happens before or after any interfaces have been created.
-        WifiChip.Response<Long> featuresResp = new WifiChip.Response<>(0L);
+        WifiChip.Response<BitSet> featuresResp = new WifiChip.Response<>(new BitSet());
         synchronized (mLock) {
             try {
                 if (!checkIfaceAndLogFailure(methodStr)) return featuresResp;
-                long halFeatureSet = mWifiChip.getFeatureSet();
-                featuresResp.setValue(halToFrameworkChipFeatureSet(halFeatureSet));
+                mHalFeatureSet = mWifiChip.getFeatureSet();
+                featuresResp.setValue(halToFrameworkChipFeatureSet(mHalFeatureSet));
                 featuresResp.setStatusCode(WifiHal.WIFI_STATUS_SUCCESS);
             } catch (RemoteException e) {
                 handleRemoteException(e, methodStr);
@@ -688,7 +700,8 @@ public class WifiChipAidlImpl implements IWifiChip {
                 List<WifiAvailableChannel> frameworkChannels = new ArrayList<>();
                 for (WifiUsableChannel ch : halChannels) {
                     frameworkChannels.add(new WifiAvailableChannel(
-                            ch.channel, halToFrameworkIfaceMode(ch.ifaceModeMask)));
+                            ch.channel, halToFrameworkIfaceMode(ch.ifaceModeMask),
+                            halToFrameworkChannelWidth(ch.channelBandwidth)));
                 }
                 return frameworkChannels;
             } catch (RemoteException e) {
@@ -699,6 +712,23 @@ public class WifiChipAidlImpl implements IWifiChip {
                 handleIllegalArgumentException(e, methodStr);
             }
             return null;
+        }
+    }
+
+    private @WifiAnnotations.ChannelWidth int halToFrameworkChannelWidth(int channelBandwidth) {
+        switch(channelBandwidth) {
+            case WIDTH_40:
+                return ScanResult.CHANNEL_WIDTH_40MHZ;
+            case WIDTH_80:
+                return ScanResult.CHANNEL_WIDTH_80MHZ;
+            case WIDTH_160:
+                return ScanResult.CHANNEL_WIDTH_160MHZ;
+            case WIDTH_80P80:
+                return ScanResult.CHANNEL_WIDTH_80MHZ_PLUS_MHZ;
+            case WIDTH_320:
+                return ScanResult.CHANNEL_WIDTH_320MHZ;
+            default:
+                return ScanResult.CHANNEL_WIDTH_20MHZ;
         }
     }
 
@@ -1131,6 +1161,32 @@ public class WifiChipAidlImpl implements IWifiChip {
         }
     }
 
+    /**
+     * See comments for {@link IWifiChip#setVoipMode(int)}
+     */
+    @Override
+    public boolean setVoipMode(@WifiChip.WifiVoipMode int mode) {
+        final String methodStr = "setVoipMode";
+        synchronized (mLock) {
+            try {
+                if (!checkIfaceAndLogFailure(methodStr)
+                        || !WifiHalAidlImpl.isServiceVersionAtLeast(2)
+                        || !bitmapContains(mHalFeatureSet, FeatureSetMask.SET_VOIP_MODE)) {
+                    return false;
+                }
+                mWifiChip.setVoipMode(frameworkToHalVoipMode(mode));
+                return true;
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+            } catch (IllegalArgumentException e) {
+                handleIllegalArgumentException(e, methodStr);
+            }
+            return false;
+        }
+    }
+
     private class ChipEventCallback extends IWifiChipEventCallback.Stub {
         @Override
         public void onChipReconfigured(int modeId) throws RemoteException {
@@ -1520,33 +1576,45 @@ public class WifiChipAidlImpl implements IWifiChip {
         return halFilter;
     }
 
+    private static int frameworkToHalVoipMode(@WifiChip.WifiVoipMode int mode)
+            throws IllegalArgumentException {
+        switch (mode) {
+            case WifiChip.WIFI_VOIP_MODE_OFF:
+                return VoipMode.OFF;
+            case WifiChip.WIFI_VOIP_MODE_VOICE:
+                return VoipMode.VOICE;
+            default:
+                throw new IllegalArgumentException("bad voip mode " + mode);
+        }
+    }
+
     private static boolean bitmapContains(long bitmap, long expectedBit) {
         return (bitmap & expectedBit) != 0;
     }
 
     @VisibleForTesting
-    protected static long halToFrameworkChipFeatureSet(long halFeatureSet) {
-        long features = 0;
+    protected static BitSet halToFrameworkChipFeatureSet(long halFeatureSet) {
+        BitSet features = new BitSet();
         if (bitmapContains(halFeatureSet, FeatureSetMask.SET_TX_POWER_LIMIT)) {
-            features |= WifiManager.WIFI_FEATURE_TX_POWER_LIMIT;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_TX_POWER_LIMIT));
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.D2D_RTT)) {
-            features |= WifiManager.WIFI_FEATURE_D2D_RTT;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_D2D_RTT));
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.D2AP_RTT)) {
-            features |= WifiManager.WIFI_FEATURE_D2AP_RTT;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_D2AP_RTT));
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.SET_LATENCY_MODE)) {
-            features |= WifiManager.WIFI_FEATURE_LOW_LATENCY;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_LOW_LATENCY));
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.P2P_RAND_MAC)) {
-            features |= WifiManager.WIFI_FEATURE_P2P_RAND_MAC;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_P2P_RAND_MAC));
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.WIGIG)) {
-            features |= WifiManager.WIFI_FEATURE_INFRA_60G;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_INFRA_60G));
         }
         if (bitmapContains(halFeatureSet, FeatureSetMask.T2LM_NEGOTIATION)) {
-            features |= WifiManager.WIFI_FEATURE_T2LM_NEGOTIATION;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_T2LM_NEGOTIATION));
         }
         return features;
     }

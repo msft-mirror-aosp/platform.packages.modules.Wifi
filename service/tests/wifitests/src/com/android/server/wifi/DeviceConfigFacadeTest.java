@@ -19,6 +19,7 @@ package com.android.server.wifi;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.verify;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.*;
 
 import android.app.test.MockAnswerUtil.AnswerWithArguments;
@@ -51,10 +52,14 @@ import java.util.function.Consumer;
  */
 @SmallTest
 public class DeviceConfigFacadeTest extends WifiBaseTest {
+    private static final String DRY_RUN_SCORER_PKG_NAME =
+            "com.google.android.apps.carrier.carrierwifi";
     @Mock Context mContext;
     @Mock WifiMetrics mWifiMetrics;
     @Mock
     Consumer<Boolean> mOobPseudonymFeatureFlagChangedListener;
+    @Mock
+    Consumer<String> mDryRunScorerPkgNameChangedListener;
 
     final ArgumentCaptor<OnPropertiesChangedListener> mOnPropertiesChangedListenerCaptor =
             ArgumentCaptor.forClass(OnPropertiesChangedListener.class);
@@ -104,6 +109,8 @@ public class DeviceConfigFacadeTest extends WifiBaseTest {
                 mOnPropertiesChangedListenerCaptor.capture()));
         mDeviceConfigFacade.setOobPseudonymFeatureFlagChangedListener(
                 mOobPseudonymFeatureFlagChangedListener);
+        mDeviceConfigFacade.setDryRunScorerPkgNameChangedListener(
+                mDryRunScorerPkgNameChangedListener);
     }
 
     /**
@@ -228,12 +235,17 @@ public class DeviceConfigFacadeTest extends WifiBaseTest {
         assertEquals(true, mDeviceConfigFacade.isAwareSuspensionEnabled());
         assertEquals(true, mDeviceConfigFacade.isHighPerfLockDeprecated());
         assertEquals(true, mDeviceConfigFacade.isOobPseudonymEnabled());
+        assertEquals(DeviceConfigFacade.DEFAULT_DRY_RUN_SCORER_PKG_NAME,
+                mDeviceConfigFacade.getDryRunScorerPkgName());
         mLooper.dispatchAll();
         verify(mOobPseudonymFeatureFlagChangedListener, never()).accept(anyBoolean());
+        verify(mDryRunScorerPkgNameChangedListener, never()).accept(anyString());
         assertEquals(true, mDeviceConfigFacade.isApplicationQosPolicyApiEnabled());
         assertEquals(false, mDeviceConfigFacade.isAdjustPollRssiIntervalEnabled());
         assertEquals(true, mDeviceConfigFacade.includePasspointSsidsInPnoScans());
         assertEquals(true, mDeviceConfigFacade.isHandleRssiOrganicKernelFailuresEnabled());
+        assertEquals(Collections.EMPTY_SET,
+                mDeviceConfigFacade.getDisabledAutoBugreportTitleAndDetails());
     }
 
     /**
@@ -376,6 +388,9 @@ public class DeviceConfigFacadeTest extends WifiBaseTest {
                 anyBoolean())).thenReturn(true);
         when(DeviceConfig.getBoolean(anyString(), eq("handle_rssi_organic_kernel_failures_enabled"),
                 anyBoolean())).thenReturn(true);
+        when(DeviceConfig.getString(anyString(),
+                eq("disabled_auto_bugreport_title_and_description"), any()))
+                .thenReturn("TITLE_1DETAIL_1,TITLE_2DETAIL_2");
         mOnPropertiesChangedListenerCaptor.getValue().onPropertiesChanged(null);
 
         // Verifying fields are updated to the new values
@@ -445,17 +460,28 @@ public class DeviceConfigFacadeTest extends WifiBaseTest {
         assertEquals(true, mDeviceConfigFacade.isAwareSuspensionEnabled());
         assertEquals(true, mDeviceConfigFacade.isHighPerfLockDeprecated());
         assertEquals(true, mDeviceConfigFacade.isOobPseudonymEnabled());
+        assertEquals(DeviceConfigFacade.DEFAULT_DRY_RUN_SCORER_PKG_NAME,
+                mDeviceConfigFacade.getDryRunScorerPkgName());
         assertEquals(true, mDeviceConfigFacade.isApplicationQosPolicyApiEnabled());
         assertEquals(true, mDeviceConfigFacade.isAdjustPollRssiIntervalEnabled());
         assertEquals(true, mDeviceConfigFacade.includePasspointSsidsInPnoScans());
         assertEquals(true, mDeviceConfigFacade.isHandleRssiOrganicKernelFailuresEnabled());
+        Set<String> disabledAutoBugreports =
+                mDeviceConfigFacade.getDisabledAutoBugreportTitleAndDetails();
+        assertEquals(2, disabledAutoBugreports.size());
+        assertTrue(disabledAutoBugreports.contains("TITLE_1DETAIL_1"));
+        assertTrue(disabledAutoBugreports.contains("TITLE_2DETAIL_2"));
 
         when(DeviceConfig.getBoolean(anyString(), eq("oob_pseudonym_enabled"),
                 anyBoolean())).thenReturn(false);
+        when(DeviceConfig.getString(anyString(), eq("dry_run_scorer_pkg_name"), anyString()))
+                .thenReturn(DRY_RUN_SCORER_PKG_NAME);
         mOnPropertiesChangedListenerCaptor.getValue().onPropertiesChanged(null);
         mLooper.dispatchAll();
 
         assertEquals(false, mDeviceConfigFacade.isOobPseudonymEnabled());
         verify(mOobPseudonymFeatureFlagChangedListener).accept(false);
+        assertEquals(DRY_RUN_SCORER_PKG_NAME, mDeviceConfigFacade.getDryRunScorerPkgName());
+        verify(mDryRunScorerPkgNameChangedListener).accept(DRY_RUN_SCORER_PKG_NAME);
     }
 }

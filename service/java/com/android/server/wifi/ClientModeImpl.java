@@ -26,6 +26,7 @@ import static android.net.wifi.WifiManager.WIFI_FEATURE_FILS_SHA384;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_LINK_LAYER_STATS;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_TDLS;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_TRUST_ON_FIRST_USE;
+import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
 
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_LOCAL_ONLY;
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_PRIMARY;
@@ -34,6 +35,12 @@ import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_LO
 import static com.android.server.wifi.ActiveModeManager.ROLE_CLIENT_SECONDARY_TRANSIENT;
 import static com.android.server.wifi.WifiSettingsConfigStore.SECONDARY_WIFI_STA_FACTORY_MAC_ADDRESS;
 import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_STA_FACTORY_MAC_ADDRESS;
+import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY;
+import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_OTHERS;
+import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY;
+import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_INTERNET;
+import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_LONG_LIVED;
+import static com.android.server.wifi.proto.WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_TRANSIENT;
 import static com.android.server.wifi.proto.WifiStatsLog.WIFI_DISCONNECT_REPORTED__FAILURE_CODE__SUPPLICANT_DISCONNECTED;
 
 import android.annotation.IntDef;
@@ -247,7 +254,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     private final PasspointManager mPasspointManager;
     private final WifiDataStall mWifiDataStall;
     private final RssiMonitor mRssiMonitor;
-    private final LinkProbeManager mLinkProbeManager;
     private final MboOceController mMboOceController;
     private final McastLockManagerFilterController mMcastLockManagerFilterController;
     private final ActivityManager mActivityManager;
@@ -692,6 +698,11 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
 
     private final ApplicationQosPolicyRequestHandler mApplicationQosPolicyRequestHandler;
 
+    @VisibleForTesting
+    public static final String X509_CERTIFICATE_EXPIRED_ERROR_STRING = "certificate has expired";
+    @VisibleForTesting
+    public static final int EAP_FAILURE_CODE_CERTIFICATE_EXPIRED = 32768;
+    private boolean mCurrentConnectionReportedCertificateExpired = false;
 
     /** Note that this constructor will also start() the StateMachine. */
     public ClientModeImpl(
@@ -731,7 +742,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             @NonNull WifiNative wifiNative,
             @NonNull WrongPasswordNotifier wrongPasswordNotifier,
             @NonNull WifiTrafficPoller wifiTrafficPoller,
-            @NonNull LinkProbeManager linkProbeManager,
             long id,
             @NonNull BatteryStatsManager batteryStatsManager,
             @NonNull SupplicantStateTracker supplicantStateTracker,
@@ -766,7 +776,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         mEapFailureNotifier = eapFailureNotifier;
         mSimRequiredNotifier = simRequiredNotifier;
         mWifiTrafficPoller = wifiTrafficPoller;
-        mLinkProbeManager = linkProbeManager;
         mMboOceController = mboOceController;
         mWifiCarrierInfoManager = wifiCarrierInfoManager;
         mWifiPseudonymManager = wifiPseudonymManager;
@@ -1641,6 +1650,13 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     }
 
     /**
+     * @return true if this device supports WPA3_SAE
+     */
+    private boolean isWpa3SaeSupported() {
+        return (getSupportedFeatures() & WIFI_FEATURE_WPA3_SAE) != 0;
+    }
+
+    /**
      * Update interface capabilities
      * This method is used to update some of interface capabilities defined in overlay
      */
@@ -1655,10 +1671,19 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             if (mContext.getResources().getBoolean(R.bool.config_wifi11axSupportOverride)) {
                 cap.setWifiStandardSupport(ScanResult.WIFI_STANDARD_11AX, true);
             }
-            // Enable WPA3 SAE auto-upgrade offload
+            // The Wi-Fi Alliance has introduced the WPA3 security update for Wi-Fi 7, which
+            // mandates cross-AKM (Authenticated Key Management) roaming between three AKMs
+            // (AKM: 24(SAE-EXT-KEY), AKM:8(SAE) and AKM:2(PSK)). If the station supports
+            // AKM 24(SAE-EXT-KEY), it is recommended to enable WPA3 SAE auto-upgrade offload,
+            // provided that the driver indicates that the maximum number of AKM suites allowed in
+            // connection requests is three or more.
             if (Flags.getDeviceCrossAkmRoamingSupport() && SdkLevel.isAtLeastV()
-                    && cap.getMaxNumberAkms() >= 2) {
+                    && cap.getMaxNumberAkms() >= 3) {
                 mWifiGlobals.setWpa3SaeUpgradeOffloadEnabled();
+            }
+            if (SdkLevel.isAtLeastV() && mWifiNative.isSupplicantAidlServiceVersionAtLeast(3)
+                    && isWpa3SaeSupported()) {
+                mWifiGlobals.enableWpa3SaeH2eSupport();
             }
 
             mWifiNative.setDeviceWiphyCapabilities(mInterfaceName, cap);
@@ -1893,7 +1918,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      */
     public boolean syncQueryPasspointIcon(long bssid, String fileName) {
         return mWifiThreadRunner.call(
-                () -> mPasspointManager.queryPasspointIcon(bssid, fileName), false);
+                () -> mPasspointManager.queryPasspointIcon(bssid, fileName), false,
+                TAG + "#syncQueryPasspointIcon");
     }
 
     @Override
@@ -1945,7 +1971,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             IProvisioningCallback callback) {
         return mWifiThreadRunner.call(
                 () -> mPasspointManager.startSubscriptionProvisioning(
-                        callingUid, provider, callback), false);
+                        callingUid, provider, callback), false,
+                TAG + "#syncStartSubscriptionProvisioning");
     }
 
     /**
@@ -2420,6 +2447,12 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             case WifiMonitor.BSS_FREQUENCY_CHANGED_EVENT:
                 sb.append(" frequency=" + msg.arg1);
                 break;
+            case WifiMonitor.AUXILIARY_SUPPLICANT_EVENT:
+                SupplicantEventInfo eventInfo = (SupplicantEventInfo) msg.obj;
+                if (eventInfo != null) {
+                    sb.append(" ").append(eventInfo.toString());
+                }
+                break;
             default:
                 sb.append(" ");
                 sb.append(Integer.toString(msg.arg1));
@@ -2712,7 +2745,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
     private void updateMloLinkFromPollResults(MloLink link, WifiSignalPollResults pollResults) {
         if (link == null) return;
         int linkId = link.getLinkId();
-        link.setRssi(pollResults.getRssi(linkId));
+        int rssi = RssiUtil.calculateAdjustedRssi(pollResults.getRssi(linkId));
+        if (rssi > WifiInfo.INVALID_RSSI) {
+            link.setRssi(rssi);
+        }
         link.setTxLinkSpeedMbps(pollResults.getTxLinkSpeed(linkId));
         link.setRxLinkSpeedMbps(pollResults.getRxLinkSpeed(linkId));
         link.setChannel(ScanResult.convertFrequencyMhzToChannelIfSupported(
@@ -2755,7 +2791,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             return stats;
         }
 
-        int newRssi = pollResults.getRssi();
+        int newRssi = RssiUtil.calculateAdjustedRssi(pollResults.getRssi());
         int newTxLinkSpeed = pollResults.getTxLinkSpeed();
         int newFrequency = pollResults.getFrequency();
         int newRxLinkSpeed = pollResults.getRxLinkSpeed();
@@ -2781,6 +2817,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
          * set Tx link speed only if it is valid
          */
         if (newTxLinkSpeed > 0) {
+            if (newTxLinkSpeed != mWifiInfo.getTxLinkSpeedMbps() && SdkLevel.isAtLeastV()) {
+                updateNetworkCapabilities = true;
+            }
             mWifiInfo.setLinkSpeed(newTxLinkSpeed);
             mWifiInfo.setTxLinkSpeedMbps(newTxLinkSpeed);
         }
@@ -2788,6 +2827,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
          * set Rx link speed only if it is valid
          */
         if (newRxLinkSpeed > 0) {
+            if (newRxLinkSpeed != mWifiInfo.getRxLinkSpeedMbps() && SdkLevel.isAtLeastV()) {
+                updateNetworkCapabilities = true;
+            }
             mWifiInfo.setRxLinkSpeedMbps(newRxLinkSpeed);
         }
         if (newFrequency > 0) {
@@ -2796,18 +2838,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             }
             mWifiInfo.setFrequency(newFrequency);
         }
+
         // updateLinkBandwidth() requires the latest frequency information
-        if (newRssi > WifiInfo.INVALID_RSSI && newRssi < WifiInfo.MAX_RSSI) {
-            /*
-             * Positive RSSI is possible when devices are close(~0m apart) to each other.
-             * And there are some driver/firmware implementation, where they avoid
-             * reporting large negative rssi values by adding 256.
-             * so adjust the valid rssi reports for such implementations.
-             */
-            if (newRssi > (WifiInfo.INVALID_RSSI + 256)) {
-                Log.wtf(getTag(), "Error! +ve value RSSI: " + newRssi);
-                newRssi -= 256;
-            }
+        if (newRssi > WifiInfo.INVALID_RSSI) {
             int oldRssi = mWifiInfo.getRssi();
             mWifiInfo.setRssi(newRssi);
             /*
@@ -2834,10 +2867,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             updateLinkBandwidthAndCapabilities(stats, updateNetworkCapabilities, txBytes,
                     rxBytes);
             mLastSignalLevel = newSignalLevel;
-        } else {
-            mWifiInfo.setRssi(WifiInfo.INVALID_RSSI);
-            updateCapabilities();
-            mLastSignalLevel = -1;
         }
         mWifiConfigManager.updateScanDetailCacheFromWifiInfo(mWifiInfo);
         /*
@@ -2886,6 +2915,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         mWifiInfo.setSuccessfulRxPacketsPerSecond(0);
         mWifiScoreReport.reset();
         mLastLinkLayerStats = null;
+        if (isPrimary()) {
+            mWifiMetrics.resetWifiUnusableEvent();
+        }
         updateCurrentConnectionInfo();
     }
 
@@ -3244,6 +3276,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             mWifiInfo.clearCurrentSecurityType();
             mWifiInfo.resetMultiLinkInfo();
         }
+        if (state == SupplicantState.SCANNING) {
+            // Set networkId only for matching Wi-Fi entry in UI.
+            mWifiInfo.setNetworkId(stateChangeResult.networkId);
+        }
 
         // SSID might have been updated, so call updateCapabilities
         updateCapabilities();
@@ -3432,6 +3468,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 mLastConnectionCapabilities.apTidToLinkMapNegotiationSupported);
         mWifiMetrics.setConnectionMaxSupportedLinkSpeedMbps(mInterfaceName,
                 maxTxLinkSpeedMbps, maxRxLinkSpeedMbps);
+        mWifiMetrics.setConnectionChannelWidth(mInterfaceName,
+                mLastConnectionCapabilities.channelBandwidth);
         if (mLastConnectionCapabilities.wifiStandard == ScanResult.WIFI_STANDARD_11BE) {
             updateMloLinkAddrAndStates(mWifiNative.getConnectionMloLinksInfo(mInterfaceName));
             updateBlockListAffiliatedBssids();
@@ -3511,6 +3549,10 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 mWakeupController.setLastDisconnectInfo(matchInfo);
             }
             mRssiMonitor.reset();
+            // On disconnect, restore roaming mode to normal
+            if (!newConnectionInProgress) {
+                enableRoaming(true);
+            }
         }
 
         clearTargetBssid("handleNetworkDisconnect");
@@ -3567,6 +3609,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         mLastNetworkId = WifiConfiguration.INVALID_NETWORK_ID;
         mLastSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         mCurrentConnectionDetectedCaptivePortal = false;
+        mCurrentConnectionReportedCertificateExpired = false;
         mLastSimBasedConnectionCarrierName = null;
         mNudFailureCounter = new Pair<>(0L, 0);
         checkAbnormalDisconnectionAndTakeBugReport();
@@ -3724,19 +3767,18 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         ActiveModeManager.ClientRole clientRole = mClientModeManager.getRole();
         if (clientRole == ROLE_CLIENT_PRIMARY) {
             return config != null && config.fromWifiNetworkSpecifier
-                    ? WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY
-                    : WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY;
+                    ? WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY
+                    : WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY;
         } else if (clientRole == ROLE_CLIENT_LOCAL_ONLY) {
-            return WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY;
+            return WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY;
         } else if (clientRole == ROLE_CLIENT_SECONDARY_LONG_LIVED) {
             return mClientModeManager.isSecondaryInternet()
-                    ? WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_INTERNET
-                    : WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_LONG_LIVED;
+                    ? WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_INTERNET
+                    : WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_LONG_LIVED;
         } else if (clientRole == ROLE_CLIENT_SECONDARY_TRANSIENT) {
-            return WifiStatsLog
-                    .WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_TRANSIENT;
+            return WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_SECONDARY_TRANSIENT;
         }
-        return WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_OTHERS;
+        return WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_OTHERS;
     }
 
     /**
@@ -4118,6 +4160,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
         // processing the posted message sent from the legacy IpClientCallbacks instance,
         // see b/286338765.
         maybeShutdownIpclient();
+        mTargetNetworkId = config.networkId;
         transitionTo(mWaitBeforeL3ProvisioningState);
 
         updateCurrentConnectionInfo();
@@ -4783,6 +4826,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         break;
                     }
                     mCurrentConnectionDetectedCaptivePortal = false;
+                    mCurrentConnectionReportedCertificateExpired = false;
                     mTargetNetworkId = netId;
                     // Update scorecard while there is still state from existing connection
                     mLastScanRssi = mWifiConfigManager.findScanRssi(netId,
@@ -4826,6 +4870,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     if (!isTrustOnFirstUseSupported()) {
                         mInsecureEapNetworkHandler.startUserApprovalIfNecessary(mIsUserSelected);
                     }
+                    mFrameworkDisconnectReasonOverride = 0;
                     connectToNetwork(config);
                     break;
                 }
@@ -5363,10 +5408,11 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
      * @param bssid BSSID of the AP.
      * @return true if BSSID matches to one of the affiliated link BSSIDs, false otherwise.
      */
-    public boolean isAffiliatedLinkBssid(@NonNull MacAddress bssid) {
+    public boolean isAffiliatedLinkBssid(@Nullable MacAddress bssid) {
+        if (bssid == null) return false;
         List<MloLink> links = mWifiInfo.getAffiliatedMloLinks();
         for (MloLink link: links) {
-            if (link.getApMacAddress().equals(bssid)) {
+            if (bssid.equals(link.getApMacAddress())) {
                 return true;
             }
         }
@@ -5510,7 +5556,8 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 return;
             }
             mWifiThreadRunner.post(
-                    () -> mRssiMonitor.updateAppThresholdsAndStartMonitor(thresholds));
+                    () -> mRssiMonitor.updateAppThresholdsAndStartMonitor(thresholds),
+                    TAG + "#onSignalStrengthThresholdsUpdated");
         }
 
         @Override
@@ -5831,6 +5878,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                         mApplicationQosPolicyRequestHandler.queueAllPoliciesOnIface(
                                 mInterfaceName, mostRecentConnectionSupports11ax());
                     }
+                    mWifiNative.resendMscs(mInterfaceName);
                     updateLayer2Information();
                     updateCurrentConnectionInfo();
                     transitionTo(mL3ProvisioningState);
@@ -5936,6 +5984,12 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     logEventIfManagedNetwork(getConnectingWifiConfigurationInternal(),
                             eventInfo.eventCode, eventInfo.bssid,
                             eventInfo.reasonString);
+                    if (!TextUtils.isEmpty(eventInfo.reasonString)
+                            && eventInfo.reasonString.contains(
+                                    X509_CERTIFICATE_EXPIRED_ERROR_STRING)) {
+                        mCurrentConnectionReportedCertificateExpired = true;
+                        Log.e(getTag(), "Current connection attempt detected expired certificate");
+                    }
                     break;
                 }
                 case CMD_DISCONNECT: {
@@ -6225,6 +6279,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             disableReason = WifiConfiguration.NetworkSelectionStatus
                                     .DISABLED_AUTHENTICATION_NO_SUBSCRIPTION;
                         }
+                        if (mCurrentConnectionReportedCertificateExpired && errorCode <= 0) {
+                            errorCode = EAP_FAILURE_CODE_CERTIFICATE_EXPIRED;
+                        }
                     }
                     mWifiConfigManager.updateNetworkSelectionStatus(
                             mTargetNetworkId, disableReason);
@@ -6426,10 +6483,9 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
 
             mRssiPollToken++;
             if (mEnableRssiPolling) {
-                if (isPrimary()) {
-                    mLinkProbeManager.resetOnNewConnection();
-                }
                 sendMessage(CMD_RSSI_POLL, mRssiPollToken, 0);
+            } else {
+                updateLinkLayerStatsRssiAndScoreReport();
             }
             sendNetworkChangeBroadcast(DetailedState.CONNECTING);
             // If this network was explicitly selected by the user, evaluate whether to inform
@@ -6665,9 +6721,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     if (message.arg1 == mRssiPollToken) {
                         updateLinkLayerStatsRssiDataStallScoreReport();
                         mWifiScoreCard.noteSignalPoll(mWifiInfo);
-                        if (isPrimary()) {
-                            mLinkProbeManager.updateConnectionStats(mWifiInfo, mInterfaceName);
-                        }
                         // Update the polling interval as needed before sending the delayed message
                         // so that the next polling can happen after the updated interval
                         if (isPrimary()) {
@@ -6693,9 +6746,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                     if (mEnableRssiPolling) {
                         // First poll
                         mLastSignalLevel = -1;
-                        if (isPrimary()) {
-                            mLinkProbeManager.resetOnScreenTurnedOn();
-                        }
                         long txBytes = mFacade.getTotalTxBytes() - mFacade.getMobileTxBytes();
                         long rxBytes = mFacade.getTotalRxBytes() - mFacade.getMobileRxBytes();
                         updateLinkLayerStatsRssiSpeedFrequencyCapabilities(txBytes, rxBytes);
@@ -6755,12 +6805,15 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             && mLastNetworkId != WifiConfiguration.INVALID_NETWORK_ID) {
                         WifiConfiguration config =
                                 mWifiConfigManager.getConfiguredNetwork(mLastNetworkId);
-                        if (config != null
-                            && ((message.arg1 == RESET_SIM_REASON_DEFAULT_DATA_SIM_CHANGED
+                        if (config == null) {
+                            break;
+                        }
+                        boolean isSimBasedNetwork = config.enterpriseConfig != null
+                                && config.enterpriseConfig.isAuthenticationSimBased();
+                        boolean isLastSubReady = mWifiCarrierInfoManager.isSimReady(mLastSubId);
+                        if ((message.arg1 == RESET_SIM_REASON_DEFAULT_DATA_SIM_CHANGED
                                 && config.carrierId != TelephonyManager.UNKNOWN_CARRIER_ID)
-                                || (config.enterpriseConfig != null
-                                && config.enterpriseConfig.isAuthenticationSimBased()
-                                && !mWifiCarrierInfoManager.isSimReady(mLastSubId)))) {
+                                || (isSimBasedNetwork && !isLastSubReady)) {
                             mWifiMetrics.logStaEvent(mInterfaceName,
                                     StaEvent.TYPE_FRAMEWORK_DISCONNECT,
                                     StaEvent.DISCONNECT_RESET_SIM_NETWORKS);
@@ -6768,7 +6821,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                             mWifiNative.removeNetworkCachedData(mLastNetworkId);
                             // remove network so that supplicant's PMKSA cache is cleared
                             mWifiNative.removeAllNetworks(mInterfaceName);
-                            if (isPrimary() && !mWifiCarrierInfoManager.isSimReady(mLastSubId)) {
+                            if (isPrimary() && isSimBasedNetwork && !isLastSubReady) {
                                 mSimRequiredNotifier.showSimRequiredNotification(
                                         config, mLastSimBasedConnectionCarrierName);
                             }
@@ -6881,6 +6934,19 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             int statusDataStall = mWifiDataStall.checkDataStallAndThroughputSufficiency(
                     mInterfaceName, mLastConnectionCapabilities, mLastLinkLayerStats, stats,
                     mWifiInfo, txBytes, rxBytes);
+            if (getClientRoleForMetrics(getConnectedWifiConfiguration())
+                    == WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_PRIMARY) {
+                mWifiMetrics.logScorerPredictionResult(mWifiInjector.hasActiveModem(),
+                        mWifiCarrierInfoManager.hasActiveSubInfo(),
+                        mWifiCarrierInfoManager.isMobileDataEnabled(),
+                        mWifiGlobals.getPollRssiIntervalMillis(),
+                        mWifiScoreReport.getAospScorerPredictionStatusForEvaluation(),
+                        mWifiScoreReport.getExternalScorerPredictionStatusForEvaluation(),
+                        mWifiScoreReport.getLingering(),
+                        mWifiInfo, mLastConnectionCapabilities);
+                mWifiScoreReport.clearScorerPredictionStatusForEvaluation();
+            }
+
             if (mDataStallTriggerTimeMs == -1
                     && statusDataStall != WifiIsUnusableEvent.TYPE_UNKNOWN) {
                 mDataStallTriggerTimeMs = mClock.getElapsedSinceBootMillis();
@@ -6979,6 +7045,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 case CMD_IPCLIENT_CREATED: {
                     if (!isFromCurrentIpClientCallbacks(message)) break;
                     mIpClient = (IpClientManager) message.obj;
+                    setMulticastFilter(true);
                     transitionTo(mL3ProvisioningState);
                     break;
                 }
@@ -7326,7 +7393,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             WifiConfiguration config = getConnectedWifiConfigurationInternal();
             mWifiScoreReport.startConnectedNetworkScorer(
                     mNetworkAgent.getNetwork().getNetId(), isRecentlySelectedByTheUser(config));
-            updateLinkLayerStatsRssiAndScoreReport();
             mWifiScoreCard.noteIpConfiguration(mWifiInfo);
             // too many places to record L3 failure with too many failure reasons.
             // So only record success here.
@@ -7334,10 +7400,16 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             updateCurrentConnectionInfo();
             sendConnectedState();
             // Set the roaming policy for the currently connected network
-            if (isPrimary() && getClientRoleForMetrics(config)
+            if (getClientRoleForMetrics(config)
                     != WifiStatsLog.WIFI_CONNECTION_RESULT_REPORTED__ROLE__ROLE_CLIENT_LOCAL_ONLY) {
-                mWifiInjector.getWifiRoamingModeManager().applyWifiRoamingMode(
-                        mInterfaceName, mWifiInfo.getSSID());
+                if (isPrimary()) {
+                    mWifiInjector.getWifiRoamingModeManager().applyWifiRoamingMode(
+                            mInterfaceName, mWifiInfo.getSSID());
+                }
+                if (SdkLevel.isAtLeastV() && mWifiInjector.getWifiVoipDetector() != null) {
+                    mWifiInjector.getWifiVoipDetector().notifyWifiConnected(true,
+                            isPrimary(), mInterfaceName);
+                }
             }
         }
 
@@ -7595,6 +7667,11 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                      WifiConnectivityManager.WIFI_STATE_TRANSITIONING);
 
             mWifiLastResortWatchdog.connectedStateTransition(false);
+            // Always notify Voip detector module.
+            if (SdkLevel.isAtLeastV() && mWifiInjector.getWifiVoipDetector() != null) {
+                mWifiInjector.getWifiVoipDetector().notifyWifiConnected(false,
+                        isPrimary(), mInterfaceName);
+            }
         }
     }
 
@@ -8641,7 +8718,7 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
             return false;
         }
 
-        return mWifiConfigManager.saveToStore(true);
+        return mWifiConfigManager.saveToStore();
     }
 
     /**

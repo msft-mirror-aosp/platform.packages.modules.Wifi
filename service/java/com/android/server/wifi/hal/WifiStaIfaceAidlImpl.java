@@ -17,6 +17,7 @@
 package com.android.server.wifi.hal;
 
 import static com.android.server.wifi.hal.WifiHalAidlImpl.isServiceVersionAtLeast;
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -80,6 +81,7 @@ import com.android.server.wifi.util.NativeUtil;
 import com.android.wifi.resources.R;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 
 /**
@@ -95,12 +97,16 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
     private Context mContext;
     private SsidTranslator mSsidTranslator;
 
+    private final boolean mWifiLinkLayerAllRadiosStatsAggregationEnabled;
+
     public WifiStaIfaceAidlImpl(@NonNull android.hardware.wifi.IWifiStaIface staIface,
             @NonNull Context context, @NonNull SsidTranslator ssidTranslator) {
         mWifiStaIface = staIface;
         mContext = context;
         mSsidTranslator = ssidTranslator;
         mHalCallback = new StaIfaceEventCallback();
+        mWifiLinkLayerAllRadiosStatsAggregationEnabled = mContext.getResources()
+                .getBoolean(R.bool.config_wifiLinkLayerAllRadiosStatsAggregationEnabled);
     }
 
     /**
@@ -277,11 +283,11 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
      * See comments for {@link IWifiStaIface#getCapabilities()}
      */
     @Override
-    public long getCapabilities() {
+    public BitSet getCapabilities() {
         final String methodStr = "getCapabilities";
         synchronized (mLock) {
             try {
-                if (!checkIfaceAndLogFailure(methodStr)) return 0L;
+                if (!checkIfaceAndLogFailure(methodStr)) return new BitSet();
                 long halFeatureSet = mWifiStaIface.getFeatureSet();
                 return halToFrameworkStaFeatureSet(halFeatureSet);
             } catch (RemoteException e) {
@@ -289,7 +295,7 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
             } catch (ServiceSpecificException e) {
                 handleServiceSpecificException(e, methodStr);
             }
-            return 0L;
+            return new BitSet();
         }
     }
 
@@ -1261,59 +1267,60 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
     }
 
     @VisibleForTesting
-    protected static long halToFrameworkStaFeatureSet(long halFeatureSet) {
-        long features = 0;
+    protected static BitSet halToFrameworkStaFeatureSet(long halFeatureSet) {
+        BitSet features = new BitSet();
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.HOTSPOT)) {
-            features |= WifiManager.WIFI_FEATURE_PASSPOINT;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_PASSPOINT));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.BACKGROUND_SCAN)) {
-            features |= WifiManager.WIFI_FEATURE_SCANNER;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_SCANNER));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.PNO)) {
-            features |= WifiManager.WIFI_FEATURE_PNO;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_PNO));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.TDLS)) {
-            features |= WifiManager.WIFI_FEATURE_TDLS;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_TDLS));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.TDLS_OFFCHANNEL)) {
-            features |= WifiManager.WIFI_FEATURE_TDLS_OFFCHANNEL;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_TDLS_OFFCHANNEL));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.LINK_LAYER_STATS)) {
-            features |= WifiManager.WIFI_FEATURE_LINK_LAYER_STATS;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.RSSI_MONITOR)) {
-            features |= WifiManager.WIFI_FEATURE_RSSI_MONITOR;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_RSSI_MONITOR));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.KEEP_ALIVE)) {
-            features |= WifiManager.WIFI_FEATURE_MKEEP_ALIVE;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_MKEEP_ALIVE));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.ND_OFFLOAD)) {
-            features |= WifiManager.WIFI_FEATURE_CONFIG_NDO;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_CONFIG_NDO));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.CONTROL_ROAMING)) {
-            features |= WifiManager.WIFI_FEATURE_CONTROL_ROAMING;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_CONTROL_ROAMING));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.PROBE_IE_ALLOWLIST)) {
-            features |= WifiManager.WIFI_FEATURE_IE_WHITELIST;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_IE_WHITELIST));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.SCAN_RAND)) {
-            features |= WifiManager.WIFI_FEATURE_SCAN_RAND;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_SCAN_RAND));
         }
         if (hasCapability(halFeatureSet,
                 android.hardware.wifi.IWifiStaIface.FeatureSetMask.ROAMING_MODE_CONTROL)) {
-            features |= WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT;
+            features.set(
+                    getCapabilityIndex(WifiManager.WIFI_FEATURE_AGGRESSIVE_ROAMING_MODE_SUPPORT));
         }
         return features;
     }
@@ -1485,9 +1492,7 @@ public class WifiStaIfaceAidlImpl implements IWifiStaIface {
 
     private void aggregateFrameworkRadioStatsFromAidl(int radioIndex,
             WifiLinkLayerStats stats, StaLinkLayerRadioStats aidlRadioStats) {
-        if (!mContext.getResources()
-                .getBoolean(R.bool.config_wifiLinkLayerAllRadiosStatsAggregationEnabled)
-                && radioIndex > 0) {
+        if (!mWifiLinkLayerAllRadiosStatsAggregationEnabled && radioIndex > 0) {
             return;
         }
         // Aggregate the radio stats from all the radios

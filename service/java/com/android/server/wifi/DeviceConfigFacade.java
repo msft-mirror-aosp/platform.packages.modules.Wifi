@@ -152,6 +152,7 @@ public class DeviceConfigFacade {
     // Maximum traffic stats threshold for link bandwidth estimator
     static final int DEFAULT_TRAFFIC_STATS_THRESHOLD_MAX_KB = 8000;
     static final int DEFAULT_BANDWIDTH_ESTIMATOR_TIME_CONSTANT_LARGE_SEC = 6;
+    static final String DEFAULT_DRY_RUN_SCORER_PKG_NAME = "";
     // Cached values of fields updated via updateDeviceConfigFlags()
     private boolean mIsAbnormalConnectionBugreportEnabled;
     private int mAbnormalConnectionDurationMs;
@@ -215,11 +216,14 @@ public class DeviceConfigFacade {
     private boolean mHighPerfLockDeprecated;
     private Optional<Boolean> mOobPseudonymEnabled = Optional.empty();
     private Consumer<Boolean> mOobPseudonymFeatureFlagChangedListener = null;
+    private String mDryRunScorerPkgName;
+    private Consumer<String> mDryRunScorerPkgNameChangedListener = null;
     private boolean mApplicationQosPolicyApiEnabled;
     private boolean mAdjustPollRssiIntervalEnabled;
     private boolean mSoftwarePnoEnabled;
     private boolean mIncludePasspointSsidsInPnoScans;
     private boolean mHandleRssiOrganicKernelFailuresEnabled;
+    private Set<String> mDisabledAutoBugreports = Collections.EMPTY_SET;
 
     private final Handler mWifiHandler;
 
@@ -411,6 +415,16 @@ public class DeviceConfigFacade {
                     () -> mOobPseudonymFeatureFlagChangedListener.accept(oobPseudonymEnabled));
         }
         mOobPseudonymEnabled = Optional.of(oobPseudonymEnabled);
+
+        String dryRunScorerPkgName = DeviceConfig.getString(NAMESPACE, "dry_run_scorer_pkg_name",
+                DEFAULT_DRY_RUN_SCORER_PKG_NAME);
+        if (mDryRunScorerPkgNameChangedListener != null
+                && !dryRunScorerPkgName.equalsIgnoreCase(mDryRunScorerPkgName)) {
+            mWifiHandler.post(
+                    () -> mDryRunScorerPkgNameChangedListener.accept(dryRunScorerPkgName));
+        }
+        mDryRunScorerPkgName = dryRunScorerPkgName;
+
         mApplicationQosPolicyApiEnabled = DeviceConfig.getBoolean(NAMESPACE,
                 "application_qos_policy_api_enabled", true);
         mAdjustPollRssiIntervalEnabled =
@@ -421,6 +435,24 @@ public class DeviceConfigFacade {
                 "include_passpoint_ssids_in_pno_scans", true);
         mHandleRssiOrganicKernelFailuresEnabled = DeviceConfig.getBoolean(NAMESPACE,
                 "handle_rssi_organic_kernel_failures_enabled", true);
+        mDisabledAutoBugreports = getDisabledAutoBugreports();
+    }
+
+    private Set<String> getDisabledAutoBugreports() {
+        String rawList = DeviceConfig.getString(NAMESPACE,
+                "disabled_auto_bugreport_title_and_description", null);
+        if (rawList == null || rawList.isEmpty()) {
+            return Collections.EMPTY_SET;
+        }
+        Set<String> result = new ArraySet<>();
+        String[] list = rawList.split(",");
+        for (String cur : list) {
+            if (cur.length() == 0) {
+                continue;
+            }
+            result.add(cur);
+        }
+        return Collections.unmodifiableSet(result);
     }
 
     private Set<String> getUnmodifiableSetQuoted(String key) {
@@ -916,6 +948,26 @@ public class DeviceConfigFacade {
     public void setOobPseudonymFeatureFlagChangedListener(
             Consumer<Boolean> listener) {
         mOobPseudonymFeatureFlagChangedListener = listener;
+    }
+
+    /*
+     * Sets the listener to be notified when the DryRunScorerPkgName is changed.
+     * Only 1 listener is accepted.
+     */
+    public void setDryRunScorerPkgNameChangedListener(Consumer<String> listener) {
+        mDryRunScorerPkgNameChangedListener = listener;
+    }
+
+    public String getDryRunScorerPkgName() {
+        return mDryRunScorerPkgName;
+    }
+
+    /**
+     * Get the set of bugreports that are explicitly disabled.
+     * @return A Set of String to indicate disabled auto-bugreports trigger points.
+     */
+    public Set<String> getDisabledAutoBugreportTitleAndDetails() {
+        return mDisabledAutoBugreports;
     }
 
     public FeatureFlags getFeatureFlags() {

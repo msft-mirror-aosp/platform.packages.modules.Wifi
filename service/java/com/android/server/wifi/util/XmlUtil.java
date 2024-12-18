@@ -16,6 +16,8 @@
 
 package com.android.server.wifi.util;
 
+import static com.android.wifi.flags.Flags.softapConfigStoreMaxChannelWidth;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.compat.CompatChanges;
@@ -29,6 +31,7 @@ import android.net.ProxyInfo;
 import android.net.RouteInfo;
 import android.net.StaticIpConfiguration;
 import android.net.Uri;
+import android.net.wifi.OuiKeyedData;
 import android.net.wifi.ScanResult;
 import android.net.wifi.SecurityParams;
 import android.net.wifi.SoftApConfiguration;
@@ -39,6 +42,7 @@ import android.net.wifi.WifiManager;
 import android.net.wifi.WifiMigration;
 import android.net.wifi.WifiSsid;
 import android.os.ParcelUuid;
+import android.os.PersistableBundle;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
@@ -50,6 +54,8 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -85,6 +91,11 @@ import java.util.Locale;
  */
 public class XmlUtil {
     private static final String TAG = "WifiXmlUtil";
+
+    public static final String XML_TAG_VENDOR_DATA_LIST = "VendorDataList";
+    public static final String XML_TAG_OUI_KEYED_DATA = "OuiKeyedData";
+    public static final String XML_TAG_VENDOR_DATA_OUI = "VendorDataOui";
+    public static final String XML_TAG_PERSISTABLE_BUNDLE = "PersistableBundle";
 
     /**
      * Ensure that the XML stream is at a start tag or the end of document.
@@ -688,6 +699,9 @@ public class XmlUtil {
                                 .getBssidAllowlistInternal()));
             }
             writeDppConfigurationToXml(out, configuration, encryptionUtil);
+            if (SdkLevel.isAtLeastV()) {
+                writeVendorDataListToXml(out, configuration.getVendorData());
+            }
         }
 
         private static List<String> covertMacAddressListToStringList(List<MacAddress> macList) {
@@ -1119,6 +1133,12 @@ public class XmlUtil {
                         case XML_TAG_DPP_NET_ACCESS_KEY:
                             dppNetAccessKey = readEncrytepdBytesFromXml(encryptionUtil, in,
                                     outerTagDepth);
+                            break;
+                        case XML_TAG_VENDOR_DATA_LIST:
+                            if (SdkLevel.isAtLeastV()) {
+                                configuration.setVendorData(
+                                        parseVendorDataListFromXml(in, outerTagDepth + 1));
+                            }
                             break;
                         default:
                             Log.w(TAG, "Ignoring unknown tag found: " + tagName);
@@ -1954,6 +1974,7 @@ public class XmlUtil {
         public static final String XML_TAG_VENDOR_ELEMENTS = "VendorElements";
         public static final String XML_TAG_PERSISTENT_RANDOMIZED_MAC_ADDRESS =
                 "PersistentRandomizedMacAddress";
+        public static final String XML_TAG_MAX_CHANNEL_WIDTH = "MaxChannelWidth";
 
 
         /**
@@ -2177,6 +2198,13 @@ public class XmlUtil {
                     XmlUtil.writeNextValue(out, XML_TAG_PERSISTENT_RANDOMIZED_MAC_ADDRESS,
                             softApConfig.getPersistentRandomizedMacAddress().toString());
                 }
+                if (softapConfigStoreMaxChannelWidth()) {
+                    XmlUtil.writeNextValue(out, XML_TAG_MAX_CHANNEL_WIDTH,
+                            softApConfig.getMaxChannelBandwidth());
+                }
+            }
+            if (SdkLevel.isAtLeastV()) {
+                writeVendorDataListToXml(out, softApConfig.getVendorData());
             }
         } // End of writeSoftApConfigurationToXml
 
@@ -2327,6 +2355,12 @@ public class XmlUtil {
                                             MacAddress.fromString((String) value));
                                 }
                                 break;
+                            case XML_TAG_MAX_CHANNEL_WIDTH:
+                                if (SdkLevel.isAtLeastT()
+                                        && softapConfigStoreMaxChannelWidth()) {
+                                    softApConfigBuilder.setMaxChannelBandwidth((int) value);
+                                }
+                                break;
                             default:
                                 Log.w(TAG, "Ignoring unknown value name " + valueName[0]);
                                 break;
@@ -2372,6 +2406,12 @@ public class XmlUtil {
                             case XML_TAG_PASSPHRASE:
                                 passphrase = readSoftApPassphraseFromXml(in, outerTagDepth,
                                         shouldExpectEncryptedCredentials, encryptionUtil);
+                                break;
+                            case XML_TAG_VENDOR_DATA_LIST:
+                                if (SdkLevel.isAtLeastV()) {
+                                    softApConfigBuilder.setVendorData(
+                                            parseVendorDataListFromXml(in, outerTagDepth + 1));
+                                }
                                 break;
                             default:
                                 Log.w(TAG, "Ignoring unknown tag found: " + tagName);
@@ -2461,5 +2501,118 @@ public class XmlUtil {
             return new String(passphraseBytes);
         }
     }
-}
 
+    /**
+     * Write the provided vendor data list to XML.
+     *
+     * @param out XmlSerializer instance pointing to the XML stream
+     * @param vendorDataList Vendor data list
+     */
+    private static void writeVendorDataListToXml(
+            XmlSerializer out, List<OuiKeyedData> vendorDataList)
+            throws XmlPullParserException, IOException {
+        if (vendorDataList == null || vendorDataList.isEmpty()) {
+            return;
+        }
+        XmlUtil.writeNextSectionStart(out, XML_TAG_VENDOR_DATA_LIST);
+        for (OuiKeyedData data : vendorDataList) {
+            writeOuiKeyedDataToXml(out, data);
+        }
+        XmlUtil.writeNextSectionEnd(out, XML_TAG_VENDOR_DATA_LIST);
+    }
+
+    private static void writeOuiKeyedDataToXml(
+            XmlSerializer out, OuiKeyedData ouiKeyedData)
+            throws XmlPullParserException, IOException {
+        // PersistableBundle cannot be written directly to XML
+        // Use byte[] as an intermediate data structure
+        if (ouiKeyedData == null) return;
+        byte[] bundleBytes;
+        try {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            ouiKeyedData.getData().writeToStream(outputStream);
+            bundleBytes = outputStream.toByteArray();
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to write PersistableBundle to byte[]");
+            return;
+        }
+        XmlUtil.writeNextSectionStart(out, XML_TAG_OUI_KEYED_DATA);
+        XmlUtil.writeNextValue(out, XML_TAG_VENDOR_DATA_OUI, ouiKeyedData.getOui());
+        XmlUtil.writeNextValue(out, XML_TAG_PERSISTABLE_BUNDLE, bundleBytes);
+        XmlUtil.writeNextSectionEnd(out, XML_TAG_OUI_KEYED_DATA);
+    }
+
+    /**
+     * Parses the vendor data list from the provided XML stream .
+     *
+     * @param in XmlPullParser instance pointing to the XML stream
+     * @param outerTagDepth depth of the outer tag in the XML document
+     * @return List of OuiKeyedData if successful, empty list otherwise
+     */
+    private static List<OuiKeyedData> parseVendorDataListFromXml(
+            XmlPullParser in, int outerTagDepth)
+            throws XmlPullParserException, IOException, IllegalArgumentException {
+        List<OuiKeyedData> vendorDataList = new ArrayList<>();
+        while (!XmlUtil.isNextSectionEnd(in, outerTagDepth)) {
+            String tagName = in.getName();
+            if (tagName == null) {
+                throw new XmlPullParserException("Unexpected null tag found");
+            }
+            switch (tagName) {
+                case XML_TAG_OUI_KEYED_DATA:
+                    OuiKeyedData data = parseOuiKeyedDataFromXml(in, outerTagDepth + 1);
+                    if (data != null) {
+                        vendorDataList.add(data);
+                    }
+                    break;
+                default:
+                    Log.w(TAG, "Ignoring unknown tag found: " + tagName);
+                    break;
+            }
+        }
+        return vendorDataList;
+    }
+
+    private static PersistableBundle readPersistableBundleFromBytes(byte[] bundleBytes) {
+        try {
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(bundleBytes);
+            return PersistableBundle.readFromStream(inputStream);
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to read PersistableBundle from byte[]");
+            return null;
+        }
+    }
+
+    private static OuiKeyedData parseOuiKeyedDataFromXml(
+            XmlPullParser in, int outerTagDepth)
+            throws XmlPullParserException, IOException, IllegalArgumentException {
+        int oui = 0;
+        PersistableBundle bundle = null;
+
+        while (!XmlUtil.isNextSectionEnd(in, outerTagDepth)) {
+            String[] valueName = new String[1];
+            Object value = XmlUtil.readCurrentValue(in, valueName);
+            if (valueName[0] == null) {
+                throw new XmlPullParserException("Missing value name");
+            }
+            switch (valueName[0]) {
+                case XML_TAG_VENDOR_DATA_OUI:
+                    oui = (int) value;
+                    break;
+                case XML_TAG_PERSISTABLE_BUNDLE:
+                    bundle = readPersistableBundleFromBytes((byte[]) value);
+                    break;
+                default:
+                    Log.e(TAG, "Unknown value name found: " + valueName[0]);
+                    break;
+            }
+        }
+
+        try {
+            return new OuiKeyedData.Builder(oui, bundle).build();
+        } catch (Exception e) {
+            Log.e(TAG, "Unable to build OuiKeyedData");
+            return null;
+        }
+    }
+}

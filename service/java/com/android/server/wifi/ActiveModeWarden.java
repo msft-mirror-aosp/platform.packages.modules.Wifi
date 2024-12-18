@@ -51,10 +51,12 @@ import android.net.wifi.SoftApCapability;
 import android.net.wifi.SoftApConfiguration;
 import android.net.wifi.SoftApState;
 import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiContext;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.DeviceMobilityState;
 import android.net.wifi.WifiScanner;
+import android.net.wifi.util.WifiResourceCache;
 import android.os.BatteryStatsManager;
 import android.os.Build;
 import android.os.Handler;
@@ -127,7 +129,7 @@ public class ActiveModeWarden {
     private final WifiInjector mWifiInjector;
     private final Looper mLooper;
     private final Handler mHandler;
-    private final Context mContext;
+    private final WifiContext mContext;
     private final WifiDiagnostics mWifiDiagnostics;
     private final WifiSettingsStore mSettingsStore;
     private final FrameworkFacade mFacade;
@@ -191,6 +193,7 @@ public class ActiveModeWarden {
     private final AtomicInteger mWifiState = new AtomicInteger(WIFI_STATE_DISABLED);
 
     private ContentObserver mSatelliteModeContentObserver;
+    private final WifiResourceCache mResourceCache;
 
     /**
      * Method that allows the active ClientModeManager to set the wifi state that is
@@ -217,9 +220,9 @@ public class ActiveModeWarden {
     }
 
     /**
-     * Get the request WorkSource for secondary LOCAL-ONLY CMM
+     * Get the request WorkSource for secondary CMM
      *
-     * @return the WorkSources of the current secondary LOCAL-ONLY CMMs
+     * @return the WorkSources of the current secondary CMMs
      */
     public Set<WorkSource> getSecondaryRequestWs() {
         synchronized (mServiceApiLock) {
@@ -380,7 +383,7 @@ public class ActiveModeWarden {
             DefaultClientModeManager defaultClientModeManager,
             BatteryStatsManager batteryStatsManager,
             WifiDiagnostics wifiDiagnostics,
-            Context context,
+            WifiContext context,
             WifiSettingsStore settingsStore,
             FrameworkFacade facade,
             WifiPermissionsUtil wifiPermissionsUtil,
@@ -392,6 +395,7 @@ public class ActiveModeWarden {
         mLooper = looper;
         mHandler = new Handler(looper);
         mContext = context;
+        mResourceCache = mContext.getResourceCache();
         mWifiDiagnostics = wifiDiagnostics;
         mSettingsStore = settingsStore;
         mFacade = facade;
@@ -411,18 +415,17 @@ public class ActiveModeWarden {
 
         wifiNative.registerStatusListener(isReady -> {
             if (!isReady && !mIsShuttingdown) {
-                mHandler.post(() -> {
-                    Log.e(TAG, "One of the native daemons died. Triggering recovery");
-                    wifiDiagnostics.triggerBugReportDataCapture(
-                            WifiDiagnostics.REPORT_REASON_WIFINATIVE_FAILURE);
+                Log.e(TAG, "One of the native daemons died. Triggering recovery");
+                mWifiInjector.getWifiConfigManager().writeDataToStorage();
+                wifiDiagnostics.triggerBugReportDataCapture(
+                        WifiDiagnostics.REPORT_REASON_WIFINATIVE_FAILURE);
 
-                    // immediately trigger SelfRecovery if we receive a notice about an
-                    // underlying daemon failure
-                    // Note: SelfRecovery has a circular dependency with ActiveModeWarden and is
-                    // instantiated after ActiveModeWarden, so use WifiInjector to get the instance
-                    // instead of directly passing in SelfRecovery in the constructor.
+                // immediately trigger SelfRecovery if we receive a notice about an
+                // underlying daemon failure
+                // Note: SelfRecovery has a circular dependency with ActiveModeWarden and is
+                // instantiated after ActiveModeWarden, so use WifiInjector to get the instance
+                // instead of directly passing in SelfRecovery in the constructor.
                     mWifiInjector.getSelfRecovery().trigger(SelfRecovery.REASON_WIFINATIVE_FAILURE);
-                });
             }
         });
 
@@ -602,7 +605,7 @@ public class ActiveModeWarden {
             return false;
         }
         if (clientRole == ROLE_CLIENT_LOCAL_ONLY) {
-            if (!mContext.getResources().getBoolean(
+            if (!mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaLocalOnlyConcurrencyEnabled)) {
                 return false;
             }
@@ -615,13 +618,13 @@ public class ActiveModeWarden {
                             packageName, Build.VERSION_CODES.S, uid);
         }
         if (clientRole == ROLE_CLIENT_SECONDARY_TRANSIENT) {
-            return mContext.getResources().getBoolean(
+            return mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaNetworkSwitchingMakeBeforeBreakEnabled);
         }
         if (clientRole == ROLE_CLIENT_SECONDARY_LONG_LIVED) {
-            return mContext.getResources().getBoolean(
+            return mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaRestrictedConcurrencyEnabled)
-                    || mContext.getResources().getBoolean(
+                    || mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaMultiInternetConcurrencyEnabled);
         }
         Log.e(TAG, "Unrecognized role=" + clientRole);
@@ -641,7 +644,7 @@ public class ActiveModeWarden {
      */
     public boolean isStaStaConcurrencySupportedForLocalOnlyConnections() {
         return mWifiNative.isStaStaConcurrencySupported()
-                && mContext.getResources().getBoolean(
+                && mResourceCache.getBoolean(
                         R.bool.config_wifiMultiStaLocalOnlyConcurrencyEnabled);
     }
 
@@ -651,7 +654,7 @@ public class ActiveModeWarden {
      */
     public boolean isStaStaConcurrencySupportedForMbb() {
         return mWifiNative.isStaStaConcurrencySupported()
-                && mContext.getResources().getBoolean(
+                && mResourceCache.getBoolean(
                         R.bool.config_wifiMultiStaNetworkSwitchingMakeBeforeBreakEnabled);
     }
 
@@ -661,7 +664,7 @@ public class ActiveModeWarden {
      */
     public boolean isStaStaConcurrencySupportedForRestrictedConnections() {
         return mWifiNative.isStaStaConcurrencySupported()
-                && mContext.getResources().getBoolean(
+                && mResourceCache.getBoolean(
                         R.bool.config_wifiMultiStaRestrictedConcurrencyEnabled);
     }
 
@@ -671,7 +674,7 @@ public class ActiveModeWarden {
      */
     public boolean isStaStaConcurrencySupportedForMultiInternet() {
         return mWifiNative.isStaStaConcurrencySupported()
-                && mContext.getResources().getBoolean(
+                && mResourceCache.getBoolean(
                         R.bool.config_wifiMultiStaMultiInternetConcurrencyEnabled);
     }
 
@@ -707,7 +710,7 @@ public class ActiveModeWarden {
                 emergencyCallbackModeChanged(emergencyMode);
             }
         }, new IntentFilter(TelephonyManager.ACTION_EMERGENCY_CALLBACK_MODE_CHANGED));
-        boolean trackEmergencyCallState = mContext.getResources().getBoolean(
+        boolean trackEmergencyCallState = mResourceCache.getBoolean(
                 R.bool.config_wifi_turn_off_during_emergency_call);
         if (trackEmergencyCallState) {
             mContext.registerReceiver(new BroadcastReceiver() {
@@ -719,7 +722,9 @@ public class ActiveModeWarden {
                 }
             }, new IntentFilter(TelephonyManager.ACTION_EMERGENCY_CALL_STATE_CHANGED));
         }
-        mWifiGlobals.setD2dStaConcurrencySupported(mWifiNative.isP2pStaConcurrencySupported());
+        mWifiGlobals.setD2dStaConcurrencySupported(
+                mWifiNative.isP2pStaConcurrencySupported()
+                        || mWifiNative.isNanStaConcurrencySupported());
         // Initialize the supported feature set.
         setSupportedFeatureSet(mWifiNative.getSupportedFeatureSet(null),
                 mWifiNative.isStaApConcurrencySupported(),
@@ -1418,7 +1423,7 @@ public class ActiveModeWarden {
         ConcreteClientModeManager manager = mWifiInjector.makeClientModeManager(
                 listener, requestorWs, role, mVerboseLoggingEnabled);
         mClientModeManagers.add(manager);
-        if (ROLE_CLIENT_LOCAL_ONLY.equals(role)) {
+        if (ROLE_CLIENT_SECONDARY_LONG_LIVED.equals(role) || ROLE_CLIENT_LOCAL_ONLY.equals(role)) {
             synchronized (mServiceApiLock) {
                 mRequestWs.add(new WorkSource(requestorWs));
             }
@@ -1439,7 +1444,7 @@ public class ActiveModeWarden {
         synchronized (mServiceApiLock) {
             mRequestWs.remove(manager.getRequestorWs());
         }
-        if (ROLE_CLIENT_LOCAL_ONLY.equals(role)) {
+        if (ROLE_CLIENT_SECONDARY_LONG_LIVED.equals(role) || ROLE_CLIENT_LOCAL_ONLY.equals(role)) {
             synchronized (mServiceApiLock) {
                 mRequestWs.add(new WorkSource(requestorWs));
             }
@@ -1489,16 +1494,16 @@ public class ActiveModeWarden {
         pw.println("STA + STA Concurrency Supported: " + isStaStaConcurrencySupported);
         if (isStaStaConcurrencySupported) {
             pw.println("   MBB use-case enabled: "
-                    + mContext.getResources().getBoolean(
+                    + mResourceCache.getBoolean(
                             R.bool.config_wifiMultiStaNetworkSwitchingMakeBeforeBreakEnabled));
             pw.println("   Local only use-case enabled: "
-                    + mContext.getResources().getBoolean(
+                    + mResourceCache.getBoolean(
                             R.bool.config_wifiMultiStaLocalOnlyConcurrencyEnabled));
             pw.println("   Restricted use-case enabled: "
-                    + mContext.getResources().getBoolean(
+                    + mResourceCache.getBoolean(
                             R.bool.config_wifiMultiStaRestrictedConcurrencyEnabled));
             pw.println("   Multi internet use-case enabled: "
-                    + mContext.getResources().getBoolean(
+                    + mResourceCache.getBoolean(
                             R.bool.config_wifiMultiStaMultiInternetConcurrencyEnabled));
         }
         pw.println("STA + AP Concurrency Supported: " + mWifiNative.isStaApConcurrencySupported());
@@ -1661,6 +1666,7 @@ public class ActiveModeWarden {
                 invokeOnPrimaryClientModeManagerChangedCallbacks(
                         mLastPrimaryClientModeManager, clientModeManager);
                 mLastPrimaryClientModeManager = clientModeManager;
+                setCurrentNetwork(clientModeManager.getCurrentNetwork());
             }
             setSupportedFeatureSet(
                     // If primary doesn't exist, DefaultClientModeManager getInterfaceName name
@@ -1694,7 +1700,8 @@ public class ActiveModeWarden {
 
         private void onStoppedOrStartFailure(ConcreteClientModeManager clientModeManager) {
             mClientModeManagers.remove(clientModeManager);
-            if (ROLE_CLIENT_LOCAL_ONLY.equals(clientModeManager.getPreviousRole())) {
+            if (ROLE_CLIENT_SECONDARY_LONG_LIVED.equals(clientModeManager.getPreviousRole())
+                    || ROLE_CLIENT_LOCAL_ONLY.equals(clientModeManager.getPreviousRole())) {
                 synchronized (mServiceApiLock) {
                     mRequestWs.remove(clientModeManager.getRequestorWs());
                 }
@@ -1740,7 +1747,8 @@ public class ActiveModeWarden {
         boolean scanEnabled = hasAnyClientModeManager();
         boolean scanningForHiddenNetworksEnabled;
 
-        if (mContext.getResources().getBoolean(R.bool.config_wifiScanHiddenNetworksScanOnlyMode)) {
+        if (mResourceCache
+                .getBoolean(R.bool.config_wifiScanHiddenNetworksScanOnlyMode)) {
             scanningForHiddenNetworksEnabled = hasAnyClientModeManager();
         } else {
             scanningForHiddenNetworksEnabled = hasAnyClientModeManagerInConnectivityRole();
@@ -1842,7 +1850,7 @@ public class ActiveModeWarden {
 
         WifiController() {
             super(TAG, mLooper);
-            final int threshold = mContext.getResources().getInteger(
+            final int threshold = mResourceCache.getInteger(
                     R.integer.config_wifiConfigurationWifiRunnerThresholdInMs);
             DefaultState defaultState = new DefaultState(threshold);
             mEnabledState = new EnabledState(threshold);
@@ -1964,7 +1972,7 @@ public class ActiveModeWarden {
         }
 
         private int readWifiRecoveryDelay() {
-            int recoveryDelayMillis = mContext.getResources().getInteger(
+            int recoveryDelayMillis = mResourceCache.getInteger(
                     R.integer.config_wifi_framework_recovery_timeout_delay);
             if (recoveryDelayMillis > MAX_RECOVERY_TIMEOUT_DELAY_MS) {
                 recoveryDelayMillis = MAX_RECOVERY_TIMEOUT_DELAY_MS;
@@ -2157,7 +2165,7 @@ public class ActiveModeWarden {
             public void exitImpl() {
             }
 
-            private void checkAndHandleAirplaneModeState() {
+            private void checkAndHandleAirplaneModeState(String loggingPackageName) {
                 if (mSettingsStore.isAirplaneModeOn()) {
                     log("Airplane mode toggled");
                     if (!mSettingsStore.shouldWifiRemainEnabledWhenApmEnabled()) {
@@ -2165,7 +2173,7 @@ public class ActiveModeWarden {
                         shutdownWifi();
                         // onStopped will move the state machine to "DisabledState".
                         mLastCallerInfoManager.put(WifiManager.API_WIFI_ENABLED, Process.myTid(),
-                                Process.WIFI_UID, -1, "android_apm", false);
+                                Process.WIFI_UID, -1, loggingPackageName, false);
                     }
                 } else {
                     log("Airplane mode disabled, determine next state");
@@ -2175,7 +2183,7 @@ public class ActiveModeWarden {
                                 mFacade.getSettingsWorkSource(mContext));
                         transitionTo(mEnabledState);
                         mLastCallerInfoManager.put(WifiManager.API_WIFI_ENABLED, Process.myTid(),
-                                Process.WIFI_UID, -1, "android_apm", true);
+                                Process.WIFI_UID, -1, loggingPackageName, true);
                     }
                     // wifi should remain disabled, do not need to transition
                 }
@@ -2211,7 +2219,7 @@ public class ActiveModeWarden {
                             log("Satellite mode is on - return");
                             break;
                         }
-                        checkAndHandleAirplaneModeState();
+                        checkAndHandleAirplaneModeState("android_apm");
                         break;
                     case CMD_UPDATE_AP_CAPABILITY:
                         updateCapabilityToSoftApModeManager((SoftApCapability) msg.obj, msg.arg1);
@@ -2223,9 +2231,12 @@ public class ActiveModeWarden {
                         if (mSettingsStore.isSatelliteModeOn()) {
                             log("Satellite mode is on, disable wifi");
                             shutdownWifi();
+                            mLastCallerInfoManager.put(WifiManager.API_WIFI_ENABLED,
+                                    Process.myTid(), Process.WIFI_UID, -1, "satellite_mode",
+                                    false);
                         } else {
                             log("Satellite mode is off, determine next stage");
-                            checkAndHandleAirplaneModeState();
+                            checkAndHandleAirplaneModeState("satellite_mode");
                         }
                         break;
                     default:
@@ -2263,6 +2274,7 @@ public class ActiveModeWarden {
                         // those secondary CMMs knows to abort properly, and won't react in strange
                         // ways to the primary switching to scan only mode later.
                         stopSecondaryClientModeManagers();
+                        mWifiInjector.getWifiConnectivityManager().resetOnWifiDisable();
                     }
                     switchAllPrimaryOrScanOnlyClientModeManagers();
                 } else {
@@ -2270,6 +2282,7 @@ public class ActiveModeWarden {
                 }
             } else {
                 stopAllClientModeManagers();
+                mWifiInjector.getWifiConnectivityManager().resetOnWifiDisable();
             }
         }
 
@@ -2427,7 +2440,8 @@ public class ActiveModeWarden {
                         if (mAllowRootToGetLocalOnlyCmm && curUid == 0) { // 0 is root UID.
                             continue;
                         }
-                        if (mWifiPermissionsUtil.checkEnterCarModePrioritized(curUid)) {
+                        if (curUid != Process.SYSTEM_UID
+                                && mWifiPermissionsUtil.checkEnterCarModePrioritized(curUid)) {
                             requestInfo.listener.onAnswer(primaryManager);
                             if (mVerboseLoggingEnabled) {
                                 Log.w(TAG, "Uid " + curUid
@@ -2587,6 +2601,26 @@ public class ActiveModeWarden {
                             }
                             return HANDLED;
                         }
+                    case CMD_SATELLITE_MODE_CHANGED:
+                        if (mSettingsStore.isSatelliteModeOn()) {
+                            log("Satellite mode is on, disable wifi");
+                            shutdownWifi();
+                            mLastCallerInfoManager.put(WifiManager.API_WIFI_ENABLED,
+                                    Process.myTid(), Process.WIFI_UID, -1, "satellite_mode",
+                                    false);
+                        } else {
+                            if (!hasPrimaryOrScanOnlyModeManager()) {
+                                // Enabling SoftAp while wifi is off could result in
+                                // ActiveModeWarden being in enabledState without a CMM.
+                                // Defer to the default state in this case to handle the satellite
+                                // mode state change which may result in enabling wifi if necessary.
+                                log("Satellite mode is off in enabled state - "
+                                        + "and no primary manager");
+                                return NOT_HANDLED;
+                            }
+                            log("Satellite mode is off in enabled state. Return handled");
+                        }
+                        break;
                     case CMD_AP_STOPPED:
                     case CMD_AP_START_FAILURE:
                         if (hasAnyModeManager()) {
@@ -2712,19 +2746,19 @@ public class ActiveModeWarden {
             concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_AP_STA;
         }
         if (isStaStaConcurrencySupported) {
-            if (mContext.getResources().getBoolean(
+            if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaLocalOnlyConcurrencyEnabled)) {
                 concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_ADDITIONAL_STA_LOCAL_ONLY;
             }
-            if (mContext.getResources().getBoolean(
+            if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaNetworkSwitchingMakeBeforeBreakEnabled)) {
                 concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MBB;
             }
-            if (mContext.getResources().getBoolean(
+            if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaRestrictedConcurrencyEnabled)) {
                 concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_ADDITIONAL_STA_RESTRICTED;
             }
-            if (mContext.getResources().getBoolean(
+            if (mResourceCache.getBoolean(
                     R.bool.config_wifiMultiStaMultiInternetConcurrencyEnabled)) {
                 concurrencyFeatureSet |= WifiManager.WIFI_FEATURE_ADDITIONAL_STA_MULTI_INTERNET;
             }
@@ -2738,13 +2772,13 @@ public class ActiveModeWarden {
                     (WifiManager.WIFI_FEATURE_D2D_RTT | WifiManager.WIFI_FEATURE_D2AP_RTT);
         }
 
-        if (!mContext.getResources().getBoolean(
+        if (!mResourceCache.getBoolean(
                 R.bool.config_wifi_p2p_mac_randomization_supported)) {
             // flags filled in by vendor HAL, remove if overlay disables it.
             excludedFeatureSet |= WifiManager.WIFI_FEATURE_P2P_RAND_MAC;
         }
 
-        if (mContext.getResources().getBoolean(
+        if (mResourceCache.getBoolean(
                 R.bool.config_wifi_connected_mac_randomization_supported)) {
             // no corresponding flags in vendor HAL, set if overlay enables it.
             additionalFeatureSet |= WifiManager.WIFI_FEATURE_CONNECTED_RAND_MAC;

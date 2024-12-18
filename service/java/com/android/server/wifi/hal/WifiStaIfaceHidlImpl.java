@@ -18,6 +18,8 @@ package com.android.server.wifi.hal;
 
 import static android.net.wifi.WifiUsabilityStatsEntry.LINK_STATE_UNKNOWN;
 
+import static com.android.server.wifi.util.GeneralUtil.getCapabilityIndex;
+
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
@@ -61,6 +63,7 @@ import com.android.server.wifi.util.NativeUtil;
 import com.android.wifi.resources.R;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -78,6 +81,7 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
     private SsidTranslator mSsidTranslator;
     private static final int DEFAULT_LINK = 0;
     private static final int NUM_OF_LINKS = 1;
+    private final boolean mWifiLinkLayerAllRadiosStatsAggregationEnabled;
 
     public WifiStaIfaceHidlImpl(@NonNull android.hardware.wifi.V1_0.IWifiStaIface staIface,
             @NonNull Context context, @NonNull SsidTranslator ssidTranslator) {
@@ -85,6 +89,8 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
         mContext = context;
         mSsidTranslator = ssidTranslator;
         mHalCallback = new StaIfaceEventCallback();
+        mWifiLinkLayerAllRadiosStatsAggregationEnabled = mContext.getResources()
+                .getBoolean(R.bool.config_wifiLinkLayerAllRadiosStatsAggregationEnabled);
     }
 
     /**
@@ -156,9 +162,9 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
     /**
      * See comments for {@link IWifiStaIface#getCapabilities()}
      */
-    public long getCapabilities() {
+    public BitSet getCapabilities() {
         final String methodStr = "getCapabilities";
-        return validateAndCall(methodStr, 0L,
+        return validateAndCall(methodStr, new BitSet(),
                 () -> getCapabilitiesInternal(methodStr));
     }
 
@@ -464,8 +470,8 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
         return scanResp.value;
     }
 
-    private long getCapabilitiesInternal(String methodStr) {
-        GeneralUtil.Mutable<Long> capsResp = new GeneralUtil.Mutable<>(0L);
+    private BitSet getCapabilitiesInternal(String methodStr) {
+        GeneralUtil.Mutable<BitSet> capsResp = new GeneralUtil.Mutable<>(new BitSet());
         try {
             mWifiStaIface.getCapabilities((status, caps) -> {
                 if (isOk(status, methodStr)) {
@@ -886,56 +892,56 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
     }
 
     @VisibleForTesting
-    long halToFrameworkStaIfaceCapability(int caps) {
-        long features = 0;
+    BitSet halToFrameworkStaIfaceCapability(int caps) {
+        BitSet features = new BitSet();
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.HOTSPOT)) {
-            features |= WifiManager.WIFI_FEATURE_PASSPOINT;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_PASSPOINT));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.BACKGROUND_SCAN)) {
-            features |= WifiManager.WIFI_FEATURE_SCANNER;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_SCANNER));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.PNO)) {
-            features |= WifiManager.WIFI_FEATURE_PNO;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_PNO));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.TDLS)) {
-            features |= WifiManager.WIFI_FEATURE_TDLS;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_TDLS));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.TDLS_OFFCHANNEL)) {
-            features |= WifiManager.WIFI_FEATURE_TDLS_OFFCHANNEL;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_TDLS_OFFCHANNEL));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.LINK_LAYER_STATS)) {
-            features |= WifiManager.WIFI_FEATURE_LINK_LAYER_STATS;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_LINK_LAYER_STATS));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.RSSI_MONITOR)) {
-            features |= WifiManager.WIFI_FEATURE_RSSI_MONITOR;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_RSSI_MONITOR));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.KEEP_ALIVE)) {
-            features |= WifiManager.WIFI_FEATURE_MKEEP_ALIVE;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_MKEEP_ALIVE));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.ND_OFFLOAD)) {
-            features |= WifiManager.WIFI_FEATURE_CONFIG_NDO;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_CONFIG_NDO));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.CONTROL_ROAMING)) {
-            features |= WifiManager.WIFI_FEATURE_CONTROL_ROAMING;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_CONTROL_ROAMING));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask
                         .PROBE_IE_WHITELIST)) {
-            features |= WifiManager.WIFI_FEATURE_IE_WHITELIST;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_IE_WHITELIST));
         }
         if (hasCapability(caps,
                 android.hardware.wifi.V1_0.IWifiStaIface.StaIfaceCapabilityMask.SCAN_RAND)) {
-            features |= WifiManager.WIFI_FEATURE_SCAN_RAND;
+            features.set(getCapabilityIndex(WifiManager.WIFI_FEATURE_SCAN_RAND));
         }
         return features;
     }
@@ -1285,9 +1291,7 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
     private void aggregateFrameworkRadioStatsFromHidl_1_3(int radioIndex,
             WifiLinkLayerStats stats,
             android.hardware.wifi.V1_3.StaLinkLayerRadioStats hidlRadioStats) {
-        if (!mContext.getResources()
-                .getBoolean(R.bool.config_wifiLinkLayerAllRadiosStatsAggregationEnabled)
-                && radioIndex > 0) {
+        if (!mWifiLinkLayerAllRadiosStatsAggregationEnabled && radioIndex > 0) {
             return;
         }
         // Aggregate the radio stats from all the radios
@@ -1334,9 +1338,7 @@ public class WifiStaIfaceHidlImpl implements IWifiStaIface {
     private void aggregateFrameworkRadioStatsFromHidl_1_6(int radioIndex,
             WifiLinkLayerStats stats,
             android.hardware.wifi.V1_6.StaLinkLayerRadioStats hidlRadioStats) {
-        if (!mContext.getResources()
-                .getBoolean(R.bool.config_wifiLinkLayerAllRadiosStatsAggregationEnabled)
-                && radioIndex > 0) {
+        if (!mWifiLinkLayerAllRadiosStatsAggregationEnabled && radioIndex > 0) {
             return;
         }
         // Aggregate the radio stats from all the radios

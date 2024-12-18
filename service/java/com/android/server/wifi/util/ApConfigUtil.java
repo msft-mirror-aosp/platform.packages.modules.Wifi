@@ -28,14 +28,14 @@ import static android.net.wifi.SoftApCapability.SOFTAP_FEATURE_MAC_ADDRESS_CUSTO
 import static android.net.wifi.SoftApCapability.SOFTAP_FEATURE_WPA3_OWE;
 import static android.net.wifi.SoftApCapability.SOFTAP_FEATURE_WPA3_OWE_TRANSITION;
 import static android.net.wifi.SoftApCapability.SOFTAP_FEATURE_WPA3_SAE;
+import static android.net.wifi.SoftApConfiguration.BAND_2GHZ;
+import static android.net.wifi.SoftApConfiguration.BAND_5GHZ;
 
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_AP_BRIDGE;
 import static com.android.server.wifi.HalDeviceManager.HDM_CREATE_IFACE_STA;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.content.Context;
-import android.content.res.Resources;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.ScanResult;
 import android.net.wifi.SoftApCapability;
@@ -45,13 +45,17 @@ import android.net.wifi.SoftApInfo;
 import android.net.wifi.WifiAvailableChannel;
 import android.net.wifi.WifiClient;
 import android.net.wifi.WifiConfiguration;
+import android.net.wifi.WifiContext;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiScanner;
+import android.net.wifi.nl80211.DeviceWiphyCapabilities;
+import android.net.wifi.util.WifiResourceCache;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.SoftApManager;
 import com.android.server.wifi.WifiNative;
@@ -239,7 +243,7 @@ public class ApConfigUtil {
      * @return The band includes 2.4Ghz when 2.4G SoftAp supported.
      */
     public static @BandType int append24GToBandIf24GSupported(@BandType int targetBand,
-            Context context) {
+            WifiContext context) {
         if (isBandSupported(SoftApConfiguration.BAND_2GHZ, context)) {
             return targetBand | SoftApConfiguration.BAND_2GHZ;
         }
@@ -253,7 +257,7 @@ public class ApConfigUtil {
      * @return The band includes 5Ghz when 5G SoftAp supported.
      */
     public static @BandType int append5GToBandIf5GSupported(@BandType int targetBand,
-            Context context) {
+            WifiContext context) {
         if (isBandSupported(SoftApConfiguration.BAND_5GHZ, context)) {
             return targetBand | SoftApConfiguration.BAND_5GHZ;
         }
@@ -296,7 +300,7 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if band is supported, false otherwise
      */
-    public static boolean isBandSupported(@BandType int apBand, Context context) {
+    public static boolean isBandSupported(@BandType int apBand, WifiContext context) {
         if (!isBandValid(apBand)) {
             Log.e(TAG, "Invalid SoftAp band " + apBand);
             return false;
@@ -375,7 +379,8 @@ public class ApConfigUtil {
         return unsafeFreqs;
     }
 
-    private static List<Integer> getConfiguredChannelList(Resources resources, @BandType int band) {
+    private static List<Integer> getConfiguredChannelList(WifiResourceCache resources,
+            @BandType int band) {
         switch (band) {
             case SoftApConfiguration.BAND_2GHZ:
                 return convertStringToChannelList(resources.getString(
@@ -395,8 +400,8 @@ public class ApConfigUtil {
     }
 
     private static List<Integer> addDfsChannelsIfNeeded(List<Integer> regulatoryList,
-            @WifiScanner.WifiBand int scannerBand, WifiNative wifiNative, Resources resources,
-            boolean inFrequencyMHz) {
+            @WifiScanner.WifiBand int scannerBand, WifiNative wifiNative,
+            WifiResourceCache resources, boolean inFrequencyMHz) {
         // Add DFS channels to the supported channel list if the device supports SoftAp
         // operation in the DFS channel.
         if (resources.getBoolean(R.bool.config_wifiSoftapAcsIncludeDfs)
@@ -415,8 +420,8 @@ public class ApConfigUtil {
     }
 
     private static List<Integer> getWifiCondAvailableChannelsForBand(
-            @WifiScanner.WifiBand int scannerBand, WifiNative wifiNative, Resources resources,
-            boolean inFrequencyMHz) {
+            @WifiScanner.WifiBand int scannerBand, WifiNative wifiNative,
+            WifiResourceCache resources, boolean inFrequencyMHz) {
         List<Integer> regulatoryList = new ArrayList<Integer>();
         // Get the allowed list of channel frequencies in MHz from wificond
         int[] regulatoryArray = wifiNative.getChannelsForBand(scannerBand);
@@ -429,7 +434,8 @@ public class ApConfigUtil {
     }
 
     private static List<Integer> getHalAvailableChannelsForBand(
-            @WifiScanner.WifiBand int scannerBand, WifiNative wifiNative, Resources resources,
+            @WifiScanner.WifiBand int scannerBand, WifiNative wifiNative,
+            WifiResourceCache resources,
             boolean inFrequencyMHz) {
         // Try vendor HAL API to get the usable channel list.
         List<WifiAvailableChannel> usableChannelList = wifiNative.getUsableChannels(
@@ -463,7 +469,7 @@ public class ApConfigUtil {
      * @return A list of frequencies that are allowed, null on error.
      */
     public static List<Integer> getAvailableChannelFreqsForBand(
-            @BandType int band, WifiNative wifiNative, Resources resources,
+            @BandType int band, WifiNative wifiNative, WifiResourceCache resources,
             boolean inFrequencyMHz) {
         if (!isBandValid(band) || isMultiband(band)) {
             return null;
@@ -525,7 +531,7 @@ public class ApConfigUtil {
      * @return a valid channel frequency on success, -1 on failure.
      */
     public static int chooseApChannel(int apBand, @NonNull CoexManager coexManager,
-            @NonNull Resources resources, SoftApCapability capability) {
+            @NonNull WifiResourceCache resources, SoftApCapability capability) {
         if (!isBandValid(apBand)) {
             Log.e(TAG, "Invalid band: " + apBand);
             return -1;
@@ -643,7 +649,7 @@ public class ApConfigUtil {
      */
     public static SoftApConfiguration removeUnavailableBandsFromConfig(
             SoftApConfiguration config, SoftApCapability capability, CoexManager coexManager,
-            @NonNull Context context) {
+            @NonNull WifiContext context) {
         SoftApConfiguration.Builder builder = new SoftApConfiguration.Builder(config);
 
         try {
@@ -692,6 +698,58 @@ public class ApConfigUtil {
     }
 
     /**
+     * Upgrades a single band config to 2 + 5 GHz dual band if the overlay is configured and
+     * there are no non-2GHz/5GHz bands that are configured and available with the current
+     * capabilities.
+     * </p>
+     * This is intended for configurations that were previously set with single band in a different
+     * country code that didn't support 2 + 5 GHz dual band, but the current country code does
+     * support 2 + 5 GHz dual band.
+     */
+    public static SoftApConfiguration upgradeTo2g5gBridgedIfAvailableBandsAreSubset(
+            SoftApConfiguration config, SoftApCapability capability, @NonNull WifiContext context) {
+        // DBS requires SdkLevel S or above.
+        if (!SdkLevel.isAtLeastS()) {
+            return config;
+        }
+
+        // Skip if overlay isn't set.
+        if (!context.getResourceCache().getBoolean(
+                R.bool.config_wifiSoftapUpgradeTetheredTo2g5gBridgedIfBandsAreSubset)) {
+            return config;
+        }
+
+        // Skip if config is already multi-band.
+        if (config.getBands().length != 1) {
+            return config;
+        }
+
+        // Skip if 2 or 5 GHz aren't supported.
+        if (capability.getSupportedChannelList(BAND_2GHZ).length == 0
+                || capability.getSupportedChannelList(BAND_5GHZ).length == 0) {
+            return config;
+        }
+
+        // Skip if any non-2GHz/5GHz band is specified and supported.
+        int configuredBand = config.getBand();
+        for (int band : SoftApConfiguration.BAND_TYPES) {
+            if (band == BAND_2GHZ || band == BAND_5GHZ) {
+                continue;
+            }
+            if ((configuredBand & band) != 0
+                    && capability.getSupportedChannelList(band).length > 0) {
+                return config;
+            }
+        }
+
+        Log.i(TAG, "Temporarily upgrading config with band " + config.getBands()[0]
+                + " to 2 + 5GHz bridged.");
+        return new SoftApConfiguration.Builder(config)
+                .setBands(new int[]{BAND_2GHZ, BAND_2GHZ | BAND_5GHZ})
+                .build();
+    }
+
+    /**
      * Remove all unsupported bands from the input band and return the resulting
      * (remaining) support bands. Unsupported bands are those which don't have channels available.
      *
@@ -701,7 +759,7 @@ public class ApConfigUtil {
      * @return the available band which removed the unsupported band.
      *         0 when all of the band is not supported.
      */
-    public static @BandType int removeUnsupportedBands(Context context,
+    public static @BandType int removeUnsupportedBands(WifiContext context,
             @NonNull int band) {
         int availableBand = band;
         for (int b : SoftApConfiguration.BAND_TYPES) {
@@ -745,8 +803,8 @@ public class ApConfigUtil {
      * @return true if HAL support to map WPA3 transition mode to WPA3 in 6GHz band,
      * false otherwise.
      */
-    public static boolean canHALConvertRestrictedSecurityTypeFor6GHz(@NonNull Resources resources,
-            @SoftApConfiguration.SecurityType int type) {
+    public static boolean canHALConvertRestrictedSecurityTypeFor6GHz(
+            @NonNull WifiResourceCache resources, @SoftApConfiguration.SecurityType int type) {
         return type == SoftApConfiguration.SECURITY_TYPE_WPA3_SAE_TRANSITION
                 && resources.getBoolean(R.bool
                         .config_wifiSofapHalMapWpa3TransitionModeToWpa3OnlyIn6GHzBand);
@@ -763,7 +821,7 @@ public class ApConfigUtil {
      * @return the updated SoftApConfiguration.
      */
     public static SoftApConfiguration remove6gBandForUnsupportedSecurity(
-            @NonNull Resources resources,
+            @NonNull WifiResourceCache resources,
             SoftApConfiguration config, boolean isBridgedMode) {
         SoftApConfiguration.Builder builder = new SoftApConfiguration.Builder(config);
 
@@ -809,6 +867,59 @@ public class ApConfigUtil {
     }
 
     /**
+     * As per IEEE specification, 11BE mode should be disabled for the following
+     * security types.
+     *   - OPEN
+     *   - WPA2-Personal
+     * Also, disable 11BE in OWE-Transition as SoftAp run in bridged mode with one instance in open
+     * mode.
+     */
+    @VisibleForTesting
+    static boolean is11beDisabledForSecurityType(
+            @SoftApConfiguration.SecurityType int type) {
+        switch(type) {
+            case SoftApConfiguration.SECURITY_TYPE_OPEN:
+            case SoftApConfiguration.SECURITY_TYPE_WPA2_PSK:
+            case SoftApConfiguration.SECURITY_TYPE_WPA3_OWE_TRANSITION:
+                return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if IEEE80211BE is allowed for the given softAp configuration.
+     *
+     * @param capabilities capabilities of the device to check support for IEEE80211BE support.
+     * @param context The caller context used to get the OEM configuration for support for
+     *                IEEE80211BE & single link MLO in bridged mode from the resource file.
+     * @param config The current {@link SoftApConfiguration}.
+     * @param isBridgedMode true if bridged mode is enabled, false otherwise.
+     *
+     * @return true if IEEE80211BE is allowed for the given configuration, false otherwise.
+     */
+    public static boolean is11beAllowedForThisConfiguration(DeviceWiphyCapabilities capabilities,
+            @NonNull WifiContext context,
+            SoftApConfiguration config,
+            boolean isBridgedMode) {
+        if (!ApConfigUtil.isIeee80211beSupported(context)) {
+            return false;
+        }
+        if (capabilities == null || !capabilities.isWifiStandardSupported(
+                ScanResult.WIFI_STANDARD_11BE)) {
+            return false;
+        }
+        if (isBridgedMode
+                && !context.getResourceCache().getBoolean(
+                        R.bool.config_wifiSoftApSingleLinkMloInBridgedModeSupported)) {
+            return false;
+        }
+        if (is11beDisabledForSecurityType(config.getSecurityType())) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * Update AP band and channel based on the provided country code and band.
      * This will also set
      * @param wifiNative reference to WifiNative
@@ -821,7 +932,7 @@ public class ApConfigUtil {
      */
     public static @SoftApManager.StartResult int updateApChannelConfig(WifiNative wifiNative,
             @NonNull CoexManager coexManager,
-            Resources resources,
+            WifiResourceCache resources,
             String countryCode,
             SoftApConfiguration.Builder configBuilder,
             SoftApConfiguration config,
@@ -933,7 +1044,7 @@ public class ApConfigUtil {
      * @return SoftApCapability which updated the feature support or not from resource.
      */
     @NonNull
-    public static SoftApCapability updateCapabilityFromResource(@NonNull Context context) {
+    public static SoftApCapability updateCapabilityFromResource(@NonNull WifiContext context) {
         long features = 0;
         if (isAcsSupported(context)) {
             Log.d(TAG, "Update Softap capability, add acs feature support");
@@ -996,7 +1107,7 @@ public class ApConfigUtil {
         }
 
         SoftApCapability capability = new SoftApCapability(features);
-        int hardwareSupportedMaxClient = context.getResources().getInteger(
+        int hardwareSupportedMaxClient = context.getResourceCache().getInteger(
                 R.integer.config_wifiHardwareSoftapMaxClientCount);
         if (hardwareSupportedMaxClient > 0) {
             Log.d(TAG, "Update Softap capability, max client = " + hardwareSupportedMaxClient);
@@ -1033,8 +1144,8 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isIeee80211axSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isIeee80211axSupported(@NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                     R.bool.config_wifiSoftapIeee80211axSupported);
     }
 
@@ -1044,8 +1155,8 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isIeee80211beSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isIeee80211beSupported(@NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                     R.bool.config_wifiSoftapIeee80211beSupported);
     }
 
@@ -1067,8 +1178,8 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isApMacRandomizationSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isApMacRandomizationSupported(@NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                     R.bool.config_wifi_ap_mac_randomization_supported);
     }
 
@@ -1080,13 +1191,26 @@ public class ApConfigUtil {
      * @return true if supported, false otherwise.
      */
     public static boolean isBridgedModeSupported(
-            @NonNull Context context, @NonNull WifiNative wifiNative) {
-        return SdkLevel.isAtLeastS() && context.getResources().getBoolean(
+            @NonNull WifiContext context, @NonNull WifiNative wifiNative) {
+        return SdkLevel.isAtLeastS() && context.getResourceCache().getBoolean(
                     R.bool.config_wifiBridgedSoftApSupported)
                     && wifiNative.canDeviceSupportCreateTypeCombo(new SparseArray<Integer>() {{
                             put(HDM_CREATE_IFACE_AP_BRIDGE, 1);
                         }});
     }
+
+   /**
+     * Helper function to get whether or not device claim support bridged AP.
+     * (i.e. In resource file)
+     *
+     * @param context the caller context used to get value from resource file.
+     * @return true if supported, false otherwise.
+     */
+    public static boolean isBridgedModeSupportedInConfig(@NonNull WifiContext context) {
+        return SdkLevel.isAtLeastS() && context.getResourceCache().getBoolean(
+                    R.bool.config_wifiBridgedSoftApSupported);
+    }
+
 
     /**
      * Helper function to get HAL support STA + bridged AP or not.
@@ -1096,8 +1220,8 @@ public class ApConfigUtil {
      * @return true if supported, false otherwise.
      */
     public static boolean isStaWithBridgedModeSupported(
-            @NonNull Context context, @NonNull WifiNative wifiNative) {
-        return SdkLevel.isAtLeastS() && context.getResources().getBoolean(
+            @NonNull WifiContext context, @NonNull WifiNative wifiNative) {
+        return SdkLevel.isAtLeastS() && context.getResourceCache().getBoolean(
                     R.bool.config_wifiStaWithBridgedSoftApConcurrencySupported)
                     && wifiNative.canDeviceSupportCreateTypeCombo(new SparseArray<Integer>() {{
                             put(HDM_CREATE_IFACE_AP_BRIDGE, 1);
@@ -1111,8 +1235,8 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isClientForceDisconnectSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isClientForceDisconnectSupported(@NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                 R.bool.config_wifiSofapClientForceDisconnectSupported);
     }
 
@@ -1122,8 +1246,8 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isWpa3SaeSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isWpa3SaeSupported(@NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                 R.bool.config_wifi_softap_sae_supported);
     }
 
@@ -1133,8 +1257,8 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isAcsSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isAcsSupported(@NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                 R.bool.config_wifi_softap_acs_supported);
     }
 
@@ -1144,8 +1268,8 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isMacCustomizationSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isMacCustomizationSupported(@NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                 R.bool.config_wifiSoftapMacAddressCustomizationSupported);
     }
 
@@ -1156,23 +1280,25 @@ public class ApConfigUtil {
      * @param band the band soft AP to operate on.
      * @return true if supported, false otherwise.
      */
-    public static boolean isSoftApBandSupported(@NonNull Context context, @BandType int band) {
+    public static boolean isSoftApBandSupported(@NonNull WifiContext context,
+            @BandType int band) {
+
         switch (band) {
             case SoftApConfiguration.BAND_2GHZ:
-                return context.getResources().getBoolean(R.bool.config_wifi24ghzSupport)
-                        && context.getResources().getBoolean(
+                return context.getResourceCache().getBoolean(R.bool.config_wifi24ghzSupport)
+                        && context.getResourceCache().getBoolean(
                         R.bool.config_wifiSoftap24ghzSupported);
             case SoftApConfiguration.BAND_5GHZ:
-                return context.getResources().getBoolean(R.bool.config_wifi5ghzSupport)
-                        && context.getResources().getBoolean(
+                return context.getResourceCache().getBoolean(R.bool.config_wifi5ghzSupport)
+                        && context.getResourceCache().getBoolean(
                         R.bool.config_wifiSoftap5ghzSupported);
             case SoftApConfiguration.BAND_6GHZ:
-                return context.getResources().getBoolean(R.bool.config_wifi6ghzSupport)
-                        && context.getResources().getBoolean(
+                return context.getResourceCache().getBoolean(R.bool.config_wifi6ghzSupport)
+                        && context.getResourceCache().getBoolean(
                         R.bool.config_wifiSoftap6ghzSupported);
             case SoftApConfiguration.BAND_60GHZ:
-                return context.getResources().getBoolean(R.bool.config_wifi60ghzSupport)
-                        && context.getResources().getBoolean(
+                return context.getResourceCache().getBoolean(R.bool.config_wifi60ghzSupport)
+                        && context.getResourceCache().getBoolean(
                         R.bool.config_wifiSoftap60ghzSupported);
             default:
                 return false;
@@ -1186,8 +1312,8 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isSoftApDynamicCountryCodeSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isSoftApDynamicCountryCodeSupported(@NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                 R.bool.config_wifiSoftApDynamicCountryCodeUpdateSupported);
     }
 
@@ -1198,8 +1324,9 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isSoftApRestartRequiredWhenCountryCodeChanged(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isSoftApRestartRequiredWhenCountryCodeChanged(
+            @NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                 R.bool.config_wifiForcedSoftApRestartWhenCountryCodeChanged);
     }
 
@@ -1209,8 +1336,8 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isOweTransitionSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isOweTransitionSupported(@NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                 R.bool.config_wifiSoftapOweTransitionSupported);
     }
 
@@ -1220,8 +1347,8 @@ public class ApConfigUtil {
      * @param context the caller context used to get value from resource file.
      * @return true if supported, false otherwise.
      */
-    public static boolean isOweSupported(@NonNull Context context) {
-        return context.getResources().getBoolean(
+    public static boolean isOweSupported(@NonNull WifiContext context) {
+        return context.getResourceCache().getBoolean(
                 R.bool.config_wifiSoftapOweSupported);
     }
 
@@ -1352,7 +1479,7 @@ public class ApConfigUtil {
      *
      * @return true when freq ranges is needed, otherwise false.
      */
-    public static boolean isSendFreqRangesNeeded(@BandType int band, Context context,
+    public static boolean isSendFreqRangesNeeded(@BandType int band, WifiContext context,
             SoftApConfiguration config) {
         // Fist we check if one of the selected bands has restrictions in the overlay file or in the
         // provided SoftApConfiguration.
@@ -1361,7 +1488,8 @@ public class ApConfigUtil {
         //   - If there is no restrictions on channels, we store the full band
         for (int b : SoftApConfiguration.BAND_TYPES) {
             if ((band & b) != 0) {
-                List<Integer> configuredList = getConfiguredChannelList(context.getResources(), b);
+                List<Integer> configuredList = getConfiguredChannelList(
+                        context.getResourceCache(), b);
                 if (configuredList != null && !configuredList.isEmpty()) {
                     // If any of the selected band has restriction in the overlay file return true.
                     return true;
@@ -1534,7 +1662,7 @@ public class ApConfigUtil {
      * @return updated soft AP capability
      */
     public static SoftApCapability updateSoftApCapabilityWithAvailableChannelList(
-            @NonNull SoftApCapability softApCapability, @NonNull Context context,
+            @NonNull SoftApCapability softApCapability, @NonNull WifiContext context,
             @NonNull WifiNative wifiNative, @NonNull SparseArray<int[]> channelMap) {
         SoftApCapability newSoftApCapability = new SoftApCapability(softApCapability);
         if (channelMap != null) {
@@ -1553,7 +1681,7 @@ public class ApConfigUtil {
         for (int band : SoftApConfiguration.BAND_TYPES) {
             if (isSoftApBandSupported(context, band)) {
                 supportedChannelList = getAvailableChannelFreqsForBand(
-                        band, wifiNative, context.getResources(), false);
+                        band, wifiNative, context.getResourceCache(), false);
                 if (supportedChannelList != null) {
                     newSoftApCapability.setSupportedChannelList(
                             band,

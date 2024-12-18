@@ -32,16 +32,20 @@ android_test {
         "mobly-snippet-lib",
     ],
     min_sdk_version: "30",
+    target_sdk_version: "35",
 }
 
 android_test {
     name: "wifi_aware_snippet_new",
     sdk_version: "current",
     srcs: [
+        "ConnectivityManagerSnippet.java",
         "PermissionUtils.java",
+        "SerializationUtil.java",
         "WifiAwareJsonDeserializer.java",
         "WifiAwareManagerSnippet.java",
         "WifiAwareSnippetConverter.java",
+        "TlvBufferUtils.java",
     ],
     manifest: "AndroidManifestNew.xml",
     static_libs: [

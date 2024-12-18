@@ -37,6 +37,7 @@ import com.android.server.wifi.util.NativeUtil;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.BitSet;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -102,6 +103,18 @@ public class WifiChip {
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface WifiAntennaMode {}
+
+    /**
+     * Supported VoIP mode.
+     */
+    public static final int WIFI_VOIP_MODE_OFF = 0;
+    public static final int WIFI_VOIP_MODE_VOICE = 1;
+    @IntDef(prefix = { "WIFI_VOIP_MODE_" }, value = {
+            WIFI_VOIP_MODE_OFF,
+            WIFI_VOIP_MODE_VOICE,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface WifiVoipMode {}
 
     /**
      * Response containing a value and a status code.
@@ -645,16 +658,16 @@ public class WifiChip {
     /**
      * See comments for {@link IWifiChip#getCapabilitiesBeforeIfacesExist()}
      */
-    public Response<Long> getCapabilitiesBeforeIfacesExist() {
-        return validateAndCall("getCapabilitiesBeforeIfacesExist", new Response<>(0L),
+    public Response<BitSet> getCapabilitiesBeforeIfacesExist() {
+        return validateAndCall("getCapabilitiesBeforeIfacesExist", new Response<>(new BitSet()),
                 () -> mWifiChip.getCapabilitiesBeforeIfacesExist());
     }
 
     /**
      * See comments for {@link IWifiChip#getCapabilitiesAfterIfacesExist()}
      */
-    public Response<Long> getCapabilitiesAfterIfacesExist() {
-        return validateAndCall("getCapabilitiesAfterIfacesExist", new Response<>(0L),
+    public Response<BitSet> getCapabilitiesAfterIfacesExist() {
+        return validateAndCall("getCapabilitiesAfterIfacesExist", new Response<>(new BitSet()),
                 () -> mWifiChip.getCapabilitiesAfterIfacesExist());
     }
 
@@ -956,5 +969,13 @@ public class WifiChip {
         if (afcChannelAllowance == null) return false;
         return validateAndCall("setAfcChannelAllowance", false,
                 () -> mWifiChip.setAfcChannelAllowance(afcChannelAllowance));
+    }
+
+    /**
+     * See comments for {@link IWifiChip#setVoipMode(int)}
+     */
+    public boolean setVoipMode(@WifiVoipMode int mode) {
+        return validateAndCall("setVoipMode", false,
+                () -> mWifiChip.setVoipMode(mode));
     }
 }

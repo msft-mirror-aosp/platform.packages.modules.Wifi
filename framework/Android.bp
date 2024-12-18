@@ -41,7 +41,7 @@ filegroup {
 
 filegroup {
     name: "framework-wifi-updatable-sources",
-    srcs: [
+    device_common_srcs: [
         ":framework-wifi-updatable-java-sources",
         ":framework-wifi-updatable-exported-aidl-sources",
         ":module-utils-os-aidls",
@@ -117,8 +117,8 @@ java_defaults {
         // Add aconfig-annotations-lib as a dependency for the optimization
         "aconfig-annotations-lib",
         // library for generated flag code read new storage
-        "aconfig_storage_reader_java",
-        "framework-configinfrastructure",
+        "aconfig_storage_stub",
+        "framework-configinfrastructure.stubs.module_lib",
     ],
     aidl: {
         generate_get_transaction_name: true,
@@ -188,6 +188,9 @@ java_sdk_library {
             "framework-tethering.stubs.module_lib",
         ],
     },
+    api_srcs: [
+        ":wifi_javadoc_only_files",
+    ],
 
     jarjar_rules: ":wifi-jarjar-rules",
 
