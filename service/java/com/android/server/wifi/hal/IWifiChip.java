@@ -29,6 +29,7 @@ import com.android.server.wifi.SarInfo;
 import com.android.server.wifi.WifiNative;
 import com.android.server.wifi.WlanWakeReasonAndCounts;
 
+import java.util.BitSet;
 import java.util.List;
 
 /** Abstraction of WifiChip */
@@ -57,10 +58,14 @@ public interface IWifiChip {
      *
      * @param vendorData List of {@link OuiKeyedData} containing vendor-provided
      *                   configuration data. Empty list indicates no vendor data.
+     * @param isUsingMultiLinkOperation whether the bridged AP is using multi-links
+     *                                      operation soft ap.
+     *
      * @return {@link WifiApIface} object, or null if a failure occurred.
      */
     @Nullable
-    WifiApIface createBridgedApIface(@NonNull List<OuiKeyedData> vendorData);
+    WifiApIface createBridgedApIface(@NonNull List<OuiKeyedData> vendorData,
+            boolean isUsingMultiLinkOperation);
 
     /**
      * Create a NAN interface on the chip.
@@ -153,19 +158,19 @@ public interface IWifiChip {
      * but it is recommended to use {@link #getCapabilitiesAfterIfacesExist()} once
      * any ifaces are up.
      *
-     * @return {@link WifiChip.Response} where the value is a bitset of
+     * @return {@link WifiChip.Response} where the value is a BitSet of
      *         WifiManager.WIFI_FEATURE_* values.
      */
-    WifiChip.Response<Long> getCapabilitiesBeforeIfacesExist();
+    WifiChip.Response<BitSet> getCapabilitiesBeforeIfacesExist();
 
     /**
      * Get the capabilities supported by this chip.
      * Call if interfaces have been created on this chip.
      *
-     * @return {@link WifiChip.Response} where the value is a bitset of
+     * @return {@link WifiChip.Response} where the value is a BitSet of
      *         WifiManager.WIFI_FEATURE_* values.
      */
-    WifiChip.Response<Long> getCapabilitiesAfterIfacesExist();
+    WifiChip.Response<BitSet> getCapabilitiesAfterIfacesExist();
 
     /**
      * Retrieve the Wi-Fi wakeup reason stats for debugging.

@@ -28,6 +28,7 @@ import com.android.server.wifi.WifiNative.HostapdDeathEventHandler;
 import com.android.server.wifi.WifiNative.SoftApHalCallback;
 
 import java.io.PrintWriter;
+import java.util.List;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -160,13 +161,16 @@ public class HostapdHal {
      * @return true on success, false otherwise.
      */
     public boolean addAccessPoint(@NonNull String ifaceName, @NonNull SoftApConfiguration config,
-                                  boolean isMetered, @NonNull Runnable onFailureListener) {
+                                  boolean isMetered, boolean isUsingMultiLinkOperation,
+                                  @NonNull List<String> instanceIdentities,
+                                  @NonNull Runnable onFailureListener) {
         synchronized (mLock) {
             String methodStr = "addAccessPoint";
             if (mIHostapd == null) {
                 return handleNullIHostapd(methodStr);
             }
-            return mIHostapd.addAccessPoint(ifaceName, config, isMetered, onFailureListener);
+            return mIHostapd.addAccessPoint(ifaceName, config, isMetered, isUsingMultiLinkOperation,
+                    instanceIdentities, onFailureListener);
         }
     }
 
@@ -285,6 +289,23 @@ public class HostapdHal {
                 return;
             }
             mIHostapd.terminate();
+        }
+    }
+
+    /**
+     * See comments for
+     * {@link IHostapdHal#removeLinkFromMultipleLinkBridgedApIface(String, String)}.
+     */
+    public void removeLinkFromMultipleLinkBridgedApIface(@NonNull String ifaceName,
+            @NonNull String apIfaceInstance) {
+        synchronized (mLock) {
+            String methodStr = "removeLinkFromMultipleLinkBridgedApIface";
+            if (mIHostapd == null) {
+                handleNullIHostapd(methodStr);
+                return;
+            }
+            mIHostapd.removeLinkFromMultipleLinkBridgedApIface(
+                    ifaceName, apIfaceInstance);
         }
     }
 

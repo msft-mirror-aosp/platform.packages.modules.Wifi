@@ -33,11 +33,10 @@ import static android.net.wifi.WifiManager.WIFI_FEATURE_WAPI;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WFD_R2;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SAE;
 import static android.net.wifi.WifiManager.WIFI_FEATURE_WPA3_SUITE_B;
-import static android.os.Build.VERSION.SDK_INT;
 
 import android.annotation.NonNull;
+import android.annotation.SuppressLint;
 import android.content.Context;
-import android.hardware.wifi.WifiChannelWidthInMhz;
 import android.hardware.wifi.supplicant.BtCoexistenceMode;
 import android.hardware.wifi.supplicant.ConnectionCapabilities;
 import android.hardware.wifi.supplicant.DebugLevel;
@@ -75,6 +74,7 @@ import android.hardware.wifi.supplicant.QosPolicyStatusCode;
 import android.hardware.wifi.supplicant.RxFilterType;
 import android.hardware.wifi.supplicant.SignalPollResult;
 import android.hardware.wifi.supplicant.SupplicantStatusCode;
+import android.hardware.wifi.supplicant.WifiChannelWidthInMhz;
 import android.hardware.wifi.supplicant.WifiTechnology;
 import android.hardware.wifi.supplicant.WpaDriverCapabilitiesMask;
 import android.hardware.wifi.supplicant.WpsConfigMethods;
@@ -91,6 +91,7 @@ import android.net.wifi.WifiKeystore;
 import android.net.wifi.WifiMigration;
 import android.net.wifi.WifiSsid;
 import android.net.wifi.flags.Flags;
+import android.net.wifi.util.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.IBinder.DeathRecipient;
@@ -102,6 +103,7 @@ import android.util.Log;
 import android.util.Pair;
 
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.modules.utils.HandlerExecutor;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.mockwifi.MockWifiServiceUtil;
 import com.android.server.wifi.util.HalAidlUtil;
@@ -110,6 +112,7 @@ import com.android.server.wifi.util.NativeUtil;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -117,6 +120,7 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.IntConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -183,6 +187,8 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
 
     @VisibleForTesting
     protected boolean mHasMigratedLegacyKeystoreAliases = false;
+    @VisibleForTesting
+    protected KeystoreMigrationStatusConsumer mKeystoreMigrationStatusConsumer;
 
     private class SupplicantDeathRecipient implements DeathRecipient {
         @Override
@@ -207,6 +213,26 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
                 }
                 Log.w(TAG, "Handle supplicant death");
                 supplicantServiceDiedHandler();
+            }
+        }
+    }
+
+    @VisibleForTesting
+    protected class KeystoreMigrationStatusConsumer implements IntConsumer {
+        @Override
+        public void accept(int statusCode) {
+            synchronized (mLock) {
+                if (statusCode == WifiMigration.KEYSTORE_MIGRATION_SUCCESS_MIGRATION_NOT_NEEDED
+                        || statusCode
+                                == WifiMigration.KEYSTORE_MIGRATION_SUCCESS_MIGRATION_COMPLETE) {
+                    mHasMigratedLegacyKeystoreAliases = true;
+                } else {
+                    mHasMigratedLegacyKeystoreAliases = false;
+                }
+                Log.i(TAG, "Keystore migration returned with success="
+                        + mHasMigratedLegacyKeystoreAliases + ", statusCode=" + statusCode);
+                // Consumer is no longer needed, since the callback has been received
+                mKeystoreMigrationStatusConsumer = null;
             }
         }
     }
@@ -2582,29 +2608,23 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
     }
 
     /**
-     * Returns a bitmask of advanced capabilities: WPA3 SAE/SUITE B and OWE
-     * Bitmask used is:
-     * - WIFI_FEATURE_WPA3_SAE
-     * - WIFI_FEATURE_WPA3_SUITE_B
-     * - WIFI_FEATURE_OWE
-     *
-     *  @return true if successful, false otherwise.
+     * See comments for {@link ISupplicantStaIfaceHal#getAdvancedCapabilities(String)}
      */
-    public long getAdvancedCapabilities(@NonNull String ifaceName) {
+    public @NonNull BitSet getAdvancedCapabilities(@NonNull String ifaceName) {
         synchronized (mLock) {
             final String methodStr = "getAdvancedCapabilities";
-            long advancedCapabilities = 0;
+            BitSet advancedCapabilities = new BitSet();
             int keyMgmtCapabilities = getKeyMgmtCapabilities(ifaceName);
 
-            advancedCapabilities |= WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS
-                    | WIFI_FEATURE_DECORATED_IDENTITY;
+            advancedCapabilities.set(WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS);
+            advancedCapabilities.set(WIFI_FEATURE_DECORATED_IDENTITY);
             if (mVerboseLoggingEnabled) {
                 Log.v(TAG, methodStr + ": Passpoint T&C supported");
                 Log.v(TAG, methodStr + ": RFC 7542 decorated identity supported");
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.SAE) != 0) {
-                advancedCapabilities |= WIFI_FEATURE_WPA3_SAE;
+                advancedCapabilities.set(WIFI_FEATURE_WPA3_SAE);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": SAE supported");
@@ -2612,7 +2632,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.SUITE_B_192) != 0) {
-                advancedCapabilities |= WIFI_FEATURE_WPA3_SUITE_B;
+                advancedCapabilities.set(WIFI_FEATURE_WPA3_SUITE_B);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": SUITE_B supported");
@@ -2620,7 +2640,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.OWE) != 0) {
-                advancedCapabilities |= WIFI_FEATURE_OWE;
+                advancedCapabilities.set(WIFI_FEATURE_OWE);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": OWE supported");
@@ -2628,8 +2648,8 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.DPP) != 0) {
-                advancedCapabilities |= WIFI_FEATURE_DPP
-                        | WIFI_FEATURE_DPP_ENROLLEE_RESPONDER;
+                advancedCapabilities.set(WIFI_FEATURE_DPP);
+                advancedCapabilities.set(WIFI_FEATURE_DPP_ENROLLEE_RESPONDER);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": DPP supported");
@@ -2638,7 +2658,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.WAPI_PSK) != 0) {
-                advancedCapabilities |= WIFI_FEATURE_WAPI;
+                advancedCapabilities.set(WIFI_FEATURE_WAPI);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": WAPI supported");
@@ -2646,7 +2666,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.FILS_SHA256) != 0) {
-                advancedCapabilities |= WIFI_FEATURE_FILS_SHA256;
+                advancedCapabilities.set(WIFI_FEATURE_FILS_SHA256);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": FILS_SHA256 supported");
@@ -2654,7 +2674,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((keyMgmtCapabilities & KeyMgmtMask.FILS_SHA384) != 0) {
-                advancedCapabilities |= WIFI_FEATURE_FILS_SHA384;
+                advancedCapabilities.set(WIFI_FEATURE_FILS_SHA384);
 
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": FILS_SHA384 supported");
@@ -2691,21 +2711,21 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
         }
     }
 
-    private long aidlWpaDrvFeatureSetToFrameworkV2(int drvCapabilitiesMask) {
-        if (!isServiceVersionAtLeast(2)) return 0;
+    private BitSet aidlWpaDrvFeatureSetToFrameworkV2(int drvCapabilitiesMask) {
+        if (!isServiceVersionAtLeast(2)) return new BitSet();
 
         final String methodStr = "getWpaDriverFeatureSetV2";
-        long featureSet = 0;
+        BitSet featureSet = new BitSet();
 
         if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.SET_TLS_MINIMUM_VERSION) != 0) {
-            featureSet |= WIFI_FEATURE_SET_TLS_MINIMUM_VERSION;
+            featureSet.set(WIFI_FEATURE_SET_TLS_MINIMUM_VERSION);
             if (mVerboseLoggingEnabled) {
                 Log.v(TAG, methodStr + ": EAP-TLS minimum version supported");
             }
         }
 
         if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.TLS_V1_3) != 0) {
-            featureSet |= WIFI_FEATURE_TLS_V1_3;
+            featureSet.set(WIFI_FEATURE_TLS_V1_3);
             if (mVerboseLoggingEnabled) {
                 Log.v(TAG, methodStr + ": EAP-TLS v1.3 supported");
             }
@@ -2714,24 +2734,21 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
     }
 
     /**
-     * Get the driver supported features through supplicant.
-     *
-     * @param ifaceName Name of the interface.
-     * @return bitmask defined by WifiManager.WIFI_FEATURE_*.
+     * See comments for {@link ISupplicantStaIfaceHal#getWpaDriverFeatureSet(String)}
      */
-    public long getWpaDriverFeatureSet(@NonNull String ifaceName) {
+    public @NonNull BitSet getWpaDriverFeatureSet(@NonNull String ifaceName) {
         synchronized (mLock) {
             final String methodStr = "getWpaDriverFeatureSet";
             int drvCapabilitiesMask = getWpaDriverCapabilities(ifaceName);
-            long featureSet = 0;
+            BitSet featureSet = new BitSet();
 
             if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.MBO) != 0) {
-                featureSet |= WIFI_FEATURE_MBO;
+                featureSet.set(WIFI_FEATURE_MBO);
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": MBO supported");
                 }
                 if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.OCE) != 0) {
-                    featureSet |= WIFI_FEATURE_OCE;
+                    featureSet.set(WIFI_FEATURE_OCE);
                     if (mVerboseLoggingEnabled) {
                         Log.v(TAG, methodStr + ": OCE supported");
                     }
@@ -2739,14 +2756,14 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
             }
 
             if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.SAE_PK) != 0) {
-                featureSet |= WIFI_FEATURE_SAE_PK;
+                featureSet.set(WIFI_FEATURE_SAE_PK);
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": SAE-PK supported");
                 }
             }
 
             if ((drvCapabilitiesMask & WpaDriverCapabilitiesMask.WFD_R2) != 0) {
-                featureSet |= WIFI_FEATURE_WFD_R2;
+                featureSet.set(WIFI_FEATURE_WFD_R2);
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": WFD-R2 supported");
                 }
@@ -2754,15 +2771,36 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
 
             if ((drvCapabilitiesMask
                     & WpaDriverCapabilitiesMask.TRUST_ON_FIRST_USE) != 0) {
-                featureSet |= WIFI_FEATURE_TRUST_ON_FIRST_USE;
+                featureSet.set(WIFI_FEATURE_TRUST_ON_FIRST_USE);
                 if (mVerboseLoggingEnabled) {
                     Log.v(TAG, methodStr + ": Trust-On-First-Use supported");
                 }
             }
 
-            featureSet |= aidlWpaDrvFeatureSetToFrameworkV2(drvCapabilitiesMask);
+            featureSet.or(aidlWpaDrvFeatureSetToFrameworkV2(drvCapabilitiesMask));
 
             return featureSet;
+        }
+    }
+
+    /**
+     * Returns true if this device supports RSN Overriding, false otherwise. Need service version
+     * at least 4 or higher.
+     */
+    public boolean isRsnOverridingSupported(@NonNull String ifaceName) {
+        synchronized (mLock) {
+            final String methodStr = "isRsnOverridingSupported";
+            if (!isServiceVersionAtLeast(4)) {
+                return false;
+            }
+            int drvCapabilitiesMask = getWpaDriverCapabilities(ifaceName);
+            boolean rsnOverridingSupported =
+                    (drvCapabilitiesMask & WpaDriverCapabilitiesMask.RSN_OVERRIDING) != 0;
+            if (mVerboseLoggingEnabled) {
+                Log.v(TAG, methodStr + ": RSN Overriding supported: "
+                        + rsnOverridingSupported);
+            }
+            return rsnOverridingSupported;
         }
     }
 
@@ -4067,6 +4105,7 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
         }
     }
 
+    @SuppressLint("NewApi") // Keystore migration API is guarded by an SDK check
     private void registerNonStandardCertCallback() {
         synchronized (mLock) {
             final String methodStr = "registerNonStandardCertCallback";
@@ -4077,11 +4116,14 @@ public class SupplicantStaIfaceHalAidlImpl implements ISupplicantStaIfaceHal {
                 return;
             }
 
-            // TODO: Use SdkLevel API when it exists, rather than the SDK_INT
-            if (!mHasMigratedLegacyKeystoreAliases && SDK_INT >= 36
+            if (!mHasMigratedLegacyKeystoreAliases && Environment.isSdkAtLeastB()
                     && Flags.legacyKeystoreToWifiBlobstoreMigrationReadOnly()) {
-                WifiMigration.migrateLegacyKeystoreToWifiBlobstore();
-                mHasMigratedLegacyKeystoreAliases = true;
+                if (mKeystoreMigrationStatusConsumer == null) {
+                    // Create global callback temporarily for access in the unit tests
+                    mKeystoreMigrationStatusConsumer = new KeystoreMigrationStatusConsumer();
+                }
+                WifiMigration.migrateLegacyKeystoreToWifiBlobstore(
+                        new HandlerExecutor(mEventHandler), mKeystoreMigrationStatusConsumer);
             }
 
             try {

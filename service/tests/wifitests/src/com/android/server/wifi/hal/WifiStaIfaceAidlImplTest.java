@@ -16,9 +16,12 @@
 
 package com.android.server.wifi.hal;
 
+import static com.android.server.wifi.TestUtil.createCapabilityBitset;
+
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,6 +58,8 @@ import android.net.wifi.WifiManager;
 import android.net.wifi.WifiScanner.ScanData;
 import android.net.wifi.WifiSsid;
 
+import com.android.dx.mockito.inline.extended.ExtendedMockito;
+import com.android.dx.mockito.inline.extended.StaticMockitoSession;
 import com.android.server.wifi.SsidTranslator;
 import com.android.server.wifi.WifiBaseTest;
 import com.android.server.wifi.WifiLinkLayerStats;
@@ -62,12 +67,14 @@ import com.android.server.wifi.WifiLoggerHal;
 import com.android.server.wifi.WifiNative;
 import com.android.wifi.resources.R;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.nio.charset.StandardCharsets;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Random;
 
@@ -79,12 +86,21 @@ public class WifiStaIfaceAidlImplTest extends WifiBaseTest {
     @Mock private Context mContextMock;
     @Mock private Resources mResourcesMock;
     @Mock private SsidTranslator mSsidTranslatorMock;
+    private StaticMockitoSession mSession;
 
     @Before
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
         when(mContextMock.getResources()).thenReturn(mResourcesMock);
         mDut = new WifiStaIfaceAidlImpl(mIWifiStaIfaceMock, mContextMock, mSsidTranslatorMock);
+        mSession = ExtendedMockito.mockitoSession()
+                .mockStatic(WifiHalAidlImpl.class)
+                .startMocking();
+    }
+
+    @After
+    public void teardown() {
+        mSession.finishMocking();
     }
 
     /**
@@ -96,10 +112,9 @@ public class WifiStaIfaceAidlImplTest extends WifiBaseTest {
                 IWifiStaIface.FeatureSetMask.BACKGROUND_SCAN
                         | IWifiStaIface.FeatureSetMask.LINK_LAYER_STATS
         );
-        long expected = (
-                WifiManager.WIFI_FEATURE_SCANNER
-                        | WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
-        assertEquals(expected, mDut.halToFrameworkStaFeatureSet(halFeatures));
+        BitSet expected = createCapabilityBitset(
+                WifiManager.WIFI_FEATURE_SCANNER, WifiManager.WIFI_FEATURE_LINK_LAYER_STATS);
+        assertTrue(expected.equals(mDut.halToFrameworkStaFeatureSet(halFeatures)));
     }
 
     /**
@@ -330,6 +345,7 @@ public class WifiStaIfaceAidlImplTest extends WifiBaseTest {
      */
     @Test
     public void testGetCachedScanData() throws Exception {
+        when(WifiHalAidlImpl.isServiceVersionAtLeast(2)).thenReturn(true);
         CachedScanData halData = new CachedScanData();
         CachedScanResult[] halResults = new CachedScanResult[2];
         CachedScanResult halResult = new CachedScanResult();
