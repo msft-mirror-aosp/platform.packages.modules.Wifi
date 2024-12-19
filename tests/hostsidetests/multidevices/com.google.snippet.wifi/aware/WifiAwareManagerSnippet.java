@@ -661,11 +661,14 @@ public class WifiAwareManagerSnippet implements Snippet {
                     + "request"
     )
     public String wifiAwareCreateNetworkSpecifier(
-            String discoverySessionId, int peerId, boolean isAcceptAnyPeer,
+            String discoverySessionId, Integer peerId, boolean isAcceptAnyPeer,
             @RpcOptional JSONObject jsonObject
     ) throws JSONException, WifiAwareManagerSnippetException {
         DiscoverySession session = getDiscoverySession(discoverySessionId);
-        PeerHandle handle = getPeerHandler(peerId);
+        PeerHandle handle = null;
+        if (peerId != null){
+        handle = getPeerHandler(peerId);
+        }
         WifiAwareNetworkSpecifier.Builder builder;
         if (isAcceptAnyPeer) {
             builder = new WifiAwareNetworkSpecifier.Builder((PublishDiscoverySession) session);

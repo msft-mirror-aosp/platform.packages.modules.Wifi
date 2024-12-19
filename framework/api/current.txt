@@ -1640,7 +1640,7 @@ package android.net.wifi.p2p {
   public static final class WifiP2pUsdBasedLocalServiceAdvertisementConfig.Builder {
     ctor public WifiP2pUsdBasedLocalServiceAdvertisementConfig.Builder();
     method @NonNull public android.net.wifi.p2p.WifiP2pUsdBasedLocalServiceAdvertisementConfig build();
-    method @NonNull public android.net.wifi.p2p.WifiP2pUsdBasedLocalServiceAdvertisementConfig.Builder setFrequencyMhz(@IntRange(from=0) int);
+    method @NonNull public android.net.wifi.p2p.WifiP2pUsdBasedLocalServiceAdvertisementConfig.Builder setFrequencyMhz(@IntRange(from=1) int);
   }
 
   @FlaggedApi("com.android.wifi.flags.wifi_direct_r2") public final class WifiP2pUsdBasedServiceDiscoveryConfig implements android.os.Parcelable {
@@ -1751,6 +1751,7 @@ package android.net.wifi.p2p.nsd {
   @FlaggedApi("com.android.wifi.flags.wifi_direct_r2") public final class WifiP2pUsdBasedServiceConfig implements android.os.Parcelable {
     ctor public WifiP2pUsdBasedServiceConfig();
     method public int describeContents();
+    method public static int getMaxAllowedServiceSpecificInfoLength();
     method @NonNull public String getServiceName();
     method @IntRange(from=0, to=255) public int getServiceProtocolType();
     method @Nullable public byte[] getServiceSpecificInfo();
@@ -1761,10 +1762,10 @@ package android.net.wifi.p2p.nsd {
   }
 
   public static final class WifiP2pUsdBasedServiceConfig.Builder {
-    ctor public WifiP2pUsdBasedServiceConfig.Builder(@NonNull String);
+    ctor public WifiP2pUsdBasedServiceConfig.Builder(@NonNull @Size(min=1) String);
     method @NonNull public android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig build();
     method @NonNull public android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig.Builder setServiceProtocolType(@IntRange(from=0, to=255) int);
-    method @NonNull public android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig.Builder setServiceSpecificInfo(@Nullable byte[]);
+    method @NonNull public android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig.Builder setServiceSpecificInfo(@Nullable @Size(min=1) byte[]);
   }
 
   @FlaggedApi("com.android.wifi.flags.wifi_direct_r2") public final class WifiP2pUsdBasedServiceResponse implements android.os.Parcelable {
