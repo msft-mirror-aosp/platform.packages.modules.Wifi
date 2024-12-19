@@ -39,6 +39,7 @@ import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pGroupList;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.WifiP2pUsdBasedLocalServiceAdvertisementConfig;
 import android.net.wifi.p2p.WifiP2pUsdBasedServiceDiscoveryConfig;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig;
@@ -2668,6 +2669,30 @@ public class SupplicantP2pIfaceHalHidlImpl implements ISupplicantP2pIfaceHal {
      */
     public void stopUsdBasedServiceDiscovery(int sessionId) {
         Log.d(TAG, "stopUsdBasedServiceDiscovery() is not supported.");
+    }
+
+    /**
+     * Start an Un-synchronized Service Discovery (USD) based P2P service advertisement.
+     *
+     * @param usdServiceConfig is the USD based service configuration.
+     * @param advertisementConfig is the configuration for this service advertisement.
+     * @param timeoutInSeconds is the maximum time to be spent for this service advertisement.
+     */
+    public int startUsdBasedServiceAdvertisement(WifiP2pUsdBasedServiceConfig usdServiceConfig,
+            WifiP2pUsdBasedLocalServiceAdvertisementConfig advertisementConfig,
+            int timeoutInSeconds) {
+        Log.d(TAG, "startUsdBasedServiceAdvertisement() is not supported.");
+        return -1;
+    }
+
+    /**
+     * Stop an Un-synchronized Service Discovery (USD) based P2P service advertisement.
+     *
+     * @param sessionId Identifier to cancel the service advertisement.
+     *        Use zero to cancel all the service advertisement instances.
+     */
+    public void stopUsdBasedServiceAdvertisement(int sessionId) {
+        Log.d(TAG, "stopUsdBasedServiceAdvertisement() is not supported.");
     }
 
     /**

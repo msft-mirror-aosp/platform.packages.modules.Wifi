@@ -707,7 +707,8 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
     @Override
     public void onUsdBasedServiceAdvertisementTerminated(int sessionId, int reasonCode) {
         logd("Usd based service advertisement terminated on " + mInterface);
-        // TODO implementation
+        mMonitor.broadcastUsdBasedServiceAdvertisementTerminated(mInterface, sessionId,
+                reasonCode);
     }
 
     private WifiP2pDevice createStaEventDevice(byte[] interfaceAddress, byte[] p2pDeviceAddress,

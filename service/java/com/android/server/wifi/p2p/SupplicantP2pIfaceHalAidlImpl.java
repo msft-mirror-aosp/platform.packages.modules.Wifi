@@ -39,6 +39,7 @@ import android.hardware.wifi.supplicant.P2pDiscoveryInfo;
 import android.hardware.wifi.supplicant.P2pExtListenInfo;
 import android.hardware.wifi.supplicant.P2pFrameTypeMask;
 import android.hardware.wifi.supplicant.P2pScanType;
+import android.hardware.wifi.supplicant.P2pUsdBasedServiceAdvertisementConfig;
 import android.hardware.wifi.supplicant.P2pUsdBasedServiceDiscoveryConfig;
 import android.hardware.wifi.supplicant.WpsConfigMethods;
 import android.hardware.wifi.supplicant.WpsProvisionMethod;
@@ -52,6 +53,7 @@ import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pGroupList;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.WifiP2pUsdBasedLocalServiceAdvertisementConfig;
 import android.net.wifi.p2p.WifiP2pUsdBasedServiceDiscoveryConfig;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig;
@@ -2791,6 +2793,74 @@ public class SupplicantP2pIfaceHalAidlImpl implements ISupplicantP2pIfaceHal {
             }
             try {
                 mISupplicantP2pIface.stopUsdBasedServiceDiscovery(sessionId);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+            }
+        }
+    }
+
+    /**
+     * Start an Un-synchronized Service Discovery (USD) based P2P service advertisement.
+     *
+     * @param usdServiceConfig is the USD based service configuration.
+     * @param advertisementConfig is the configuration for this service advertisement.
+     * @param timeoutInSeconds is the maximum time to be spent for this service advertisement.
+     */
+    @SuppressLint("NewApi")
+    public int startUsdBasedServiceAdvertisement(WifiP2pUsdBasedServiceConfig usdServiceConfig,
+            WifiP2pUsdBasedLocalServiceAdvertisementConfig advertisementConfig,
+            int timeoutInSeconds) {
+        synchronized (mLock) {
+            String methodStr = "startUsdBasedServiceAdvertisement";
+            if (!checkP2pIfaceAndLogFailure(methodStr)) {
+                return -1;
+            }
+            if (getCachedServiceVersion() < 4) {
+                return -1;
+            }
+            if (usdServiceConfig == null || advertisementConfig == null) {
+                return -1;
+            }
+            try {
+                P2pUsdBasedServiceAdvertisementConfig aidlServiceAdvertisementConfig =
+                        new P2pUsdBasedServiceAdvertisementConfig();
+                aidlServiceAdvertisementConfig.serviceName = usdServiceConfig.getServiceName();
+                aidlServiceAdvertisementConfig.serviceProtocolType = usdServiceConfig
+                        .getServiceProtocolType();
+                aidlServiceAdvertisementConfig.serviceSpecificInfo = usdServiceConfig
+                        .getServiceSpecificInfo();
+                aidlServiceAdvertisementConfig.frequencyMHz = advertisementConfig.getFrequencyMhz();
+                aidlServiceAdvertisementConfig.timeoutInSeconds = timeoutInSeconds;
+                return mISupplicantP2pIface.startUsdBasedServiceAdvertisement(
+                        aidlServiceAdvertisementConfig);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+            }
+            return -1;
+        }
+    }
+
+    /**
+     * Stop an Un-synchronized Service Discovery (USD) based P2P service advertisement.
+     *
+     * @param sessionId Identifier to cancel the service advertisement.
+     *        Use zero to cancel all the service advertisement instances.
+     */
+    public void stopUsdBasedServiceAdvertisement(int sessionId) {
+        synchronized (mLock) {
+            String methodStr = "stopUsdBasedServiceAdvertisement";
+            if (!checkP2pIfaceAndLogFailure(methodStr)) {
+                return;
+            }
+            if (getCachedServiceVersion() < 4) {
+                return;
+            }
+            try {
+                mISupplicantP2pIface.stopUsdBasedServiceAdvertisement(sessionId);
             } catch (RemoteException e) {
                 handleRemoteException(e, methodStr);
             } catch (ServiceSpecificException e) {

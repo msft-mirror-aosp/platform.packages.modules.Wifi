@@ -82,6 +82,7 @@ public class WifiP2pMonitor {
 
     /* USD service discovery events */
     public static final int USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT = BASE + 43;
+    public static final int USD_BASED_SERVICE_ADVERTISEMENT_TERMINATED_EVENT = BASE + 44;
 
     public static final int PROV_DISC_STATUS_SUCCESS             = 0;
     public static final int PROV_DISC_STATUS_TIMEOUT             = 1;
@@ -502,5 +503,17 @@ public class WifiP2pMonitor {
     public void broadcastUsdBasedServiceDiscoveryTerminated(@NonNull String iface,
             int sessionId, int reasonCode) {
         sendMessage(iface, USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT, sessionId, reasonCode);
+    }
+
+    /**
+     * Broadcast the termination of USD based service advertisement.
+     *
+     * @param iface Name of iface on which this occurred.
+     * @param sessionId Identifier to identify the instance of a service advertisement.
+     * @param reasonCode The reason for termination of service advertisement.
+     */
+    public void broadcastUsdBasedServiceAdvertisementTerminated(@NonNull String iface,
+            int sessionId, int reasonCode) {
+        sendMessage(iface, USD_BASED_SERVICE_ADVERTISEMENT_TERMINATED_EVENT, sessionId, reasonCode);
     }
 }

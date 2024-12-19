@@ -80,11 +80,13 @@ import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pManager.ExternalApproverRequestListener;
 import android.net.wifi.p2p.WifiP2pProvDiscEvent;
+import android.net.wifi.p2p.WifiP2pUsdBasedLocalServiceAdvertisementConfig;
 import android.net.wifi.p2p.WifiP2pUsdBasedServiceDiscoveryConfig;
 import android.net.wifi.p2p.WifiP2pWfdInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
 import android.net.wifi.p2p.nsd.WifiP2pServiceResponse;
+import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig;
 import android.net.wifi.util.Environment;
 import android.os.Binder;
 import android.os.Build;
@@ -1963,6 +1965,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     return "WifiP2pMonitor.P2P_FREQUENCY_CHANGED_EVENT";
                 case WifiP2pMonitor.USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT:
                     return "WifiP2pMonitor.USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT";
+                case WifiP2pMonitor.USD_BASED_SERVICE_ADVERTISEMENT_TERMINATED_EVENT:
+                    return "WifiP2pMonitor.USD_BASED_SERVICE_ADVERTISEMENT_TERMINATED_EVENT";
                 case WpsInfo.DISPLAY:
                     return "WpsInfo.DISPLAY";
                 case WpsInfo.KEYPAD:
@@ -2158,6 +2162,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     WifiP2pMonitor.P2P_FREQUENCY_CHANGED_EVENT, getHandler());
             mWifiMonitor.registerHandler(mInterfaceName,
                     WifiP2pMonitor.USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT, getHandler());
+            mWifiMonitor.registerHandler(mInterfaceName,
+                    WifiP2pMonitor.USD_BASED_SERVICE_ADVERTISEMENT_TERMINATED_EVENT, getHandler());
 
             mWifiMonitor.startMonitoring(mInterfaceName);
         }
@@ -2551,6 +2557,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     case WifiP2pMonitor.P2P_SERV_DISC_RESP_EVENT:
                     case WifiP2pMonitor.P2P_PROV_DISC_FAILURE_EVENT:
                     case WifiP2pMonitor.USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT:
+                    case WifiP2pMonitor.USD_BASED_SERVICE_ADVERTISEMENT_TERMINATED_EVENT:
                     case PEER_CONNECTION_USER_ACCEPT:
                     case PEER_CONNECTION_USER_REJECT:
                     case DISCONNECT_WIFI_RESPONSE:
@@ -3443,6 +3450,20 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                     WifiP2pManager.ERROR);
                         }
                         break;
+                    case WifiP2pMonitor.USD_BASED_SERVICE_ADVERTISEMENT_TERMINATED_EVENT: {
+                        int sessionId = message.arg1;
+                        for (ClientInfo c : mClientInfoList.values()) {
+                            for (WifiP2pServiceInfo serviceInfo : c.mUsdServiceAdvertiseList) {
+                                if (serviceInfo.getUsdSessionId() == sessionId) {
+                                    serviceInfo.setUsdSessionId(0);
+                                    break;
+                                }
+                            }
+                        }
+                        // TODO check the reason code and set to false only for timeout
+                        sendP2pListenChangedBroadcast(false);
+                        break;
+                    }
                     case WifiP2pMonitor.USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT: {
                         int sessionId = message.arg1;
                         if (mServiceDiscoveryInfo.isValid()) {
@@ -8527,6 +8548,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             updateSupplicantGasFrameBasedServiceRequest();
         }
 
+        @SuppressLint("NewApi")
         private boolean addLocalService(@NonNull Message message) {
             Messenger m = message.replyTo;
             Bundle extras = message.getData()
@@ -8535,12 +8557,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     extras.getParcelable(WifiP2pManager.EXTRA_PARAM_KEY_SERVICE_INFO);
             if (m == null || servInfo == null) {
                 Log.e(TAG, "Illegal arguments");
-                return false;
-            }
-            int addLocalServiceType = message.arg1;
-            if (addLocalServiceType
-                    == WifiP2pManager.WIFI_P2P_USD_BASED_ADD_LOCAL_SERVICE) {
-                // TODO implementation
                 return false;
             }
 
@@ -8552,18 +8568,46 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 return false;
             }
 
-            if (!clientInfo.mServList.add(servInfo)) {
-                return false;
-            }
+            int addLocalServiceType = message.arg1;
+            if (addLocalServiceType
+                    == WifiP2pManager.WIFI_P2P_USD_BASED_ADD_LOCAL_SERVICE) {
+                if (!isWifiDirect2Enabled()) {
+                    return false;
+                }
+                int sessionId = 0;
+                if (Environment.isSdkAtLeastB()
+                        && servInfo.getWifiP2pUsdBasedServiceConfig() != null) {
+                    WifiP2pUsdBasedServiceConfig usdServiceConfig =
+                            servInfo.getWifiP2pUsdBasedServiceConfig();
+                    WifiP2pUsdBasedLocalServiceAdvertisementConfig advertisementConfig =
+                            extras.getParcelable(WifiP2pManager
+                                    .EXTRA_PARAM_KEY_USD_BASED_LOCAL_SERVICE_ADVERTISEMENT_CONFIG);
+                    sessionId = mWifiNative.startUsdBasedServiceAdvertisement(usdServiceConfig,
+                            advertisementConfig,
+                            USD_BASED_SERVICE_ADVERTISEMENT_DISCOVERY_TIMEOUT_S);
 
-            if (!mWifiNative.p2pServiceAdd(servInfo)) {
-                clientInfo.mServList.remove(servInfo);
-                return false;
+                }
+                if (sessionId > 0) {
+                    servInfo.setUsdSessionId(sessionId);
+                    clientInfo.mUsdServiceAdvertiseList.add(servInfo);
+                    sendP2pListenChangedBroadcast(true);
+                } else {
+                    return false;
+                }
+            } else {
+                if (!clientInfo.mServList.add(servInfo)) {
+                    return false;
+                }
+                if (!mWifiNative.p2pServiceAdd(servInfo)) {
+                    clientInfo.mServList.remove(servInfo);
+                    return false;
+                }
             }
 
             return true;
         }
 
+        @SuppressLint("NewApi")
         private void removeLocalService(Messenger m, WifiP2pServiceInfo servInfo) {
             if (m == null || servInfo == null) {
                 Log.e(TAG, "Illegal arguments");
@@ -8575,8 +8619,21 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 return;
             }
 
-            mWifiNative.p2pServiceDel(servInfo);
-            clientInfo.mServList.remove(servInfo);
+            if (Environment.isSdkAtLeastB() && servInfo.getWifiP2pUsdBasedServiceConfig() != null) {
+                for (WifiP2pServiceInfo savedServInfo: clientInfo.mUsdServiceAdvertiseList) {
+                    if (servInfo.equals(savedServInfo)) {
+                        int sessionId = savedServInfo.getUsdSessionId();
+                        if (sessionId > 0) {
+                            mWifiNative.stopUsdBasedServiceAdvertisement(sessionId);
+                        }
+                        clientInfo.mUsdServiceAdvertiseList.remove(servInfo);
+                        break;
+                    }
+                }
+            } else {
+                mWifiNative.p2pServiceDel(servInfo);
+                clientInfo.mServList.remove(servInfo);
+            }
         }
 
         private void clearLocalServices(Messenger m) {
@@ -8589,6 +8646,15 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             if (clientInfo == null) {
                 return;
             }
+
+            for (WifiP2pServiceInfo savedServInfo: clientInfo.mUsdServiceAdvertiseList) {
+                int sessionId = savedServInfo.getUsdSessionId();
+                if (sessionId > 0) {
+                    mWifiNative.stopUsdBasedServiceAdvertisement(sessionId);
+                }
+            }
+
+            clientInfo.mUsdServiceAdvertiseList.clear();
 
             for (WifiP2pServiceInfo servInfo: clientInfo.mServList) {
                 mWifiNative.p2pServiceDel(servInfo);
@@ -9173,6 +9239,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
 
         // A service discovery request list using USD frames.
         private final List<WifiP2pServiceRequest> mUsdServiceDiscoverList = new ArrayList<>();
+
+        // A service advertise list using USD frames.
+        private final List<WifiP2pServiceInfo> mUsdServiceAdvertiseList = new ArrayList<>();
 
         private ClientInfo(Messenger m) {
             mMessenger = m;
