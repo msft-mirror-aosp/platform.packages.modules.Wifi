@@ -1745,6 +1745,35 @@ public class WifiNativeTest extends WifiBaseTest {
     }
 
     /**
+     * Verifies that getSupportedBandsForStaFromWifiCond() calls underlying wificond
+     * when all 5G available channels are DFS channels.
+     */
+    @Test
+    public void testGetSupportedBandsWhenOnly5DhsExist() throws Exception {
+        when(mWificondControl.getChannelsMhzForBand(WifiScanner.WIFI_BAND_24_GHZ)).thenReturn(
+                new int[]{2412});
+        when(mWificondControl.getChannelsMhzForBand(WifiScanner.WIFI_BAND_5_GHZ)).thenReturn(
+                new int[0]);
+        when(mWificondControl.getChannelsMhzForBand(WifiScanner.WIFI_BAND_5_GHZ_DFS_ONLY))
+                .thenReturn(new int[]{5500});
+        when(mWificondControl.getChannelsMhzForBand(WifiScanner.WIFI_BAND_6_GHZ)).thenReturn(
+                new int[0]);
+        when(mWificondControl.getChannelsMhzForBand(WifiScanner.WIFI_BAND_60_GHZ)).thenReturn(
+                new int[0]);
+        when(mWifiVendorHal.getUsableChannels(WifiScanner.WIFI_BAND_24_5_WITH_DFS_6_60_GHZ,
+                WifiAvailableChannel.OP_MODE_STA,
+                WifiAvailableChannel.FILTER_REGULATORY)).thenReturn(null);
+        mWifiNative.setupInterfaceForClientInScanMode(null, TEST_WORKSOURCE,
+                mConcreteClientModeManager);
+        mWifiNative.switchClientInterfaceToConnectivityMode(WIFI_IFACE_NAME, TEST_WORKSOURCE);
+        verify(mWificondControl, times(2)).getChannelsMhzForBand(WifiScanner.WIFI_BAND_24_GHZ);
+        verify(mWificondControl, times(2)).getChannelsMhzForBand(WifiScanner.WIFI_BAND_5_GHZ);
+        verify(mWificondControl, times(2))
+                .getChannelsMhzForBand(WifiScanner.WIFI_BAND_5_GHZ_DFS_ONLY);
+        assertEquals(3, mWifiNative.getSupportedBandsForSta(WIFI_IFACE_NAME));
+    }
+
+    /**
      * Verifies that isSoftApInstanceDiedHandlerSupported() calls underlying HostapdHal.
      */
     @Test
