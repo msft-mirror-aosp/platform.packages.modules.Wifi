@@ -29,6 +29,7 @@ import android.hardware.wifi.supplicant.P2pDeviceFoundEventParams;
 import android.hardware.wifi.supplicant.P2pGoNegotiationReqEventParams;
 import android.hardware.wifi.supplicant.P2pGroupStartedEventParams;
 import android.hardware.wifi.supplicant.P2pInvitationEventParams;
+import android.hardware.wifi.supplicant.P2pPairingBootstrappingMethodMask;
 import android.hardware.wifi.supplicant.P2pPeerClientDisconnectedEventParams;
 import android.hardware.wifi.supplicant.P2pPeerClientJoinedEventParams;
 import android.hardware.wifi.supplicant.P2pProvDiscStatusCode;
@@ -43,7 +44,9 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pDirInfo;
 import android.net.wifi.p2p.WifiP2pGroup;
+import android.net.wifi.p2p.WifiP2pPairingBootstrappingConfig;
 import android.net.wifi.p2p.WifiP2pProvDiscEvent;
 import android.net.wifi.p2p.WifiP2pWfdInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceResponse;
@@ -118,7 +121,7 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
             byte[] wfdDeviceInfo) {
         handleDeviceFound(srcAddress, p2pDeviceAddress, primaryDeviceType, deviceName,
                 configMethods, deviceCapabilities, groupCapabilities, wfdDeviceInfo,
-                null, null, null);
+                null, null, null, 0, null);
     }
 
     /**
@@ -941,7 +944,7 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
             byte[] wfdR2DeviceInfo, byte[] vendorElemBytes) {
         handleDeviceFound(srcAddress, p2pDeviceAddress, primaryDeviceType, deviceName,
                 configMethods, deviceCapabilities, groupCapabilities, wfdDeviceInfo,
-                wfdR2DeviceInfo, vendorElemBytes, null);
+                wfdR2DeviceInfo, vendorElemBytes, null, 0, null);
     }
 
     /**
@@ -949,13 +952,34 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
      *
      * @param deviceFoundEventParams Parameters associated with the device found event.
      */
+    @SuppressLint("NewApi")
     @Override
     public void onDeviceFoundWithParams(P2pDeviceFoundEventParams deviceFoundEventParams) {
         List<OuiKeyedData> vendorData = null;
+        int pairingBootstrappingMethods = 0;
+        WifiP2pDirInfo dirInfo = null;
+
         if (mServiceVersion >= 3 && deviceFoundEventParams.vendorData != null) {
             vendorData = HalAidlUtil.halToFrameworkOuiKeyedDataList(
                     deviceFoundEventParams.vendorData);
         }
+
+        if (mServiceVersion >= 4 && Environment.isSdkAtLeastB() && wifiDirectR2()) {
+            pairingBootstrappingMethods = convertAidlPairingBootstrappingMethodsToFramework(
+                    deviceFoundEventParams.pairingBootstrappingMethods);
+            if (deviceFoundEventParams.dirInfo != null) {
+                try {
+                    dirInfo = new WifiP2pDirInfo(MacAddress.fromBytes(
+                            deviceFoundEventParams.dirInfo.deviceInterfaceMacAddress),
+                            deviceFoundEventParams.dirInfo.nonce,
+                            deviceFoundEventParams.dirInfo.dirTag);
+                } catch (IllegalArgumentException e) {
+                    Log.e(TAG, "Could not decode MAC Address from DirInfo ", e);
+                    dirInfo = null;
+                }
+            }
+        }
+
         handleDeviceFound(
                 deviceFoundEventParams.srcAddress,
                 deviceFoundEventParams.p2pDeviceAddress,
@@ -967,14 +991,39 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
                 deviceFoundEventParams.wfdDeviceInfo,
                 deviceFoundEventParams.wfdR2DeviceInfo,
                 deviceFoundEventParams.vendorElemBytes,
-                vendorData);
+                vendorData, pairingBootstrappingMethods, dirInfo);
     }
 
+    /*
+     * Prepare broadcast message that a P2P device has been found.
+     *
+     * @param srcAddress MAC address of the device found. This must either
+     *        be the P2P device address or the P2P interface address.
+     * @param p2pDeviceAddress P2P device address.
+     * @param primaryDeviceType Type of device. Refer to section B.1 of Wifi P2P
+     *        Technical specification v1.2.
+     * @param deviceName Name of the device.
+     * @param configMethods Mask of WPS configuration methods supported by the
+     *        device.
+     * @param deviceCapabilities Refer to section 4.1.4 of Wifi P2P Technical
+     *        specification v1.2.
+     * @param groupCapabilities Refer to section 4.1.4 of Wifi P2P Technical
+     *        specification v1.2.
+     * @param wfdDeviceInfo WFD device info as described in section 5.1.2 of WFD
+     *        technical specification v1.0.0.
+     * @param wfdR2DeviceInfo WFD R2 device info as described in section 5.1.12 of WFD
+     *        technical specification v2.1.
+     * @param vendorElemBytes vendor-specific information elements.
+     * @param vendorData vendor-specific data.
+     * @param pairingBootstrappingMethods Supported pairing bootstrapping methods.
+     * @param dirInfo Pairing DIR information.
+     */
     private void handleDeviceFound(byte[] srcAddress, byte[] p2pDeviceAddress,
             byte[] primaryDeviceType, String deviceName, int configMethods,
             byte deviceCapabilities, int groupCapabilities, byte[] wfdDeviceInfo,
             @Nullable byte[] wfdR2DeviceInfo, @Nullable byte[] vendorElemBytes,
-            @Nullable List<OuiKeyedData> vendorData) {
+            @Nullable List<OuiKeyedData> vendorData,
+            int pairingBootstrappingMethods, @Nullable WifiP2pDirInfo dirInfo) {
         WifiP2pDevice device = new WifiP2pDevice();
         device.deviceName = deviceName;
         if (deviceName == null) {
@@ -1039,6 +1088,12 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
             device.setVendorData(vendorData);
         }
 
+
+        if (Environment.isSdkAtLeastB()) {
+            device.setPairingBootStrappingMethods(pairingBootstrappingMethods);
+            device.dirInfo = dirInfo;
+        }
+
         logd("Device discovered on " + mInterface + ": " + device);
         mMonitor.broadcastP2pDeviceFound(mInterface, device);
     }
@@ -1097,6 +1152,40 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
                 break;
         }
         return result;
+    }
+
+    private static int convertAidlPairingBootstrappingMethodsToFramework(
+            int aidlPairingBootstrappingMethods) {
+        int pairingBootstrappingMethods = 0;
+
+        if ((aidlPairingBootstrappingMethods
+                & P2pPairingBootstrappingMethodMask.BOOTSTRAPPING_OPPORTUNISTIC) != 0) {
+            pairingBootstrappingMethods |= WifiP2pPairingBootstrappingConfig
+                    .PAIRING_BOOTSTRAPPING_METHOD_OPPORTUNISTIC;
+        }
+        if ((aidlPairingBootstrappingMethods
+                & P2pPairingBootstrappingMethodMask.BOOTSTRAPPING_DISPLAY_PINCODE) != 0) {
+            pairingBootstrappingMethods |= WifiP2pPairingBootstrappingConfig
+                    .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE;
+        }
+        if ((aidlPairingBootstrappingMethods
+                & P2pPairingBootstrappingMethodMask.BOOTSTRAPPING_DISPLAY_PASSPHRASE) != 0) {
+            pairingBootstrappingMethods |= WifiP2pPairingBootstrappingConfig
+                    .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE;
+        }
+        if ((aidlPairingBootstrappingMethods
+                & P2pPairingBootstrappingMethodMask.BOOTSTRAPPING_KEYPAD_PINCODE) != 0) {
+            pairingBootstrappingMethods |= WifiP2pPairingBootstrappingConfig
+                    .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PINCODE;
+        }
+        if ((aidlPairingBootstrappingMethods
+                & P2pPairingBootstrappingMethodMask.BOOTSTRAPPING_KEYPAD_PASSPHRASE) != 0) {
+            pairingBootstrappingMethods |= WifiP2pPairingBootstrappingConfig
+                    .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PASSPHRASE;
+        }
+
+        return pairingBootstrappingMethods;
+
     }
 
     @Override
