@@ -21,6 +21,7 @@ import static com.android.wifi.flags.Flags.wifiDirectR2;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.hardware.wifi.supplicant.ISupplicantP2pIfaceCallback;
 import android.hardware.wifi.supplicant.KeyMgmtMask;
 import android.hardware.wifi.supplicant.P2pClientEapolIpAddressInfo;
@@ -46,6 +47,7 @@ import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pProvDiscEvent;
 import android.net.wifi.p2p.WifiP2pWfdInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceResponse;
+import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceResponse;
 import android.net.wifi.util.Environment;
 import android.text.TextUtils;
 import android.util.Log;
@@ -662,10 +664,26 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
      *
      * @param params Parameters associated with the USD based service discovery result.
      */
+    @SuppressLint("NewApi")
     @Override
     public void onUsdBasedServiceDiscoveryResult(P2pUsdBasedServiceDiscoveryResultParams params) {
         logd("Usd based service discovery result received on " + mInterface);
-        // TODO implementation
+        if (Environment.isSdkAtLeastB() && wifiDirectR2()) {
+            WifiP2pUsdBasedServiceResponse usdBasedServiceResponse =
+                    new WifiP2pUsdBasedServiceResponse(params.serviceProtocolType,
+                            params.serviceSpecificInfo);
+            WifiP2pDevice dev = new WifiP2pDevice();
+            try {
+                dev.deviceAddress = NativeUtil.macAddressFromByteArray(params.peerMacAddress);
+            } catch (Exception e) {
+                Log.e(TAG, "Could not decode device address.", e);
+                return;
+            }
+            List<WifiP2pServiceResponse> respList = new ArrayList<>();
+            respList.add(
+                    new WifiP2pServiceResponse(dev, usdBasedServiceResponse, params.sessionId));
+            mMonitor.broadcastP2pServiceDiscoveryResponse(mInterface, respList);
+        }
     }
 
     /**
@@ -677,7 +695,7 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
     @Override
     public void onUsdBasedServiceDiscoveryTerminated(int sessionId, int reasonCode) {
         logd("Usd based service discovery terminated on " + mInterface);
-        // TODO implementation
+        mMonitor.broadcastUsdBasedServiceDiscoveryTerminated(mInterface, sessionId, reasonCode);
     }
 
     /**

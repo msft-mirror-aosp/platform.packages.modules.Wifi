@@ -21,6 +21,8 @@ import static android.net.wifi.p2p.WifiP2pManager.FEATURE_WIFI_DIRECT_R2;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
+import android.hardware.wifi.supplicant.BandMask;
 import android.hardware.wifi.supplicant.DebugLevel;
 import android.hardware.wifi.supplicant.FreqRange;
 import android.hardware.wifi.supplicant.ISupplicant;
@@ -37,6 +39,7 @@ import android.hardware.wifi.supplicant.P2pDiscoveryInfo;
 import android.hardware.wifi.supplicant.P2pExtListenInfo;
 import android.hardware.wifi.supplicant.P2pFrameTypeMask;
 import android.hardware.wifi.supplicant.P2pScanType;
+import android.hardware.wifi.supplicant.P2pUsdBasedServiceDiscoveryConfig;
 import android.hardware.wifi.supplicant.WpsConfigMethods;
 import android.hardware.wifi.supplicant.WpsProvisionMethod;
 import android.net.wifi.CoexUnsafeChannel;
@@ -49,7 +52,9 @@ import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pGroupList;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.WifiP2pUsdBasedServiceDiscoveryConfig;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
+import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig;
 import android.os.IBinder;
 import android.os.IBinder.DeathRecipient;
 import android.os.RemoteException;
@@ -2717,6 +2722,95 @@ public class SupplicantP2pIfaceHalAidlImpl implements ISupplicantP2pIfaceHal {
             }
             return false;
         }
+    }
+
+    /**
+     * Start an Un-synchronized Service Discovery (USD) based P2P service discovery.
+     *
+     * @param usdServiceConfig is the USD based service configuration.
+     * @param discoveryConfig is the configuration for this service discovery request.
+     * @param timeoutInSeconds is the maximum time to be spent for this service discovery request.
+     */
+    @SuppressLint("NewApi")
+    public int startUsdBasedServiceDiscovery(WifiP2pUsdBasedServiceConfig usdServiceConfig,
+            WifiP2pUsdBasedServiceDiscoveryConfig discoveryConfig, int timeoutInSeconds) {
+        synchronized (mLock) {
+            String methodStr = "startUsdBasedServiceDiscovery";
+            if (!checkP2pIfaceAndLogFailure(methodStr)) {
+                return -1;
+            }
+            if (getCachedServiceVersion() < 4) {
+                return -1;
+            }
+            if (usdServiceConfig == null || discoveryConfig == null) {
+                return -1;
+            }
+            try {
+                P2pUsdBasedServiceDiscoveryConfig aidlUsdBasedServiceDiscoveryConfig =
+                        new P2pUsdBasedServiceDiscoveryConfig();
+                aidlUsdBasedServiceDiscoveryConfig.serviceName = usdServiceConfig.getServiceName();
+                aidlUsdBasedServiceDiscoveryConfig.serviceProtocolType = usdServiceConfig
+                        .getServiceProtocolType();
+                aidlUsdBasedServiceDiscoveryConfig.serviceSpecificInfo = usdServiceConfig
+                        .getServiceSpecificInfo();
+                if (discoveryConfig.getBand() != ScanResult.UNSPECIFIED) {
+                    aidlUsdBasedServiceDiscoveryConfig.bandMask =
+                            scanResultBandMaskToSupplicantHalWifiBandMask(
+                                    discoveryConfig.getBand());
+                } else {
+                    aidlUsdBasedServiceDiscoveryConfig.bandMask = 0;
+                }
+                aidlUsdBasedServiceDiscoveryConfig.frequencyListMhz = discoveryConfig
+                        .getFrequenciesMhz();
+                aidlUsdBasedServiceDiscoveryConfig.timeoutInSeconds = timeoutInSeconds;
+                return mISupplicantP2pIface.startUsdBasedServiceDiscovery(
+                        aidlUsdBasedServiceDiscoveryConfig);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+            }
+            return -1;
+        }
+    }
+
+    /**
+     * Stop an Un-synchronized Service Discovery (USD) based P2P service discovery.
+     *
+     * @param sessionId Identifier to cancel the service discovery instance.
+     *        Use zero to cancel all the service discovery instances.
+     */
+    public void stopUsdBasedServiceDiscovery(int sessionId) {
+        synchronized (mLock) {
+            String methodStr = "stopUsdBasedServiceDiscovery";
+            if (!checkP2pIfaceAndLogFailure(methodStr)) {
+                return;
+            }
+            if (getCachedServiceVersion() < 4) {
+                return;
+            }
+            try {
+                mISupplicantP2pIface.stopUsdBasedServiceDiscovery(sessionId);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+            }
+        }
+    }
+
+    private static int scanResultBandMaskToSupplicantHalWifiBandMask(int bandMask) {
+        int halBandMask = 0;
+        if ((bandMask & ScanResult.WIFI_BAND_24_GHZ) != 0) {
+            halBandMask |= BandMask.BAND_2_GHZ;
+        }
+        if ((bandMask & ScanResult.WIFI_BAND_5_GHZ) != 0) {
+            halBandMask |= BandMask.BAND_5_GHZ;
+        }
+        if ((bandMask & ScanResult.WIFI_BAND_6_GHZ) != 0) {
+            halBandMask |= BandMask.BAND_6_GHZ;
+        }
+        return halBandMask;
     }
 
     private byte[] convertInformationElementSetToBytes(

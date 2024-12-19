@@ -80,6 +80,7 @@ import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pManager.ExternalApproverRequestListener;
 import android.net.wifi.p2p.WifiP2pProvDiscEvent;
+import android.net.wifi.p2p.WifiP2pUsdBasedServiceDiscoveryConfig;
 import android.net.wifi.p2p.WifiP2pWfdInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
@@ -179,6 +180,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -291,6 +293,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
 
     // Set a two minute discover timeout to avoid STA scans from being blocked
     private static final int DISCOVER_TIMEOUT_S = 120;
+
+    // Set a 30 seconds timeout for USD service discovery and advertisement.
+    private static final int USD_BASED_SERVICE_ADVERTISEMENT_DISCOVERY_TIMEOUT_S = 30;
 
     // Idle time after a peer is gone when the group is torn down
     private static final int GROUP_IDLE_TIME_S = 10;
@@ -413,10 +418,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
 
     // The transaction Id of service discovery request
     private int mServiceTransactionId = 0;
-
-    // Service discovery request ID of wpa_supplicant.
-    // null means it's not set yet.
-    private String mServiceDiscReqId;
 
     // clients(application) information list
     private final HashMap<Messenger, ClientInfo> mClientInfoList = new HashMap<>();
@@ -610,6 +611,55 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             p2pGroup = group;
             p2pInfo = info;
             ipClient = client;
+        }
+    }
+
+    // Tracks the ongoing Service discovery request to wpa_supplicant.
+    private final WifiP2pOngoingServiceDiscoveryRequestInfo mServiceDiscoveryInfo =
+            new WifiP2pOngoingServiceDiscoveryRequestInfo();
+    private static class WifiP2pOngoingServiceDiscoveryRequestInfo {
+        public static final int WIFI_P2P_GAS_FRAME_BASED_SERVICE_DISCOVERY = 1;
+        public static final int WIFI_P2P_USD_FRAME_BASED_SERVICE_DISCOVERY = 2;
+        private String mSessionId = "";
+        private int mServiceDiscoveryType = 0;
+        WifiP2pOngoingServiceDiscoveryRequestInfo() {
+        }
+
+        public String getSessionId() {
+            return mSessionId;
+        }
+
+        public int getServiceDiscoveryType() {
+            return mServiceDiscoveryType;
+        }
+
+        public void update(int serviceDiscoveryType, String sessionId) {
+            mServiceDiscoveryType = serviceDiscoveryType;
+            mSessionId = sessionId;
+        }
+
+        public int getSessionIdInt() {
+            return Integer.parseInt(mSessionId);
+        }
+
+        public void update(int serviceDiscoveryType, int sessionId) {
+            mServiceDiscoveryType = serviceDiscoveryType;
+            mSessionId = Integer.toString(sessionId);
+        }
+
+        public void invalidate() {
+            mServiceDiscoveryType = 0;
+            mSessionId = "";
+        }
+
+        public boolean isValid() {
+            return mServiceDiscoveryType != 0 && !TextUtils.isEmpty(mSessionId);
+        }
+        public String toString() {
+            StringBuilder sbuf = new StringBuilder("WifiP2pOngoingServiceDiscoveryRequestInfo:");
+            sbuf.append("\n serviceDiscoveryType: ").append(mServiceDiscoveryType);
+            sbuf.append("\n sessionId: ").append(mSessionId);
+            return sbuf.toString();
         }
     }
 
@@ -1416,7 +1466,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         pw.println("mListenStarted " + mListenStarted);
         pw.println("mDetailedState " + mDetailedState);
         pw.println("mTemporarilyDisconnectedWifi " + mTemporarilyDisconnectedWifi);
-        pw.println("mServiceDiscReqId " + mServiceDiscReqId);
+        pw.println("ServiceDiscoveryInfo " + mServiceDiscoveryInfo);
         pw.println("mDeathDataByBinder " + mDeathDataByBinder);
         pw.println("mClientInfoList " + mClientInfoList.size());
         pw.println("mActiveClients " + mActiveClients);
@@ -1911,6 +1961,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     return "WifiP2pMonitor.SUP_DISCONNECTION_EVENT";
                 case WifiP2pMonitor.P2P_FREQUENCY_CHANGED_EVENT:
                     return "WifiP2pMonitor.P2P_FREQUENCY_CHANGED_EVENT";
+                case WifiP2pMonitor.USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT:
+                    return "WifiP2pMonitor.USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT";
                 case WpsInfo.DISPLAY:
                     return "WpsInfo.DISPLAY";
                 case WpsInfo.KEYPAD:
@@ -2104,6 +2156,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     WifiP2pMonitor.SUP_DISCONNECTION_EVENT, getHandler());
             mWifiMonitor.registerHandler(mInterfaceName,
                     WifiP2pMonitor.P2P_FREQUENCY_CHANGED_EVENT, getHandler());
+            mWifiMonitor.registerHandler(mInterfaceName,
+                    WifiP2pMonitor.USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT, getHandler());
 
             mWifiMonitor.startMonitoring(mInterfaceName);
         }
@@ -2495,6 +2549,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     case WifiP2pMonitor.P2P_DEVICE_LOST_EVENT:
                     case WifiP2pMonitor.P2P_FIND_STOPPED_EVENT:
                     case WifiP2pMonitor.P2P_SERV_DISC_RESP_EVENT:
+                    case WifiP2pMonitor.P2P_PROV_DISC_FAILURE_EVENT:
+                    case WifiP2pMonitor.USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT:
                     case PEER_CONNECTION_USER_ACCEPT:
                     case PEER_CONNECTION_USER_REJECT:
                     case DISCONNECT_WIFI_RESPONSE:
@@ -2510,7 +2566,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     case TETHER_INTERFACE_STATE_CHANGED:
                     case TETHER_INTERFACE_CLIENTS_CHANGED:
                     case UPDATE_P2P_DISALLOWED_CHANNELS:
-                    case WifiP2pMonitor.P2P_PROV_DISC_FAILURE_EVENT:
                     case SET_MIRACAST_MODE:
                         break;
                     case WifiP2pManager.START_LISTEN:
@@ -3362,7 +3417,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         mLastCallerInfoManager.put(apiType, Process.myTid(), uid, 0, packageName,
                                 true);
                         // do not send service discovery request while normal find operation.
-                        clearSupplicantServiceRequest();
+                        clearGasFrameBasedServiceDiscoveryRequests();
                         if (p2pFind(scanType, freq, DISCOVER_TIMEOUT_S, discoveryConfig)) {
                             mWifiP2pMetrics.incrementPeerScans();
                             replyToMessage(message, WifiP2pManager.DISCOVER_PEERS_SUCCEEDED);
@@ -3388,6 +3443,34 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                     WifiP2pManager.ERROR);
                         }
                         break;
+                    case WifiP2pMonitor.USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT: {
+                        int sessionId = message.arg1;
+                        if (mServiceDiscoveryInfo.isValid()) {
+                            if (sessionId == mServiceDiscoveryInfo.getSessionIdInt()) {
+                                mServiceDiscoveryInfo.invalidate();
+                                sendP2pDiscoveryChangedBroadcast(false);
+                            } else {
+                                Log.e(TAG, "USD terminate event received from non-active"
+                                        + " session ID: " + sessionId + " . Active session ID: "
+                                        + mServiceDiscoveryInfo.getSessionIdInt());
+                            }
+                        } else {
+                            Log.e(TAG, "USD terminate event received from non-active session"
+                                    + " ID: " + sessionId + " when there is no active session"
+                                    + " running");
+                        }
+
+                        for (ClientInfo c : mClientInfoList.values()) {
+                            for (WifiP2pServiceRequest serviceRequest : c.mUsdServiceDiscoverList) {
+                                if (serviceRequest.getUsdSessionId() == sessionId) {
+                                    Log.d(TAG, "Clear service request session ID: " +  sessionId);
+                                    serviceRequest.setUsdSessionId(0);
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                    }
                     case WifiP2pManager.DISCOVER_SERVICES: {
                         String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
                         if (packageName == null) {
@@ -3423,30 +3506,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         logd(getName() + " discover services - Type: " + serviceDiscoveryType);
                         if (serviceDiscoveryType
                                 == WifiP2pManager.WIFI_P2P_USD_BASED_SERVICE_DISCOVERY) {
-                            if (Environment.isSdkAtLeastB() && Flags.wifiDirectR2()
-                                     && isFeatureSupported(
-                                             WifiP2pManager.FEATURE_WIFI_DIRECT_R2)) {
-                                // TODO implementation
-                                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
-                                        WifiP2pManager.ERROR);
-                            } else {
-                                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
-                                        WifiP2pManager.ERROR);
-                            }
-                            break;
-                        }
-                        if (!updateSupplicantServiceRequest()) {
-                            replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
-                                    WifiP2pManager.NO_SERVICE_REQUESTS);
-                            break;
-                        }
-                        if (p2pFind(DISCOVER_TIMEOUT_S)) {
-                            sendP2pDiscoveryChangedBroadcast(true);
-                            mWifiP2pMetrics.incrementServiceScans();
-                            replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_SUCCEEDED);
+                            processUsdFrameBasedServiceDiscoveryRequestMessage(message);
                         } else {
-                            replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
-                                    WifiP2pManager.ERROR);
+                            processGasFrameBasedServiceDiscoveryRequestMessage(message);
                         }
                         break;
                     }
@@ -3517,8 +3579,10 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         break;
                     case WifiP2pManager.ADD_SERVICE_REQUEST:
                         if (mVerboseLoggingEnabled) logd(getName() + " add service request");
-                        if (!addServiceRequest(message)) {
-                            replyToMessage(message, WifiP2pManager.ADD_SERVICE_REQUEST_FAILED);
+                        AtomicInteger errorCode = new AtomicInteger(0);
+                        if (!addServiceRequest(message, errorCode)) {
+                            replyToMessage(message, WifiP2pManager.ADD_SERVICE_REQUEST_FAILED,
+                                    errorCode.get());
                             break;
                         }
                         replyToMessage(message, WifiP2pManager.ADD_SERVICE_REQUEST_SUCCEEDED);
@@ -3862,7 +3926,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             // When discovery stops in inactive state, flush to clear
                             // state peer data
                             mWifiNative.p2pFlush();
-                            mServiceDiscReqId = null;
+                            mServiceDiscoveryInfo.invalidate();
                             replyToMessage(message, WifiP2pManager.STOP_DISCOVERY_SUCCEEDED);
                         } else {
                             replyToMessage(message, WifiP2pManager.STOP_DISCOVERY_FAILED,
@@ -4340,7 +4404,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             // When discovery stops in inactive state, flush to clear
                             // state peer data
                             mWifiNative.p2pFlush();
-                            mServiceDiscReqId = null;
+                            mServiceDiscoveryInfo.invalidate();
                             replyToMessage(message, WifiP2pManager.STOP_DISCOVERY_SUCCEEDED);
                         } else {
                             replyToMessage(message, WifiP2pManager.STOP_DISCOVERY_FAILED,
@@ -7389,6 +7453,20 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         }
 
         /**
+         * Check if the Wi-Fi Direct R2 feature is enabled or not
+         *
+         * @return true if Wi-Fi Direct R2 feature is enabled, false otherwise.
+         */
+        private boolean isWifiDirect2Enabled() {
+            if (Environment.isSdkAtLeastB()
+                    && isFeatureSupported(WifiP2pManager.FEATURE_WIFI_DIRECT_R2)
+                    && Flags.wifiDirectR2()) {
+                return true;
+            }
+            return false;
+        }
+
+        /**
          * Check the config for group owner version 2.
          *
          * @param config config to be checked for P2P group owner version.
@@ -7980,7 +8058,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             mWifiNative.p2pFlush();
             mWifiNative.p2pServiceFlush();
             mServiceTransactionId = 0;
-            mServiceDiscReqId = null;
+            mServiceDiscoveryInfo.invalidate();
 
             if (null != mThisDevice.wfdInfo) {
                 setWfdInfo(mThisDevice.wfdInfo);
@@ -8051,7 +8129,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             }
 
             mPeersLostDuringConnection.clear();
-            mServiceDiscReqId = null;
+            mServiceDiscoveryInfo.invalidate();
 
             Bundle extras = new Bundle();
             extras.putBoolean(WifiP2pManager.EXTRA_PARAM_KEY_INTERNAL_MESSAGE, true);
@@ -8111,7 +8189,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
 
             mGroup = null;
             mPeersLostDuringConnection.clear();
-            mServiceDiscReqId = null;
+            mServiceDiscoveryInfo.invalidate();
 
             sendDisconnectWifiRequest(false);
         }
@@ -8181,11 +8259,97 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         }
 
         /**
-         * Update service discovery request to wpa_supplicant.
+         * Process USD based service discovery request message.
          */
-        private boolean updateSupplicantServiceRequest() {
-            clearSupplicantServiceRequest();
-            StringBuffer sb = new StringBuffer();
+        private void processGasFrameBasedServiceDiscoveryRequestMessage(@NonNull Message message) {
+            if (!updateSupplicantGasFrameBasedServiceRequest()) {
+                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                        WifiP2pManager.NO_SERVICE_REQUESTS);
+                return;
+            }
+            if (p2pFind(DISCOVER_TIMEOUT_S)) {
+                sendP2pDiscoveryChangedBroadcast(true);
+                mWifiP2pMetrics.incrementServiceScans();
+                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_SUCCEEDED);
+            } else {
+                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                        WifiP2pManager.ERROR);
+            }
+        }
+        /**
+         * Process USD based service discovery request message.
+         */
+        @SuppressLint("NewApi")
+        private void processUsdFrameBasedServiceDiscoveryRequestMessage(@NonNull Message message) {
+            if (!isWifiDirect2Enabled()) {
+                Log.e(TAG, "Wi-Fi Direct R2 is not supported");
+                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                        WifiP2pManager.ERROR);
+                return;
+            }
+            Messenger m = message.replyTo;
+            Bundle extras = message.getData()
+                    .getBundle(WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE);
+            if (m == null || extras == null) {
+                Log.e(TAG, "Illegal argument(s)");
+                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                        WifiP2pManager.ERROR);
+                return;
+            }
+            WifiP2pUsdBasedServiceDiscoveryConfig serviceDiscoveryConfig =
+                    extras.getParcelable(WifiP2pManager
+                            .EXTRA_PARAM_KEY_USD_BASED_SERVICE_DISCOVERY_CONFIG);
+            if (serviceDiscoveryConfig == null) {
+                Log.e(TAG, "Service discovery config null!");
+                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                        WifiP2pManager.ERROR);
+                return;
+            }
+
+            ClientInfo clientInfo = getClientInfo(m, false);
+            if (clientInfo == null) {
+                Log.e(TAG, "Client doesn't exist");
+                replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                        WifiP2pManager.NO_SERVICE_REQUESTS);
+                return;
+            }
+
+            if (mServiceDiscoveryInfo.isValid() && mServiceDiscoveryInfo.getServiceDiscoveryType()
+                    == WifiP2pOngoingServiceDiscoveryRequestInfo
+                    .WIFI_P2P_USD_FRAME_BASED_SERVICE_DISCOVERY) {
+                mWifiNative.stopUsdBasedServiceDiscovery(mServiceDiscoveryInfo.getSessionIdInt());
+            }
+
+            // TODO This loop runs only once as add service request allow to add only one service
+            // per client. Keeping this loop to expand in the future to service multiple services.
+            for (WifiP2pServiceRequest serviceRequest: clientInfo.mUsdServiceDiscoverList) {
+                int sessionId = mWifiNative.startUsdBasedServiceDiscovery(
+                        serviceRequest.getWifiP2pUsdBasedServiceConfig(), serviceDiscoveryConfig,
+                        USD_BASED_SERVICE_ADVERTISEMENT_DISCOVERY_TIMEOUT_S);
+                if (sessionId > 0) {
+                    serviceRequest.setUsdSessionId(sessionId);
+                    mServiceDiscoveryInfo.update(WifiP2pOngoingServiceDiscoveryRequestInfo
+                                    .WIFI_P2P_USD_FRAME_BASED_SERVICE_DISCOVERY, sessionId);
+                    sendP2pDiscoveryChangedBroadcast(true);
+                    replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_SUCCEEDED);
+                } else {
+                    replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                            WifiP2pManager.ERROR);
+                }
+                return;
+            }
+
+            Log.e(TAG, "No service requests added");
+            replyToMessage(message, WifiP2pManager.DISCOVER_SERVICES_FAILED,
+                    WifiP2pManager.NO_SERVICE_REQUESTS);
+        }
+
+        /**
+         * Update GAS frame based service discovery request to wpa_supplicant.
+         */
+        private boolean updateSupplicantGasFrameBasedServiceRequest() {
+            clearGasFrameBasedServiceDiscoveryRequests();
+            StringBuilder sb = new StringBuilder();
             for (ClientInfo c: mClientInfoList.values()) {
                 WifiP2pServiceRequest req;
                 for (int i = 0; i < c.mReqList.size(); i++) {
@@ -8199,41 +8363,42 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 return false;
             }
 
-            mServiceDiscReqId = mWifiNative.p2pServDiscReq("00:00:00:00:00:00", sb.toString());
-            return mServiceDiscReqId != null;
+            String serviceDiscReqId = mWifiNative.p2pServDiscReq("00:00:00:00:00:00",
+                    sb.toString());
+            if (!TextUtils.isEmpty(serviceDiscReqId)) {
+                mServiceDiscoveryInfo.update(WifiP2pOngoingServiceDiscoveryRequestInfo
+                        .WIFI_P2P_GAS_FRAME_BASED_SERVICE_DISCOVERY, serviceDiscReqId);
+                return true;
+            } else {
+                return false;
+            }
         }
 
         /**
-         * Clear service discovery request in wpa_supplicant
+         * Clear GAS frame based service discovery requests in wpa_supplicant
          */
-        private void clearSupplicantServiceRequest() {
-            if (mServiceDiscReqId == null) return;
-
-            mWifiNative.p2pServDiscCancelReq(mServiceDiscReqId);
-            mServiceDiscReqId = null;
+        private void clearGasFrameBasedServiceDiscoveryRequests() {
+            if (!mServiceDiscoveryInfo.isValid()) {
+                return;
+            }
+            if (mServiceDiscoveryInfo.getServiceDiscoveryType()
+                    != WifiP2pOngoingServiceDiscoveryRequestInfo
+                    .WIFI_P2P_GAS_FRAME_BASED_SERVICE_DISCOVERY) {
+                return;
+            }
+            mWifiNative.p2pServDiscCancelReq(mServiceDiscoveryInfo.getSessionId());
+            mServiceDiscoveryInfo.invalidate();
         }
 
         @SuppressLint("NewApi")
-        private boolean addServiceRequest(@NonNull Message message) {
+        private boolean addServiceRequest(@NonNull Message message, AtomicInteger errorCode) {
             Messenger m = message.replyTo;
             WifiP2pServiceRequest req = (WifiP2pServiceRequest) message.obj;
             if (m == null || req == null) {
                 Log.e(TAG, "Illegal argument(s)");
+                errorCode.set(WifiP2pManager.ERROR);
                 return false;
             }
-            if (Environment.isSdkAtLeastB() && Flags.wifiDirectR2()
-                    && isFeatureSupported(WifiP2pManager.FEATURE_WIFI_DIRECT_R2)) {
-                if (req.getWifiP2pUsdBasedServiceConfig() != null) {
-                    if (mVerboseLoggingEnabled) {
-                        logd(getName() + " USD service config: "
-                                + req.getWifiP2pUsdBasedServiceConfig().toString());
-                    }
-                    // TODO implementation
-                    return false;
-                }
-            }
-            // TODO: We could track individual service adds separately and avoid
-            // having to do update all service requests on every new request
             clearClientDeadChannels();
 
             ClientInfo clientInfo = getClientInfo(m, false);
@@ -8241,20 +8406,49 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 return false;
             }
 
+            if (Environment.isSdkAtLeastB() && req.getWifiP2pUsdBasedServiceConfig() != null) {
+                if (isWifiDirect2Enabled()) {
+                    if (mVerboseLoggingEnabled) {
+                        logd(getName() + " Add USD service config: "
+                                + req.getWifiP2pUsdBasedServiceConfig().toString());
+                    }
+                    if (clientInfo.mUsdServiceDiscoverList.isEmpty()) {
+                        clientInfo.mUsdServiceDiscoverList.add(req);
+                        return true;
+                    } else {
+                        loge(getName() + "This application already has a service added");
+                        errorCode.set(WifiP2pManager.BUSY);
+                        return false;
+                    }
+                } else {
+                    loge(getName() + "Device doesn't support Wi-Fi Direct R2");
+                    errorCode.set(WifiP2pManager.ERROR);
+                    return false;
+                }
+            }
+
+            // Add GAS frame based service discovery request.
+
+            // TODO: We could track individual service adds separately and avoid
+            // having to do update all service requests on every new request
             ++mServiceTransactionId;
             // The Wi-Fi p2p spec says transaction id should be 1 byte and non-zero.
             if (mServiceTransactionId == 256) mServiceTransactionId = 1;
             req.setTransactionId((mServiceTransactionId));
             clientInfo.mReqList.put(mServiceTransactionId, req);
-            if (mServiceDiscReqId == null) {
+            if (!mServiceDiscoveryInfo.isValid() || mServiceDiscoveryInfo
+                    .getServiceDiscoveryType() == WifiP2pOngoingServiceDiscoveryRequestInfo
+                    .WIFI_P2P_USD_FRAME_BASED_SERVICE_DISCOVERY) {
                 return true;
             }
-            return updateSupplicantServiceRequest();
+            return updateSupplicantGasFrameBasedServiceRequest();
         }
 
+        @SuppressLint("NewApi")
         private void removeServiceRequest(Messenger m, WifiP2pServiceRequest req) {
             if (m == null || req == null) {
                 Log.e(TAG, "Illegal argument(s)");
+                return;
             }
 
             ClientInfo clientInfo = getClientInfo(m, false);
@@ -8265,21 +8459,37 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             // Application does not have transaction id information
             // go through stored requests to remove
             boolean removed = false;
-            for (int i = 0; i < clientInfo.mReqList.size(); i++) {
-                if (req.equals(clientInfo.mReqList.valueAt(i))) {
-                    removed = true;
-                    clientInfo.mReqList.removeAt(i);
-                    break;
+            if (Environment.isSdkAtLeastB() && req.getWifiP2pUsdBasedServiceConfig() != null) {
+                for (WifiP2pServiceRequest usdServRequest : clientInfo.mUsdServiceDiscoverList) {
+                    if (req.equals(usdServRequest)) {
+                        int sessionId = usdServRequest.getUsdSessionId();
+                        if (sessionId > 0) {
+                            mWifiNative.stopUsdBasedServiceDiscovery(sessionId);
+                        }
+                        clientInfo.mUsdServiceDiscoverList.remove(usdServRequest);
+                        removed = true;
+                        break;
+                    }
+                }
+            } else {
+                for (int i = 0; i < clientInfo.mReqList.size(); i++) {
+                    if (req.equals(clientInfo.mReqList.valueAt(i))) {
+                        removed = true;
+                        clientInfo.mReqList.removeAt(i);
+                        break;
+                    }
                 }
             }
 
             if (!removed) return;
 
-            if (mServiceDiscReqId == null) {
+            if (!mServiceDiscoveryInfo.isValid() || mServiceDiscoveryInfo
+                    .getServiceDiscoveryType() == WifiP2pOngoingServiceDiscoveryRequestInfo
+                    .WIFI_P2P_USD_FRAME_BASED_SERVICE_DISCOVERY) {
                 return;
             }
 
-            updateSupplicantServiceRequest();
+            updateSupplicantGasFrameBasedServiceRequest();
         }
 
         private void clearServiceRequests(Messenger m) {
@@ -8293,17 +8503,28 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 return;
             }
 
-            if (clientInfo.mReqList.size() == 0) {
+            if (clientInfo.mReqList.size() == 0
+                    && clientInfo.mUsdServiceDiscoverList.size() == 0) {
                 return;
             }
 
             clientInfo.mReqList.clear();
 
-            if (mServiceDiscReqId == null) {
+            for (WifiP2pServiceRequest usdServRequest : clientInfo.mUsdServiceDiscoverList) {
+                int sessionId = usdServRequest.getUsdSessionId();
+                if (sessionId > 0) {
+                    mWifiNative.stopUsdBasedServiceDiscovery(sessionId);
+                }
+            }
+            clientInfo.mUsdServiceDiscoverList.clear();
+
+            if (!mServiceDiscoveryInfo.isValid() || mServiceDiscoveryInfo
+                    .getServiceDiscoveryType() == WifiP2pOngoingServiceDiscoveryRequestInfo
+                    .WIFI_P2P_USD_FRAME_BASED_SERVICE_DISCOVERY) {
                 return;
             }
 
-            updateSupplicantServiceRequest();
+            updateSupplicantGasFrameBasedServiceRequest();
         }
 
         private boolean addLocalService(@NonNull Message message) {
@@ -8389,31 +8610,50 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
 
         /**
          * Send the service response to the WifiP2pManager.Channel.
-         * @param WifiP2pServiceResponse response to service discovery
+         * @param resp {@link WifiP2pServiceResponse} response to service discovery
          */
         private void sendServiceResponse(WifiP2pServiceResponse resp) {
+            WifiP2pServiceRequest req = null;
+            ClientInfo client = null;
             if (resp == null) {
                 Log.e(TAG, "sendServiceResponse with null response");
                 return;
             }
             for (ClientInfo c : mClientInfoList.values()) {
-                WifiP2pServiceRequest req = c.mReqList.get(resp.getTransactionId());
-                if (req != null) {
-                    Message msg = Message.obtain();
-                    msg.what = WifiP2pManager.RESPONSE_SERVICE;
-                    msg.arg1 = 0;
-                    msg.arg2 = 0;
-                    msg.obj = resp;
-                    if (c.mMessenger == null) {
-                        continue;
+                if (Environment.isSdkAtLeastB()
+                        && resp.getWifiP2pUsdBasedServiceResponse() != null) {
+                    for (WifiP2pServiceRequest serviceRequest : c.mUsdServiceDiscoverList) {
+                        if (serviceRequest.getUsdSessionId() == resp.getUsdSessionId()) {
+                            client = c;
+                            req = serviceRequest;
+                            break;
+                        }
+
                     }
-                    try {
-                        c.mMessenger.send(msg);
-                    } catch (RemoteException e) {
-                        if (mVerboseLoggingEnabled) logd("detect dead channel");
-                        clearClientInfo(c.mMessenger);
-                        return;
+                } else {
+                    WifiP2pServiceRequest serviceRequest = c.mReqList.get(resp.getTransactionId());
+                    if (serviceRequest != null) {
+                        client = c;
+                        req = serviceRequest;
+                        break;
                     }
+                }
+            }
+
+            if (req != null) {
+                Message msg = Message.obtain();
+                msg.what = WifiP2pManager.RESPONSE_SERVICE;
+                msg.arg1 = 0;
+                msg.arg2 = 0;
+                msg.obj = resp;
+                if (client.mMessenger == null) {
+                    return;
+                }
+                try {
+                    client.mMessenger.send(msg);
+                } catch (RemoteException e) {
+                    if (mVerboseLoggingEnabled) logd("detect dead channel");
+                    clearClientInfo(client.mMessenger);
                 }
             }
         }
@@ -8925,11 +9165,14 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         private String mPackageName;
         @Nullable private String mFeatureId;
 
-        // A service discovery request list.
+        // A service discovery request list using GAS frames.
         private final SparseArray<WifiP2pServiceRequest> mReqList = new SparseArray<>();
 
         // A local service information list.
         private final List<WifiP2pServiceInfo> mServList = new ArrayList<>();
+
+        // A service discovery request list using USD frames.
+        private final List<WifiP2pServiceRequest> mUsdServiceDiscoverList = new ArrayList<>();
 
         private ClientInfo(Messenger m) {
             mMessenger = m;

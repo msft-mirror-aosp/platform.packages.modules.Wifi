@@ -80,6 +80,9 @@ public class WifiP2pMonitor {
     public static final int AP_STA_DISCONNECTED_EVENT            = BASE + 41;
     public static final int AP_STA_CONNECTED_EVENT               = BASE + 42;
 
+    /* USD service discovery events */
+    public static final int USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT = BASE + 43;
+
     public static final int PROV_DISC_STATUS_SUCCESS             = 0;
     public static final int PROV_DISC_STATUS_TIMEOUT             = 1;
     public static final int PROV_DISC_STATUS_REJECTED            = 2;
@@ -487,5 +490,17 @@ public class WifiP2pMonitor {
      */
     public void broadcastP2pFrequencyChanged(String iface,  int frequency) {
         sendMessage(iface, P2P_FREQUENCY_CHANGED_EVENT, frequency);
+    }
+
+    /**
+     * Broadcast the termination of USD based service discovery.
+     *
+     * @param iface Name of iface on which this occurred.
+     * @param sessionId Identifier to identify the instance of a service discovery.
+     * @param reasonCode The reason for termination of service discovery.
+     */
+    public void broadcastUsdBasedServiceDiscoveryTerminated(@NonNull String iface,
+            int sessionId, int reasonCode) {
+        sendMessage(iface, USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT, sessionId, reasonCode);
     }
 }

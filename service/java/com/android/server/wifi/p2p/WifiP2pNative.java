@@ -31,7 +31,9 @@ import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pGroupList;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.WifiP2pUsdBasedServiceDiscoveryConfig;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
+import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig;
 import android.net.wifi.util.Environment;
 import android.os.Handler;
 import android.os.WorkSource;
@@ -1121,5 +1123,28 @@ public class WifiP2pNative {
             int ipAddressStart, int ipAddressEnd) {
         return mSupplicantP2pIfaceHal.configureEapolIpAddressAllocationParams(ipAddressGo,
                 ipAddressMask, ipAddressStart, ipAddressEnd);
+    }
+
+    /**
+     * Start an Un-synchronized Service Discovery (USD) based P2P service discovery.
+     *
+     * @param usdServiceConfig is the USD based service configuration.
+     * @param discoveryConfig is the configuration for this service discovery request.
+     * @param timeoutInSeconds is the maximum time to be spent for this service discovery request.
+     */
+    public int startUsdBasedServiceDiscovery(WifiP2pUsdBasedServiceConfig usdServiceConfig,
+            WifiP2pUsdBasedServiceDiscoveryConfig discoveryConfig, int timeoutInSeconds) {
+        return mSupplicantP2pIfaceHal.startUsdBasedServiceDiscovery(usdServiceConfig,
+                discoveryConfig, timeoutInSeconds);
+    }
+
+    /**
+     * Stop an Un-synchronized Service Discovery (USD) based P2P service discovery.
+     *
+     * @param sessionId Identifier to cancel the service discovery instance.
+     *        Use zero to cancel all the service discovery instances.
+     */
+    public void stopUsdBasedServiceDiscovery(int sessionId) {
+        mSupplicantP2pIfaceHal.stopUsdBasedServiceDiscovery(sessionId);
     }
 }
