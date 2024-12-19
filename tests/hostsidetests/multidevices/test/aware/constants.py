@@ -130,6 +130,7 @@ class DiscoverySessionCallbackParamsType(enum.StrEnum):
 class NetworkCbEventName(enum.StrEnum):
     """Represents the event name for ConnectivityManager network callbacks."""
     NETWORK_CALLBACK = "NetworkCallback"
+    NETWORK_CB_LOST = "CallbackLost"
 
 
 @enum.unique
@@ -142,6 +143,7 @@ class NetworkCbEventKey(enum.StrEnum):
     CHANNEL_IN_MHZ = "channelInMhz"
 
 
+
 @enum.unique
 class NetworkCbName(enum.StrEnum):
     """Represents the name of network callback for ConnectivityManager.
@@ -151,6 +153,9 @@ class NetworkCbName(enum.StrEnum):
     """
     ON_UNAVAILABLE = "onUnavailable"
     ON_CAPABILITIES_CHANGED = "onCapabilitiesChanged"
+    NET_CAP_IPV6 = "aware_ipv6"
+    NET_CAP_PORT = "port"
+    NET_CAP_TRANSPORT_PROTOCOL = "aware_transport_protocol"
 
 
 @enum.unique
