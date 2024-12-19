@@ -148,3 +148,29 @@ python_test_host {
         },
     },
 }
+
+python_library_host {
+    name: "wifi_softap_constants",
+    srcs: ["softap/constants.py"],
+}
+
+python_test_host {
+    name: "WifiSoftApTestCases",
+    main: "softap/wifi_softap_test.py",
+    srcs: ["softap/wifi_softap_test.py"],
+    libs: [
+        "mobly",
+        "wifi_softap_constants",
+    ],
+    device_common_data: [":wifi_mobly_snippet"],
+    test_options: {
+        unit_test: false,
+        tags: ["mobly"],
+    },
+    test_suites: ["general-tests"],
+    version: {
+        py3: {
+            embedded_launcher: true,
+        },
+    },
+}
