@@ -20,7 +20,6 @@ import android.annotation.NonNull;
 import android.content.Context;
 import android.net.wifi.IBooleanListener;
 import android.net.wifi.usd.Characteristics;
-import android.net.wifi.usd.IAvailabilityCallback;
 import android.net.wifi.usd.IPublishSessionCallback;
 import android.net.wifi.usd.ISubscribeSessionCallback;
 import android.net.wifi.usd.IUsdManager;
@@ -83,55 +82,6 @@ public class UsdServiceImpl extends IUsdManager.Stub {
      */
     public int getMockableCallingUid() {
         return Binder.getCallingUid();
-    }
-
-    /**
-     * See {@link UsdManager#isSubscriberAvailable()}
-     */
-    @Override
-    public boolean isSubscriberAvailable() {
-        int uid = getMockableCallingUid();
-        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
-            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
-        }
-        Log.i(TAG, "Subscriber is not available");
-        return false;
-    }
-
-    /**
-     * See {@link UsdManager#isPublisherAvailable()}
-     */
-    @Override
-    public boolean isPublisherAvailable() {
-        int uid = getMockableCallingUid();
-        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
-            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
-        }
-        Log.i(TAG, "Publisher is not available");
-        return false;
-    }
-
-    /**
-     * See
-     * {@link UsdManager#registerAvailabilityCallback(Executor, UsdManager.AvailabilityCallback)}
-     */
-    @Override
-    public void registerAvailabilityCallback(IAvailabilityCallback callback) {
-        int uid = getMockableCallingUid();
-        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
-            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
-        }
-    }
-
-    /**
-     * See {@link UsdManager#unregisterAvailabilityCallback(UsdManager.AvailabilityCallback)}
-     */
-    @Override
-    public void unregisterAvailabilityCallback(IAvailabilityCallback callback) {
-        int uid = getMockableCallingUid();
-        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
-            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
-        }
     }
 
     /**
@@ -228,5 +178,47 @@ public class UsdServiceImpl extends IUsdManager.Stub {
             throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
         }
         Log.i(TAG, "subscribe " + subscribeConfig);
+    }
+
+    /**
+     * See {@link UsdManager#registerPublisherStatusListener(Executor, Consumer)}
+     */
+    public void registerPublisherStatusListener(@NonNull IBooleanListener listener) {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+
+    }
+
+    /**
+     * See {@link UsdManager#unregisterPublisherStatusListener(Consumer)}
+     */
+    public void unregisterPublisherStatusListener(@NonNull IBooleanListener listener) {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+    }
+
+    /**
+     * See {@link UsdManager#registerSubscriberStatusListener(Executor, Consumer)}
+     */
+    public void registerSubscriberStatusListener(@NonNull IBooleanListener listener) {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
+
+    }
+
+    /**
+     * See {@link UsdManager#unregisterSubscriberStatusListener(Consumer)}
+     */
+    public void unregisterSubscriberStatusListener(@NonNull IBooleanListener listener) {
+        int uid = getMockableCallingUid();
+        if (!mWifiPermissionsUtil.checkManageWifiNetworkSelectionPermission(uid)) {
+            throw new SecurityException("App not allowed to use USD (uid = " + uid + ")");
+        }
     }
 }
