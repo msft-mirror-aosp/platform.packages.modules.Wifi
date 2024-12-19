@@ -229,6 +229,7 @@ import com.android.server.wifi.util.GeneralUtil.Mutable;
 import com.android.server.wifi.util.LastCallerInfoManager;
 import com.android.server.wifi.util.RssiUtil;
 import com.android.server.wifi.util.WifiPermissionsUtil;
+import com.android.server.wifi.util.WorkSourceHelper;
 import com.android.wifi.flags.FeatureFlags;
 import com.android.wifi.resources.R;
 
@@ -2534,6 +2535,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
      * Implements LOHS behavior on top of the existing SoftAp API.
      */
     private final class LohsSoftApTracker extends BaseSoftApTracker {
+        private static final int UNSPECIFIED_PID = -1;
+
         @GuardedBy("mLocalOnlyHotspotRequests")
         private final HashMap<Integer, LocalOnlyHotspotRequestInfo>
                 mLocalOnlyHotspotRequests = new HashMap<>();
@@ -2550,10 +2553,16 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         private boolean mIsExclusive = false;
 
         @GuardedBy("mLocalOnlyHotspotRequests")
+        private WorkSource mCurrentWs = null;
+
+        @GuardedBy("mLocalOnlyHotspotRequests")
         private String mLohsInterfaceName;
 
         @GuardedBy("mLocalOnlyHotspotRequests")
         private int mLohsInterfaceMode = WifiManager.IFACE_IP_MODE_UNSPECIFIED;
+
+        @GuardedBy("mLocalOnlyHotspotRequests")
+        private int mPidRestartingLohsFor = UNSPECIFIED_PID;
 
         public void updateInterfaceIpState(String ifaceName, int mode) {
             // update interface IP state related to local-only hotspot
@@ -2640,6 +2649,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
             // Since all callers were notified, now clear the registrations.
             mLocalOnlyHotspotRequests.clear();
+            mPidRestartingLohsFor = UNSPECIFIED_PID;
         }
 
         /**
@@ -2678,14 +2688,35 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 // Never accept exclusive requests (with custom configuration) at the same time as
                 // shared requests.
                 if (!mLocalOnlyHotspotRequests.isEmpty()) {
-                    boolean requestIsExclusive = request.getCustomConfig() != null;
-                    if (mIsExclusive || requestIsExclusive) {
+                    final boolean requestIsExclusive = request.getCustomConfig() != null;
+                    final int newRequestorWsPriority = mWifiInjector
+                            .makeWsHelper(request.getWorkSource()).getRequestorWsPriority();
+                    final int currentWsPriority = mWifiInjector
+                            .makeWsHelper(mCurrentWs).getRequestorWsPriority();
+                    final boolean isCurrentLohsWorksOnNonDefaultBand = mActiveConfig != null
+                            && mActiveConfig.getSoftApConfiguration().getBand()
+                                    != SoftApConfiguration.BAND_2GHZ;
+                    Log.d(TAG, "Receive multiple LOHS requestors,"
+                                + ", requestIsExclusive: " + requestIsExclusive
+                                + ", mIsExclusive: " + mIsExclusive
+                                + ", currentWsPriority: " + currentWsPriority
+                                + ", newRequestorWsPriority: " + newRequestorWsPriority);
+                    if (requestIsExclusive || mIsExclusive
+                            || (currentWsPriority >= newRequestorWsPriority
+                                    && isCurrentLohsWorksOnNonDefaultBand)) {
                         mLog.trace("Cannot share with existing LOHS request due to custom config")
                                 .flush();
                         return LocalOnlyHotspotCallback.ERROR_GENERIC;
                     }
+                    if (mFeatureFlags.publicBandsForLohs() && isCurrentLohsWorksOnNonDefaultBand) {
+                        // Current LOHS is not using 2.4 band, and new caller priority is higher.
+                        // stop all and logging the new requestor pid.
+                        mLog.trace("Restarting LOHS to default band for new requestor")
+                                .flush();
+                        mLohsSoftApTracker.stopAll();
+                        mPidRestartingLohsFor = pid;
+                    }
                 }
-
                 // At this point, the request is accepted.
                 if (mLocalOnlyHotspotRequests.isEmpty()) {
                     mWifiThreadRunner.post(() -> {
@@ -2702,7 +2733,6 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                         return LocalOnlyHotspotCallback.ERROR_GENERIC;
                     }
                 }
-
                 mLocalOnlyHotspotRequests.put(pid, request);
                 return LocalOnlyHotspotCallback.REQUEST_REGISTERED;
             }
@@ -2717,7 +2747,15 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             mActiveConfig = new SoftApModeConfiguration(
                     WifiManager.IFACE_IP_MODE_LOCAL_ONLY,
                     softApConfig, lohsCapability, mCountryCode.getCountryCode(), null);
-            mIsExclusive = (request.getCustomConfig() != null);
+            mCurrentWs = request.getWorkSource();
+            final int currentWsPriority = mWifiInjector.makeWsHelper(mCurrentWs)
+                    .getRequestorWsPriority();
+            if (mFeatureFlags.publicBandsForLohs()) {
+                mIsExclusive = (request.getCustomConfig() != null)
+                        && currentWsPriority >= WorkSourceHelper.PRIORITY_SYSTEM;
+            } else {
+                mIsExclusive = (request.getCustomConfig() != null);
+            }
             // Report the error if we got failure in startSoftApInternal
             if (!startSoftApInternal(mActiveConfig, request.getWorkSource(), null)) {
                 onStateChanged(new SoftApState(
@@ -2773,7 +2811,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             if (mLocalOnlyHotspotRequests.isEmpty()) {
                 mActiveConfig = null;
                 mIsExclusive = false;
+                mCurrentWs = null;
                 mLohsInterfaceName = null;
+                mPidRestartingLohsFor = UNSPECIFIED_PID;
                 mLohsInterfaceMode = WifiManager.IFACE_IP_MODE_UNSPECIFIED;
                 stopSoftApInternal(WifiManager.IFACE_IP_MODE_LOCAL_ONLY);
             }
@@ -2823,6 +2863,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     // also need to clear interface ip state
                     updateInterfaceIpState(mLohsInterfaceName,
                             WifiManager.IFACE_IP_MODE_UNSPECIFIED);
+                    // failed, reset restarting pid info
+                    mPidRestartingLohsFor = UNSPECIFIED_PID;
                 } else if (state == WIFI_AP_STATE_DISABLING || state == WIFI_AP_STATE_DISABLED) {
                     // softap is shutting down or is down...  let requestors know via the
                     // onStopped call
@@ -2833,12 +2875,22 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                         // holding the required lock: send message to requestors and clear the list
                         sendHotspotStoppedMessageToAllLOHSRequestInfoEntriesLocked();
                     } else {
-                        // LOHS not active: report an error (still holding the required lock)
-                        sendHotspotFailedMessageToAllLOHSRequestInfoEntriesLocked(ERROR_GENERIC);
+                        // The LOHS is being restarted since there is a mPidRestartingLohsFor,
+                        // We should expect there will be DISABLING and DISABLED.
+                        // No need to report error.
+                        if (mPidRestartingLohsFor == UNSPECIFIED_PID) {
+                            // LOHS not active: report an error.
+                            sendHotspotFailedMessageToAllLOHSRequestInfoEntriesLocked(
+                                    ERROR_GENERIC);
+                        }
                     }
                     // also clear interface ip state
                     updateInterfaceIpState(mLohsInterfaceName,
                             WifiManager.IFACE_IP_MODE_UNSPECIFIED);
+                } else if (state ==  WIFI_AP_STATE_ENABLING
+                        && mPidRestartingLohsFor != UNSPECIFIED_PID) {
+                    // restarting, reset pid info
+                    mPidRestartingLohsFor = UNSPECIFIED_PID;
                 }
                 // For enabling and enabled, just record the new state
                 setState(softApState);
@@ -2922,8 +2974,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
      * softap mode changes.
      */
     @VisibleForTesting
-    void registerLOHSForTest(int pid, LocalOnlyHotspotRequestInfo request) {
-        mLohsSoftApTracker.start(pid, request);
+    int registerLOHSForTest(int pid, LocalOnlyHotspotRequestInfo request) {
+        return mLohsSoftApTracker.start(pid, request);
     }
 
     /**
