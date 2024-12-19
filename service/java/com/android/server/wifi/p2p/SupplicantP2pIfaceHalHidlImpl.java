@@ -35,6 +35,7 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pDirInfo;
 import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pGroupList;
@@ -2693,6 +2694,29 @@ public class SupplicantP2pIfaceHalHidlImpl implements ISupplicantP2pIfaceHal {
      */
     public void stopUsdBasedServiceAdvertisement(int sessionId) {
         Log.d(TAG, "stopUsdBasedServiceAdvertisement() is not supported.");
+    }
+
+    /**
+     * Get the Device Identity Resolution (DIR) Information.
+     * See {@link WifiP2pDirInfo} for details
+     *
+     * @return {@link WifiP2pDirInfo} instance on success, null on failure.
+     */
+    public WifiP2pDirInfo getDirInfo() {
+        Log.d(TAG, "getDirInfo() is not supported.");
+        return null;
+    }
+
+    /**
+     * Validate the Device Identity Resolution (DIR) Information of a P2P device.
+     * See {@link WifiP2pDirInfo} for details.
+     *
+     * @param dirInfo {@link WifiP2pDirInfo} to validate.
+     * @return The identifier of device identity key on success, -1 on failure.
+     */
+    public int validateDirInfo(@NonNull WifiP2pDirInfo dirInfo) {
+        Log.d(TAG, "validateDirInfo() is not supported.");
+        return -1;
     }
 
     /**

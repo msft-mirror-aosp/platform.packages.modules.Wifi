@@ -71,6 +71,7 @@ import android.net.wifi.p2p.IWifiP2pManager;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pDeviceList;
+import android.net.wifi.p2p.WifiP2pDirInfo;
 import android.net.wifi.p2p.WifiP2pDiscoveryConfig;
 import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
@@ -3768,32 +3769,63 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     case WifiP2pManager.GET_DIR_INFO: {
                         String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
                         if (packageName == null) {
-                            replyToMessage(message, WifiP2pManager.GET_DIR_INFO_FAILED);
+                            replyToMessage(message, WifiP2pManager.GET_DIR_INFO_FAILED,
+                                    WifiP2pManager.ERROR);
                             break;
                         }
-                        if (!Environment.isSdkAtLeastB()
-                                || !checkNearbyDevicesPermission(message, "GET_DIR_INFO")) {
-                            replyToMessage(message, WifiP2pManager.GET_DIR_INFO_FAILED);
+                        if (!isWifiDirect2Enabled()) {
+                            replyToMessage(message, WifiP2pManager.GET_DIR_INFO_FAILED,
+                                    WifiP2pManager.ERROR);
                             break;
                         }
-                        // TODO implementation
-                        replyToMessage(message, WifiP2pManager.RESPONSE_GET_DIR_INFO, null);
+                        if (!checkNearbyDevicesPermission(message, "GET_DIR_INFO")) {
+                            replyToMessage(message, WifiP2pManager.GET_DIR_INFO_FAILED,
+                                    WifiP2pManager.NO_PERMISSION);
+                            break;
+                        }
+
+                        WifiP2pDirInfo dirInfo = mWifiNative.getDirInfo();
+                        if (mVerboseLoggingEnabled) {
+                            Log.d(TAG, " DIR info received: " + dirInfo);
+                        }
+                        replyToMessage(message, WifiP2pManager.RESPONSE_GET_DIR_INFO, dirInfo);
                         break;
                     }
                     case WifiP2pManager.VALIDATE_DIR_INFO: {
                         String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
                         if (packageName == null) {
-                            replyToMessage(message, WifiP2pManager.VALIDATE_DIR_INFO_FAILED);
+                            replyToMessage(message, WifiP2pManager.VALIDATE_DIR_INFO_FAILED,
+                                    WifiP2pManager.ERROR);
                             break;
                         }
-                        if (!Environment.isSdkAtLeastB()
-                                || !checkNearbyDevicesPermission(message,
-                                "VALIDATE_DIR_INFO")) {
-                            replyToMessage(message, WifiP2pManager.VALIDATE_DIR_INFO_FAILED);
+                        if (!isWifiDirect2Enabled()) {
+                            replyToMessage(message, WifiP2pManager.GET_DIR_INFO_FAILED,
+                                    WifiP2pManager.ERROR);
                             break;
                         }
-                        // TODO implementation
-                        replyToMessage(message, WifiP2pManager.RESPONSE_VALIDATE_DIR_INFO, 0);
+                        if (!checkNearbyDevicesPermission(message, "VALIDATE_DIR_INFO")) {
+                            replyToMessage(message, WifiP2pManager.VALIDATE_DIR_INFO_FAILED,
+                                    WifiP2pManager.NO_PERMISSION);
+                            break;
+                        }
+                        Bundle extras = message.getData()
+                                .getBundle(WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE);
+                        WifiP2pDirInfo dirInfo = extras.getParcelable(
+                                WifiP2pManager.EXTRA_PARAM_KEY_DIR_INFO);
+                        if (dirInfo == null) {
+                            replyToMessage(message, WifiP2pManager.VALIDATE_DIR_INFO_FAILED,
+                                    WifiP2pManager.ERROR);
+                            break;
+                        }
+                        boolean isValid = false;
+                        if (mWifiNative.validateDirInfo(dirInfo) >= 0) {
+                            isValid = true;
+                        }
+                        if (mVerboseLoggingEnabled) {
+                            Log.d(TAG, " DIR info validated. isValid: " + isValid);
+                        }
+                        replyToMessage(message, WifiP2pManager.RESPONSE_VALIDATE_DIR_INFO,
+                                isValid ? 1 : 0);
                         break;
                     }
                     default:

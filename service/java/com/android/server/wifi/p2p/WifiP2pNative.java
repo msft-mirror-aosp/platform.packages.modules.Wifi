@@ -26,6 +26,7 @@ import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.ScanResult;
 import android.net.wifi.nl80211.WifiNl80211Manager;
 import android.net.wifi.p2p.WifiP2pConfig;
+import android.net.wifi.p2p.WifiP2pDirInfo;
 import android.net.wifi.p2p.WifiP2pDiscoveryConfig;
 import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
@@ -1171,6 +1172,27 @@ public class WifiP2pNative {
      */
     public void stopUsdBasedServiceAdvertisement(int sessionId) {
         mSupplicantP2pIfaceHal.stopUsdBasedServiceAdvertisement(sessionId);
+    }
+
+    /**
+     * Get the Device Identity Resolution (DIR) Information.
+     * See {@link WifiP2pDirInfo} for details
+     *
+     * @return {@link WifiP2pDirInfo} instance on success, null on failure.
+     */
+    public WifiP2pDirInfo getDirInfo() {
+        return mSupplicantP2pIfaceHal.getDirInfo();
+    }
+
+    /**
+     * Validate the Device Identity Resolution (DIR) Information of a P2P device.
+     * See {@link WifiP2pDirInfo} for details.
+     *
+     * @param dirInfo {@link WifiP2pDirInfo} to validate.
+     * @return The identifier of device identity key on success, -1 on failure.
+     */
+    public int validateDirInfo(@NonNull WifiP2pDirInfo dirInfo) {
+        return mSupplicantP2pIfaceHal.validateDirInfo(dirInfo);
     }
 
 }

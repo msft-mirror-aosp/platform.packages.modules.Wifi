@@ -35,6 +35,7 @@ import android.hardware.wifi.supplicant.KeyMgmtMask;
 import android.hardware.wifi.supplicant.MiracastMode;
 import android.hardware.wifi.supplicant.P2pAddGroupConfigurationParams;
 import android.hardware.wifi.supplicant.P2pConnectInfo;
+import android.hardware.wifi.supplicant.P2pDirInfo;
 import android.hardware.wifi.supplicant.P2pDiscoveryInfo;
 import android.hardware.wifi.supplicant.P2pExtListenInfo;
 import android.hardware.wifi.supplicant.P2pFrameTypeMask;
@@ -43,11 +44,13 @@ import android.hardware.wifi.supplicant.P2pUsdBasedServiceAdvertisementConfig;
 import android.hardware.wifi.supplicant.P2pUsdBasedServiceDiscoveryConfig;
 import android.hardware.wifi.supplicant.WpsConfigMethods;
 import android.hardware.wifi.supplicant.WpsProvisionMethod;
+import android.net.MacAddress;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pDirInfo;
 import android.net.wifi.p2p.WifiP2pDiscoveryConfig;
 import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
@@ -2881,6 +2884,72 @@ public class SupplicantP2pIfaceHalAidlImpl implements ISupplicantP2pIfaceHal {
             halBandMask |= BandMask.BAND_6_GHZ;
         }
         return halBandMask;
+    }
+
+    /**
+     * Get the Device Identity Resolution (DIR) Information.
+     * See {@link WifiP2pDirInfo} for details
+     *
+     * @return {@link WifiP2pDirInfo} instance on success, null on failure.
+     */
+    @SuppressLint("NewApi")
+    public WifiP2pDirInfo getDirInfo() {
+        synchronized (mLock) {
+            String methodStr = "getDirInfo";
+            if (!checkP2pIfaceAndLogFailure(methodStr)) {
+                return null;
+            }
+            if (getCachedServiceVersion() < 4) {
+                return null;
+            }
+            try {
+                P2pDirInfo aidlDirInfo = mISupplicantP2pIface.getDirInfo();
+                WifiP2pDirInfo dirInfo = new WifiP2pDirInfo(MacAddress.fromBytes(
+                        aidlDirInfo.deviceInterfaceMacAddress),
+                        aidlDirInfo.nonce, aidlDirInfo.dirTag);
+                return dirInfo;
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+            } catch (IllegalArgumentException e) {
+                Log.e(TAG, "Could not decode MAC Address.", e);
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Validate the Device Identity Resolution (DIR) Information of a P2P device.
+     * See {@link WifiP2pDirInfo} for details.
+     *
+     * @param dirInfo {@link WifiP2pDirInfo} to validate.
+     * @return The identifier of device identity key on success, -1 on failure.
+     */
+    @SuppressLint("NewApi")
+    public int validateDirInfo(@NonNull WifiP2pDirInfo dirInfo) {
+        synchronized (mLock) {
+            String methodStr = "validateDirInfo";
+            if (!checkP2pIfaceAndLogFailure(methodStr)) {
+                return -1;
+            }
+            if (getCachedServiceVersion() < 4) {
+                return -1;
+            }
+            try {
+                P2pDirInfo aidlDirInfo = new P2pDirInfo();
+                aidlDirInfo.cipherVersion = P2pDirInfo.CipherVersion.DIRA_CIPHER_VERSION_128_BIT;
+                aidlDirInfo.deviceInterfaceMacAddress = dirInfo.getMacAddress().toByteArray();
+                aidlDirInfo.nonce = dirInfo.getNonce();
+                aidlDirInfo.dirTag = dirInfo.getDirTag();
+                return mISupplicantP2pIface.validateDirInfo(aidlDirInfo);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+            }
+            return -1;
+        }
     }
 
     private byte[] convertInformationElementSetToBytes(

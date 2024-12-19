@@ -100,6 +100,7 @@ import android.net.wifi.p2p.IWifiP2pListener;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pDeviceList;
+import android.net.wifi.p2p.WifiP2pDirInfo;
 import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pGroupList;
@@ -222,6 +223,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     private static final int P2P_PEER_AUTH_TIMEOUT_MS = 1000;
     private static final int P2P_EXT_LISTEN_PERIOD_MS = 250;
     private static final int P2P_EXT_LISTEN_INTERVAL_MS = 450;
+    private static final String TEST_DEVICE_MAC_ADDRESS_STRING = "00:11:22:33:44:55";
+    private static final byte[] TEST_NONCE = {10, 20, 30, 40, 50, 60, 70, 80};
+    private static final byte[] TEST_DIR_TAG = {11, 22, 33, 44, 55, 66, 77, 88};
 
     private ArgumentCaptor<BroadcastReceiver> mBcastRxCaptor = ArgumentCaptor.forClass(
             BroadcastReceiver.class);
@@ -8644,6 +8648,9 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     @Test
     public void testGetDirInfo() throws Exception {
         assumeTrue(Environment.isSdkAtLeastB());
+        when(mWifiNative.getSupportedFeatures()).thenReturn(
+                WifiP2pManager.FEATURE_WIFI_DIRECT_R2);
+        when(mFeatureFlags.wifiDirectR2()).thenReturn(true);
         forceP2pEnabled(mClient1);
         when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
                 .thenReturn(false);
@@ -8666,15 +8673,32 @@ public class WifiP2pServiceImplTest extends WifiBaseTest {
     @Test
     public void testValidateDirInfo() throws Exception {
         assumeTrue(Environment.isSdkAtLeastB());
+        when(mWifiNative.getSupportedFeatures()).thenReturn(
+                WifiP2pManager.FEATURE_WIFI_DIRECT_R2);
+        when(mFeatureFlags.wifiDirectR2()).thenReturn(true);
+
+        WifiP2pDirInfo dirInfo = new WifiP2pDirInfo(
+                MacAddress.fromString(TEST_DEVICE_MAC_ADDRESS_STRING), TEST_NONCE, TEST_DIR_TAG);
+        Message msg = Message.obtain();
+        msg.what = WifiP2pManager.VALIDATE_DIR_INFO;
+        msg.replyTo = mClientMessenger;
+        msg.obj = new AttributionSource(1000, TEST_PACKAGE_NAME, null);
+        Bundle extras = new Bundle();
+        extras.putParcelable(WifiP2pManager.EXTRA_PARAM_KEY_DIR_INFO, dirInfo);
+        msg.getData().putBundle(WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE, extras);
+
+
         forceP2pEnabled(mClient1);
         when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
                 .thenReturn(false);
-        sendSimpleMsg(mClientMessenger, WifiP2pManager.VALIDATE_DIR_INFO);
+        mP2pStateMachineMessenger.send(Message.obtain(msg));
+        mLooper.dispatchAll();
         assertTrue(mClientHandler.hasMessages(WifiP2pManager.VALIDATE_DIR_INFO_FAILED));
 
         when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
                 .thenReturn(true);
-        sendSimpleMsg(mClientMessenger, WifiP2pManager.VALIDATE_DIR_INFO);
+        mP2pStateMachineMessenger.send(Message.obtain(msg));
+        mLooper.dispatchAll();
 
         verify(mClientHandler, times(2)).sendMessage(mMessageCaptor.capture());
         List<Message> messages = mMessageCaptor.getAllValues();

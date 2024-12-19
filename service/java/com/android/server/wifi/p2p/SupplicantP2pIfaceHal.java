@@ -21,6 +21,7 @@ import android.annotation.Nullable;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.ScanResult;
 import android.net.wifi.p2p.WifiP2pConfig;
+import android.net.wifi.p2p.WifiP2pDirInfo;
 import android.net.wifi.p2p.WifiP2pDiscoveryConfig;
 import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
@@ -1236,6 +1237,41 @@ public class SupplicantP2pIfaceHal {
                 return;
             }
             mP2pIfaceHal.stopUsdBasedServiceAdvertisement(sessionId);
+        }
+    }
+
+    /**
+     * Get the Device Identity Resolution (DIR) Information.
+     * See {@link WifiP2pDirInfo} for details
+     *
+     * @return {@link WifiP2pDirInfo} instance on success, null on failure.
+     */
+    public WifiP2pDirInfo getDirInfo() {
+        synchronized (mLock) {
+            String methodStr = "getDirInfo";
+            if (mP2pIfaceHal == null) {
+                handleNullHal(methodStr);
+                return null;
+            }
+            return mP2pIfaceHal.getDirInfo();
+        }
+    }
+
+    /**
+     * Validate the Device Identity Resolution (DIR) Information of a P2P device.
+     * See {@link WifiP2pDirInfo} for details.
+     *
+     * @param dirInfo {@link WifiP2pDirInfo} to validate.
+     * @return The identifier of device identity key on success, -1 on failure.
+     */
+    public int validateDirInfo(@NonNull WifiP2pDirInfo dirInfo) {
+        synchronized (mLock) {
+            String methodStr = "validateDirInfo";
+            if (mP2pIfaceHal == null) {
+                handleNullHal(methodStr);
+                return -1;
+            }
+            return mP2pIfaceHal.validateDirInfo(dirInfo);
         }
     }
 
