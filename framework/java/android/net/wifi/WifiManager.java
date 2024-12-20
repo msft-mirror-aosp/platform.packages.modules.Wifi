@@ -4064,6 +4064,11 @@ public class WifiManager {
      */
     public static final int WIFI_FEATURE_SOFTAP_MLO = 63;
 
+    /**
+     * NOTE: When adding a new WIFI_FEATURE_ value, also be sure to update
+     * {@link com.android.server.wifi.util.FeatureBitsetUtils}
+     */
+
     private boolean isFeatureSupported(int feature) {
         try {
             return mService.isFeatureSupported(feature);
