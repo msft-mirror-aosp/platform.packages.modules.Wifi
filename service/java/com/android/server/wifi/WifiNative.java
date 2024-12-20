@@ -74,6 +74,8 @@ import android.util.Log;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
 
+import androidx.annotation.Keep;
+
 import com.android.internal.annotations.Immutable;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.HexDump;
@@ -1950,6 +1952,7 @@ public class WifiNative {
      * @return frequencies vector of valid frequencies (MHz), or null for error.
      * @throws IllegalArgumentException if band is not recognized.
      */
+    @Keep
     public int [] getChannelsForBand(@WifiAnnotations.WifiBandBasic int band) {
         if (!SdkLevel.isAtLeastS() && band == WifiScanner.WIFI_BAND_60_GHZ) {
             // 60 GHz band is new in Android S, return empty array on older SDK versions
@@ -2447,6 +2450,7 @@ public class WifiNative {
      * @param reasonCode One of disconnect reason code which defined in {@link ApConfigUtil}.
      * @return true on success, false otherwise.
      */
+    @Keep
     public boolean forceClientDisconnect(@NonNull String ifaceName,
             @NonNull MacAddress client, int reasonCode) {
         return mHostapdHal.forceClientDisconnect(ifaceName, client, reasonCode);
@@ -3803,6 +3807,7 @@ public class WifiNative {
      * Gets the latest link layer stats
      * @param ifaceName Name of the interface.
      */
+    @Keep
     public WifiLinkLayerStats getWifiLinkLayerStats(@NonNull String ifaceName) {
         WifiLinkLayerStats stats = mWifiVendorHal.getWifiLinkLayerStats(ifaceName);
         if (stats != null) {
@@ -4148,6 +4153,7 @@ public class WifiNative {
      * Returns an array of SignalPollResult objects.
      * Returns null on failure.
      */
+    @Keep
     @Nullable
     public WifiSignalPollResults signalPoll(@NonNull String ifaceName) {
         if (mMockWifiModem != null
@@ -4979,6 +4985,7 @@ public class WifiNative {
      * @param ifaceName name of the interface
      * @return the device capabilities for this interface
      */
+    @Keep
     public DeviceWiphyCapabilities getDeviceWiphyCapabilities(@NonNull String ifaceName) {
         return getDeviceWiphyCapabilities(ifaceName, false);
     }
@@ -5030,6 +5037,7 @@ public class WifiNative {
      * @param ifaceName name of the interface
      * @param capabilities the wiphy capabilities to set for this interface
      */
+    @Keep
     public void setDeviceWiphyCapabilities(@NonNull String ifaceName,
             DeviceWiphyCapabilities capabilities) {
         synchronized (mLock) {

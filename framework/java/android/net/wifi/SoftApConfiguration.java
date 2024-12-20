@@ -35,6 +35,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseIntArray;
 
+import androidx.annotation.Keep;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.VisibleForTesting;
 
@@ -869,6 +870,7 @@ public final class SoftApConfiguration implements Parcelable {
      *
      * @hide
      */
+    @Keep
     public @NonNull int[] getBands() {
         int[] bands = new int[mChannels.size()];
         for (int i = 0; i < bands.length; i++) {
