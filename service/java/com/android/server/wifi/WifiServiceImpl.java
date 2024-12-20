@@ -225,6 +225,7 @@ import com.android.server.wifi.proto.WifiStatsLog;
 import com.android.server.wifi.proto.nano.WifiMetricsProto.UserActionEvent;
 import com.android.server.wifi.util.ActionListenerWrapper;
 import com.android.server.wifi.util.ApConfigUtil;
+import com.android.server.wifi.util.FeatureBitsetUtils;
 import com.android.server.wifi.util.GeneralUtil.Mutable;
 import com.android.server.wifi.util.LastCallerInfoManager;
 import com.android.server.wifi.util.RssiUtil;
@@ -3466,7 +3467,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         if (needToLogSupportedFeatures(supportedFeatures)) {
             mLog.info("isFeatureSupported uid=% returns %")
                     .c(Binder.getCallingUid())
-                    .c(supportedFeatures.toString())
+                    .c(FeatureBitsetUtils.formatSupportedFeatures(supportedFeatures))
                     .flush();
         }
         return supportedFeatures.get(feature);
@@ -5830,7 +5831,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                         mContext, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 0));
                 pw.println("mInIdleMode " + mInIdleMode);
                 pw.println("mScanPending " + mScanPending);
-                pw.println("SupportedFeatures: " + getSupportedFeaturesInternal());
+                pw.println("SupportedFeatures: " + getSupportedFeaturesString());
                 pw.println("SettingsStore:");
                 mSettingsStore.dump(fd, pw, args);
                 mActiveModeWarden.dump(fd, pw, args);
@@ -6470,6 +6471,10 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         // Post operation to handler thread
         mWifiThreadRunner.post(() -> mWifiTrafficPoller.removeCallback(callback),
                 TAG + "#unregisterTrafficStateCallback");
+    }
+
+    protected String getSupportedFeaturesString() {
+        return FeatureBitsetUtils.formatSupportedFeatures(getSupportedFeaturesInternal());
     }
 
     private BitSet getSupportedFeaturesInternal() {
