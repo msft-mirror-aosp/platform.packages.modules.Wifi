@@ -2743,22 +2743,22 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
         @GuardedBy("mLocalOnlyHotspotRequests")
         private void startForFirstRequestLocked(LocalOnlyHotspotRequestInfo request) {
-            final SoftApCapability lohsCapability = mLohsSoftApTracker.getSoftApCapability();
-            SoftApConfiguration softApConfig = mWifiApConfigStore.generateLocalOnlyHotspotConfig(
-                    mContext, request.getCustomConfig(), lohsCapability);
-
-            mActiveConfig = new SoftApModeConfiguration(
-                    WifiManager.IFACE_IP_MODE_LOCAL_ONLY,
-                    softApConfig, lohsCapability, mCountryCode.getCountryCode(), null);
             mCurrentWs = request.getWorkSource();
             final int currentWsPriority = mWifiInjector.makeWsHelper(mCurrentWs)
                     .getRequestorWsPriority();
-            if (mFeatureFlags.publicBandsForLohs()) {
+            if (mFeatureFlags.publicBandsForLohs() && Environment.isSdkAtLeastB()) {
                 mIsExclusive = (request.getCustomConfig() != null)
                         && currentWsPriority >= WorkSourceHelper.PRIORITY_SYSTEM;
             } else {
                 mIsExclusive = (request.getCustomConfig() != null);
             }
+            final SoftApCapability lohsCapability = mLohsSoftApTracker.getSoftApCapability();
+            SoftApConfiguration softApConfig = mWifiApConfigStore.generateLocalOnlyHotspotConfig(
+                    mContext, request.getCustomConfig(), lohsCapability, mIsExclusive);
+
+            mActiveConfig = new SoftApModeConfiguration(
+                    WifiManager.IFACE_IP_MODE_LOCAL_ONLY,
+                    softApConfig, lohsCapability, mCountryCode.getCountryCode(), null);
             // Report the error if we got failure in startSoftApInternal
             if (!startSoftApInternal(mActiveConfig, request.getWorkSource(), null)) {
                 onStateChanged(new SoftApState(
