@@ -4079,7 +4079,8 @@ public class WifiNative {
             if (getChannelsForBand(WifiScanner.WIFI_BAND_24_GHZ).length > 0) {
                 bands |= WifiScanner.WIFI_BAND_24_GHZ;
             }
-            if (getChannelsForBand(WifiScanner.WIFI_BAND_5_GHZ).length > 0) {
+            if ((getChannelsForBand(WifiScanner.WIFI_BAND_5_GHZ).length > 0)
+                    || (getChannelsForBand(WifiScanner.WIFI_BAND_5_GHZ_DFS_ONLY).length > 0)) {
                 bands |= WifiScanner.WIFI_BAND_5_GHZ;
             }
             if (getChannelsForBand(WifiScanner.WIFI_BAND_6_GHZ).length > 0) {
