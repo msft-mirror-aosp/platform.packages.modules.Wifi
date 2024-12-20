@@ -1341,10 +1341,11 @@ public class SupplicantP2pIfaceHalHidlImpl implements ISupplicantP2pIfaceHal {
      *
      * @param networkId Used to specify the restart of a persistent group.
      * @param isPersistent Used to request a persistent group to be formed.
+     * @param isP2pV2 Used to start a Group Owner that support P2P2 IE
      *
      * @return true, if operation was successful.
      */
-    public boolean groupAdd(int networkId, boolean isPersistent) {
+    public boolean groupAdd(int networkId, boolean isPersistent, boolean isP2pV2) {
         synchronized (mLock) {
             if (!checkSupplicantP2pIfaceAndLogFailure("groupAdd")) return false;
             SupplicantResult<Void> result =
@@ -2717,6 +2718,22 @@ public class SupplicantP2pIfaceHalHidlImpl implements ISupplicantP2pIfaceHal {
     public int validateDirInfo(@NonNull WifiP2pDirInfo dirInfo) {
         Log.d(TAG, "validateDirInfo() is not supported.");
         return -1;
+    }
+
+    /**
+     * Used to authorize a connection request to an existing Group Owner
+     * interface, to allow a peer device to connect.
+     *
+     * @param config Configuration to use for connection.
+     * @param groupOwnerInterfaceName Group Owner interface name on which the request to connect
+     *                           needs to be authorized.
+     *
+     * @return boolean value indicating whether operation was successful.
+     */
+    public boolean authorizeConnectRequestOnGroupOwner(WifiP2pConfig config,
+            String groupOwnerInterfaceName) {
+        Log.d(TAG, "authorizeConnectRequestOnGroupOwner() is not supported.");
+        return false;
     }
 
     /**

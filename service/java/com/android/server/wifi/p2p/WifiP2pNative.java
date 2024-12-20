@@ -700,11 +700,12 @@ public class WifiP2pNative {
      * This is a helper method that invokes groupAdd(networkId, isPersistent) internally.
      *
      * @param persistent Used to request a persistent group to be formed.
+     * @param isP2pV2 Used to start a Group Owner that support P2P2 IE.
      *
      * @return true, if operation was successful.
      */
-    public boolean p2pGroupAdd(boolean persistent) {
-        return mSupplicantP2pIfaceHal.groupAdd(persistent);
+    public boolean p2pGroupAdd(boolean persistent, boolean isP2pV2) {
+        return mSupplicantP2pIfaceHal.groupAdd(persistent, isP2pV2);
     }
 
     /**
@@ -713,11 +714,12 @@ public class WifiP2pNative {
      * group owner.
      *
      * @param netId Used to specify the restart of a persistent group.
+     * @param isP2pV2 Used to start a Group Owner that support P2P2 IE.
      *
      * @return true, if operation was successful.
      */
-    public boolean p2pGroupAdd(int netId) {
-        return mSupplicantP2pIfaceHal.groupAdd(netId, true);
+    public boolean p2pGroupAdd(int netId, boolean isP2pV2) {
+        return mSupplicantP2pIfaceHal.groupAdd(netId, true, isP2pV2);
     }
 
     /**
@@ -1193,6 +1195,22 @@ public class WifiP2pNative {
      */
     public int validateDirInfo(@NonNull WifiP2pDirInfo dirInfo) {
         return mSupplicantP2pIfaceHal.validateDirInfo(dirInfo);
+    }
+
+    /**
+     * Used to authorize a connection request to an existing Group Owner
+     * interface, to allow a peer device to connect.
+     *
+     * @param config Configuration to use for connection.
+     * @param groupOwnerInterfaceName Group Owner interface name on which the request to connect
+     *                           needs to be authorized.
+     *
+     * @return boolean value indicating whether operation was successful.
+     */
+    public boolean authorizeConnectRequestOnGroupOwner(
+            WifiP2pConfig config, String groupOwnerInterfaceName) {
+        return mSupplicantP2pIfaceHal.authorizeConnectRequestOnGroupOwner(config,
+                groupOwnerInterfaceName);
     }
 
 }

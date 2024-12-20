@@ -284,10 +284,11 @@ interface ISupplicantP2pIfaceHal {
      *
      * @param networkId Used to specify the restart of a persistent group.
      * @param isPersistent Used to request a persistent group to be formed.
+     * @param isP2pV2 Used to start a Group Owner that support P2P2 IE
      *
      * @return true, if operation was successful.
      */
-    boolean groupAdd(int networkId, boolean isPersistent);
+    boolean groupAdd(int networkId, boolean isPersistent, boolean isP2pV2);
 
     /**
      * Set up a P2P group as Group Owner or join a group with a configuration.
@@ -664,6 +665,19 @@ interface ISupplicantP2pIfaceHal {
      * @return The identifier of device identity key on success, -1 on failure.
      */
     int validateDirInfo(@NonNull WifiP2pDirInfo dirInfo);
+
+    /**
+     * Used to authorize a connection request to an existing Group Owner
+     * interface, to allow a peer device to connect.
+     *
+     * @param config Configuration to use for connection.
+     * @param groupOwnerInterfaceName Group Owner interface name on which the request to connect
+     *                           needs to be authorized.
+     *
+     * @return boolean value indicating whether operation was successful.
+     */
+    boolean authorizeConnectRequestOnGroupOwner(WifiP2pConfig config,
+            String groupOwnerInterfaceName);
 
     /**
      * Terminate the supplicant daemon & wait for its death.

@@ -84,6 +84,14 @@ public class WifiP2pMonitor {
     public static final int USD_BASED_SERVICE_DISCOVERY_TERMINATED_EVENT = BASE + 43;
     public static final int USD_BASED_SERVICE_ADVERTISEMENT_TERMINATED_EVENT = BASE + 44;
 
+    /* Provision Discovery event with Pairing bootstrapping method */
+    public static final int P2P_PROV_DISC_PAIRING_BOOTSTRAPPING_OPPORTUNISTIC_REQ_EVENT = BASE + 45;
+    public static final int P2P_PROV_DISC_PAIRING_BOOTSTRAPPING_OPPORTUNISTIC_RSP_EVENT = BASE + 46;
+    public static final int P2P_PROV_DISC_ENTER_PAIRING_BOOTSTRAPPING_PIN_OR_PASSPHRASE_EVENT =
+            BASE + 47;
+    public static final int P2P_PROV_DISC_SHOW_PAIRING_BOOTSTRAPPING_PIN_OR_PASSPHRASE_EVENT =
+            BASE + 48;
+
     public static final int PROV_DISC_STATUS_SUCCESS             = 0;
     public static final int PROV_DISC_STATUS_TIMEOUT             = 1;
     public static final int PROV_DISC_STATUS_REJECTED            = 2;
@@ -439,6 +447,67 @@ public class WifiP2pMonitor {
     public void broadcastP2pProvisionDiscoveryShowPin(String iface, WifiP2pProvDiscEvent event) {
         if (event != null) {
             sendMessage(iface, P2P_PROV_DISC_SHOW_PIN_EVENT, event);
+        }
+    }
+
+    /**
+     * Broadcast provision discovery request event with requested method opportunistic
+     * bootstrapping to all handlers registered for this event.
+     *
+     * @param iface Name of iface on which this occurred.
+     * @param event Provision discovery request event.
+     */
+    public void broadcastP2pProvisionDiscoveryPairingBootstrappingOpportunisticRequest(
+            String iface, WifiP2pProvDiscEvent event) {
+        if (event != null) {
+            sendMessage(iface, P2P_PROV_DISC_PAIRING_BOOTSTRAPPING_OPPORTUNISTIC_REQ_EVENT,
+                    event);
+        }
+    }
+
+    /**
+     * Broadcast provision discovery response event with requested method opportunistic
+     * bootstrapping to all handlers registered for this event.
+     *
+     * @param iface Name of iface on which this occurred.
+     * @param event Provision discovery response event.
+     */
+    public void broadcastP2pProvisionDiscoveryPairingBootstrappingOpportunisticResponse(
+            String iface, WifiP2pProvDiscEvent event) {
+        if (event != null) {
+            sendMessage(iface, P2P_PROV_DISC_PAIRING_BOOTSTRAPPING_OPPORTUNISTIC_RSP_EVENT,
+                    event);
+        }
+    }
+
+    /**
+     * Broadcast provision discovery event to enter pairing bootstrapping PIN (Keypad pin-code only
+     * method) or Pairing Passphrase (Keypad passphrase method) to all handlers registered for
+     * this event.
+     *
+     * @param iface Name of iface on which this occurred.
+     * @param event Provision discovery request event.
+     */
+    public void broadcastP2pProvisionDiscoveryEnterPairingBootstrappingPinOrPassphrase(String iface,
+            WifiP2pProvDiscEvent event) {
+        if (event != null) {
+            sendMessage(iface, P2P_PROV_DISC_ENTER_PAIRING_BOOTSTRAPPING_PIN_OR_PASSPHRASE_EVENT,
+                    event);
+        }
+    }
+
+    /**
+     * Broadcast provision discovery event to show pairing bootstrapping PIN (Display pin-code only
+     * method) or Passphrase (Display passphrase method) to all handlers registered for this event.
+     *
+     * @param iface Name of iface on which this occurred.
+     * @param event Provision discovery response event.
+     */
+    public void broadcastP2pProvisionDiscoveryShowPairingBootstrappingPinOrPassphrase(String iface,
+            WifiP2pProvDiscEvent event) {
+        if (event != null) {
+            sendMessage(iface, P2P_PROV_DISC_SHOW_PAIRING_BOOTSTRAPPING_PIN_OR_PASSPHRASE_EVENT,
+                    event);
         }
     }
 

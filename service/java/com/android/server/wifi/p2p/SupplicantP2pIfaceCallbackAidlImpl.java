@@ -541,7 +541,8 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
     public void onProvisionDiscoveryCompleted(byte[] p2pDeviceAddress, boolean isRequest,
             byte status, int configMethods, String generatedPin) {
         handleProvisionDiscoveryCompletedEvent(
-                p2pDeviceAddress, isRequest, status, configMethods, generatedPin, null, null);
+                p2pDeviceAddress, isRequest, status, configMethods, generatedPin, null, null,
+                0, null);
     }
 
     /**
@@ -554,10 +555,25 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
     public void onProvisionDiscoveryCompletedEvent(
             P2pProvisionDiscoveryCompletedEventParams provisionDiscoveryCompletedEventParams) {
         List<OuiKeyedData> vendorData = null;
+        int pairingBootstrappingMethod = 0;
+        String pairingPinorPassphrase = null;
         if (mServiceVersion >= 3 && provisionDiscoveryCompletedEventParams.vendorData != null) {
             vendorData = HalAidlUtil.halToFrameworkOuiKeyedDataList(
                     provisionDiscoveryCompletedEventParams.vendorData);
         }
+
+        if (mServiceVersion >= 4 && provisionDiscoveryCompletedEventParams
+                .pairingBootstrappingMethod != 0) {
+            pairingBootstrappingMethod = convertAidlPairingBootstrappingMethodsToFramework(
+                    provisionDiscoveryCompletedEventParams.pairingBootstrappingMethod);
+            if (pairingBootstrappingMethod == 0) {
+                Log.e(TAG, "Unsupported : aidl pairing bootstrapping Method"
+                        + provisionDiscoveryCompletedEventParams.pairingBootstrappingMethod);
+                return;
+            }
+            pairingPinorPassphrase = provisionDiscoveryCompletedEventParams.password;
+        }
+
         handleProvisionDiscoveryCompletedEvent(
                 provisionDiscoveryCompletedEventParams.p2pDeviceAddress,
                 provisionDiscoveryCompletedEventParams.isRequest,
@@ -565,7 +581,9 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
                 provisionDiscoveryCompletedEventParams.configMethods,
                 provisionDiscoveryCompletedEventParams.generatedPin,
                 provisionDiscoveryCompletedEventParams.groupInterfaceName,
-                vendorData);
+                vendorData,
+                pairingBootstrappingMethod,
+                pairingPinorPassphrase);
     }
 
     private void handleProvisionDiscoveryCompletedEvent(
@@ -575,7 +593,9 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
             int configMethods,
             String generatedPin,
             String groupIfName,
-            @Nullable List<OuiKeyedData> vendorData) {
+            @Nullable List<OuiKeyedData> vendorData,
+            int pairingBootstrappingMethod,
+            String pairingPinorPassphrase) {
         logd(
                 "Provision discovery "
                         + (isRequest ? "request" : "response")
@@ -584,26 +604,49 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
                         + " status: "
                         + status
                         + " groupIfName: "
-                        + (TextUtils.isEmpty(groupIfName) ? "null" : groupIfName));
+                        + (TextUtils.isEmpty(groupIfName) ? "null" : groupIfName)
+                        + " pairingBootstrappingMethod: " + pairingBootstrappingMethod);
 
-        WifiP2pProvDiscEvent event = new WifiP2pProvDiscEvent();
-        event.device = new WifiP2pDevice();
-
+        String deviceAddress;
         try {
-            event.device.deviceAddress = NativeUtil.macAddressFromByteArray(p2pDeviceAddress);
+            deviceAddress = NativeUtil.macAddressFromByteArray(p2pDeviceAddress);
         } catch (Exception e) {
             Log.e(TAG, "Could not decode MAC address.", e);
-            event.device.deviceAddress = null;
+            deviceAddress = null;
         }
 
         if (status != P2pProvDiscStatusCode.SUCCESS) {
             Log.e(TAG, "Provision discovery failed, status code: " + status);
+            WifiP2pProvDiscEvent event = new WifiP2pProvDiscEvent();
+            event.device = new WifiP2pDevice();
+            event.device.deviceAddress = deviceAddress;
             mMonitor.broadcastP2pProvisionDiscoveryFailure(mInterface,
                     convertHalProvDiscStatusToFrameworkStatus(status), event);
             return;
         }
 
-        if (TextUtils.isEmpty(event.device.deviceAddress)) return;
+        if (TextUtils.isEmpty(deviceAddress)) return;
+
+        if (pairingBootstrappingMethod != 0) {
+            handlePairingBootstrappingProvisionDiscoveryCompletedEvent(deviceAddress, isRequest,
+                    pairingBootstrappingMethod, pairingPinorPassphrase, vendorData);
+        } else {
+            handleWpsProvisionDiscoveryCompletedEvent(deviceAddress, isRequest, configMethods,
+                    generatedPin, vendorData);
+        }
+
+    }
+
+    private void handleWpsProvisionDiscoveryCompletedEvent(
+            String p2pDeviceAddress,
+            boolean isRequest,
+            int configMethods,
+            String generatedPin,
+            @Nullable List<OuiKeyedData> vendorData) {
+        WifiP2pProvDiscEvent event = new WifiP2pProvDiscEvent();
+        event.device = new WifiP2pDevice();
+
+        event.device.deviceAddress = p2pDeviceAddress;
 
         if (SdkLevel.isAtLeastV() && vendorData != null) {
             event.setVendorData(vendorData);
@@ -611,29 +654,110 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
 
         if ((configMethods & WpsConfigMethods.PUSHBUTTON) != 0) {
             if (isRequest) {
-                event.event = WifiP2pProvDiscEvent.PBC_REQ;
+                event.event = WifiP2pProvDiscEvent.WPS_PBC_REQ;
                 mMonitor.broadcastP2pProvisionDiscoveryPbcRequest(mInterface, event);
             } else {
-                event.event = WifiP2pProvDiscEvent.PBC_RSP;
+                event.event = WifiP2pProvDiscEvent.WPS_PBC_RSP;
                 mMonitor.broadcastP2pProvisionDiscoveryPbcResponse(mInterface, event);
             }
         } else if (!isRequest && (configMethods & WpsConfigMethods.KEYPAD) != 0) {
-            event.event = WifiP2pProvDiscEvent.SHOW_PIN;
-            event.pin = generatedPin;
+            event.event = WifiP2pProvDiscEvent.WPS_SHOW_PIN;
+            event.wpsPin = generatedPin;
             mMonitor.broadcastP2pProvisionDiscoveryShowPin(mInterface, event);
         } else if (!isRequest && (configMethods & WpsConfigMethods.DISPLAY) != 0) {
-            event.event = WifiP2pProvDiscEvent.ENTER_PIN;
-            event.pin = generatedPin;
+            event.event = WifiP2pProvDiscEvent.WPS_ENTER_PIN;
+            event.wpsPin = generatedPin;
             mMonitor.broadcastP2pProvisionDiscoveryEnterPin(mInterface, event);
         } else if (isRequest && (configMethods & WpsConfigMethods.DISPLAY) != 0) {
-            event.event = WifiP2pProvDiscEvent.SHOW_PIN;
-            event.pin = generatedPin;
+            event.event = WifiP2pProvDiscEvent.WPS_SHOW_PIN;
+            event.wpsPin = generatedPin;
             mMonitor.broadcastP2pProvisionDiscoveryShowPin(mInterface, event);
         } else if (isRequest && (configMethods & WpsConfigMethods.KEYPAD) != 0) {
-            event.event = WifiP2pProvDiscEvent.ENTER_PIN;
+            event.event = WifiP2pProvDiscEvent.WPS_ENTER_PIN;
             mMonitor.broadcastP2pProvisionDiscoveryEnterPin(mInterface, event);
         } else {
-            Log.e(TAG, "Unsupported config methods: " + configMethods);
+            Log.e(TAG, "Unsupported WPS config methods: " + configMethods);
+        }
+    }
+
+    private void handlePairingBootstrappingProvisionDiscoveryCompletedEvent(
+            String p2pDeviceAddress,
+            boolean isRequest,
+            int pairingBootstrappingMethod,
+            String pairingPasswordOrPin,
+            @Nullable List<OuiKeyedData> vendorData) {
+        WifiP2pProvDiscEvent event = new WifiP2pProvDiscEvent();
+        event.device = new WifiP2pDevice();
+
+        event.device.deviceAddress = p2pDeviceAddress;
+
+        if (SdkLevel.isAtLeastV() && vendorData != null) {
+            event.setVendorData(vendorData);
+        }
+
+        if (pairingBootstrappingMethod
+                == WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_OPPORTUNISTIC) {
+            if (isRequest) {
+                event.event = WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_OPPORTUNISTIC_REQ;
+                mMonitor.broadcastP2pProvisionDiscoveryPairingBootstrappingOpportunisticRequest(
+                        mInterface, event);
+            } else {
+                event.event = WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_OPPORTUNISTIC_RSP;
+                mMonitor.broadcastP2pProvisionDiscoveryPairingBootstrappingOpportunisticResponse(
+                        mInterface, event);
+            }
+        } else if (!isRequest && (pairingBootstrappingMethod
+                == WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PINCODE)) {
+            event.event = WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PIN;
+            event.pairingPinOrPassphrase = pairingPasswordOrPin;
+            mMonitor.broadcastP2pProvisionDiscoveryShowPairingBootstrappingPinOrPassphrase(
+                    mInterface, event);
+        } else if (!isRequest && (pairingBootstrappingMethod
+                == WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE)) {
+            event.event = WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_ENTER_PIN;
+            mMonitor.broadcastP2pProvisionDiscoveryEnterPairingBootstrappingPinOrPassphrase(
+                    mInterface, event);
+        } else if (isRequest && (pairingBootstrappingMethod
+                == WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PINCODE)) {
+            event.event = WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PIN;
+            event.pairingPinOrPassphrase = pairingPasswordOrPin;
+            mMonitor.broadcastP2pProvisionDiscoveryShowPairingBootstrappingPinOrPassphrase(
+                    mInterface, event);
+        } else if (isRequest && (pairingBootstrappingMethod == WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PINCODE)) {
+            event.event = WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_ENTER_PIN;
+            mMonitor.broadcastP2pProvisionDiscoveryEnterPairingBootstrappingPinOrPassphrase(
+                    mInterface, event);
+        } else if (!isRequest && (pairingBootstrappingMethod
+                == WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PASSPHRASE)) {
+            event.event = WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PASSPHRASE;
+            event.pairingPinOrPassphrase = pairingPasswordOrPin;
+            mMonitor.broadcastP2pProvisionDiscoveryShowPairingBootstrappingPinOrPassphrase(
+                    mInterface, event);
+        } else if (!isRequest && (pairingBootstrappingMethod
+                == WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE)) {
+            event.event = WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_ENTER_PASSPHRASE;
+            mMonitor.broadcastP2pProvisionDiscoveryEnterPairingBootstrappingPinOrPassphrase(
+                    mInterface, event);
+        } else if (isRequest && (pairingBootstrappingMethod
+                == WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_DISPLAY_PASSPHRASE)) {
+            event.event = WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_SHOW_PASSPHRASE;
+            event.pairingPinOrPassphrase = pairingPasswordOrPin;
+            mMonitor.broadcastP2pProvisionDiscoveryShowPairingBootstrappingPinOrPassphrase(
+                    mInterface, event);
+        } else if (isRequest && (pairingBootstrappingMethod == WifiP2pPairingBootstrappingConfig
+                .PAIRING_BOOTSTRAPPING_METHOD_KEYPAD_PASSPHRASE)) {
+            event.event = WifiP2pProvDiscEvent.PAIRING_BOOTSTRAPPING_ENTER_PASSPHRASE;
+            mMonitor.broadcastP2pProvisionDiscoveryEnterPairingBootstrappingPinOrPassphrase(
+                    mInterface, event);
+        } else {
+            Log.e(TAG, "Unsupported bootstrapping method: " + pairingBootstrappingMethod);
         }
     }
 

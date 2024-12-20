@@ -1312,9 +1312,9 @@ public class SupplicantP2pIfaceHalHidlImplTest extends WifiBaseTest {
         when(mISupplicantP2pIfaceMock.addGroup(eq(true), eq(3)))
                 .thenReturn(mStatusSuccess);
         // Default value when service is not initialized.
-        assertFalse(mDut.groupAdd(3, true));
+        assertFalse(mDut.groupAdd(3, true, false));
         executeAndValidateInitializationSequence(false, false, false);
-        assertTrue(mDut.groupAdd(3, true));
+        assertTrue(mDut.groupAdd(3, true, false));
     }
 
     /**
@@ -1325,7 +1325,7 @@ public class SupplicantP2pIfaceHalHidlImplTest extends WifiBaseTest {
         executeAndValidateInitializationSequence(false, false, false);
         when(mISupplicantP2pIfaceMock.addGroup(anyBoolean(), anyInt()))
                 .thenReturn(mStatusFailure);
-        assertFalse(mDut.groupAdd(0, true));
+        assertFalse(mDut.groupAdd(0, true, false));
         // Check that service is still alive.
         assertTrue(mDut.isInitializationComplete());
     }
@@ -1338,7 +1338,7 @@ public class SupplicantP2pIfaceHalHidlImplTest extends WifiBaseTest {
         executeAndValidateInitializationSequence(false, false, false);
         when(mISupplicantP2pIfaceMock.addGroup(anyBoolean(), anyInt()))
                 .thenThrow(mRemoteException);
-        assertFalse(mDut.groupAdd(0, true));
+        assertFalse(mDut.groupAdd(0, true, false));
         // Check service is dead.
         assertFalse(mDut.isInitializationComplete());
     }

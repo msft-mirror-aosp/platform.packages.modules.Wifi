@@ -529,16 +529,17 @@ public class SupplicantP2pIfaceHal {
      *
      * @param networkId Used to specify the restart of a persistent group.
      * @param isPersistent Used to request a persistent group to be formed.
+     * @param isP2pV2 Used to start a Group Owner that support P2P2 IE.
      *
      * @return true, if operation was successful.
      */
-    public boolean groupAdd(int networkId, boolean isPersistent) {
+    public boolean groupAdd(int networkId, boolean isPersistent, boolean isP2pV2) {
         synchronized (mLock) {
             String methodStr = "groupAdd";
             if (mP2pIfaceHal == null) {
                 return handleNullHal(methodStr);
             }
-            return mP2pIfaceHal.groupAdd(networkId, isPersistent);
+            return mP2pIfaceHal.groupAdd(networkId, isPersistent, isP2pV2);
         }
     }
 
@@ -547,13 +548,14 @@ public class SupplicantP2pIfaceHal {
      * This is a helper method that invokes groupAdd(networkId, isPersistent) internally.
      *
      * @param isPersistent Used to request a persistent group to be formed.
+     * @param isP2pV2 Used to start a Group Owner that support P2P2 IE.
      *
      * @return true, if operation was successful.
      */
-    public boolean groupAdd(boolean isPersistent) {
+    public boolean groupAdd(boolean isPersistent, boolean isP2pV2) {
         synchronized (mLock) {
             // Supplicant expects networkId to be -1 if not supplied.
-            return groupAdd(-1, isPersistent);
+            return groupAdd(-1, isPersistent, isP2pV2);
         }
     }
 
@@ -1272,6 +1274,29 @@ public class SupplicantP2pIfaceHal {
                 return -1;
             }
             return mP2pIfaceHal.validateDirInfo(dirInfo);
+        }
+    }
+
+    /**
+     * Used to authorize a connection request to an existing Group Owner
+     * interface, to allow a peer device to connect.
+     *
+     * @param config Configuration to use for connection.
+     * @param groupOwnerInterfaceName Group Owner interface name on which the request to connect
+     *                           needs to be authorized.
+     *
+     * @return boolean value indicating whether operation was successful.
+     */
+    public boolean authorizeConnectRequestOnGroupOwner(
+            WifiP2pConfig config, String groupOwnerInterfaceName) {
+        synchronized (mLock) {
+            String methodStr = "connect";
+            if (mP2pIfaceHal == null) {
+                handleNullHal(methodStr);
+                return false;
+            }
+            return mP2pIfaceHal.authorizeConnectRequestOnGroupOwner(config,
+                    groupOwnerInterfaceName);
         }
     }
 
