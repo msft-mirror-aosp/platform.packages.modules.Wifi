@@ -22,6 +22,7 @@ import static android.net.wifi.hotspot2.PasspointConfiguration.MAX_NUMBER_OF_OI;
 import static android.net.wifi.hotspot2.PasspointConfiguration.MAX_OI_VALUE;
 import static android.net.wifi.hotspot2.PasspointConfiguration.MAX_URL_BYTES;
 
+import static com.android.server.wifi.util.GeneralUtil.longToBitset;
 import static com.android.server.wifi.util.NativeUtil.addEnclosingQuotes;
 
 import android.annotation.SuppressLint;
@@ -40,6 +41,8 @@ import android.os.PatternMatcher;
 import android.text.TextUtils;
 import android.util.Log;
 import android.util.Pair;
+
+import androidx.annotation.Keep;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
@@ -103,6 +106,7 @@ public class WifiConfigurationUtil {
     /**
      * Helper method to check if the provided |config| corresponds to a PSK network or not.
      */
+    @Keep
     public static boolean isConfigForPskNetwork(WifiConfiguration config) {
         return config.isSecurityType(WifiConfiguration.SECURITY_TYPE_PSK);
     }
@@ -124,6 +128,7 @@ public class WifiConfigurationUtil {
     /**
      * Helper method to check if the provided |config| corresponds to an SAE network or not.
      */
+    @Keep
     public static boolean isConfigForSaeNetwork(WifiConfiguration config) {
         return config.isSecurityType(WifiConfiguration.SECURITY_TYPE_SAE);
     }
@@ -131,6 +136,7 @@ public class WifiConfigurationUtil {
     /**
      * Helper method to check if the provided |config| corresponds to an OWE network or not.
      */
+    @Keep
     public static boolean isConfigForOweNetwork(WifiConfiguration config) {
         return config.isSecurityType(WifiConfiguration.SECURITY_TYPE_OWE);
     }
@@ -178,6 +184,7 @@ public class WifiConfigurationUtil {
     /**
      * Helper method to check if the provided |config| corresponds to a WEP network or not.
      */
+    @Keep
     public static boolean isConfigForWepNetwork(WifiConfiguration config) {
         return config.isSecurityType(WifiConfiguration.SECURITY_TYPE_WEP);
     }
@@ -194,6 +201,7 @@ public class WifiConfigurationUtil {
      * Helper method to check if the provided |config| corresponds to an open or enhanced
      * open network, or not.
      */
+    @Keep
     public static boolean isConfigForOpenNetwork(WifiConfiguration config) {
         return (!(isConfigForWepNetwork(config) || isConfigForPskNetwork(config)
                 || isConfigForWapiPskNetwork(config) || isConfigForWapiCertNetwork(config)
@@ -829,6 +837,15 @@ public class WifiConfigurationUtil {
         return true;
     }
 
+    /**
+     * Please check {@link #validate(WifiConfiguration, BitSet, boolean)}
+     */
+    @Keep
+    public static boolean validate(WifiConfiguration config, long supportedFeatureSet,
+            boolean isAdd) {
+        return validate(config, longToBitset(supportedFeatureSet), isAdd);
+    }
+
     private static boolean validateStringField(String field, int maxLength) {
         return field == null || field.length() <= maxLength;
     }
@@ -1187,7 +1204,7 @@ public class WifiConfigurationUtil {
     private static boolean isSecurityParamsSupported(SecurityParams params) {
         final BitSet wifiFeatures = WifiInjector.getInstance()
                 .getActiveModeWarden().getPrimaryClientModeManager()
-                .getSupportedFeatures();
+                .getSupportedFeaturesBitSet();
         switch (params.getSecurityType()) {
             case WifiConfiguration.SECURITY_TYPE_SAE:
                 return wifiFeatures.get(WifiManager.WIFI_FEATURE_WPA3_SAE);

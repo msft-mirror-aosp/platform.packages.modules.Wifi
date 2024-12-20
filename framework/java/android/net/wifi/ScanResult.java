@@ -32,6 +32,8 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.util.Log;
 
+import androidx.annotation.Keep;
+
 import com.android.modules.utils.build.SdkLevel;
 import com.android.wifi.flags.Flags;
 
@@ -979,6 +981,7 @@ public final class ScanResult implements Parcelable {
      *
      * @hide
      */
+    @Keep
     public static boolean is24GHz(int freqMhz) {
         return freqMhz >= BAND_24_GHZ_START_FREQ_MHZ && freqMhz <= BAND_24_GHZ_END_FREQ_MHZ;
     }
@@ -990,6 +993,7 @@ public final class ScanResult implements Parcelable {
      *
      * @hide
      */
+    @Keep
     public static boolean is5GHz(int freqMhz) {
         return freqMhz >=  BAND_5_GHZ_START_FREQ_MHZ && freqMhz <= BAND_5_GHZ_END_FREQ_MHZ;
     }
@@ -1001,6 +1005,7 @@ public final class ScanResult implements Parcelable {
      *
      * @hide
      */
+    @Keep
     public static boolean is6GHz(int freqMhz) {
         if (freqMhz == BAND_6_GHZ_OP_CLASS_136_CH_2_FREQ_MHZ) {
             return true;
