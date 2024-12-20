@@ -149,6 +149,7 @@ class NetworkCbEventKey(enum.StrEnum):
     NETWORK_CAPABILITIES = 'networkCapabilities'
     TRANSPORT_INFO_CLASS_NAME = 'transportInfoClassName'
     CHANNEL_IN_MHZ = 'channelInMhz'
+    NETWORK_INTERFACE_NAME = 'interfaceName'
 
 
 @enum.unique
@@ -161,6 +162,7 @@ class NetworkCbName(enum.StrEnum):
 
     ON_UNAVAILABLE = 'onUnavailable'
     ON_CAPABILITIES_CHANGED = 'onCapabilitiesChanged'
+    ON_PROPERTIES_CHANGED = 'onLinkPropertiesChanged'
     NET_CAP_IPV6 = 'aware_ipv6'
     NET_CAP_PORT = 'port'
     NET_CAP_TRANSPORT_PROTOCOL = 'aware_transport_protocol'

@@ -41,12 +41,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
+import java.net.SocketException;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Enumeration;
 
 public class ConnectivityManagerSnippet implements Snippet {
     private static final String EVENT_KEY_CB_NAME = "callbackName";
@@ -178,7 +182,47 @@ public class ConnectivityManagerSnippet implements Snippet {
             EventCache.getInstance().postEvent(event);
         }
     }
+    private Enumeration<InetAddress> getInetAddrsForInterface(String ifaceName) {
+        NetworkInterface iface = null;
+        try {
+            iface = NetworkInterface.getByName(ifaceName);
+        } catch (SocketException e) {
+            return null;
+        }
 
+        if (iface == null)
+            return null;
+        return iface.getInetAddresses();
+    }
+    /**
+     * Returns the link local IPv6 address of the interface.
+     *
+     * @param ifaceName network interface name.
+     */
+    @Rpc(description = "Returns the link local IPv6 address of the interface.")
+    public String connectivityGetLinkLocalIpv6Address(String ifaceName) {
+        Inet6Address inet6Address = null;
+        Enumeration<InetAddress> inetAddresses = getInetAddrsForInterface(ifaceName);
+        if (inetAddresses == null) {
+            return null;
+        }
+
+        while (inetAddresses.hasMoreElements()) {
+            InetAddress addr = inetAddresses.nextElement();
+            if (addr instanceof Inet6Address) {
+                if (((Inet6Address) addr).isLinkLocalAddress()) {
+                    inet6Address = (Inet6Address) addr;
+                    break;
+                }
+            }
+        }
+
+        if (inet6Address == null) {
+            return null;
+        }
+
+        return inet6Address.getHostAddress();
+    }
     /**
      * Requests a network with the specified network request and sets a callback for network
      * events.
