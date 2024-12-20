@@ -123,6 +123,7 @@ java_library {
         "service-entitlement",
         "wifi-lite-protos",
         "wifi-nano-protos",
+        "com.android.net.flags-aconfig-java-export",
         "android.net.wifi.flags-aconfig-java",
         "android.security.flags-aconfig-java-export",
         "net-utils-service-wifi",

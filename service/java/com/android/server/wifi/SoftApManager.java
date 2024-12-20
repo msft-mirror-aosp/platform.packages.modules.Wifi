@@ -243,6 +243,10 @@ public class SoftApManager implements ActiveModeManager {
      */
     @Nullable
     private SoftApConfiguration mCurrentSoftApConfiguration;
+    /**
+     * Whether the configuration being used is the user's persistent SoftApConfiguration.
+     */
+    private boolean mIsUsingPersistentSoftApConfiguration = false;
 
     @NonNull
     private Map<String, SoftApInfo> mCurrentSoftApInfoMap = new HashMap<>();
@@ -485,9 +489,11 @@ public class SoftApManager implements ActiveModeManager {
         mWifiApConfigStore = wifiApConfigStore;
         mCurrentSoftApConfiguration = apConfig.getSoftApConfiguration();
         mCurrentSoftApCapability = apConfig.getCapability();
+
         // null is a valid input and means we use the user-configured tethering settings.
         if (mCurrentSoftApConfiguration == null) {
             mCurrentSoftApConfiguration = mWifiApConfigStore.getApConfiguration();
+            mIsUsingPersistentSoftApConfiguration = true;
             // may still be null if we fail to load the default config
         }
         // Store mode configuration before update the configuration.
@@ -1279,8 +1285,8 @@ public class SoftApManager implements ActiveModeManager {
                                                 .setBand(newSingleApBand)
                                                 .build();
                             }
-                        } else if (!isCountryCodeChanged
-                                && mRole == ROLE_SOFTAP_TETHERED && isBridgedApAvailable()) {
+                        } else if (!isCountryCodeChanged && isBridgedApAvailable()
+                                && mIsUsingPersistentSoftApConfiguration) {
                             // Try upgrading config to 2 + 5 GHz Dual Band if the available config
                             // bands only include 2 or 5 Ghz. This is to handle cases where the
                             // config was previously set to single band in a CC that didn't support
@@ -1512,7 +1518,7 @@ public class SoftApManager implements ActiveModeManager {
                                     mCurrentSoftApCapability, mContext, mWifiNative, null);
                     updateSafeChannelFrequencyList();
                     int[] oldBands = mCurrentSoftApConfiguration.getBands();
-                    if (mRole == ROLE_SOFTAP_TETHERED && isBridgedApAvailable()) {
+                    if (isBridgedApAvailable() && mIsUsingPersistentSoftApConfiguration) {
                         mCurrentSoftApConfiguration =
                                 ApConfigUtil.upgradeTo2g5gBridgedIfAvailableBandsAreSubset(
                                         mCurrentSoftApConfiguration,
