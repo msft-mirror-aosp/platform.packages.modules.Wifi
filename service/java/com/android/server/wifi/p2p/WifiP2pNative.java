@@ -39,6 +39,8 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.util.SparseArray;
 
+import androidx.annotation.Keep;
+
 import com.android.server.wifi.HalDeviceManager;
 import com.android.server.wifi.PropertyService;
 import com.android.server.wifi.WifiInjector;
@@ -490,6 +492,7 @@ public class WifiP2pNative {
      *
      * @return boolean value indicating whether operation was successful.
      */
+    @Keep
     public boolean setP2pPowerSave(String iface, boolean enabled) {
         return mSupplicantP2pIfaceHal.setPowerSave(iface, enabled);
     }

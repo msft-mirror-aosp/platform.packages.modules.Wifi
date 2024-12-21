@@ -78,6 +78,8 @@ import android.util.LocalLog;
 import android.util.Log;
 import android.util.Pair;
 
+import androidx.annotation.Keep;
+
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IState;
@@ -849,6 +851,7 @@ public class ActiveModeWarden {
     }
 
     /** Wifi has been toggled. */
+    @Keep
     public void wifiToggled(WorkSource requestorWs) {
         mWifiController.sendMessage(WifiController.CMD_WIFI_TOGGLED, requestorWs);
     }
@@ -1073,6 +1076,7 @@ public class ActiveModeWarden {
      * calls.
      * @return Instance of {@link ConcreteClientModeManager} or null.
      */
+    @Keep
     @Nullable
     public ConcreteClientModeManager getPrimaryClientModeManagerNullable() {
         return getClientModeManagerInRole(ROLE_CLIENT_PRIMARY);
@@ -1085,6 +1089,7 @@ public class ActiveModeWarden {
      * calls.
      * @return Instance of {@link ClientModeManager}.
      */
+    @Keep
     @NonNull
     public ClientModeManager getPrimaryClientModeManager() {
         ClientModeManager cm = getPrimaryClientModeManagerNullable();
@@ -1120,6 +1125,7 @@ public class ActiveModeWarden {
     }
 
     @NonNull
+    @Keep
     public List<ClientModeManager> getClientModeManagers() {
         return new ArrayList<>(mClientModeManagers);
     }
@@ -1185,6 +1191,7 @@ public class ActiveModeWarden {
     }
 
     /** Get any client mode manager in the given role, or null if none was found. */
+    @Keep
     @Nullable
     public ConcreteClientModeManager getClientModeManagerInRole(ClientRole role) {
         for (ConcreteClientModeManager manager : mClientModeManagers) {

@@ -851,7 +851,7 @@ public class WifiLockManager {
         }
 
         BitSet supportedFeatures =
-                mActiveModeWarden.getPrimaryClientModeManager().getSupportedFeatures();
+                mActiveModeWarden.getPrimaryClientModeManager().getSupportedFeaturesBitSet();
         if (supportedFeatures.isEmpty()) {
             return LOW_LATENCY_SUPPORT_UNDEFINED;
         }
