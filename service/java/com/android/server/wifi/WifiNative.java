@@ -62,6 +62,8 @@ import android.net.wifi.nl80211.RadioChainInfo;
 import android.net.wifi.nl80211.WifiNl80211Manager;
 import android.net.wifi.twt.TwtRequest;
 import android.net.wifi.twt.TwtSessionCallback;
+import android.net.wifi.usd.PublishConfig;
+import android.net.wifi.usd.SubscribeConfig;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -88,6 +90,7 @@ import com.android.server.wifi.hal.WifiNanIface;
 import com.android.server.wifi.hotspot2.NetworkDetail;
 import com.android.server.wifi.mockwifi.MockWifiServiceUtil;
 import com.android.server.wifi.proto.WifiStatsLog;
+import com.android.server.wifi.usd.UsdRequestManager;
 import com.android.server.wifi.util.FrameParser;
 import com.android.server.wifi.util.InformationElementUtil;
 import com.android.server.wifi.util.NativeUtil;
@@ -164,6 +167,7 @@ public class WifiNative {
      * (ScanResult.KEY_MGMT_XX)
      */
     @VisibleForTesting @Nullable SparseIntArray mUnknownAkmMap;
+    private SupplicantStaIfaceHal.UsdCapabilitiesInternal mCachedUsdCapabilities = null;
 
     public WifiNative(WifiVendorHal vendorHal,
                       SupplicantStaIfaceHal staIfaceHal, HostapdHal hostapdHal,
@@ -267,6 +271,80 @@ public class WifiNative {
      */
     public Bundle getTwtCapabilities(String interfaceName) {
         return mCachedTwtCapabilities.get(interfaceName);
+    }
+
+    /**
+     * Whether USD subscriber is supported in USD capability or not.
+     */
+    public boolean isUsdSubscriberSupported() {
+        return mCachedUsdCapabilities != null && mCachedUsdCapabilities.isUsdSubscriberSupported;
+    }
+
+    /**
+     * Whether USD publisher is supported in USD capability or not.
+     */
+    public boolean isUsdPublisherSupported() {
+        return mCachedUsdCapabilities != null && mCachedUsdCapabilities.isUsdPublisherSupported;
+    }
+
+    /**
+     * Gets USD capabilities.
+     */
+    public SupplicantStaIfaceHal.UsdCapabilitiesInternal getUsdCapabilities() {
+        return mCachedUsdCapabilities;
+    }
+
+    /**
+     * Start USD publish.
+     */
+    public boolean startUsdPublish(String interfaceName, int cmdId, PublishConfig publishConfig) {
+        return mSupplicantStaIfaceHal.startUsdPublish(interfaceName, cmdId, publishConfig);
+    }
+
+    /**
+     * Register a framework callback to receive USD events from HAL.
+     */
+    public void registerUsdEventsCallback(
+            UsdRequestManager.UsdNativeEventsCallback usdNativeEventsCallback) {
+        mSupplicantStaIfaceHal.registerUsdEventsCallback(usdNativeEventsCallback);
+    }
+
+    /**
+     * Start USD subscribe.
+     */
+    public boolean startUsdSubscribe(String interfaceName, int cmdId,
+            SubscribeConfig subscribeConfig) {
+        return mSupplicantStaIfaceHal.startUsdSubscribe(interfaceName, cmdId, subscribeConfig);
+    }
+
+    /**
+     * Update USD publish.
+     */
+    public void updateUsdPublish(String interfaceName, int publishId, byte[] ssi) {
+        mSupplicantStaIfaceHal.updateUsdPublish(interfaceName, publishId, ssi);
+    }
+
+    /**
+     * Cancel USD publish.
+     */
+    public void cancelUsdPublish(String interfaceName, int publishId) {
+        mSupplicantStaIfaceHal.cancelUsdPublish(interfaceName, publishId);
+    }
+
+    /**
+     * Cancel USD subscribe.
+     */
+    public void cancelUsdSubscribe(String interfaceName, int subscribeId) {
+        mSupplicantStaIfaceHal.cancelUsdSubscribe(interfaceName, subscribeId);
+    }
+
+    /**
+     * Send USD message to the peer identified by the peerId and the peerMacAddress.
+     */
+    public boolean sendUsdMessage(String interfaceName, int ownId, int peerId,
+            MacAddress peerMacAddress, byte[] message) {
+        return mSupplicantStaIfaceHal.sendUsdMessage(interfaceName, ownId, peerId, peerMacAddress,
+                message);
     }
 
     /**
@@ -4070,6 +4148,7 @@ public class WifiNative {
         }
         Bundle twtCapabilities = mWifiVendorHal.getTwtCapabilities(ifaceName);
         if (twtCapabilities != null) mCachedTwtCapabilities.put(ifaceName, twtCapabilities);
+        mCachedUsdCapabilities = mSupplicantStaIfaceHal.getUsdCapabilities(ifaceName);
         return featureSet;
     }
 

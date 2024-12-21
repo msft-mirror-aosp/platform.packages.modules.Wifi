@@ -80,10 +80,10 @@ public class UsdManager {
     }
 
     /** @hide */
-    public void sendMessage(int peerId, @NonNull byte[] message, @NonNull Executor executor,
-            @NonNull Consumer<Boolean> resultCallback) {
+    public void sendMessage(int sessionId, int peerId, @NonNull byte[] message,
+            @NonNull Executor executor, @NonNull Consumer<Boolean> resultCallback) {
         try {
-            mService.sendMessage(peerId, message, new IBooleanListener.Stub() {
+            mService.sendMessage(sessionId, peerId, message, new IBooleanListener.Stub() {
                 @Override
                 public void onResult(boolean value) throws RemoteException {
                     Binder.clearCallingIdentity();
