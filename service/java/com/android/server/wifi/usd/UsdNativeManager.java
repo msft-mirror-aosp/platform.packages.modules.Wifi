@@ -51,12 +51,12 @@ public class UsdNativeManager {
         /**
          * Called when publisher is failed to start.
          */
-        void onUsdPublishConfigFailed(int cmdId);
+        void onUsdPublishConfigFailed(int cmdId, @SessionCallback.FailureCode int errorCode);
 
         /**
          * Called when subscriber is failed to start.
          */
-        void onUsdSubscribeConfigFailed(int cmdId);
+        void onUsdSubscribeConfigFailed(int cmdId, @SessionCallback.FailureCode int errorCode);
 
         /**
          * Called when publish session is terminated.

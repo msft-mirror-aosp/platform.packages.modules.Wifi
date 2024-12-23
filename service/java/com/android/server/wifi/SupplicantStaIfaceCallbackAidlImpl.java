@@ -29,6 +29,7 @@ import static com.android.server.wifi.hotspot2.anqp.Constants.ANQPElementType.HS
 import static com.android.server.wifi.hotspot2.anqp.Constants.ANQPElementType.HSWANMetrics;
 
 import android.annotation.NonNull;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.hardware.wifi.supplicant.AnqpData;
 import android.hardware.wifi.supplicant.AssociationRejectionData;
@@ -706,7 +707,8 @@ class SupplicantStaIfaceCallbackAidlImpl extends ISupplicantStaIfaceCallback.Stu
                 Log.e(TAG, "UsdEventsCallback callback is null");
                 return;
             }
-            mStaIfaceHal.getUsdEventsCallback().onUsdPublishConfigFailed(cmdId);
+            mStaIfaceHal.getUsdEventsCallback().onUsdPublishConfigFailed(cmdId,
+                    convertHalToFrameworkUsdConfigErrorCode(errorCode));
         });
     }
 
@@ -717,7 +719,8 @@ class SupplicantStaIfaceCallbackAidlImpl extends ISupplicantStaIfaceCallback.Stu
                 Log.e(TAG, "UsdEventsCallback callback is null");
                 return;
             }
-            mStaIfaceHal.getUsdEventsCallback().onUsdSubscribeConfigFailed(cmdId);
+            mStaIfaceHal.getUsdEventsCallback().onUsdSubscribeConfigFailed(cmdId,
+                    convertHalToFrameworkUsdConfigErrorCode(errorCode));
         });
     }
 
@@ -739,6 +742,19 @@ class SupplicantStaIfaceCallbackAidlImpl extends ISupplicantStaIfaceCallback.Stu
                 return SessionCallback.TERMINATION_REASON_USER_INITIATED;
             default:
                 return SessionCallback.TERMINATION_REASON_UNKNOWN;
+        }
+    }
+
+    @SuppressLint("NewApi")
+    private static @SessionCallback.FailureCode int
+            convertHalToFrameworkUsdConfigErrorCode(int errorCode) {
+        switch (errorCode) {
+            case UsdConfigErrorCode.FAILURE_TIMEOUT:
+                return SessionCallback.FAILURE_TIMEOUT;
+            case UsdConfigErrorCode.FAILURE_NOT_AVAILABLE:
+                return SessionCallback.FAILURE_NOT_AVAILABLE;
+            default:
+                return SessionCallback.FAILURE_UNKNOWN;
         }
     }
 
