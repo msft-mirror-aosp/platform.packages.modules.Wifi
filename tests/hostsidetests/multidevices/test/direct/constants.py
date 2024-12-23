@@ -267,6 +267,19 @@ class WifiP2pGroup:
     return [cls.from_dict(group) for group in groups]
 
 
+@enum.unique
+class ServiceType(enum.IntEnum):
+    """Indicates the type of Wi-Fi p2p services.
+
+    https://developer.android.com/reference/android/net/wifi/p2p/nsd/WifiP2pServiceInfo#summary
+    """
+
+    ALL = 0
+    BONJOUR = 1
+    UPNP = 2
+    WS_DISCOVERY = 3
+
+
 class ServiceData:
     """Constants for Wi-Fi p2p services."""
 
@@ -297,7 +310,7 @@ class ServiceData:
     }
 
     # Expected services to be discovered.
-    ALL_UPNP_SERVICES = [
+    ALL_UPNP_SERVICES = (
         'uuid:6859dede-8574-59ab-9332-123456789011',
         'uuid:6859dede-8574-59ab-9332-123456789011::upnp:rootdevice',
         (
@@ -312,12 +325,12 @@ class ServiceData:
             'uuid:6859dede-8574-59ab-9332-123456789011::urn:schemas-upnp-org:'
             'service:ConnectionManager:1'
         ),
-    ]
-    ALL_DNS_SD = [
+    )
+    ALL_DNS_SD = (
         ('MyPrinter', '_ipp._tcp.local.'),
         ('Example', '_afpovertcp._tcp.local.'),
-    ]
-    ALL_DNS_TXT = [
+    )
+    ALL_DNS_TXT = (
         (
             'myprinter._ipp._tcp.local.',
             {
@@ -326,5 +339,6 @@ class ServiceData:
             },
         ),
         ('example._afpovertcp._tcp.local.', {}),
-    ]
+    )
 
+    UPNP_ROOT_DEVICE = ('uuid:6859dede-8574-59ab-9332-123456789011::upnp:rootdevice')

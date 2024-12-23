@@ -11,7 +11,6 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
 # Lint as: python3
 
 from collections.abc import Sequence
@@ -525,26 +524,12 @@ def set_upnp_response_listener(
     device.upnp_response_listener = upnp_response_listener
 
 
-def unset_upnp_response_listener(
-    device: DeviceState, channel_id: int = DEFAULT_CHANNEL_ID
-):
-    """Unset response listener for Upnp service."""
-    device.ad.wifi.wifiP2pUnsetUpnpResponseListener(channel_id)
-    device.upnp_response_listener = None
-
-
 def set_dns_sd_response_listeners(
     device: DeviceState, channel_id: int = DEFAULT_CHANNEL_ID
 ):
     """Set response listener for Bonjour service."""
     listener = device.ad.wifi.wifiP2pSetDnsSdResponseListeners(channel_id)
     device.dns_sd_response_listener = listener
-
-
-def unset_dns_sd_response_listender(device: DeviceState):
-    """Unset response listener for Bonjour service."""
-    device.ad.wifi.wifiP2pUnsetDnsSdResponseListeners()
-    device.dns_sd_response_listener = None
 
 
 def reset_p2p_service_state(
@@ -585,7 +570,7 @@ def check_discovered_upnp_services(
         )
         return
 
-    expected_services = set(expected_services.copy())
+    expected_services = set(expected_services)
 
     def _all_service_received(event):
         nonlocal expected_services
@@ -600,6 +585,7 @@ def check_discovered_upnp_services(
                 expected_services.remove(service)
         return len(expected_services) == 0
 
+    device.ad.log.debug('Waiting for UpnP services: %s', expected_services)
     try:
         device.upnp_response_listener.waitForEvent(
             event_name=constants.ON_UPNP_SERVICE_AVAILABLE,
@@ -614,7 +600,7 @@ def check_discovered_upnp_services(
 
 def check_discovered_dns_sd_response(
     device: DeviceState,
-    expected_responses: list[tuple[str, str]],
+    expected_responses: Sequence[Sequence[str, str]],
     expected_src_device_address: str,
 ):
     """Check discovered DNS SD responses.
@@ -640,6 +626,8 @@ def check_discovered_dns_sd_response(
         )
         return
 
+    expected_responses = list(expected_responses)
+
     def _all_service_received(event):
         nonlocal expected_responses
         src_device = constants.WifiP2pDevice.from_dict(
@@ -655,6 +643,7 @@ def check_discovered_dns_sd_response(
             expected_responses.remove(service_tuple)
         return len(expected_responses) == 0
 
+    device.ad.log.debug('Waiting for DNS SD services: %s', expected_responses)
     try:
         device.dns_sd_response_listener.waitForEvent(
             event_name=constants.ON_DNS_SD_SERVICE_AVAILABLE,
@@ -669,7 +658,7 @@ def check_discovered_dns_sd_response(
 
 def check_discovered_dns_sd_txt_record(
     device: DeviceState,
-    expected_records: list[tuple[str, dict[str, str]]],
+    expected_records: Sequence[Sequence[str, dict[str, str]]],
     expected_src_device_address: str,
 ):
     """Check discovered DNS SD TXT records.
@@ -695,6 +684,8 @@ def check_discovered_dns_sd_txt_record(
         )
         return
 
+    expected_records = list(expected_records)
+
     def _all_service_received(event):
         nonlocal expected_records
         src_device = constants.WifiP2pDevice.from_dict(
@@ -710,6 +701,7 @@ def check_discovered_dns_sd_txt_record(
             expected_records.remove(record_to_remove)
         return len(expected_records) == 0
 
+    device.ad.log.debug('Waiting for DNS SD TXT records: %s', expected_records)
     try:
         device.dns_sd_response_listener.waitForEvent(
             event_name=constants.ON_DNS_SD_TXT_RECORD_AVAILABLE,

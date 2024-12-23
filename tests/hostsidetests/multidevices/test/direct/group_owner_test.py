@@ -113,12 +113,12 @@ class GroupOwnerTest(base_test.BaseTestClass):
         )
         p2p_utils.check_discovered_dns_sd_response(
             client,
-            expected_responses=[],
+            expected_responses=(),
             expected_src_device_address=group_owner_address,
         )
         p2p_utils.check_discovered_dns_sd_txt_record(
             client,
-            expected_records=[],
+            expected_records=(),
             expected_src_device_address=group_owner_address,
         )
 
@@ -187,7 +187,7 @@ class GroupOwnerTest(base_test.BaseTestClass):
         )
         p2p_utils.check_discovered_upnp_services(
             client,
-            expected_services=[],
+            expected_services=(),
             expected_src_device_address=group_owner_address,
         )
 
@@ -197,6 +197,7 @@ class GroupOwnerTest(base_test.BaseTestClass):
             group_owner,
             constants.WpsInfo.DISPLAY,
         )
+        p2p_utils.reset_p2p_service_state(client, sub_channel_id)
 
     def _add_local_services(self, device: p2p_utils.DeviceState) -> None:
         """Adds local services on the given device."""

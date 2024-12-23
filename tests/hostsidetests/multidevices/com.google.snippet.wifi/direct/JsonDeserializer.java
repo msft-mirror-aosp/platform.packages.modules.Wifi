@@ -61,7 +61,8 @@ public class JsonDeserializer {
         }
         if (jsonObject.has(GROUP_CLIENT_IP_PROVISIONING_MODE)) {
             builder.setGroupClientIpProvisioningMode(
-                    jsonObject.getInt(GROUP_CLIENT_IP_PROVISIONING_MODE));
+                    jsonObject.getInt(GROUP_CLIENT_IP_PROVISIONING_MODE)
+            );
         }
         if (jsonObject.has(GROUP_OPERATING_BAND)) {
             builder.setGroupOperatingBand(jsonObject.getInt(GROUP_OPERATING_BAND));
@@ -77,4 +78,5 @@ public class JsonDeserializer {
         }
         return builder.build();
     }
+
 }

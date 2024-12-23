@@ -486,8 +486,8 @@ public class WifiP2pManagerSnippet implements Snippet {
             String uuid,
             String device,
             JSONArray services,
-            @RpcDefault(value = "0") Integer channelId
-    ) throws Throwable {
+            @RpcDefault(value = "0"
+            ) Integer channelId) throws Throwable {
         WifiP2pManager.Channel channel = getChannel(channelId);
         List<String> serviceList = new ArrayList<String>();
         for (int i = 0; i < services.length(); i++) {
@@ -972,7 +972,7 @@ public class WifiP2pManagerSnippet implements Snippet {
             throws WifiP2pManagerException {
         WifiP2pManager.Channel channel = mChannels.get(channelId);
         if (channel == null) {
-            Log.e(TAG + ": checkAndGetChannel : channel keys" + mChannels.keySet());
+            Log.e(TAG + ": getChannel : channel keys" + mChannels.keySet());
             throw new WifiP2pManagerException(
                     "The channelId " + channelId + " is wrong. Please use the channelId returned "
                             + "by calling `wifiP2pInitialize` or `wifiP2pInitExtraChannel`.");
