@@ -1017,7 +1017,10 @@ public class WifiP2pConfig implements Parcelable {
             config.netId = mNetId;
             config.mGroupClientIpProvisioningMode = mGroupClientIpProvisioningMode;
             config.mJoinExistingGroup = mJoinExistingGroup;
-            config.mPairingBootstrappingConfig = mPairingBootstrappingConfig;
+            if (mPairingBootstrappingConfig != null) {
+                config.mPairingBootstrappingConfig = mPairingBootstrappingConfig;
+                config.wps.setup = WpsInfo.INVALID;
+            }
             config.mIsAuthorizeConnectionFromPeerEnabled = mIsAuthorizeConnectionFromPeerEnabled;
             return config;
         }

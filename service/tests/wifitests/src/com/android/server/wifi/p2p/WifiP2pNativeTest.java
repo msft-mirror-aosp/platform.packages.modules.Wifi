@@ -751,9 +751,9 @@ public class WifiP2pNativeTest extends WifiBaseTest {
      */
     @Test
     public void testJoinGroup() {
-        when(mSupplicantP2pIfaceHalMock.groupAdd(anyBoolean())).thenReturn(true);
-        assertTrue(mWifiP2pNative.p2pGroupAdd(true));
-        verify(mSupplicantP2pIfaceHalMock).groupAdd(eq(true));
+        when(mSupplicantP2pIfaceHalMock.groupAdd(anyBoolean(), anyBoolean())).thenReturn(true);
+        assertTrue(mWifiP2pNative.p2pGroupAdd(true, false));
+        verify(mSupplicantP2pIfaceHalMock).groupAdd(eq(true), eq(false));
     }
 
     /**
@@ -761,9 +761,10 @@ public class WifiP2pNativeTest extends WifiBaseTest {
      */
     @Test
     public void testJoinGroupWithNetworkId() {
-        when(mSupplicantP2pIfaceHalMock.groupAdd(anyInt(), anyBoolean())).thenReturn(true);
-        assertTrue(mWifiP2pNative.p2pGroupAdd(5));
-        verify(mSupplicantP2pIfaceHalMock).groupAdd(eq(5), eq(true));
+        when(mSupplicantP2pIfaceHalMock.groupAdd(anyInt(), anyBoolean(), anyBoolean()))
+                .thenReturn(true);
+        assertTrue(mWifiP2pNative.p2pGroupAdd(5, false));
+        verify(mSupplicantP2pIfaceHalMock).groupAdd(eq(5), eq(true), eq(false));
     }
 
     /**

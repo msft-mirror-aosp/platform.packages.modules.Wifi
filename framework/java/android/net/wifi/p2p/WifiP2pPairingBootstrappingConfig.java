@@ -118,6 +118,21 @@ public final class WifiP2pPairingBootstrappingConfig implements Parcelable {
         }
     }
 
+    /** @hide */
+    public int getPairingBootstrappingMethod() {
+        return mPairingBootstrappingMethod;
+    }
+
+    /** @hide */
+    public String getPairingBootstrappingPassword() {
+        return mPassword;
+    }
+
+    /** @hide */
+    public void setPairingBootstrappingPassword(@NonNull String password) {
+        mPassword = password;
+    }
+
     /**
      * Constructor for a WifiP2pPairingBootstrappingConfig.
      * @param method One of the {@code PAIRING_BOOTSTRAPPING_METHOD_*}.

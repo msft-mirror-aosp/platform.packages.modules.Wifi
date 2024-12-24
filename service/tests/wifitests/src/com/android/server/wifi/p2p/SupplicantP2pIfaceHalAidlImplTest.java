@@ -1261,9 +1261,9 @@ public class SupplicantP2pIfaceHalAidlImplTest extends WifiBaseTest {
     public void testGroupAdd_success() throws Exception {
         doNothing().when(mISupplicantP2pIfaceMock).addGroup(eq(true), eq(3));
         // Default value when service is not initialized.
-        assertFalse(mDut.groupAdd(3, true));
+        assertFalse(mDut.groupAdd(3, true, false));
         executeAndValidateInitializationSequence(false, false);
-        assertTrue(mDut.groupAdd(3, true));
+        assertTrue(mDut.groupAdd(3, true, false));
     }
 
     /**
@@ -1274,7 +1274,7 @@ public class SupplicantP2pIfaceHalAidlImplTest extends WifiBaseTest {
         executeAndValidateInitializationSequence(false, false);
         doThrow(new ServiceSpecificException(SupplicantStatusCode.FAILURE_UNKNOWN))
                 .when(mISupplicantP2pIfaceMock).addGroup(anyBoolean(), anyInt());
-        assertFalse(mDut.groupAdd(0, true));
+        assertFalse(mDut.groupAdd(0, true, false));
         // Check that service is still alive.
         assertTrue(mDut.isInitializationComplete());
     }
@@ -1287,7 +1287,7 @@ public class SupplicantP2pIfaceHalAidlImplTest extends WifiBaseTest {
         executeAndValidateInitializationSequence(false, false);
         doThrow(new RemoteException()).when(mISupplicantP2pIfaceMock)
                 .addGroup(anyBoolean(), anyInt());
-        assertFalse(mDut.groupAdd(0, true));
+        assertFalse(mDut.groupAdd(0, true, false));
         // Check service is dead.
         assertFalse(mDut.isInitializationComplete());
     }
