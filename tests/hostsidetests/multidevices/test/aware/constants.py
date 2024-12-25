@@ -612,3 +612,16 @@ class AndroidVersion(enum.IntEnum):
     S = 12
     T = 13
     U = 14
+
+
+@enum.unique
+class CountryCode(enum.StrEnum):
+    """Country Code abbreviation."""
+    AUSTRALIA = 'AU'
+    CHINA = 'CN'
+    GERMANY = 'DE'
+    JAPAN = 'JP'
+    UK = 'GB'
+    US = 'US'
+    UNKNOWN = 'UNKNOWN'
+
