@@ -188,6 +188,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
             "set-mock-wifimodem-methods",
             "force-overlay-config-value",
             "get-softap-supported-features",
+            "get-wifi-supported-features",
             "get-overlay-config-values"
     };
 
@@ -1014,6 +1015,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                         pw.println("wifi_softap_bridged_ap_with_sta_supported");
                     }
                     return 0;
+                case "get-wifi-supported-features": {
+                    pw.println(mWifiService.getSupportedFeaturesString());
+                    return 0;
+                }
                 case "settings-reset":
                     mWifiNative.stopFakingScanDetails();
                     mWifiNative.resetFakeScanDetails();
@@ -3127,6 +3132,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    and/or 'wifi_softap_bridged_ap_supported',");
         pw.println("    and/or 'wifi_softap_bridged_ap_with_sta_supported',");
         pw.println("    each on a separate line.");
+        pw.println("  get-wifi-supported-features");
+        pw.println("    Gets the features supported by WifiManager");
     }
 
     private void onHelpPrivileged(PrintWriter pw) {
