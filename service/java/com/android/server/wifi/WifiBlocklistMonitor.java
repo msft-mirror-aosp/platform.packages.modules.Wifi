@@ -34,6 +34,8 @@ import android.util.LocalLog;
 import android.util.Log;
 import android.util.SparseArray;
 
+import androidx.annotation.Keep;
+
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.wifi.util.StringUtil;
 import com.android.server.wifi.util.WifiPermissionsUtil;
@@ -733,6 +735,7 @@ public class WifiBlocklistMonitor {
      * Clears the blocklist for BSSIDs associated with the input SSID only.
      * @param ssid
      */
+    @Keep
     public void clearBssidBlocklistForSsid(@NonNull String ssid) {
         int prevSize = mBssidStatusMap.size();
         mBssidStatusMap.entrySet().removeIf(e -> {

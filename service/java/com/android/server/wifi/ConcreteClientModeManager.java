@@ -60,6 +60,8 @@ import android.telephony.ims.stub.ImsRegistrationImplBase;
 import android.text.TextUtils;
 import android.util.Log;
 
+import androidx.annotation.Keep;
+
 import com.android.internal.util.IState;
 import com.android.internal.util.State;
 import com.android.internal.util.StateMachine;
@@ -199,6 +201,7 @@ public class ConcreteClientModeManager implements ClientModeManager {
      * Sets whether this ClientModeManager is for secondary STA with internet.
      * @param secondaryInternet whether the ClientModeManager is for secondary internet.
      */
+    @Keep
     public void setSecondaryInternet(boolean secondaryInternet) {
         // TODO: b/197670907 : Add client role ROLE_CLIENT_SECONDARY_INTERNET
         if (mRole == ROLE_CLIENT_SECONDARY_LONG_LIVED) {
@@ -210,6 +213,7 @@ public class ConcreteClientModeManager implements ClientModeManager {
      * Sets whether this ClientModeManager is for DBS AP multi internet.
      * @param isDbs whether the ClientModeManager is connecting to to the same SSID as primary.
      */
+    @Keep
     public void setSecondaryInternetDbsAp(boolean isDbs) {
         // TODO: b/197670907 : Add client role ROLE_CLIENT_SECONDARY_INTERNET
         if (mRole == ROLE_CLIENT_SECONDARY_LONG_LIVED) {
@@ -1481,8 +1485,8 @@ public class ConcreteClientModeManager implements ClientModeManager {
     }
 
     @Override
-    public @NonNull BitSet getSupportedFeatures() {
-        return getClientMode().getSupportedFeatures();
+    public @NonNull BitSet getSupportedFeaturesBitSet() {
+        return getClientMode().getSupportedFeaturesBitSet();
     }
 
     @Override
