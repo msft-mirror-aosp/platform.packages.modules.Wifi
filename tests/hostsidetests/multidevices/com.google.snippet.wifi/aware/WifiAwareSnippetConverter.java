@@ -19,6 +19,7 @@ package com.google.snippet.wifi.aware;
 import android.net.NetworkRequest;
 import android.net.wifi.aware.PublishConfig;
 import android.net.wifi.aware.SubscribeConfig;
+import android.net.wifi.aware.WifiAwareNetworkSpecifier;
 
 import com.google.android.mobly.snippet.SnippetObjectConverter;
 
@@ -39,6 +40,12 @@ public class WifiAwareSnippetConverter implements SnippetObjectConverter {
         // need to define it here.
         // If the object type is not recognized, you can throw an exception or return null
         // depending on your application's needs.
+        JSONObject result = new JSONObject();
+        if (object instanceof WifiAwareNetworkSpecifier) {
+            WifiAwareNetworkSpecifier frame = (WifiAwareNetworkSpecifier) object;
+            result.put("result", SerializationUtil.parcelableToString(frame));
+            return result;
+        }
         return null;
     }
 
