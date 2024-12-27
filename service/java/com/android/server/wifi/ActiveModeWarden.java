@@ -2000,6 +2000,13 @@ public class ActiveModeWarden {
                 setInitialState(mDisabledState);
             }
             mWifiMetrics.noteWifiEnabledDuringBoot(mSettingsStore.isWifiToggleEnabled());
+            if (mSettingsStore.isWifiToggleEnabled()) {
+                boolean isWifiWakeOn = mWifiInjector.getWakeupController().isUsable();
+                mWifiMetrics.reportWifiStateChanged(true, isWifiWakeOn, false);
+                if (mVerboseLoggingEnabled) {
+                    Log.d(TAG, "logging wifi is on after boot. wifi wake state=" + isWifiWakeOn);
+                }
+            }
 
             // Initialize the lower layers before we start.
             mWifiNative.initialize();
