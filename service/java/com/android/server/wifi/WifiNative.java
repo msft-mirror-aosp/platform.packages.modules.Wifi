@@ -3856,12 +3856,13 @@ public class WifiNative {
     @Nullable
     ScanData getCachedScanResults(String ifaceName) {
         ScanData scanData = mWifiVendorHal.getCachedScanData(ifaceName);
-        if (scanData == null || scanData.getResults() == null) {
+        ScanResult[] scanResults = scanData != null ? scanData.getResults() : null;
+        if (scanResults == null) {
             return null;
         }
-        ScanResult[] results = getCachedScanResultsFilteredByLocationModeEnabled(
-                scanData.getResults());
-        return new ScanData(0, 0, 0, scanData.getScannedBands(), results);
+        ScanResult[] filteredResults = getCachedScanResultsFilteredByLocationModeEnabled(
+                scanResults);
+        return new ScanData(0, 0, 0, scanData.getScannedBands(), filteredResults);
     }
 
     /**
@@ -3892,23 +3893,23 @@ public class WifiNative {
             stats.aggregateLinkLayerStats();
             stats.wifiMloMode = getMloMode();
             ScanData scanData = getCachedScanResults(ifaceName);
-            if (scanData != null && scanData.getResults() != null
-                    && scanData.getResults().length >  0) {
+            ScanResult[] scanResults = scanData != null ? scanData.getResults() : null;
+            if (scanResults != null && scanResults.length > 0) {
                 for (int linkIndex = 0; linkIndex < stats.links.length; ++linkIndex) {
                     List<ScanResultWithSameFreq> ScanResultsSameFreq = new ArrayList<>();
-                    for (int scanResultsIndex = 0; scanResultsIndex < scanData.getResults().length;
+                    for (int scanResultsIndex = 0; scanResultsIndex < scanResults.length;
                             ++scanResultsIndex) {
-                        if (scanData.getResults()[scanResultsIndex].frequency
+                        if (scanResults[scanResultsIndex].frequency
                                 != stats.links[linkIndex].frequencyMhz) {
                             continue;
                         }
                         ScanResultWithSameFreq ScanResultSameFreq = new ScanResultWithSameFreq();
                         ScanResultSameFreq.scan_result_timestamp_micros =
-                            scanData.getResults()[scanResultsIndex].timestamp;
-                        ScanResultSameFreq.rssi = scanData.getResults()[scanResultsIndex].level;
+                            scanResults[scanResultsIndex].timestamp;
+                        ScanResultSameFreq.rssi = scanResults[scanResultsIndex].level;
                         ScanResultSameFreq.frequencyMhz =
-                            scanData.getResults()[scanResultsIndex].frequency;
-                        ScanResultSameFreq.bssid = scanData.getResults()[scanResultsIndex].BSSID;
+                            scanResults[scanResultsIndex].frequency;
+                        ScanResultSameFreq.bssid = scanResults[scanResultsIndex].BSSID;
                         ScanResultsSameFreq.add(ScanResultSameFreq);
                     }
                     stats.links[linkIndex].scan_results_same_freq = ScanResultsSameFreq;
