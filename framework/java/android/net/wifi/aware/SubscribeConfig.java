@@ -100,50 +100,75 @@ public final class SubscribeConfig implements Parcelable {
     @Retention(RetentionPolicy.SOURCE)
     public @interface PeriodicRangingInterval {
     }
-    /* Ranging is not repeated */
-    /** @hide */
+
+    /**
+     * Ranging is not repeated
+     *
+     * @hide
+     */
     @FlaggedApi(FLAG_RANGING_RTT_ENABLED)
     @SystemApi
     public static final int PERIODIC_RANGING_INTERVAL_NONE = 0;
 
-    /* Ranging interval is 128TU [= (128 * 1024) / 1000 = 131.072 ms] */
-    /** @hide */
+    /**
+     * Ranging interval is 128TU [= (128 * 1024) / 1000 = 131.072 ms]
+     *
+     * @hide
+     */
     @FlaggedApi(FLAG_RANGING_RTT_ENABLED)
     @SystemApi
     public static final int PERIODIC_RANGING_INTERVAL_128TU = 128;
 
-    /* Ranging interval is 256TU [= (256 * 1024) / 1000 = 262.144 ms] */
-    /** @hide */
+    /**
+     * Ranging interval is 256TU [= (256 * 1024) / 1000 = 262.144 ms]
+     *
+     * @hide
+     */
     @FlaggedApi(FLAG_RANGING_RTT_ENABLED)
     @SystemApi
     public static final int PERIODIC_RANGING_INTERVAL_256TU = 256;
 
-    /* Ranging interval is 512TU [= (512 * 1024) / 1000 = 524.288 ms] */
-    /** @hide */
+    /**
+     * Ranging interval is 512TU [= (512 * 1024) / 1000 = 524.288 ms]
+     *
+     * @hide
+     */
     @FlaggedApi(FLAG_RANGING_RTT_ENABLED)
     @SystemApi
     public static final int PERIODIC_RANGING_INTERVAL_512TU = 512;
 
-    /* Ranging interval is 1024TU [= (1024 * 1024) / 1000 = 1048.576 ms] */
-    /** @hide */
+    /**
+     * Ranging interval is 1024TU [= (1024 * 1024) / 1000 = 1048.576 ms]
+     *
+     * @hide
+     */
     @FlaggedApi(FLAG_RANGING_RTT_ENABLED)
     @SystemApi
     public static final int PERIODIC_RANGING_INTERVAL_1024TU = 1024;
 
-    /* Ranging interval is 2048TU [= (2048 * 1024) / 1000 = 2097.152 ms] */
-    /** @hide */
+    /**
+     * Ranging interval is 2048TU [= (2048 * 1024) / 1000 = 2097.152 ms]
+     *
+     * @hide
+     */
     @FlaggedApi(FLAG_RANGING_RTT_ENABLED)
     @SystemApi
     public static final int PERIODIC_RANGING_INTERVAL_2048TU = 2048;
 
-    /* Ranging interval is 4096TU [= (4096 * 1024) / 1000 = 4194.304 ms] */
-    /** @hide */
+    /**
+     * Ranging interval is 4096TU [= (4096 * 1024) / 1000 = 4194.304 ms]
+     *
+     * @hide
+     */
     @FlaggedApi(FLAG_RANGING_RTT_ENABLED)
     @SystemApi
     public static final int PERIODIC_RANGING_INTERVAL_4096TU = 4096;
 
-    /* Ranging interval is 8192TU [= (8192 * 1024) / 1000 = 8388.608 ms] */
-    /** @hide */
+    /**
+     * Ranging interval is 8192TU [= (8192 * 1024) / 1000 = 8388.608 ms]
+     *
+     * @hide
+     */
     @FlaggedApi(FLAG_RANGING_RTT_ENABLED)
     @SystemApi
     public static final int PERIODIC_RANGING_INTERVAL_8192TU = 8192;

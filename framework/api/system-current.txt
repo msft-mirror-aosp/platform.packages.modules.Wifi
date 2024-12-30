@@ -1528,7 +1528,7 @@ package android.net.wifi.aware {
   }
 
   public final class Characteristics implements android.os.Parcelable {
-    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public int getMaxSupportedRangingPktBandwidth();
+    method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public int getMaxSupportedRangingPacketBandwidth();
     method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public int getMaxSupportedRxChains();
     method @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public boolean isPeriodicRangingSupported();
     field @FlaggedApi("com.android.ranging.flags.ranging_rtt_enabled") public static final int SUPPORTED_RX_CHAINS_1 = 1; // 0x1

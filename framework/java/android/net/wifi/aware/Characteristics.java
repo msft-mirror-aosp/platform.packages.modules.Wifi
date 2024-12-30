@@ -270,7 +270,7 @@ public final class Characteristics implements Parcelable {
      */
     @FlaggedApi(FLAG_RANGING_RTT_ENABLED)
     @SystemApi
-    public @WifiAnnotations.ChannelWidth int getMaxSupportedRangingPktBandwidth() {
+    public @WifiAnnotations.ChannelWidth int getMaxSupportedRangingPacketBandwidth() {
         return mCharacteristics.getInt(KEY_MAX_SUPPORTED_RANGING_PKT_BANDWIDTH);
     }
 
