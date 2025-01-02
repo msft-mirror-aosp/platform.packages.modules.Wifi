@@ -285,6 +285,28 @@ class ServiceData:
 
     # Service configurations.
     # Configuration for Bonjour IPP local service.
+    IPP_DNS_SD = (('MyPrinter', '_ipp._tcp.local.'),)
+    AFP_DNS_SD = (('Example', '_afpovertcp._tcp.local.'),)
+    ALL_DNS_SD = (
+        ('MyPrinter', '_ipp._tcp.local.'),
+        ('Example', '_afpovertcp._tcp.local.'),
+    )
+
+    IPP_DNS_TXT = (
+        ('myprinter._ipp._tcp.local.', {
+            'txtvers': '1',
+            'pdl': 'application/postscript'
+        }),
+    )
+    AFP_DNS_TXT = (('example._afpovertcp._tcp.local.', {}),)
+    ALL_DNS_TXT = (('myprinter._ipp._tcp.local.',
+                    {
+                        'txtvers': '1',
+                        'pdl': 'application/postscript'
+                    }
+                    ), ('example._afpovertcp._tcp.local.', {}),)
+
+    # Configuration for IPP local service.
     DEFAULT_IPP_SERVICE_CONF = {
         'instance_name': 'MyPrinter',
         'service_type': '_ipp._tcp',
@@ -326,19 +348,13 @@ class ServiceData:
             'service:ConnectionManager:1'
         ),
     )
-    ALL_DNS_SD = (
-        ('MyPrinter', '_ipp._tcp.local.'),
-        ('Example', '_afpovertcp._tcp.local.'),
-    )
-    ALL_DNS_TXT = (
-        (
-            'myprinter._ipp._tcp.local.',
-            {
-                'txtvers': '1',
-                'pdl': 'application/postscript',
-            },
-        ),
-        ('example._afpovertcp._tcp.local.', {}),
-    )
 
-    UPNP_ROOT_DEVICE = ('uuid:6859dede-8574-59ab-9332-123456789011::upnp:rootdevice')
+    UPNP_ROOT_DEVICE = ('uuid:6859dede-8574-59ab-9332-123456789011::upnp:rootdevice',)
+
+
+class WifiP2pManagerConstants:
+    """Constants for Wi-Fi p2p manager.
+
+    https://developer.android.com/reference/android/net/wifi/p2p/WifiP2pManager#NO_SERVICE_REQUESTS
+    """
+    NO_SERVICE_REQUESTS = 3

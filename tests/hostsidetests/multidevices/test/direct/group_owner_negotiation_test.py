@@ -147,8 +147,10 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
         )
 
     def _teardown_device(self, ad: android_device.AndroidDevice):
-        p2p_utils.teardown_wifi_p2p(ad)
-        ad.services.create_output_excerpts_all(self.current_test_info)
+        try:
+            p2p_utils.teardown_wifi_p2p(ad)
+        finally:
+            ad.services.create_output_excerpts_all(self.current_test_info)
 
     def teardown_test(self) -> None:
         utils.concurrent_exec(

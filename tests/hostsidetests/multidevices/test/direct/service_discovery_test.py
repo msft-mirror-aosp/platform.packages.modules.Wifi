@@ -20,6 +20,7 @@ import logging
 from android.platform.test.annotations import ApiTest
 from direct import constants
 from direct import p2p_utils
+from mobly import asserts
 from mobly import base_test
 from mobly import records
 from mobly import test_runner
@@ -74,7 +75,7 @@ class ServiceDiscoveryTest(base_test.BaseTestClass):
         ad.wifi.wifiClearConfiguredNetworks()
         ad.wifi.wifiEnable()
 
-    def test_search_all_services_1(self) -> None:
+    def test_search_all_services_01(self) -> None:
         """Searches all p2p services with API
         `WifiP2pServiceRequest.newInstance(WifiP2pServiceInfo.SERVICE_TYPE_ALL)`.
 
@@ -100,7 +101,7 @@ class ServiceDiscoveryTest(base_test.BaseTestClass):
             expected_upnp_sequence=constants.ServiceData.ALL_UPNP_SERVICES,
         )
 
-    def test_search_all_services_2(self) -> None:
+    def test_search_all_services_02(self) -> None:
         """Searches all p2p services with API
         `WifiP2pServiceRequest.newInstance(SERVICE_TYPE_BONJOUR/SERVICE_TYPE_UPNP)`
 
@@ -130,7 +131,7 @@ class ServiceDiscoveryTest(base_test.BaseTestClass):
             expected_upnp_sequence=constants.ServiceData.ALL_UPNP_SERVICES,
         )
 
-    def test_search_all_services_3(self) -> None:
+    def test_search_all_services_03(self) -> None:
         """Searches all p2p services with API `WifiP2pDnsSdServiceRequest.newInstance()`
         and `WifiP2pUpnpServiceRequest.newInstance()`.
 
@@ -156,6 +157,401 @@ class ServiceDiscoveryTest(base_test.BaseTestClass):
             expected_upnp_sequence=constants.ServiceData.ALL_UPNP_SERVICES,
         )
 
+    def test_serv_req_dns_ptr(self) -> None:
+        """Searches Bonjour services with Bonjour domain.
+
+        Test Steps:
+            1. Initialize Wi-Fi p2p on both devices.
+            2. Add local services UPnP and Bonjour and initiate peer discovery on one device
+               (responder).
+            3. Add Bonjour service request with service type `_ipp._tcp`.
+            4. Initiate p2p service discovery on the requester. Verify that the requester discovers
+               expected services.
+        """
+        requester, responder = self._setup_wifi_p2p()
+        self._add_p2p_services(responder)
+        requester.ad.wifi.wifiP2pAddBonjourServiceRequest(
+            None,  # instanceName
+            '_ipp._tcp',
+        )
+        self._search_p2p_services(
+            responder,
+            requester,
+            expected_dns_sd_sequence=constants.ServiceData.IPP_DNS_SD,
+            expected_dns_txt_sequence=(),
+            expected_upnp_sequence=(),
+        )
+
+    def test_serv_req_dns_txt(self) -> None:
+        """Searches Bonjour services with TXT record.
+
+        Test Steps:
+            1. Initialize Wi-Fi p2p on both devices.
+            2. Add local services UPnP and Bonjour and initiate peer discovery on one device
+               (responder).
+            3. Add Bonjour service request with instance name `MyPrinter` and
+               service type `_ipp._tcp`.
+            4. Initiate p2p service discovery on the requester. Verify that the requester discovers
+               expected services.
+        """
+        requester, responder = self._setup_wifi_p2p()
+        self._add_p2p_services(responder)
+        requester.ad.wifi.wifiP2pAddBonjourServiceRequest(
+            'MyPrinter',
+            '_ipp._tcp',
+        )
+        self._search_p2p_services(
+            responder,
+            requester,
+            expected_dns_sd_sequence=(),
+            expected_dns_txt_sequence=constants.ServiceData.IPP_DNS_TXT,
+            expected_upnp_sequence=(),
+        )
+
+    def test_serv_req_upnp_all(self) -> None:
+        """Searches all UPnP services with service type `ssdp:all`.
+
+        Test Steps:
+            1. Initialize Wi-Fi p2p on both devices.
+            2. Add local services UPnP and Bonjour and initiate peer discovery on one device
+               (responder).
+            3. Add UPnP service request with service type `ssdp:all`.
+            4. Initiate p2p service discovery on the requester. Verify that the requester discovers
+               expected services.
+        """
+        requester, responder = self._setup_wifi_p2p()
+        self._add_p2p_services(responder)
+        requester.ad.wifi.wifiP2pAddUpnpServiceRequest('ssdp:all')
+        self._search_p2p_services(
+            responder,
+            requester,
+            expected_dns_sd_sequence=(),
+            expected_dns_txt_sequence=(),
+            expected_upnp_sequence=constants.ServiceData.ALL_UPNP_SERVICES,
+        )
+
+    def test_serv_req_upnp_root_device(self) -> None:
+        """Searches UPnP root devices.
+
+        Test Steps:
+            1. Initialize Wi-Fi p2p on both devices.
+            2. Add local services UPnP and Bonjour and initiate peer discovery on one device
+               (responder).
+            3. Add UPnP service request with service type `upnp:rootdevice`.
+            4. Initiate p2p service discovery on the requester. Verify that the requester discovers
+               expected services.
+        """
+        requester, responder = self._setup_wifi_p2p()
+        self._add_p2p_services(responder)
+        requester.ad.wifi.wifiP2pAddUpnpServiceRequest('upnp:rootdevice')
+        self._search_p2p_services(
+            responder,
+            requester,
+            expected_dns_sd_sequence=(),
+            expected_dns_txt_sequence=(),
+            expected_upnp_sequence=constants.ServiceData.UPNP_ROOT_DEVICE,
+        )
+
+    def test_serv_req_remove_request(self) -> None:
+        """Checks that API `WifiP2pManager#removeServiceRequest` works well.
+
+        Test Steps:
+            1. Initialize Wi-Fi p2p on both devices.
+            2. Add local services UPnP and Bonjour and initiate peer discovery on one device
+               (responder).
+            3. Add 2 UPnP service requests and 2 Bonjour service requests on the
+               requester.
+            4. Removes 3 of the 4 added requests.
+            5. Initiate p2p service discovery on the requester. Verify that the requester
+               only discovers services corresponds to the remaining request.
+        """
+        requester, responder = self._setup_wifi_p2p()
+        self._add_p2p_services(responder)
+
+        # Add requests
+        requester.ad.log.info('Adding service requests.')
+        upnp_req_1_id = requester.ad.wifi.wifiP2pAddUpnpServiceRequest()
+        requester.ad.wifi.wifiP2pAddUpnpServiceRequest('ssdp:all')
+        bonjour_req_1_id = requester.ad.wifi.wifiP2pAddBonjourServiceRequest()
+        bonjour_req_2_id = requester.ad.wifi.wifiP2pAddBonjourServiceRequest(
+            None,  # instanceName
+            '_ipp._tcp',
+        )
+
+        # Remove 3 of the 4 added requests except for ssdp:all
+        requester.ad.log.info('Removing service requests.')
+        requester.ad.wifi.wifiP2pRemoveServiceRequest(upnp_req_1_id)
+        requester.ad.wifi.wifiP2pRemoveServiceRequest(bonjour_req_1_id)
+        requester.ad.wifi.wifiP2pRemoveServiceRequest(bonjour_req_2_id)
+
+        # Initialize test listener.
+        p2p_utils.set_upnp_response_listener(requester)
+        p2p_utils.set_dns_sd_response_listeners(requester)
+        # Search service
+        requester.ad.wifi.wifiP2pDiscoverServices()
+
+        # Initiates service discovery and check expected services.
+        p2p_utils.check_discovered_services(
+            requester,
+            responder.p2p_device.device_address,
+            expected_dns_sd_sequence=(),
+            expected_dns_txt_sequence=(),
+            expected_upnp_sequence=constants.ServiceData.ALL_UPNP_SERVICES
+        )
+
+    def test_serv_req_clear_request(self) -> None:
+        """Checks that API `WifiP2pManager#clearServiceRequests` works well.
+
+        Test Steps:
+            1. Initialize Wi-Fi p2p on both devices.
+            2. Add local services UPnP and Bonjour and initiate peer discovery on one device
+               (responder).
+            3. Add 2 UPnP service requests and 2 Bonjour service requests on the
+               requester.
+            4. Clears all added requests.
+            5. Initiate p2p service discovery on the requester. Verify that the service
+               discovery should fail due to no service request.
+        """
+        requester, responder = self._setup_wifi_p2p()
+        self._add_p2p_services(responder)
+
+        # Add requests
+        requester.ad.log.info('Adding service requests.')
+        requester.ad.wifi.wifiP2pAddUpnpServiceRequest()
+        requester.ad.wifi.wifiP2pAddUpnpServiceRequest('ssdp:all')
+        requester.ad.wifi.wifiP2pAddBonjourServiceRequest()
+        requester.ad.wifi.wifiP2pAddBonjourServiceRequest(
+            None,  # instanceName
+            '_ipp._tcp',
+        )
+
+        # Clear requests
+        requester.ad.log.info('Clearing all service requests.')
+        requester.ad.wifi.wifiP2pClearServiceRequests()
+
+        # Search services, but NO_SERVICE_REQUESTS is returned.
+        requester.ad.log.info('Initiating service discovery.')
+        expect_error_code = constants.WifiP2pManagerConstants.NO_SERVICE_REQUESTS
+        with asserts.assert_raises_regex(
+            Exception,
+            f'reason_code={str(expect_error_code)}',
+            extras='Service discovery should fail due to no service request.',
+        ):
+            requester.ad.wifi.wifiP2pDiscoverServices()
+
+    def test_serv_req_multi_channel_01(self) -> None:
+        """Searches all UPnP services on channel1 and all Bonjour services on
+        channel2.
+
+        Test Steps:
+            1. Initialize Wi-Fi p2p on both devices. This initializes p2p channel
+               channel1.
+            2. Add local services UPnP and Bonjour and initiate peer discovery on one device
+               (responder).
+            3. Initialize an extra p2p channel channel2 on another device (requester).
+            4. Add a UPnP service request to channel1.
+            5. Add a Bonjour request to channel2.
+            6. Initiate p2p service discovery on channel1. Verify that the requester
+               discovers UPnP services on channel1 and Bonjour services on channel2.
+        """
+        requester, responder = self._setup_wifi_p2p()
+        self._add_p2p_services(responder)
+        channel1 = requester.channel_ids[0]
+        channel2 = p2p_utils.init_extra_channel(requester)
+
+        requester.ad.log.info('Adding service requests.')
+        # Add UPnP request to the channel 1.
+        requester.ad.wifi.wifiP2pAddUpnpServiceRequest(
+            None,  # serviceType
+            channel1,
+        )
+        # Add UPnP request to channel 2.
+        requester.ad.wifi.wifiP2pAddBonjourServiceRequest(
+            None,  # instanceName
+            None,  # serviceType
+            channel2,
+        )
+
+        # Set service listener.
+        requester.ad.log.info('Setting service listeners.')
+        p2p_utils.set_upnp_response_listener(requester, channel1)
+        p2p_utils.set_dns_sd_response_listeners(requester, channel1)
+        p2p_utils.set_upnp_response_listener(requester, channel2)
+        p2p_utils.set_dns_sd_response_listeners(requester, channel2)
+
+        # Discover services
+        requester.ad.log.info('Initiating service discovery.')
+        requester.ad.wifi.wifiP2pDiscoverServices(channel1)
+        responder_address = responder.p2p_device.device_address
+
+        # Check discovered services
+        # Channel1 receive only UPnP service.
+        requester.ad.log.info('Checking services on channel %d.', channel1)
+        p2p_utils.check_discovered_services(
+            requester,
+            responder.p2p_device.device_address,
+            expected_dns_sd_sequence=(),
+            expected_dns_txt_sequence=(),
+            expected_upnp_sequence=constants.ServiceData.ALL_UPNP_SERVICES,
+            channel_id=channel1,
+        )
+        # Channel2 receive only Bonjour service.
+        requester.ad.log.info('Checking services on channel %d.', channel2)
+        p2p_utils.check_discovered_services(
+            requester,
+            responder.p2p_device.device_address,
+            expected_dns_sd_sequence=constants.ServiceData.ALL_DNS_SD,
+            expected_dns_txt_sequence=constants.ServiceData.ALL_DNS_TXT,
+            expected_upnp_sequence=(),
+            channel_id=channel2,
+        )
+
+        # Clean up.
+        p2p_utils.reset_p2p_service_state(requester.ad, channel1)
+        p2p_utils.reset_p2p_service_state(requester.ad, channel2)
+
+    def test_serv_req_multi_channel_02(self) -> None:
+        """Searches Bonjour IPP PTR service on channel1 and AFP TXT service on channel2.
+
+        Test Steps:
+            1. Initialize Wi-Fi p2p on both devices. This initializes p2p channel
+               channel1.
+            2. Add local services UPnP and Bonjour and initiate peer discovery on one device
+               (responder).
+            3. Initialize an extra p2p channel channel2 on another device (requester).
+            4. Add a Bonjour IPP PTR request to channel1.
+            5. Add a Bonjour AFP TXT request to channel2.
+            6. Initiate p2p service discovery on channel1. Verify that the requester
+               discovers IPP PTR services on channel1 and AFP TXT services on channel2.
+        """
+        requester, responder = self._setup_wifi_p2p()
+        self._add_p2p_services(responder)
+        channel1 = requester.channel_ids[0]
+        channel2 = p2p_utils.init_extra_channel(requester)
+
+        # Add Bonjour IPP PRT request to channel1.
+        requester.ad.log.info('Adding service requests.')
+        requester.ad.wifi.wifiP2pAddBonjourServiceRequest(
+            None,  # instanceName
+            '_ipp._tcp',
+            channel1,
+        )
+
+        # Add Bonjour AFP TXT request to channel2.
+        requester.ad.wifi.wifiP2pAddBonjourServiceRequest(
+            'Example',
+            '_afpovertcp._tcp',
+            channel2,
+        )
+
+        # Initialize listener test objects.
+        requester.ad.log.info('Setting service listeners.')
+        p2p_utils.set_upnp_response_listener(requester, channel1)
+        p2p_utils.set_dns_sd_response_listeners(requester, channel1)
+        p2p_utils.set_upnp_response_listener(requester, channel2)
+        p2p_utils.set_dns_sd_response_listeners(requester, channel2)
+
+        # Discover services
+        requester.ad.log.info('Initiating service discovery.')
+        requester.ad.wifi.wifiP2pDiscoverServices(channel1)
+        responder_address = responder.p2p_device.device_address
+
+        # Check discovered services
+        # Channel1 receive only Bonjour IPP PTR.
+        requester.ad.log.info('Checking services on channel %d.', channel1)
+        p2p_utils.check_discovered_services(
+            requester,
+            responder.p2p_device.device_address,
+            expected_dns_sd_sequence=constants.ServiceData.IPP_DNS_SD,
+            expected_dns_txt_sequence=(),
+            expected_upnp_sequence=(),
+            channel_id=channel1,
+        )
+        # Channel2 receive only Bonjour AFP TXT.
+        requester.ad.log.info('Checking services on channel %d.', channel2)
+        p2p_utils.check_discovered_services(
+            requester,
+            responder.p2p_device.device_address,
+            expected_dns_sd_sequence=(),
+            expected_dns_txt_sequence=constants.ServiceData.AFP_DNS_TXT,
+            expected_upnp_sequence=(),
+            channel_id=channel2,
+        )
+
+        # Clean up.
+        p2p_utils.reset_p2p_service_state(requester.ad, channel1)
+        p2p_utils.reset_p2p_service_state(requester.ad, channel2)
+
+    def test_serv_req_multi_channel_03(self) -> None:
+        """Checks that `removeServiceRequest` and `clearServiceRequests` have no
+        effect against another channel.
+
+        Test Steps:
+            1. Initialize Wi-Fi p2p on both devices. This initializes p2p channel
+               channel1.
+            2. Add local services UPnP and Bonjour and initiate peer discovery on one device
+               (responder).
+            3. Initialize an extra p2p channel channel2 on another device (requester).
+            4. Add a Bonjour request to channel1.
+            5. Try to remove the request of channel1 on channel2. This should
+               not have effect.
+            6. Try to clear service requests on channel2. This should not have
+               effect.
+            4. Add a Bonjour request to channel2.
+            5. Initiate p2p service discovery on channel1. Verify that the requester
+               discovers Bonjour services but not UPnP services on channel1.
+        """
+        requester, responder = self._setup_wifi_p2p()
+        self._add_p2p_services(responder)
+        channel1 = requester.channel_ids[0]
+        channel2 = p2p_utils.init_extra_channel(requester)
+
+        # Add Bonjour request to channel1.
+        requester.ad.log.info('Adding service request to channel %d', channel1)
+        bonjour_req_id = requester.ad.wifi.wifiP2pAddBonjourServiceRequest(
+            None,  # instanceName
+            None,  # serviceType
+            channel1,
+        )
+        requester.ad.log.info('Added request %d', bonjour_req_id)
+
+        # Try to remove the Bonjour request of channel1 on channel2.
+        # However, it should silently succeed but have no effect
+        requester.ad.log.info('Removing the request %d from channel %d', bonjour_req_id, channel1)
+        requester.ad.wifi.wifiP2pRemoveServiceRequest(bonjour_req_id, channel2)
+
+        # Clear the all requests on channel2.
+        # However, it should silently succeed but have no effect
+        requester.ad.log.info('Clearing service requests on channel %d', channel2)
+        requester.ad.wifi.wifiP2pClearServiceRequests(channel2)
+
+        # Initialize service listeners.
+        requester.ad.log.info('Setting service listeners on both channels.')
+        p2p_utils.set_upnp_response_listener(requester, channel1)
+        p2p_utils.set_dns_sd_response_listeners(requester, channel1)
+        p2p_utils.set_upnp_response_listener(requester, channel2)
+        p2p_utils.set_dns_sd_response_listeners(requester, channel2)
+
+        # Discover services
+        requester.ad.log.info('Initiating service discovery.')
+        requester.ad.wifi.wifiP2pDiscoverServices(channel1)
+        responder_address = responder.p2p_device.device_address
+
+        # Check that Bonjour response can be received on channel1
+        requester.ad.log.info('Checking Bonjour services on channel %d.', channel1)
+        p2p_utils.check_discovered_services(
+            requester,
+            responder.p2p_device.device_address,
+            expected_dns_sd_sequence=constants.ServiceData.ALL_DNS_SD,
+            expected_dns_txt_sequence=constants.ServiceData.AFP_DNS_TXT,
+            expected_upnp_sequence=(),
+            channel_id=channel1,
+        )
+
+        # Clean up.
+        p2p_utils.reset_p2p_service_state(requester.ad, channel1)
+        p2p_utils.reset_p2p_service_state(requester.ad, channel2)
+
     def _search_p2p_services(
         self,
         responder: p2p_utils.DeviceState,
@@ -173,26 +569,18 @@ class ServiceDiscoveryTest(base_test.BaseTestClass):
             expected_dns_txt_sequence: Expected DNS TXT records.
             expected_upnp_sequence: Expected UPNP services.
         """
-        requester.ad.log.info('Searching for expected services.')
+        requester.ad.log.info('Initiating service discovery.')
         p2p_utils.set_upnp_response_listener(requester)
         p2p_utils.set_dns_sd_response_listeners(requester)
         requester.ad.wifi.wifiP2pDiscoverServices()
 
-        responder_address = responder.p2p_device.device_address
-        p2p_utils.check_discovered_dns_sd_response(
+        requester.ad.log.info('Checking discovered services.')
+        p2p_utils.check_discovered_services(
             requester,
-            expected_responses=expected_dns_sd_sequence,
-            expected_src_device_address=responder_address,
-        )
-        p2p_utils.check_discovered_dns_sd_txt_record(
-            requester,
-            expected_records=expected_dns_txt_sequence,
-            expected_src_device_address=responder_address,
-        )
-        p2p_utils.check_discovered_upnp_services(
-            requester,
-            expected_services=expected_upnp_sequence,
-            expected_src_device_address=responder_address,
+            responder.p2p_device.device_address,
+            expected_dns_sd_sequence=expected_dns_sd_sequence,
+            expected_dns_txt_sequence=expected_dns_txt_sequence,
+            expected_upnp_sequence=expected_upnp_sequence,
         )
 
     def _add_p2p_services(self, responder: p2p_utils.DeviceState):
@@ -220,11 +608,10 @@ class ServiceDiscoveryTest(base_test.BaseTestClass):
         return requester, responder
 
     def _teardown_wifi_p2p(self, ad: android_device.AndroidDevice):
-        p2p_utils.reset_p2p_service_state(ad)
-        p2p_utils.teardown_wifi_p2p(ad)
-        ad.services.create_output_excerpts_all(
-            self.current_test_info
-        )
+        try:
+            p2p_utils.teardown_wifi_p2p(ad)
+        finally:
+            ad.services.create_output_excerpts_all(self.current_test_info)
 
     def teardown_test(self) -> None:
         utils.concurrent_exec(
