@@ -700,7 +700,7 @@ class SupplicantStaIfaceCallbackAidlImpl extends ISupplicantStaIfaceCallback.Stu
     }
 
     @Override
-    public void onUsdPublishConfigFailed(int cmdId) {
+    public void onUsdPublishConfigFailed(int cmdId, int errorCode) {
         mEventHandler.post(() -> {
             if (mStaIfaceHal.getUsdEventsCallback() == null) {
                 Log.e(TAG, "UsdEventsCallback callback is null");
@@ -711,7 +711,7 @@ class SupplicantStaIfaceCallbackAidlImpl extends ISupplicantStaIfaceCallback.Stu
     }
 
     @Override
-    public void onUsdSubscribeConfigFailed(int cmdId) {
+    public void onUsdSubscribeConfigFailed(int cmdId, int errorCode) {
         mEventHandler.post(() -> {
             if (mStaIfaceHal.getUsdEventsCallback() == null) {
                 Log.e(TAG, "UsdEventsCallback callback is null");
