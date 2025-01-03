@@ -81,6 +81,7 @@ import android.os.RemoteException;
 import android.os.WorkSource;
 import android.os.connectivity.WifiActivityEnergyInfo;
 import android.security.advancedprotection.AdvancedProtectionFeature;
+import android.security.advancedprotection.AdvancedProtectionManager;
 import android.telephony.SubscriptionInfo;
 import android.text.TextUtils;
 import android.util.ArraySet;
@@ -13220,8 +13221,8 @@ public class WifiManager {
         }
         List<AdvancedProtectionFeature> features = new ArrayList<>();
         if (Flags.wepDisabledInApm()) {
-            // TODO: b/362586268 Change to AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP
-            features.add(new AdvancedProtectionFeature("WEP"));
+            features.add(new AdvancedProtectionFeature(
+                    AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP));
         }
         return features;
     }
