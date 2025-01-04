@@ -487,11 +487,22 @@ public class WifiApConfigStore {
     /**
      * Generate a temporary WPA2 based configuration for use by the local only hotspot.
      * This config is not persisted and will not be stored by the WifiApConfigStore.
+     *
+     * @param context the context of wifi.
+     * @param customConfig customzied softap configuration.
+     * @param capability current softap capability.
+     * @param isExclusive whether customConfig is exclusive (set by privledged app).
+     * @return configuration of local only hotspot.
      */
     public SoftApConfiguration generateLocalOnlyHotspotConfig(@NonNull WifiContext context,
-            @Nullable SoftApConfiguration customConfig, @NonNull SoftApCapability capability) {
+            @Nullable SoftApConfiguration customConfig, @NonNull SoftApCapability capability,
+            boolean isExclusive) {
         SoftApConfiguration.Builder configBuilder;
-        if (customConfig != null) {
+        boolean wasSsidAssigned = false;
+        if (customConfig != null && isExclusive) {
+            if (!TextUtils.isEmpty(customConfig.getSsid())) {
+                wasSsidAssigned = true;
+            }
             configBuilder = new SoftApConfiguration.Builder(customConfig);
             // Make sure that we use available band on old build.
             if (!SdkLevel.isAtLeastT()
@@ -500,8 +511,12 @@ public class WifiApConfigStore {
             }
         } else {
             configBuilder = new SoftApConfiguration.Builder();
-            // Make sure the default band configuration is supported.
-            configBuilder.setBand(generateDefaultBand(context));
+            if (customConfig != null && SdkLevel.isAtLeastS()) {
+                configBuilder.setChannels(customConfig.getChannels());
+            } else {
+                // Make sure the default band configuration is supported.
+                configBuilder.setBand(generateDefaultBand(context));
+            }
             // Default to disable the auto shutdown
             configBuilder.setAutoShutdownEnabled(false);
             try {
@@ -543,7 +558,8 @@ public class WifiApConfigStore {
             }
             configBuilder.setBand(desiredBand);
         }
-        if (customConfig == null || customConfig.getSsid() == null) {
+
+        if (!wasSsidAssigned) {
             configBuilder.setSsid(generateLohsSsid(context));
         }
 
