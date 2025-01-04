@@ -1014,6 +1014,9 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     if (mWifiService.isFeatureSupported(WifiManager.WIFI_FEATURE_STA_BRIDGED_AP)) {
                         pw.println("wifi_softap_bridged_ap_with_sta_supported");
                     }
+                    if (mWifiNative.isMLDApSupportMLO()) {
+                        pw.println("wifi_softap_mlo_supported");
+                    }
                     return 0;
                 case "get-wifi-supported-features": {
                     pw.println(mWifiService.getSupportedFeaturesString());
@@ -3131,6 +3134,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    and/or 'wifi_softap_wpa3_sae_supported',");
         pw.println("    and/or 'wifi_softap_bridged_ap_supported',");
         pw.println("    and/or 'wifi_softap_bridged_ap_with_sta_supported',");
+        pw.println("    and/or 'wifi_softap_mlo_supported',");
         pw.println("    each on a separate line.");
         pw.println("  get-wifi-supported-features");
         pw.println("    Gets the features supported by WifiManager");
