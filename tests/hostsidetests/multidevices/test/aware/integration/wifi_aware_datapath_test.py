@@ -937,6 +937,40 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
             return None
         return res.group(1)
 
+    def get_network_specifier(self, dut, id, dev_type, peer_mac, sec, net_work_request_id):
+        """Create a network specifier for the device based on the security
+        configuration.
+
+        Args:
+        dut: device
+        id: session ID
+        dev_type: device type - Initiator or Responder
+        peer_mac: the discovery MAC address of the peer
+        sec: security configuration
+        """
+        if sec is None:
+            network_specifier_parcel = (
+                dut.wifi_aware_snippet.createNetworkSpecifierOob(
+                id, dev_type, peer_mac, None, None)
+                )
+        if isinstance(sec, str):
+            network_specifier_parcel = (
+                dut.wifi_aware_snippet.createNetworkSpecifierOob(
+                id, dev_type, peer_mac, sec, None)
+                )
+        else:
+            network_specifier_parcel = (
+                dut.wifi_aware_snippet.createNetworkSpecifierOob(
+                id, dev_type, peer_mac, None, sec)
+                )
+        network_request_dict = constants.NetworkRequest(
+            transport_type=constants.NetworkCapabilities.Transport.TRANSPORT_WIFI_AWARE,
+            network_specifier_parcel=network_specifier_parcel["result"],
+        ).to_dict()
+        return dut.wifi_aware_snippet.connectivityRequestNetwork(
+            net_work_request_id, network_request_dict, _REQUEST_NETWORK_TIMEOUT_MS
+        )
+
     #######################################
     # Positive In-Band (IB) tests key:
     #
@@ -1622,6 +1656,250 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
             i_network_callback_event.callback_id)
         resp_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
             r_network_callback_event.callback_id)
+
+    def run_multiple_ndi(self, sec_configs, flip_init_resp=False):
+        """Validate that the device can create and use multiple NDIs.
+
+        The security configuration can be:
+        - None: open
+        - String: passphrase
+        - otherwise: PMK (byte array)
+
+        Args:
+        sec_configs: list of security configurations
+        flip_init_resp: if True the roles of Initiator and Responder are flipped
+                        between the 2 devices, otherwise same devices are always
+                        configured in the same role.
+        """
+        dut1 = self.ads[0]
+        dut2 = self.ads[1]
+        asserts.skip_if(
+            autils.get_aware_capabilities(dut1)[_CAP_MAX_NDI_INTERFACES] <
+            len(sec_configs)
+            or autils.get_aware_capabilities(dut2)[_CAP_MAX_NDI_INTERFACES] <
+            len(sec_configs), "DUTs do not support enough NDIs")
+
+        id1, mac1 = self.attach_with_identity(dut1)
+        id2, mac2 = self.attach_with_identity(dut2)
+        time.sleep(self.WAIT_FOR_CLUSTER)
+        dut2_req_keys = []
+        dut2_key_evens = []
+        dut1_req_keys = []
+        dut1_key_evens = []
+        dut2_aware_ifs = []
+        dut1_aware_ifs = []
+        dut2_aware_ipv6s = []
+        dut1_aware_ipv6s = []
+        dut2_type = _DATA_PATH_RESPONDER
+        dut1_type = _DATA_PATH_INITIATOR
+        dut2_is_responder = True
+        if flip_init_resp:
+            if dut2_is_responder:
+                dut2_type = _DATA_PATH_INITIATOR
+                dut1_type = _DATA_PATH_RESPONDER
+            else:
+                dut2_type = _DATA_PATH_RESPONDER
+                dut1_type = _DATA_PATH_INITIATOR
+            dut2_is_responder = not dut2_is_responder
+        # first NDP: DUT1 (Init) -> DUT2 (Resp)
+        dut1_accept_handler = (
+            dut1.wifi_aware_snippet.connectivityServerSocketAccept())
+        network_id = dut1_accept_handler.callback_id
+        for sec in sec_configs:
+            if dut2_is_responder:
+                dut2_req_key = self.get_network_specifier(
+                    dut2, id2, dut2_type, mac1, sec, network_id
+                    )
+                dut1_req_key = self.get_network_specifier(
+                    dut1, id1, dut1_type, mac2, sec, network_id
+                    )
+            else:
+                dut1_req_key = self.get_network_specifier(
+                    dut1, id1, dut1_type, mac2, sec, network_id
+                    )
+                dut2_req_key = self.get_network_specifier(
+                    dut2, id2, dut2_type, mac1,  sec, network_id
+                    )
+            dut2_req_keys.append(dut2_req_key)
+            dut1_req_keys.append(dut1_req_key)
+
+            dut1_key_even = dut1_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+                )
+            i_callback_name_a = dut1_key_even.data[_CALLBACK_NAME]
+            dut2_key_even = dut2_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+                )
+            r_callback_name_a = dut2_key_even.data[_CALLBACK_NAME]
+            dut2_aware_ipv6 = dut2_key_even.data[
+                constants.NetworkCbName.NET_CAP_IPV6]
+            dut1_aware_ipv6 = dut1_key_even.data[
+                constants.NetworkCbName.NET_CAP_IPV6]
+            dut2_key_evens.append(dut2_key_even)
+            dut1_key_evens.append(dut1_key_even)
+            asserts.assert_true(
+                constants.NetworkCbName.ON_CAPABILITIES_CHANGED in
+                dut2_key_even.data[_CALLBACK_NAME],
+                f'{dut2} succeeded to request the network, got callback'
+                f' {dut2_key_evens}.'
+                )
+            asserts.assert_true(
+                constants.NetworkCbName.ON_CAPABILITIES_CHANGED in
+                dut1_key_even.data[_CALLBACK_NAME],
+                f'{dut1} succeeded to request the network, got callback'
+                f' {dut1_key_evens}.'
+                )
+
+            dut1_key_even = dut1_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+                )
+            i_callback_name_a = dut1_key_even.data[_CALLBACK_NAME]
+            dut2_key_even = dut2_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+                )
+            r_callback_name_a = dut2_key_even.data[_CALLBACK_NAME]
+
+            dut2_key_evens.append(dut2_key_even)
+            dut1_key_evens.append(dut1_key_even)
+            asserts.assert_true(
+                _NETWORK_CB_LINK_PROPERTIES_CHANGED in
+                dut2_key_even.data[_CALLBACK_NAME],
+                f'{dut2} succeeded to request the network, got callback'
+                f' {dut2_key_evens}.'
+                )
+            asserts.assert_true(
+                _NETWORK_CB_LINK_PROPERTIES_CHANGED in
+                dut1_key_even.data[_CALLBACK_NAME],
+                f'{dut1} succeeded to request the network, got callback'
+                f' {dut1_key_evens}.'
+                )
+            dut2_aware_if = dut2_key_even.data[_NETWORK_CB_KEY_INTERFACE_NAME]
+            dut1_aware_if = dut1_key_even.data[_NETWORK_CB_KEY_INTERFACE_NAME]
+            dut2_aware_ifs.append(dut2_aware_if)
+            dut1_aware_ifs.append(dut1_aware_if)
+            dut2_aware_ipv6s.append(dut2_aware_ipv6)
+            dut1_aware_ipv6s.append(dut1_aware_ipv6)
+        dut1_aware_ifs = list(set(dut1_aware_ifs))
+        dut2_aware_ifs = list(set(dut2_aware_ifs))
+        dut1_aware_ipv6s = list(set(dut1_aware_ipv6s))
+        dut2_aware_ipv6s = list(set(dut2_aware_ipv6s))
+        logging.info("Interface names: DUT1=%s, DUT2=%s", dut1_aware_ifs,
+                      dut2_aware_ifs)
+        logging.info("IPv6 addresses: DUT1=%s, DUT2=%s", dut1_aware_ipv6s,
+                      dut2_aware_ipv6s)
+        asserts.assert_equal(
+            len(dut1_aware_ifs), len(sec_configs), "Multiple DUT1 interfaces")
+        asserts.assert_equal(
+            len(dut2_aware_ifs), len(sec_configs), "Multiple DUT2 interfaces")
+        asserts.assert_equal(
+            len(dut1_aware_ipv6s), len(sec_configs),
+            "Multiple DUT1 IPv6 addresses")
+        asserts.assert_equal(
+            len(dut2_aware_ipv6s), len(sec_configs),
+            "Multiple DUT2 IPv6 addresses")
+        for i in range(len(sec_configs)):
+            if_name = "%s%d" %("aware_data",i)
+            dut1_ipv6 = self.get_ipv6_addr(dut1, if_name)
+            dut2_ipv6 = self.get_ipv6_addr(dut2, if_name)
+            asserts.assert_equal(
+                dut1_ipv6 is None, if_name not in dut1_aware_ifs,
+                "Initiator interface %s in unexpected state" % if_name)
+            asserts.assert_equal(
+                dut2_ipv6 is None, if_name not in dut2_aware_ifs,
+                "Responder interface %s in unexpected state" % if_name)
+        for dut1_req_key in dut1_req_keys:
+            dut1.wifi_aware_snippet.connectivityUnregisterNetwork(
+                dut1_key_even.callback_id)
+        for dut2_key_even in dut2_key_evens:
+            dut2.wifi_aware_snippet.connectivityUnregisterNetwork(
+                dut2_key_even.callback_id)
+
+    def test_multiple_ndi_open_passphrase(self):
+        """Verify that between 2 DUTs can create 2 NDPs with different security
+        configuration (one open, one using passphrase). The result should use
+        twodifferent NDIs
+        """
+        # self.run_multiple_ndi(self.PASSPHRASE)
+        self.run_multiple_ndi([None, self.PASSPHRASE])
+
+    def test_multiple_ndi_passphrases(self):
+        """Verify that between 2 DUTs can create 2 NDPs with different security
+        configuration (using different passphrases). The result should use two
+        different NDIs
+        """
+        self.run_multiple_ndi([self.PASSPHRASE, self.PASSPHRASE2])
+
+    def test_multiple_ndi_open_passphrase_flip(self):
+        """Verify that between 2 DUTs can create 2 NDPs with different security
+        configuration (one open, one using passphrase). The result should use
+        two different NDIs.
+
+        Flip Initiator and Responder roles.
+        """
+        self.run_multiple_ndi([None, self.PASSPHRASE], flip_init_resp=True)
+
+    def test_multiple_ndi_passphrases_flip(self):
+        """Verify that between 2 DUTs can create 2 NDPs with different security
+        configuration (using different passphrases). The result should use two
+        different NDIs
+
+        Flip Initiator and Responder roles.
+        """
+        self.run_multiple_ndi(
+            [self.PASSPHRASE, self.PASSPHRASE2], flip_init_resp=True)
+
+    def test_multiple_ndi_open_pmk(self):
+        """Verify that between 2 DUTs can create 2 NDPs with different security
+        configuration (one open, one using pmk). The result should use two
+        different NDIs
+        """
+        self.run_multiple_ndi([None, self.PMK])
+
+    def test_multiple_ndi_passphrase_pmk(self):
+        """Verify that between 2 DUTs can create 2 NDPs with different security
+        configuration (one using passphrase, one using pmk). The result should
+        use two different NDIs
+        """
+        self.run_multiple_ndi([self.PASSPHRASE, self.PMK])
+
+    def test_multiple_ndi_pmks(self):
+        """Verify that between 2 DUTs can create 2 NDPs with different security
+        configuration (using different PMKS). The result should use two
+        different NDIs
+        """
+        self.run_multiple_ndi([self.PMK, self.PMK2])
+
+    def test_multiple_ndi_open_pmk_flip(self):
+        """Verify that between 2 DUTs can create 2 NDPs with different security
+        configuration (one open, one using pmk). The result should use two
+        different NDIs
+
+        Flip Initiator and Responder roles.
+        """
+        self.run_multiple_ndi([None, self.PMK], flip_init_resp=True)
+
+    def test_multiple_ndi_passphrase_pmk_flip(self):
+        """Verify that between 2 DUTs can create 2 NDPs with different security
+        configuration (one using passphrase, one using pmk). The result should
+        use two different NDIs
+
+        Flip Initiator and Responder roles.
+        """
+        self.run_multiple_ndi([self.PASSPHRASE, self.PMK], flip_init_resp=True)
+
+    def test_multiple_ndi_pmks_flip(self):
+        """Verify that between 2 DUTs can create 2 NDPs with different security
+        configuration (using different PMKS). The result should use two
+        different NDIs
+
+        Flip Initiator and Responder roles.
+        """
+        self.run_multiple_ndi([self.PMK, self.PMK2], flip_init_resp=True)
+
 
 if __name__ == '__main__':
     # Take test args
