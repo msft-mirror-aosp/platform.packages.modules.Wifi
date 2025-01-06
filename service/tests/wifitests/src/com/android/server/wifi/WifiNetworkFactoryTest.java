@@ -299,7 +299,7 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
         when(mFrameworkFacade.getSettingsWorkSource(any())).thenReturn(
                 new WorkSource(Process.SYSTEM_UID, "system-service"));
 
-        when(mPrimaryClientModeManager.getSupportedFeatures()).thenReturn(
+        when(mPrimaryClientModeManager.getSupportedFeaturesBitSet()).thenReturn(
                 createCapabilityBitset(
                         WifiManager.WIFI_FEATURE_WPA3_SAE, WifiManager.WIFI_FEATURE_OWE));
 

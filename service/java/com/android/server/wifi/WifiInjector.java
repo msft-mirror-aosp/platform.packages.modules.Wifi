@@ -51,6 +51,8 @@ import android.telephony.TelephonyManager;
 import android.util.LocalLog;
 import android.util.Log;
 
+import androidx.annotation.Keep;
+
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.BackgroundThread;
 import com.android.modules.utils.build.SdkLevel;
@@ -651,6 +653,7 @@ public class WifiInjector {
      * This is the generic method to get an instance of the class. The first instance should be
      * retrieved using the getInstanceWithContext method.
      */
+    @Keep
     public static WifiInjector getInstance() {
         if (sWifiInjector == null) {
             throw new IllegalStateException(
@@ -761,7 +764,7 @@ public class WifiInjector {
     public SarManager getSarManager() {
         return mSarManager;
     }
-
+    @Keep
     public ActiveModeWarden getActiveModeWarden() {
         return mActiveModeWarden;
     }
@@ -793,7 +796,7 @@ public class WifiInjector {
     public WifiMulticastLockManager getWifiMulticastLockManager() {
         return mWifiMulticastLockManager;
     }
-
+    @Keep
     public WifiConfigManager getWifiConfigManager() {
         return mWifiConfigManager;
     }
@@ -825,6 +828,7 @@ public class WifiInjector {
         return mContext.getSystemService(BatteryManager.class);
     }
 
+    @Keep
     public WifiCarrierInfoManager getWifiCarrierInfoManager() {
         return mWifiCarrierInfoManager;
     }
@@ -1027,14 +1031,17 @@ public class WifiInjector {
         return mHalDeviceManager;
     }
 
+    @Keep
     public WifiNative getWifiNative() {
         return mWifiNative;
     }
 
+    @Keep
     public WifiMonitor getWifiMonitor() {
         return mWifiMonitor;
     }
 
+    @Keep
     public WifiP2pNative getWifiP2pNative() {
         return mWifiP2pNative;
     }
@@ -1055,6 +1062,7 @@ public class WifiInjector {
         return mSelfRecovery;
     }
 
+    @Keep
     public ScanRequestProxy getScanRequestProxy() {
         return mScanRequestProxy;
     }
@@ -1090,6 +1098,7 @@ public class WifiInjector {
         return mHostapdHal;
     }
 
+    @Keep
     public WifiThreadRunner getWifiThreadRunner() {
         return mWifiThreadRunner;
     }
@@ -1135,6 +1144,7 @@ public class WifiInjector {
         return mConnectHelper;
     }
 
+    @Keep
     public WifiNetworkFactory getWifiNetworkFactory() {
         return mWifiNetworkFactory;
     }
@@ -1163,6 +1173,7 @@ public class WifiInjector {
         return mWifiP2pConnection;
     }
 
+    @Keep
     public WifiGlobals getWifiGlobals() {
         return mWifiGlobals;
     }

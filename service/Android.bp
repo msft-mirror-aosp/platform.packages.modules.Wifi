@@ -61,6 +61,7 @@ java_library {
         "framework-bluetooth.stubs.module_lib",
         "framework-configinfrastructure.stubs.module_lib",
         "framework-connectivity.stubs.module_lib",
+        "framework-connectivity-b.stubs.module_lib",
         "framework-connectivity-t.stubs.module_lib",
         "framework-location.stubs.module_lib",
         "framework-statsd.stubs.module_lib",
@@ -122,7 +123,9 @@ java_library {
         "service-entitlement",
         "wifi-lite-protos",
         "wifi-nano-protos",
+        "com.android.net.flags-aconfig-java-export",
         "android.net.wifi.flags-aconfig-java",
+        "android.security.flags-aconfig-java-export",
         "net-utils-service-wifi",
     ],
     apex_available: ["com.android.wifi"],
@@ -138,6 +141,16 @@ java_library {
     ],
     installable: true,
     static_libs: ["wifi-service-pre-jarjar"],
+
+    dex_preopt: {
+        // The profile is updated monthly with the bootclasspath/system_server
+        // profiles based on the data from Dogfooders, and before mainline
+        // releases. go/boot-image-profiles.
+        profile: select(release_flag("RELEASE_SERVICE_WIFI_SPEED_PROFILE_ART_COMPILATION"), {
+            true: "art-profile",
+            false: "",
+        }),
+    },
 
     // need to include `libs` so that Soong doesn't complain about missing classes after jarjaring
     libs: [

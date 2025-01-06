@@ -28,13 +28,18 @@ python_library_host {
     libs: ["wifi_aware_constants"],
 }
 
+python_library_host {
+    name: "wifi_test_utils",
+    srcs: ["wifi_test_utils.py"],
+}
+
 python_defaults {
     name: "CtsWifiMultiDevicePythonDefaults",
     libs: [
         "mobly",
     ],
     test_suites: [
-        "cts",
+        "cts-interactive",
         "general-tests",
     ],
     version: {
@@ -52,7 +57,6 @@ python_test_host {
     device_common_data: [
         // Package the snippet with the mobly test
         ":wifi_aware_snippet",
-        "requirements.txt",
     ],
     test_options: {
         unit_test: false,
@@ -64,10 +68,13 @@ python_test_host {
     name: "WifiAwareManagerTestCases",
     main: "aware/wifi_aware_manager_test.py",
     srcs: ["aware/wifi_aware_manager_test.py"],
-    device_common_data: [":wifi_aware_snippet_new"],
+    device_common_data: [":wifi_mobly_snippet"],
     libs: [
+        "aware_lib_utils",
         "mobly",
         "wifi_aware_constants",
+        "wifi_test_utils",
+        "platform-test-py-annotations",
     ],
     test_suites: [
         "general-tests",
@@ -83,6 +90,15 @@ python_library_host {
     srcs: ["direct/constants.py"],
 }
 
+python_library_host {
+    name: "wifi_direct_test_utils",
+    srcs: ["direct/p2p_utils.py"],
+    libs: [
+        "wifi_direct_constants",
+        "mobly",
+    ],
+}
+
 python_test_host {
     name: "WifiDirectMoblyTests",
     main: "direct/wifi_direct_test.py",
@@ -92,6 +108,60 @@ python_test_host {
         "wifi_direct_constants",
     ],
     device_common_data: [":wifi_direct_mobly_snippet"],
+    test_options: {
+        unit_test: false,
+        tags: ["mobly"],
+    },
+    test_suites: ["general-tests"],
+    version: {
+        py3: {
+            embedded_launcher: true,
+        },
+    },
+}
+
+python_test_host {
+    name: "CtsWifiDirectTestCases",
+    main: "direct/cts_wifi_direct_test_suite.py",
+    srcs: [
+        "direct/group_owner_negotiation_test.py",
+        "direct/group_owner_test.py",
+        "direct/cts_wifi_direct_test_suite.py",
+    ],
+    libs: [
+        "mobly",
+        "wifi_direct_constants",
+        "wifi_test_utils",
+        "wifi_direct_test_utils",
+        "platform-test-py-annotations",
+    ],
+    device_common_data: [":wifi_mobly_snippet"],
+    test_options: {
+        unit_test: false,
+        tags: ["mobly"],
+    },
+    test_suites: ["general-tests"],
+    version: {
+        py3: {
+            embedded_launcher: true,
+        },
+    },
+}
+
+python_library_host {
+    name: "wifi_softap_constants",
+    srcs: ["softap/constants.py"],
+}
+
+python_test_host {
+    name: "WifiSoftApTestCases",
+    main: "softap/wifi_softap_test.py",
+    srcs: ["softap/wifi_softap_test.py"],
+    libs: [
+        "mobly",
+        "wifi_softap_constants",
+    ],
+    device_common_data: [":wifi_mobly_snippet"],
     test_options: {
         unit_test: false,
         tags: ["mobly"],

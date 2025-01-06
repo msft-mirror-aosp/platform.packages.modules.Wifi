@@ -16,6 +16,7 @@
 package com.android.server.wifi;
 
 import android.annotation.NonNull;
+import android.annotation.SuppressLint;
 import android.hardware.wifi.hostapd.ApInfo;
 import android.hardware.wifi.hostapd.BandMask;
 import android.hardware.wifi.hostapd.ChannelBandwidth;
@@ -41,6 +42,7 @@ import android.net.wifi.SoftApInfo;
 import android.net.wifi.WifiAnnotations;
 import android.net.wifi.WifiContext;
 import android.net.wifi.WifiManager;
+import android.net.wifi.util.Environment;
 import android.net.wifi.util.WifiResourceCache;
 import android.os.Handler;
 import android.os.IBinder;
@@ -57,6 +59,7 @@ import com.android.server.wifi.WifiNative.SoftApHalCallback;
 import com.android.server.wifi.util.ApConfigUtil;
 import com.android.server.wifi.util.HalAidlUtil;
 import com.android.server.wifi.util.NativeUtil;
+import com.android.wifi.flags.Flags;
 import com.android.wifi.resources.R;
 
 import java.io.PrintWriter;
@@ -419,7 +422,10 @@ public class HostapdHalAidlImp implements IHostapdHal {
                     callback.onInfoChanged(info.apIfaceInstance, info.freqMhz,
                             mapHalChannelBandwidthToSoftApInfo(info.channelBandwidth),
                             mapHalGenerationToWifiStandard(info.generation),
-                            MacAddress.fromBytes(info.apIfaceInstanceMacAddress), vendorData);
+                            MacAddress.fromBytes(info.apIfaceInstanceMacAddress),
+                            (Flags.mloSap() && info.mldMacAddress != null)
+                                    ? MacAddress.fromBytes(info.mldMacAddress) : null,
+                            vendorData);
                 }
                 mActiveInstances.add(info.apIfaceInstance);
             } catch (IllegalArgumentException iae) {
@@ -1032,6 +1038,7 @@ public class HostapdHalAidlImp implements IHostapdHal {
         };
     }
 
+    @SuppressLint("NewApi")
     private NetworkParams prepareNetworkParams(boolean isMetered,
             SoftApConfiguration config) {
         NetworkParams nwParams = new NetworkParams();
@@ -1061,6 +1068,9 @@ public class HostapdHalAidlImp implements IHostapdHal {
         nwParams.encryptionType = getEncryptionType(config);
         nwParams.passphrase = (config.getPassphrase() != null)
                     ? config.getPassphrase() : "";
+        if (Flags.apIsolate() && isServiceVersionAtLeast(3) && Environment.isSdkAtLeastB()) {
+            nwParams.isClientIsolationEnabled = config.isClientIsolationEnabled();
+        }
 
         if (nwParams.ssid == null || nwParams.passphrase == null) {
             return null;
@@ -1076,8 +1086,10 @@ public class HostapdHalAidlImp implements IHostapdHal {
         ifaceParams.hwModeParams = prepareHwModeParams(config);
         ifaceParams.channelParams = prepareChannelParamsList(config);
         ifaceParams.usesMlo = isUsingMultiLinkOperation;
-        ifaceParams.instanceIdentities =
-                instanceIdentities.toArray(new String[instanceIdentities.size()]);
+        if (instanceIdentities != null) {
+            ifaceParams.instanceIdentities =
+                    instanceIdentities.toArray(new String[instanceIdentities.size()]);
+        }
         if (ifaceParams.name == null || ifaceParams.hwModeParams == null
                 || ifaceParams.channelParams == null) {
             return null;
@@ -1185,9 +1197,33 @@ public class HostapdHalAidlImp implements IHostapdHal {
     /**
      * Dump information about the AIDL implementation.
      *
-     * TODO (b/202302891) Log version information once we freeze the AIDL interface
      */
     public void dump(PrintWriter pw) {
-        pw.println("AIDL interface version: 1 (initial)");
+        pw.println("AIDL interface version: " + mServiceVersion);
+    }
+
+    /**
+     * See comments for
+     * {@link IHostapdHal#removeLinkFromMultipleLinkBridgedApIface(String, String)}.
+     */
+    public void removeLinkFromMultipleLinkBridgedApIface(@NonNull String ifaceName,
+            @NonNull String apIfaceInstance) {
+        if (!isServiceVersionAtLeast(3)) {
+            return;
+        }
+        synchronized (mLock) {
+            final String methodStr = "removeLinkFromMultipleLinkBridgedApIface";
+            if (!checkHostapdAndLogFailure(methodStr)) {
+                return;
+            }
+            Log.i(TAG, "Remove link: " + apIfaceInstance + " from AP iface: " + ifaceName);
+            try {
+                mIHostapd.removeLinkFromMultipleLinkBridgedApIface(ifaceName, apIfaceInstance);
+            } catch (RemoteException e) {
+                handleRemoteException(e, methodStr);
+            } catch (ServiceSpecificException e) {
+                handleServiceSpecificException(e, methodStr);
+            }
+        }
     }
 }

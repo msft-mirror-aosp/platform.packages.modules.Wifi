@@ -64,6 +64,8 @@ import android.util.LocalLog;
 import android.util.Log;
 import android.util.Pair;
 
+import androidx.annotation.Keep;
+
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.net.module.util.MacAddressUtils;
@@ -229,7 +231,6 @@ public class WifiConfigManager {
      * Link networks only if the bssid in scan results for the networks match in the first
      * 16 ASCII chars in the bssid string. For example = "af:de:56;34:15:7"
      */
-    @VisibleForTesting
     public static final int LINK_CONFIGURATION_BSSID_MATCH_LENGTH = 16;
     /**
      * Log tag for this class.
@@ -820,6 +821,7 @@ public class WifiConfigManager {
      *
      * @return List of WifiConfiguration objects representing the networks.
      */
+    @Keep
     public List<WifiConfiguration> getSavedNetworks(int targetUid) {
         return getConfiguredNetworks(true, true, targetUid);
     }
@@ -845,6 +847,7 @@ public class WifiConfigManager {
      * @param networkId networkId of the requested network.
      * @return WifiConfiguration object if found, null otherwise.
      */
+    @Keep
     public @Nullable WifiConfiguration getConfiguredNetwork(int networkId) {
         WifiConfiguration config = getInternalConfiguredNetwork(networkId);
         if (config == null) {
@@ -1451,7 +1454,7 @@ public class WifiConfigManager {
         WifiConfiguration newInternalConfig = null;
 
         BitSet supportedFeatures = mWifiInjector.getActiveModeWarden()
-                .getPrimaryClientModeManager().getSupportedFeatures();
+                .getPrimaryClientModeManager().getSupportedFeaturesBitSet();
 
         // First check if we already have a network with the provided network id or configKey.
         WifiConfiguration existingInternalConfig = getInternalConfiguredNetwork(config);
@@ -1788,6 +1791,7 @@ public class WifiConfigManager {
      * @param uid    UID of the app requesting the network addition/modification.
      * @return NetworkUpdateResult object representing status of the update.
      */
+    @Keep
     public NetworkUpdateResult addOrUpdateNetwork(WifiConfiguration config, int uid) {
         return addOrUpdateNetwork(config, uid, null, false);
     }
@@ -2194,6 +2198,7 @@ public class WifiConfigManager {
      * @param reason    reason to update the network.
      * @return true if the input configuration has been updated, false otherwise.
      */
+    @Keep
     public boolean updateNetworkSelectionStatus(int networkId, int reason) {
         WifiConfiguration config = getInternalConfiguredNetwork(networkId);
         if (config == null) {
@@ -2742,6 +2747,7 @@ public class WifiConfigManager {
      *
      * @return network Id corresponding to the last selected network.
      */
+    @Keep
     public int getLastSelectedNetwork() {
         return mLastSelectedNetworkId;
     }
@@ -2768,6 +2774,7 @@ public class WifiConfigManager {
      *
      * @return timestamp in milliseconds from boot when this was set.
      */
+    @Keep
     public long getLastSelectedTimeStamp() {
         return mLastSelectedTimeStamp;
     }
@@ -2779,6 +2786,7 @@ public class WifiConfigManager {
      * @param networkId network ID corresponding to the network.
      * @return existing {@link ScanDetailCache} entry if one exists or null.
      */
+    @Keep
     public ScanDetailCache getScanDetailCacheForNetwork(int networkId) {
         return mScanDetailCaches.get(networkId);
     }
@@ -2855,6 +2863,7 @@ public class WifiConfigManager {
      * @return WifiConfiguration object representing the network corresponding to the scanResult,
      * null if none exists.
      */
+    @Keep
     public WifiConfiguration getSavedNetworkForScanResult(@NonNull ScanResult scanResult) {
         WifiConfiguration config = null;
         try {
@@ -3566,7 +3575,7 @@ public class WifiConfigManager {
             Map<String, String> macAddressMapping) {
 
         BitSet supportedFeatures = mWifiInjector.getActiveModeWarden()
-                .getPrimaryClientModeManager().getSupportedFeatures();
+                .getPrimaryClientModeManager().getSupportedFeaturesBitSet();
 
         for (WifiConfiguration configuration : configurations) {
             if (!WifiConfigurationUtil.validate(
@@ -3605,7 +3614,7 @@ public class WifiConfigManager {
      */
     private void loadInternalDataFromUserStore(List<WifiConfiguration> configurations) {
         BitSet supportedFeatures = mWifiInjector.getActiveModeWarden()
-                .getPrimaryClientModeManager().getSupportedFeatures();
+                .getPrimaryClientModeManager().getSupportedFeaturesBitSet();
 
         for (WifiConfiguration configuration : configurations) {
             if (!WifiConfigurationUtil.validate(

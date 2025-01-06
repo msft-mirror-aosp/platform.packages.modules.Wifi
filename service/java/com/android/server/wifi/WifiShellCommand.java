@@ -188,6 +188,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
             "set-mock-wifimodem-methods",
             "force-overlay-config-value",
             "get-softap-supported-features",
+            "get-wifi-supported-features",
             "get-overlay-config-values"
     };
 
@@ -274,6 +275,11 @@ public class WifiShellCommand extends BasicShellCommandHandler {
 
         @Override
         public void onBlockedClientConnecting(WifiClient client, int reason) {
+        }
+
+        @Override
+        public void onClientsDisconnected(SoftApInfo info, List<WifiClient> clients) {
+            mPrintWriter.println("onClientsDisconnected, info: " + info + ", clients: " + clients);
         }
     }
 
@@ -903,7 +909,7 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     mWifiService.registerLocalOnlyHotspotSoftApCallback(softApCallback, extras);
                     if (REQUEST_REGISTERED != mWifiService.startLocalOnlyHotspot(
                               lohsCallback, SHELL_PACKAGE_NAME, null /* featureId */,
-                              config, extras)) {
+                              config, extras, false)) {
                         pw.println("Lohs failed to start. Please check config parameters");
                     }
                     // Wait for lohs to start and complete callback
@@ -1008,7 +1014,14 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     if (mWifiService.isFeatureSupported(WifiManager.WIFI_FEATURE_STA_BRIDGED_AP)) {
                         pw.println("wifi_softap_bridged_ap_with_sta_supported");
                     }
+                    if (mWifiNative.isMLDApSupportMLO()) {
+                        pw.println("wifi_softap_mlo_supported");
+                    }
                     return 0;
+                case "get-wifi-supported-features": {
+                    pw.println(mWifiService.getSupportedFeaturesString());
+                    return 0;
+                }
                 case "settings-reset":
                     mWifiNative.stopFakingScanDetails();
                     mWifiNative.resetFakeScanDetails();
@@ -1606,25 +1619,32 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                 case "launch-dialog-p2p-invitation-sent": {
                     int displayId = Display.DEFAULT_DISPLAY;
                     String deviceName = getNextArgRequired();
-                    String displayPin = getNextArgRequired();
                     String cmdOption = getNextOption();
-                    if (cmdOption != null && cmdOption.equals("-i")) {
-                        String displayIdStr = getNextArgRequired();
-                        try {
-                            displayId = Integer.parseInt(displayIdStr);
-                        } catch (NumberFormatException e) {
-                            pw.println("Invalid <display-id> argument to "
-                                    + "'launch-dialog-p2p-invitation-sent' "
-                                    + "- must be an integer: "
-                                    + displayIdStr);
-                            return -1;
+                    String displayPin = null;
+                    while (cmdOption != null) {
+                        if (cmdOption.equals("-d")) {
+                            displayPin = getNextArgRequired();
+                        } else if (cmdOption.equals("-i")) {
+                            String displayIdStr = getNextArgRequired();
+                            try {
+                                displayId = Integer.parseInt(displayIdStr);
+                            } catch (NumberFormatException e) {
+                                pw.println("Invalid <display-id> argument to "
+                                        + "'launch-dialog-p2p-invitation-sent' "
+                                        + "- must be an integer: "
+                                        + displayIdStr);
+                                return -1;
+                            }
+                            DisplayManager dm = mContext.getSystemService(DisplayManager.class);
+                            Display[] displays = dm.getDisplays();
+                            for (Display display : displays) {
+                                pw.println("Display: id=" + display.getDisplayId() + ", info="
+                                        + display.getDeviceProductInfo());
+                            }
+                        } else {
+                            pw.println("Ignoring unknown option " + cmdOption);
                         }
-                        DisplayManager dm = mContext.getSystemService(DisplayManager.class);
-                        Display[] displays = dm.getDisplays();
-                        for (Display display : displays) {
-                            pw.println("Display: id=" + display.getDisplayId() + ", info="
-                                    + display.getDeviceProductInfo());
-                        }
+                        cmdOption = getNextOption();
                     }
                     mWifiDialogManager.createP2pInvitationSentDialog(deviceName, displayPin,
                             displayId).launchDialog();
@@ -2296,6 +2316,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
                     }
 
                     mWifiService.setPerSsidRoamingMode(wifiSsid, mode, SHELL_PACKAGE_NAME);
+                    return 0;
+                case "set-scan-throttling-enabled":
+                    mWifiService.setScanThrottleEnabled(
+                            getNextArgRequiredTrueOrFalse("enabled", "disabled"));
                     return 0;
                 default:
                     return handleDefaultCommands(cmd);
@@ -3038,7 +3062,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    -x - Neutral Button Text");
         pw.println("    -c - Optional timeout in milliseconds");
         pw.println("    -s - Use the legacy dialog implementation on the system process");
-        pw.println("  launch-dialog-p2p-invitation-sent <device_name> <pin> [-i <display_id>]");
+        pw.println("  launch-dialog-p2p-invitation-sent <device_name> [-d <pin>]"
+                + " [-i <display_id>]");
         pw.println("    Launches a P2P Invitation Sent dialog.");
         pw.println("    <device_name> - Name of the device the invitation was sent to");
         pw.println("    <pin> - PIN for the invited device to input");
@@ -3109,7 +3134,10 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    and/or 'wifi_softap_wpa3_sae_supported',");
         pw.println("    and/or 'wifi_softap_bridged_ap_supported',");
         pw.println("    and/or 'wifi_softap_bridged_ap_with_sta_supported',");
+        pw.println("    and/or 'wifi_softap_mlo_supported',");
         pw.println("    each on a separate line.");
+        pw.println("  get-wifi-supported-features");
+        pw.println("    Gets the features supported by WifiManager");
     }
 
     private void onHelpPrivileged(PrintWriter pw) {
@@ -3392,6 +3420,8 @@ public class WifiShellCommand extends BasicShellCommandHandler {
         pw.println("    Sets the roaming mode for the given SSID.");
         pw.println("    -x - Specifies the SSID as hex digits instead of plain text.");
         pw.println("    Example: set-ssid-roaming-mode test_ssid aggressive");
+        pw.println("  set-scan-throttling-enabled enabled|disabled");
+        pw.println("    Set wifi scan throttling for 3P apps enabled or disabled.");
     }
 
     @Override

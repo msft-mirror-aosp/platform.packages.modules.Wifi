@@ -20,6 +20,7 @@ import android.net.wifi.AnqpInformationElement;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiSsid;
 
+import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -62,6 +63,8 @@ public class ScanDetail {
         boolean is80211McResponder = false;
         boolean isTwtResponder = false;
         boolean is11azNtbResponder = false;
+        boolean isSecureHeLtfSupported = false;
+        boolean isRangingFrameProtectionRequired = false;
         if (networkDetail != null) {
             hessid = networkDetail.getHESSID();
             anqpDomainId = networkDetail.getAnqpDomainID();
@@ -77,6 +80,8 @@ public class ScanDetail {
             is80211McResponder = networkDetail.is80211McResponderSupport();
             isTwtResponder = networkDetail.isIndividualTwtSupported();
             is11azNtbResponder = networkDetail.is80211azNtbResponder();
+            isSecureHeLtfSupported = networkDetail.isSecureHeLtfSupported();
+            isRangingFrameProtectionRequired = networkDetail.isRangingFrameProtectionRequired();
         }
         sBuilder.clear();
         mScanResult = sBuilder
@@ -91,6 +96,8 @@ public class ScanDetail {
                 .setTsf(tsf)
                 .setIsTwtResponder(isTwtResponder)
                 .setIs80211azNtbRTTResponder(is11azNtbResponder)
+                .setSecureHeLtfSupported(isSecureHeLtfSupported)
+                .setRangingFrameProtectionRequired(isRangingFrameProtectionRequired)
                 .build();
         mSeen = System.currentTimeMillis();
         mScanResult.seen = mSeen;
@@ -177,6 +184,7 @@ public class ScanDetail {
         }
     }
 
+    @Keep
     public ScanResult getScanResult() {
         return mScanResult;
     }

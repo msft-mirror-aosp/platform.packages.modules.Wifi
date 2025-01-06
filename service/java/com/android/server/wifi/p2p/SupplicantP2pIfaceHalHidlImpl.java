@@ -35,11 +35,15 @@ import android.net.wifi.ScanResult;
 import android.net.wifi.WpsInfo;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pDirInfo;
 import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pGroupList;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.WifiP2pUsdBasedLocalServiceAdvertisementConfig;
+import android.net.wifi.p2p.WifiP2pUsdBasedServiceDiscoveryConfig;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
+import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig;
 import android.os.IHwBinder.DeathRecipient;
 import android.os.RemoteException;
 import android.text.TextUtils;
@@ -1337,10 +1341,11 @@ public class SupplicantP2pIfaceHalHidlImpl implements ISupplicantP2pIfaceHal {
      *
      * @param networkId Used to specify the restart of a persistent group.
      * @param isPersistent Used to request a persistent group to be formed.
+     * @param isP2pV2 Used to start a Group Owner that support P2P2 IE
      *
      * @return true, if operation was successful.
      */
-    public boolean groupAdd(int networkId, boolean isPersistent) {
+    public boolean groupAdd(int networkId, boolean isPersistent, boolean isP2pV2) {
         synchronized (mLock) {
             if (!checkSupplicantP2pIfaceAndLogFailure("groupAdd")) return false;
             SupplicantResult<Void> result =
@@ -2642,6 +2647,92 @@ public class SupplicantP2pIfaceHalHidlImpl implements ISupplicantP2pIfaceHal {
     public boolean configureEapolIpAddressAllocationParams(int ipAddressGo, int ipAddressMask,
             int ipAddressStart, int ipAddressEnd) {
         Log.d(TAG, "configureEapolIpAddressAllocationParams() is not supported.");
+        return false;
+    }
+
+    /**
+     * Start an Un-synchronized Service Discovery (USD) based P2P service discovery.
+     *
+     * @param usdServiceConfig is the USD based service configuration.
+     * @param discoveryConfig is the configuration for this service discovery request.
+     * @param timeoutInSeconds is the maximum time to be spent for this service discovery request.
+     */
+    public int startUsdBasedServiceDiscovery(WifiP2pUsdBasedServiceConfig usdServiceConfig,
+            WifiP2pUsdBasedServiceDiscoveryConfig discoveryConfig, int timeoutInSeconds) {
+        Log.d(TAG, "startUsdBasedServiceDiscovery() is not supported.");
+        return -1;
+    }
+
+    /**
+     * Stop an Un-synchronized Service Discovery (USD) based P2P service discovery.
+     *
+     * @param sessionId Identifier to cancel the service discovery instance.
+     *        Use zero to cancel all the service discovery instances.
+     */
+    public void stopUsdBasedServiceDiscovery(int sessionId) {
+        Log.d(TAG, "stopUsdBasedServiceDiscovery() is not supported.");
+    }
+
+    /**
+     * Start an Un-synchronized Service Discovery (USD) based P2P service advertisement.
+     *
+     * @param usdServiceConfig is the USD based service configuration.
+     * @param advertisementConfig is the configuration for this service advertisement.
+     * @param timeoutInSeconds is the maximum time to be spent for this service advertisement.
+     */
+    public int startUsdBasedServiceAdvertisement(WifiP2pUsdBasedServiceConfig usdServiceConfig,
+            WifiP2pUsdBasedLocalServiceAdvertisementConfig advertisementConfig,
+            int timeoutInSeconds) {
+        Log.d(TAG, "startUsdBasedServiceAdvertisement() is not supported.");
+        return -1;
+    }
+
+    /**
+     * Stop an Un-synchronized Service Discovery (USD) based P2P service advertisement.
+     *
+     * @param sessionId Identifier to cancel the service advertisement.
+     *        Use zero to cancel all the service advertisement instances.
+     */
+    public void stopUsdBasedServiceAdvertisement(int sessionId) {
+        Log.d(TAG, "stopUsdBasedServiceAdvertisement() is not supported.");
+    }
+
+    /**
+     * Get the Device Identity Resolution (DIR) Information.
+     * See {@link WifiP2pDirInfo} for details
+     *
+     * @return {@link WifiP2pDirInfo} instance on success, null on failure.
+     */
+    public WifiP2pDirInfo getDirInfo() {
+        Log.d(TAG, "getDirInfo() is not supported.");
+        return null;
+    }
+
+    /**
+     * Validate the Device Identity Resolution (DIR) Information of a P2P device.
+     * See {@link WifiP2pDirInfo} for details.
+     *
+     * @param dirInfo {@link WifiP2pDirInfo} to validate.
+     * @return The identifier of device identity key on success, -1 on failure.
+     */
+    public int validateDirInfo(@NonNull WifiP2pDirInfo dirInfo) {
+        Log.d(TAG, "validateDirInfo() is not supported.");
+        return -1;
+    }
+
+    /**
+     * Used to authorize a connection request to an existing Group Owner
+     * interface, to allow a peer device to connect.
+     *
+     * @param config Configuration to use for connection.
+     * @param groupOwnerInterfaceName Group Owner interface name on which the request to connect
+     *                           needs to be authorized.
+     *
+     * @return boolean value indicating whether operation was successful.
+     */
+    public boolean authorizeConnectRequestOnGroupOwner(WifiP2pConfig config,
+            String groupOwnerInterfaceName) {
+        Log.d(TAG, "authorizeConnectRequestOnGroupOwner() is not supported.");
         return false;
     }
 

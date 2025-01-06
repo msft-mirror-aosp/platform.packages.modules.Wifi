@@ -21,12 +21,16 @@ import android.annotation.Nullable;
 import android.net.wifi.CoexUnsafeChannel;
 import android.net.wifi.ScanResult;
 import android.net.wifi.p2p.WifiP2pConfig;
+import android.net.wifi.p2p.WifiP2pDirInfo;
 import android.net.wifi.p2p.WifiP2pDiscoveryConfig;
 import android.net.wifi.p2p.WifiP2pExtListenParams;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pGroupList;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.WifiP2pUsdBasedLocalServiceAdvertisementConfig;
+import android.net.wifi.p2p.WifiP2pUsdBasedServiceDiscoveryConfig;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
+import android.net.wifi.p2p.nsd.WifiP2pUsdBasedServiceConfig;
 
 import com.android.server.wifi.WifiNative;
 
@@ -280,10 +284,11 @@ interface ISupplicantP2pIfaceHal {
      *
      * @param networkId Used to specify the restart of a persistent group.
      * @param isPersistent Used to request a persistent group to be formed.
+     * @param isP2pV2 Used to start a Group Owner that support P2P2 IE
      *
      * @return true, if operation was successful.
      */
-    boolean groupAdd(int networkId, boolean isPersistent);
+    boolean groupAdd(int networkId, boolean isPersistent, boolean isP2pV2);
 
     /**
      * Set up a P2P group as Group Owner or join a group with a configuration.
@@ -606,6 +611,73 @@ interface ISupplicantP2pIfaceHal {
      */
     boolean configureEapolIpAddressAllocationParams(int ipAddressGo, int ipAddressMask,
             int ipAddressStart, int ipAddressEnd);
+
+    /**
+     * Start an Un-synchronized Service Discovery (USD) based P2P service discovery.
+     *
+     * @param usdServiceConfig is the USD based service configuration.
+     * @param discoveryConfig is the configuration for this service discovery request.
+     * @param timeoutInSeconds is the maximum time to be spent for this service discovery request.
+     */
+    int startUsdBasedServiceDiscovery(WifiP2pUsdBasedServiceConfig usdServiceConfig,
+            WifiP2pUsdBasedServiceDiscoveryConfig discoveryConfig, int timeoutInSeconds);
+
+    /**
+     * Stop an Un-synchronized Service Discovery (USD) based P2P service discovery.
+     *
+     * @param sessionId Identifier to cancel the service discovery instance.
+     *        Use zero to cancel all the service discovery instances.
+     */
+    void stopUsdBasedServiceDiscovery(int sessionId);
+
+    /**
+     * Start an Un-synchronized Service Discovery (USD) based P2P service advertisement.
+     *
+     * @param usdServiceConfig is the USD based service configuration.
+     * @param advertisementConfig is the configuration for this service advertisement.
+     * @param timeoutInSeconds is the maximum time to be spent for this service advertisement.
+     */
+    int startUsdBasedServiceAdvertisement(WifiP2pUsdBasedServiceConfig usdServiceConfig,
+            WifiP2pUsdBasedLocalServiceAdvertisementConfig advertisementConfig,
+            int timeoutInSeconds);
+
+    /**
+     * Stop an Un-synchronized Service Discovery (USD) based P2P service advertisement.
+     *
+     * @param sessionId Identifier to cancel the service advertisement.
+     *        Use zero to cancel all the service advertisement instances.
+     */
+    void stopUsdBasedServiceAdvertisement(int sessionId);
+
+    /**
+     * Get the Device Identity Resolution (DIR) Information.
+     * See {@link WifiP2pDirInfo} for details
+     *
+     * @return {@link WifiP2pDirInfo} instance on success, null on failure.
+     */
+    WifiP2pDirInfo getDirInfo();
+
+    /**
+     * Validate the Device Identity Resolution (DIR) Information of a P2P device.
+     * See {@link WifiP2pDirInfo} for details.
+     *
+     * @param dirInfo {@link WifiP2pDirInfo} to validate.
+     * @return The identifier of device identity key on success, -1 on failure.
+     */
+    int validateDirInfo(@NonNull WifiP2pDirInfo dirInfo);
+
+    /**
+     * Used to authorize a connection request to an existing Group Owner
+     * interface, to allow a peer device to connect.
+     *
+     * @param config Configuration to use for connection.
+     * @param groupOwnerInterfaceName Group Owner interface name on which the request to connect
+     *                           needs to be authorized.
+     *
+     * @return boolean value indicating whether operation was successful.
+     */
+    boolean authorizeConnectRequestOnGroupOwner(WifiP2pConfig config,
+            String groupOwnerInterfaceName);
 
     /**
      * Terminate the supplicant daemon & wait for its death.

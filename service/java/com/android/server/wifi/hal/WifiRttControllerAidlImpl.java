@@ -18,6 +18,7 @@ package com.android.server.wifi.hal;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.hardware.wifi.Akm;
 import android.hardware.wifi.IWifiRttControllerEventCallback;
 import android.hardware.wifi.RttBw;
 import android.hardware.wifi.RttCapabilities;
@@ -25,6 +26,7 @@ import android.hardware.wifi.RttConfig;
 import android.hardware.wifi.RttPeerType;
 import android.hardware.wifi.RttPreamble;
 import android.hardware.wifi.RttResult;
+import android.hardware.wifi.RttSecureConfig;
 import android.hardware.wifi.RttStatus;
 import android.hardware.wifi.RttType;
 import android.hardware.wifi.WifiChannelInfo;
@@ -33,10 +35,12 @@ import android.hardware.wifi.common.OuiKeyedData;
 import android.net.MacAddress;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiAnnotations;
+import android.net.wifi.rtt.PasnConfig;
 import android.net.wifi.rtt.RangingRequest;
 import android.net.wifi.rtt.RangingResult;
 import android.net.wifi.rtt.ResponderConfig;
 import android.net.wifi.rtt.ResponderLocation;
+import android.net.wifi.rtt.SecureRangingConfig;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.util.Log;
@@ -45,6 +49,7 @@ import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.util.HalAidlUtil;
 
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -301,7 +306,17 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
                     .set80211azInitiatorTxLtfRepetitionsCount(rttResult.i2rTxLtfRepetitionCount)
                     .set80211azResponderTxLtfRepetitionsCount(rttResult.r2iTxLtfRepetitionCount)
                     .set80211azNumberOfTxSpatialStreams(rttResult.numTxSpatialStreams)
-                    .set80211azNumberOfRxSpatialStreams(rttResult.numRxSpatialStreams);
+                    .set80211azNumberOfRxSpatialStreams(rttResult.numRxSpatialStreams)
+                    .setPasnComebackAfterMillis(rttResult.pasnComebackAfterMillis)
+                    .setRangingAuthenticated((rttResult.baseAkm & ~Akm.PASN) != 0)
+                    .setRangingFrameProtected(rttResult.isRangingFrameProtectionEnabled)
+                    .setSecureHeLtfEnabled(rttResult.isSecureLtfEnabled)
+                    .setSecureHeLtfProtocolVersion(rttResult.secureHeLtfProtocolVersion);
+
+            if (rttResult.pasnComebackCookie != null) {
+                resultBuilder.setPasnComebackCookie(rttResult.pasnComebackCookie);
+            }
+
             if (SdkLevel.isAtLeastV() && WifiHalAidlImpl.isServiceVersionAtLeast(2)
                     && rttResult.vendorData != null) {
                 resultBuilder.setVendorData(
@@ -312,7 +327,10 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
         return rangingResults;
     }
 
-    private static @WifiAnnotations.ChannelWidth int halToFrameworkChannelBandwidth(
+    /**
+     *  AIDL Hal to framework mapping for Channel width
+     */
+    public static @WifiAnnotations.ChannelWidth int halToFrameworkChannelBandwidth(
             @RttBw int packetBw) {
         switch (packetBw) {
             case RttBw.BW_20MHZ:
@@ -330,7 +348,10 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
         }
     }
 
-    private static @WifiRttController.FrameworkRttStatus int halToFrameworkRttStatus(
+    /**
+     *  AIDL Hal to framework mapping for RTT status
+     */
+    public static @WifiRttController.FrameworkRttStatus int halToFrameworkRttStatus(
             int halStatus) {
         switch (halStatus) {
             case RttStatus.SUCCESS:
@@ -523,6 +544,31 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
                         config.preamble = halRttPreambleCapabilityLimiter(config.preamble, cap,
                                 config.type);
                     }
+
+                    // Update secure ranging configuration
+                    SecureRangingConfig secureConfig = responder.getSecureRangingConfig();
+                    @PasnConfig.AkmType int baseAkm = PasnConfig.AKM_NONE;
+                    @PasnConfig.Cipher int cipherSuite = PasnConfig.CIPHER_NONE;
+                    PasnConfig pasnConfig = null;
+                    if (secureConfig != null && cap != null
+                            && request.getSecurityMode() != RangingRequest.SECURITY_MODE_OPEN) {
+                        pasnConfig = secureConfig.getPasnConfig();
+                        baseAkm = getBestBaseAkm(pasnConfig.getBaseAkms(), cap.akmsSupported);
+                        cipherSuite = getBestCipherSuite(pasnConfig.getCiphers(),
+                                cap.cipherSuitesSupported);
+
+                    }
+                    if (baseAkm != PasnConfig.AKM_NONE && cipherSuite != PasnConfig.CIPHER_NONE) {
+                        config.secureConfig = new RttSecureConfig();
+                        config.secureConfig.enableSecureHeLtf = secureConfig.isSecureHeLtfEnabled();
+                        config.secureConfig.enableRangingFrameProtection = true;
+                        config.secureConfig.pasnConfig = new android.hardware.wifi.PasnConfig();
+                        config.secureConfig.pasnConfig.baseAkm = baseAkm;
+                        config.secureConfig.pasnConfig.cipherSuite = cipherSuite;
+                        config.secureConfig.pasnConfig.passphrase =
+                                pasnConfig.getPassword().getBytes(StandardCharsets.UTF_8);
+                        config.secureConfig.pasnComebackCookie = pasnConfig.getPasnComebackCookie();
+                    }
                 }
             } catch (IllegalArgumentException e) {
                 Log.e(TAG, "Invalid configuration: " + e.getMessage());
@@ -537,6 +583,62 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
             configArray[i] = rttConfigs.get(i);
         }
         return configArray;
+    }
+
+    /**
+     * Get the best Cipher based on security.
+     */
+    @PasnConfig.Cipher
+    private static int getBestCipherSuite(@PasnConfig.Cipher int requiredAkms,
+            @PasnConfig.Cipher int supportedAkms) {
+        int possibleAkms = requiredAkms & supportedAkms;
+        if ((possibleAkms & PasnConfig.CIPHER_GCMP_256) != 0) {
+            return PasnConfig.CIPHER_GCMP_256;
+        }
+        if ((possibleAkms & PasnConfig.CIPHER_GCMP_128) != 0) {
+            return PasnConfig.CIPHER_GCMP_128;
+        }
+        if ((possibleAkms & PasnConfig.CIPHER_CCMP_256) != 0) {
+            return PasnConfig.CIPHER_CCMP_256;
+        }
+        if ((possibleAkms & PasnConfig.CIPHER_CCMP_128) != 0) {
+            return PasnConfig.CIPHER_CCMP_128;
+        }
+        return PasnConfig.CIPHER_NONE;
+    }
+
+    /**
+     * Get the best AKM based on security.
+     */
+    @PasnConfig.AkmType
+    private static int getBestBaseAkm(@PasnConfig.AkmType int requiredAkms,
+            @PasnConfig.AkmType int supportedAkms) {
+        int possibleAkms = requiredAkms & supportedAkms;
+        if ((possibleAkms & PasnConfig.AKM_FT_EAP_SHA384) != 0) {
+            return PasnConfig.AKM_FT_EAP_SHA384;
+        }
+        if ((possibleAkms & PasnConfig.AKM_FILS_EAP_SHA384) != 0) {
+            return PasnConfig.AKM_FILS_EAP_SHA384;
+        }
+        if ((possibleAkms & PasnConfig.AKM_FILS_EAP_SHA256) != 0) {
+            return PasnConfig.AKM_FILS_EAP_SHA256;
+        }
+        if ((possibleAkms & PasnConfig.AKM_FT_EAP_SHA256) != 0) {
+            return PasnConfig.AKM_FT_EAP_SHA256;
+        }
+        if ((possibleAkms & PasnConfig.AKM_FT_PSK_SHA384) != 0) {
+            return PasnConfig.AKM_FT_PSK_SHA384;
+        }
+        if ((possibleAkms & PasnConfig.AKM_FT_PSK_SHA256) != 0) {
+            return PasnConfig.AKM_FT_PSK_SHA256;
+        }
+        if ((possibleAkms & PasnConfig.AKM_SAE) != 0) {
+            return PasnConfig.AKM_SAE;
+        }
+        if ((possibleAkms & PasnConfig.AKM_PASN) != 0) {
+            return PasnConfig.AKM_PASN;
+        }
+        return PasnConfig.AKM_NONE;
     }
 
     private static void validateBwAndPreambleCombination(int bw, int preamble) {
@@ -575,7 +677,10 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
         }
     }
 
-    private static int frameworkToHalChannelWidth(int responderChannelWidth)
+    /**
+     *  Framework to AIDL Hal mapping for Channel Width
+     */
+    public static int frameworkToHalChannelWidth(int responderChannelWidth)
             throws IllegalArgumentException {
         switch (responderChannelWidth) {
             case ResponderConfig.CHANNEL_WIDTH_20MHZ:
@@ -616,7 +721,10 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
         }
     }
 
-    private static int frameworkToHalResponderPreamble(int responderPreamble)
+    /**
+     *  Framework to AIDL Hal mapping for Preamble
+     */
+    public static int frameworkToHalResponderPreamble(int responderPreamble)
             throws IllegalArgumentException {
         switch (responderPreamble) {
             case ResponderConfig.PREAMBLE_LEGACY:
@@ -627,6 +735,8 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
                 return RttPreamble.VHT;
             case ResponderConfig.PREAMBLE_HE:
                 return RttPreamble.HE;
+            case ResponderConfig.PREAMBLE_EHT:
+                return RttPreamble.EHT;
             default:
                 throw new IllegalArgumentException(
                         "frameworkToHalResponderPreamble: bad " + responderPreamble);
