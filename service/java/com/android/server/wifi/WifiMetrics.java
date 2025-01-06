@@ -9257,7 +9257,7 @@ public class WifiMetrics {
      */
     public void incrementConnectionDuration(String ifaceName, int timeDeltaLastTwoPollsMs,
             boolean isThroughputSufficient, boolean isCellularDataAvailable, int rssi, int txKbps,
-            int rxKbps) {
+            int rxKbps, int txLinkSpeedMbps, int rxLinkSpeedMbps) {
         synchronized (mLock) {
             if (!isPrimary(ifaceName)) {
                 return;
@@ -9270,7 +9270,8 @@ public class WifiMetrics {
             WifiStatsLog.write(WifiStatsLog.WIFI_HEALTH_STAT_REPORTED, timeDeltaLastTwoPollsMs,
                     isThroughputSufficient || !mWifiWins, isCellularDataAvailable, band, rssi,
                     txKbps, rxKbps, mScorerUid, (wifiUsabilityState == WifiUsabilityState.USABLE),
-                    convertWifiUsabilityState(wifiUsabilityState));
+                    convertWifiUsabilityState(wifiUsabilityState),
+                    txLinkSpeedMbps, rxLinkSpeedMbps);
         }
     }
 
