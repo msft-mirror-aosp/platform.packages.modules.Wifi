@@ -4517,7 +4517,7 @@ public class WifiMetricsTest extends WifiBaseTest {
      * Verify wifiUsabilityStatsTraining size limit
      */
     @Test
-    public void testwifiUsabilityStatsTrainingSize() {
+    public void testwifiUsabilityStatsTrainingSize() throws Exception {
         ringBufferSetupForTestStoreCapturedData();
         // Do MAX_WIFI_USABILITY_STATS_TRAINING_SIZE times successful data capture
         for (int i = 0; i < WifiMetrics.MAX_WIFI_USABILITY_STATS_TRAINING_SIZE; ++i) {
@@ -4541,6 +4541,8 @@ public class WifiMetricsTest extends WifiBaseTest {
         // 1st capture period is [33s, 153s), current time is 258s, storeTimeOffsetMs is 105s
         assertEquals(105 * mWifiMetrics.MILLIS_IN_A_SECOND,
                 mWifiMetrics.mWifiUsabilityStatsTrainingExamples.get(0).storeTimeOffsetMs);
+        dumpProtoAndDeserialize();
+        assertEquals(10, mDecodedProto.wifiUsabilityStatsTraining.length);
     }
 
     /**
