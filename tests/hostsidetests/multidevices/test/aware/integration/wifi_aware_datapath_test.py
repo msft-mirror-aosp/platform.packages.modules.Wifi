@@ -86,6 +86,8 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
     # take some time
     WAIT_FOR_CLUSTER = 5
 
+    EVENT_NDP_TIMEOUT = 20
+
     # configuration parameters used by tests
     ENCR_TYPE_OPEN = 0
     ENCR_TYPE_PASSPHRASE = 1
@@ -937,6 +939,113 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
             return None
         return res.group(1)
 
+    def run_mismatched_oob_data_path_test(self,
+                                          init_mismatch_mac=False,
+                                          resp_mismatch_mac=False,
+                                          init_encr_type=ENCR_TYPE_OPEN,
+                                          resp_encr_type=ENCR_TYPE_OPEN):
+        """Runs the negative out-of-band data-path tests: mismatched information
+        between Responder and Initiator.
+
+        Args:
+            init_mismatch_mac: True to mismatch the Initiator MAC address
+            resp_mismatch_mac: True to mismatch the Responder MAC address
+            init_encr_type: Encryption type of Initiator - ENCR_TYPE_*
+            resp_encr_type: Encryption type of Responder - ENCR_TYPE_*
+        """
+
+        init_dut = self.ads[0]
+        init_dut.pretty_name = "Initiator"
+        resp_dut = self.ads[1]
+        resp_dut.pretty_name = "Responder"
+        init_handler = init_dut.wifi_aware_snippet.wifiAwareAttached(True)
+        resp_handler = resp_dut.wifi_aware_snippet.wifiAwareAttached(True)
+        init_id, init_mac = self.attach_with_identity(init_dut)
+        resp_id, resp_mac = self.attach_with_identity(resp_dut)
+        if init_mismatch_mac:  # assumes legit ones don't start with "00"
+            init_mac = "00" + init_mac[2:]
+        if resp_mismatch_mac:
+            resp_mac = "00" + resp_mac[2:]
+
+        # wait for devices to synchronize with each other - there are no other
+        # mechanisms to make sure this happens for OOB discovery (except retrying
+        # to execute the data-path request)
+        time.sleep(self.WAIT_FOR_CLUSTER)
+
+        # set up separate keys: even if types are the same we want a mismatch
+        init_passphrase = None
+        init_pmk = None
+        if init_encr_type == self.ENCR_TYPE_PASSPHRASE:
+            init_passphrase = self.PASSPHRASE
+        elif init_encr_type == self.ENCR_TYPE_PMK:
+            init_pmk = self.PMK
+        resp_passphrase = None
+        resp_pmk = None
+        if resp_encr_type == self.ENCR_TYPE_PASSPHRASE:
+            resp_passphrase = self.PASSPHRASE2
+        elif resp_encr_type == self.ENCR_TYPE_PMK:
+            resp_pmk = self.PMK2
+
+        # Responder: request network
+        init_dut_accept_handler = init_dut.wifi_aware_snippet.connectivityServerSocketAccept()
+        network_id = init_dut_accept_handler.callback_id
+        init_local_port = init_dut_accept_handler.ret_value
+        resp_req_key = self.request_oob_network(
+            resp_dut,
+            resp_id,
+            _DATA_PATH_RESPONDER,
+            init_mac,
+            resp_passphrase,
+            resp_pmk,
+            network_id
+            )
+
+        # Initiator: request network
+        init_req_key = self.request_oob_network(
+            init_dut,
+            init_id,
+            _DATA_PATH_INITIATOR,
+            resp_mac,
+            init_passphrase,
+            resp_pmk,
+            network_id
+            )
+        # Initiator & Responder:
+        # - expect unavailable on the Initiator party if the
+        #   Initiator and Responder with mac or encryption mismatch
+        # - For responder:
+        #   - If mac mismatch, responder will keep waiting ...
+        #   - If encryption mismatch, responder expect unavailable
+        p_network_callback_event = init_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+        p_callback_name = p_network_callback_event.data[_CALLBACK_NAME]
+        asserts.assert_equal(
+            p_callback_name, constants.NetworkCbName.ON_UNAVAILABLE,
+            f'{init_dut} failed to request the network, got callback'
+            f' {p_callback_name}.'
+            )
+        time.sleep(self.EVENT_NDP_TIMEOUT)
+        if init_mismatch_mac or resp_mismatch_mac:
+            autils.callback_no_response(
+                resp_handler, constants.NetworkCbEventName.NETWORK_CALLBACK,
+                10, True
+            )
+        else:
+            s_network_callback_event = resp_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            s_callback_name = s_network_callback_event.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                s_callback_name, constants.NetworkCbName.ON_UNAVAILABLE,
+                f'{resp_dut} failed to request the network, got callback'
+                f' {s_callback_name}.'
+                )
+        init_dut.wifi_aware_snippet.connectivityUnregisterNetwork(network_id)
+        resp_dut.wifi_aware_snippet.connectivityUnregisterNetwork(network_id)
+
     def get_network_specifier(self, dut, id, dev_type, peer_mac, sec, net_work_request_id):
         """Create a network specifier for the device based on the security
         configuration.
@@ -1232,6 +1341,67 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
             use_peer_id=False,
             passphrase_to_use=self.PASSPHRASE_MAX)
 
+    def test_negative_mismatch_init_mac(self):
+        """Data-path: failure when Initiator MAC address mismatch"""
+        self.run_mismatched_oob_data_path_test(
+            init_mismatch_mac=True, resp_mismatch_mac=False)
+
+    def test_negative_mismatch_resp_mac(self):
+        """Data-path: failure when Responder MAC address mismatch"""
+        self.run_mismatched_oob_data_path_test(
+            init_mismatch_mac=False, resp_mismatch_mac=True)
+
+    def test_negative_mismatch_passphrase(self):
+        """Data-path: failure when passphrases mismatch"""
+        self.run_mismatched_oob_data_path_test(
+            init_encr_type=self.ENCR_TYPE_PASSPHRASE,
+            resp_encr_type=self.ENCR_TYPE_PASSPHRASE)
+
+    def test_negative_mismatch_open_passphrase(self):
+        """Data-path:
+            failure when initiator is open, and responder passphrase
+        """
+        self.run_mismatched_oob_data_path_test(
+            init_encr_type=self.ENCR_TYPE_OPEN,
+            resp_encr_type=self.ENCR_TYPE_PASSPHRASE)
+
+    def test_negative_mismatch_passphrase_open(self):
+        """Data-path:
+            failure when initiator is passphrase, and responder open
+        """
+        self.run_mismatched_oob_data_path_test(
+            init_encr_type=self.ENCR_TYPE_PASSPHRASE,
+            resp_encr_type=self.ENCR_TYPE_OPEN)
+
+    def test_negative_mismatch_pmk(self):
+        """Data-path: failure when PMK mismatch"""
+        self.run_mismatched_oob_data_path_test(
+            init_encr_type=self.ENCR_TYPE_PMK,
+            resp_encr_type=self.ENCR_TYPE_PMK)
+
+    def test_negative_mismatch_open_pmk(self):
+        """Data-path: failure when initiator is open, and responder PMK"""
+        self.run_mismatched_oob_data_path_test(
+            init_encr_type=self.ENCR_TYPE_OPEN,
+            resp_encr_type=self.ENCR_TYPE_PMK)
+
+    def test_negative_mismatch_pmk_passphrase(self):
+        """Data-path: failure when initiator is pmk, and responder passphrase"""
+        self.run_mismatched_oob_data_path_test(
+            init_encr_type=self.ENCR_TYPE_PMK,
+            resp_encr_type=self.ENCR_TYPE_PASSPHRASE)
+
+    def test_negative_mismatch_pmk_open(self):
+        """Data-path: failure when initiator is PMK, and responder open"""
+        self.run_mismatched_oob_data_path_test(
+            init_encr_type=self.ENCR_TYPE_PMK,
+            resp_encr_type=self.ENCR_TYPE_OPEN)
+
+    def test_negative_mismatch_passphrase_pmk(self):
+        """Data-path: failure when initiator is passphrase, and responder pmk"""
+        self.run_mismatched_oob_data_path_test(
+            init_encr_type=self.ENCR_TYPE_PASSPHRASE,
+            resp_encr_type=self.ENCR_TYPE_PMK)
 
     #######################################
     # Positive Out-of-Band (OOB) tests key:
