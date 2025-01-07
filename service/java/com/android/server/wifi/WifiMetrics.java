@@ -5795,8 +5795,9 @@ public class WifiMetrics {
                     new WifiUsabilityStatsTraining[mWifiUsabilityStatsTrainingExamples.size()];
             for (int i = 0; i < mWifiUsabilityStatsTrainingExamples.size(); i++) {
                 mWifiLogProto.wifiUsabilityStatsTraining[i] =
-                        mWifiUsabilityStatsTrainingExamples.remove(0);
+                        mWifiUsabilityStatsTrainingExamples.get(i);
             }
+            mWifiUsabilityStatsTrainingExamples.clear();
             mWifiLogProto.mobilityStatePnoStatsList =
                     new DeviceMobilityStatePnoScanStats[mMobilityStatePnoStatsMap.size()];
             for (int i = 0; i < mMobilityStatePnoStatsMap.size(); i++) {
