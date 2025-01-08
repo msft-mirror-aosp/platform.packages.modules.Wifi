@@ -259,6 +259,61 @@ public class WifiRttControllerAidlImplTest extends WifiBaseTest {
     }
 
     /**
+     * Validate IEEE 802.11az ranging request on an IEEE 802.11mc capable device. Expectation is
+     * RTT type has to be downgraded to 11mc and pre-amble needs to be adjusted based on the band
+     * of operation.
+     */
+    @Test
+    public void test11azRangeRequestOn11mcCapableDevice() throws Exception {
+        int cmdId = 55;
+        RangingRequest request = RttTestUtils.getDummyRangingRequestWith11az((byte) 0);
+
+        // update capabilities to enable 11mc only
+        RttCapabilities cap = getFullRttCapabilities();
+        cap.ntbInitiatorSupported = false;
+        reset(mIWifiRttControllerMock);
+        when(mIWifiRttControllerMock.getCapabilities()).thenReturn(cap);
+        createAndInitializeDut();
+
+        mDut.rangeRequest(cmdId, request);
+        verify(mIWifiRttControllerMock).rangeRequest(eq(cmdId), mRttConfigCaptor.capture());
+        RttConfig[] halRequest = mRttConfigCaptor.getValue();
+
+        collector.checkThat("number of entries", halRequest.length,
+                equalTo(request.mRttPeers.size()));
+
+        RttConfig rttConfig = halRequest[0];
+        collector.checkThat("entry 0: MAC", rttConfig.addr,
+                equalTo(MacAddress.fromString("00:01:02:03:04:00").toByteArray()));
+        collector.checkThat("entry 0: rtt type", rttConfig.type, equalTo(RttType.TWO_SIDED));
+        collector.checkThat("entry 0: peer type", rttConfig.peer, equalTo(RttPeerType.AP));
+        collector.checkThat("", rttConfig.preamble, equalTo(RttPreamble.VHT));
+
+        rttConfig = halRequest[1];
+        collector.checkThat("entry 1: MAC", rttConfig.addr,
+                equalTo(MacAddress.fromString("0A:0B:0C:0D:0E:00").toByteArray()));
+        collector.checkThat("entry 1: rtt type", rttConfig.type, equalTo(RttType.ONE_SIDED));
+        collector.checkThat("entry 1: peer type", rttConfig.peer, equalTo(RttPeerType.AP));
+        collector.checkThat("", rttConfig.preamble, equalTo(RttPreamble.HT));
+
+        rttConfig = halRequest[2];
+        collector.checkThat("entry 2: MAC", rttConfig.addr,
+                equalTo(MacAddress.fromString("08:09:08:07:06:05").toByteArray()));
+        collector.checkThat("entry 2: rtt type", rttConfig.type, equalTo(RttType.TWO_SIDED));
+        collector.checkThat("entry 2: peer type", rttConfig.peer, equalTo(RttPeerType.NAN_TYPE));
+        collector.checkThat("", rttConfig.preamble, equalTo(RttPreamble.HT));
+
+        rttConfig = halRequest[3];
+        collector.checkThat("entry 3: MAC", rttConfig.addr,
+                equalTo(MacAddress.fromString("00:11:22:33:44:00").toByteArray()));
+        collector.checkThat("entry 3: rtt type", rttConfig.type, equalTo(RttType.TWO_SIDED_11MC));
+        collector.checkThat("entry 3: peer type", rttConfig.peer, equalTo(RttPeerType.AP));
+        collector.checkThat("entry 3: preamble", rttConfig.preamble, equalTo(RttPreamble.VHT));
+
+        verifyNoMoreInteractions(mIWifiRttControllerMock);
+
+    }
+    /**
      * Validate successful ranging flow - with privileges access but with limited capabilities:
      * - Very limited BW
      * - Very limited Preamble
