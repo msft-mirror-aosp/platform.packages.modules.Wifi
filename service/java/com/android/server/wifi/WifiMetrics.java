@@ -9259,7 +9259,8 @@ public class WifiMetrics {
      */
     public void incrementConnectionDuration(String ifaceName, int timeDeltaLastTwoPollsMs,
             boolean isThroughputSufficient, boolean isCellularDataAvailable, int rssi, int txKbps,
-            int rxKbps, int txLinkSpeedMbps, int rxLinkSpeedMbps) {
+            int rxKbps, int txLinkSpeedMbps, int rxLinkSpeedMbps,
+            @WifiAnnotations.ChannelWidth int channelBandwidth) {
         synchronized (mLock) {
             if (!isPrimary(ifaceName)) {
                 return;
@@ -9273,7 +9274,7 @@ public class WifiMetrics {
                     isThroughputSufficient || !mWifiWins, isCellularDataAvailable, band, rssi,
                     txKbps, rxKbps, mScorerUid, (wifiUsabilityState == WifiUsabilityState.USABLE),
                     convertWifiUsabilityState(wifiUsabilityState),
-                    txLinkSpeedMbps, rxLinkSpeedMbps);
+                    txLinkSpeedMbps, rxLinkSpeedMbps, convertChannelWidthToProto(channelBandwidth));
         }
     }
 
