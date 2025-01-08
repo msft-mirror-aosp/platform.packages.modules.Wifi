@@ -203,6 +203,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
     @Mock WifiGlobals mWifiGlobals;
     @Mock WifiConnectivityManager mWifiConnectivityManager;
     @Mock WifiConfigManager mWifiConfigManager;
+    @Mock WakeupController mWakeupController;
 
     Listener<ConcreteClientModeManager> mClientListener;
     Listener<SoftApManager> mSoftApListener;
@@ -242,6 +243,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         when(mWifiInjector.getWifiHandlerLocalLog()).thenReturn(mLocalLog);
         when(mWifiInjector.getWifiConnectivityManager()).thenReturn(mWifiConnectivityManager);
         when(mWifiInjector.getWifiConfigManager()).thenReturn(mWifiConfigManager);
+        when(mWifiInjector.getWakeupController()).thenReturn(mWakeupController);
         when(mClientModeManager.getRole()).thenReturn(ROLE_CLIENT_PRIMARY);
         when(mClientModeManager.getInterfaceName()).thenReturn(WIFI_IFACE_NAME);
         when(mContext.getResourceCache()).thenReturn(mWifiResourceCache);
@@ -300,6 +302,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         mLooper.dispatchAll();
 
         verify(mWifiMetrics).noteWifiEnabledDuringBoot(false);
+        verify(mWifiMetrics, never()).reportWifiStateChanged(eq(true), anyBoolean(), eq(false));
         verify(mWifiGlobals).setD2dStaConcurrencySupported(false);
         verify(mWifiNative).registerStatusListener(mStatusListenerCaptor.capture());
         verify(mWifiNative).initialize();
@@ -1523,6 +1526,7 @@ public class ActiveModeWardenTest extends WifiBaseTest {
         mLooper.dispatchAll();
 
         verify(mWifiMetrics).noteWifiEnabledDuringBoot(true);
+        verify(mWifiMetrics).reportWifiStateChanged(eq(true), anyBoolean(), eq(false));
 
         assertInEnabledState();
 
