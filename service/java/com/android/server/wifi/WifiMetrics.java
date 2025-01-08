@@ -2348,7 +2348,8 @@ public class WifiMetrics {
                         currentConnectionEvent.mPasspointRoamingType,
                         currentConnectionEvent.mCarrierId,
                         currentConnectionEvent.mTofuConnectionState,
-                        currentConnectionEvent.mUid);
+                        currentConnectionEvent.mUid,
+                        frequency);
 
                 if (connectionSucceeded) {
                     reportRouterCapabilities(currentConnectionEvent.mRouterFingerPrint);
