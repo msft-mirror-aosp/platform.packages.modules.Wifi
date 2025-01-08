@@ -4062,6 +4062,12 @@ public class WifiManager {
     public static final int WIFI_FEATURE_SOFTAP_MLO = 63;
 
     /**
+     * Supports multiple Wi-Fi 7 multi-link devices (MLD) on SoftAp.
+     * @hide
+     */
+    public static final int WIFI_FEATURE_MULTIPLE_MLD_ON_SAP = 64;
+
+    /**
      * NOTE: When adding a new WIFI_FEATURE_ value, also be sure to update
      * {@link com.android.server.wifi.util.FeatureBitsetUtils}
      */

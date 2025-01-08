@@ -226,6 +226,9 @@ public class SoftApManager implements ActiveModeManager {
     // Whether this SoftApManager (i.e. this AP interface) is using multiple link operation.
     private boolean mIsUsingMlo = false;
 
+    private int mMaximumNumberOfMLDSupported;
+    private int mCurrentExistingMLD;
+
     /**
      * The specified configuration passed in during initialization or during a configuration update
      * that doesn't require a restart.
@@ -533,6 +536,9 @@ public class SoftApManager implements ActiveModeManager {
         mRole = role;
         // chip support it && overlay configuration is set.
         mIsMLDApSupportMLO = mWifiNative.isMLDApSupportMLO();
+        mMaximumNumberOfMLDSupported = ApConfigUtil.getMaximumSupportedMLD(
+                mContext, mWifiNative.isMultipleMLDSupportedOnSap());
+        mCurrentExistingMLD = mActiveModeWarden.getCurrentMLDAp();
         mIsUsingMlo = useMultilinkMloSoftAp();
         enableVerboseLogging(verboseLoggingEnabled);
         mStateMachine.sendMessage(SoftApStateMachine.CMD_START, requestorWs);
@@ -568,12 +574,10 @@ public class SoftApManager implements ActiveModeManager {
                 && mCurrentSoftApConfiguration.isIeee80211beEnabled()
                 && isBridgedMode() && mIsMLDApSupportMLO) {
 
-            int currentExistingMLD =
-                    mActiveModeWarden.getCurrentMLDAp();
             if (ApConfigUtil.is11beAllowedForThisConfiguration(
                     null /* Wiphy capability can be ignored for MLO case*/,
                     mContext, mCurrentSoftApConfiguration, true /* isBridgedMode */,
-                    currentExistingMLD,
+                    mMaximumNumberOfMLDSupported, mCurrentExistingMLD,
                     true /* isMLDApSupportMLO */)) {
                 return true;
             }
@@ -1350,11 +1354,9 @@ public class SoftApManager implements ActiveModeManager {
                             DeviceWiphyCapabilities capabilities =
                                     mWifiNative.getDeviceWiphyCapabilities(
                                             mApInterfaceName, isBridgeRequired());
-                            int currentExistingMLD =
-                                    mActiveModeWarden.getCurrentMLDAp();
                             if (!ApConfigUtil.is11beAllowedForThisConfiguration(capabilities,
                                     mContext, mCurrentSoftApConfiguration, isBridgedMode(),
-                                    currentExistingMLD,
+                                    mMaximumNumberOfMLDSupported, mCurrentExistingMLD,
                                     mIsMLDApSupportMLO)) {
                                 Log.d(getTag(), "11BE is not allowed,"
                                         + " removing from configuration");

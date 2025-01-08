@@ -96,6 +96,8 @@ public class FeatureBitsetUtils {
             append(WifiManager.WIFI_FEATURE_D2D_WHEN_INFRA_STA_DISABLED,
                     "WIFI_FEATURE_D2D_WHEN_INFRA_STA_DISABLED");
             append(WifiManager.WIFI_FEATURE_SOFTAP_MLO, "WIFI_FEATURE_SOFTAP_MLO");
+            append(WifiManager.WIFI_FEATURE_MULTIPLE_MLD_ON_SAP,
+                    "WIFI_FEATURE_MULTIPLE_MLD_ON_SAP");
         }
     };
 
