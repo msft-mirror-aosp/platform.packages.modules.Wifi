@@ -6064,16 +6064,16 @@ public class WifiMetricsTest extends WifiBaseTest {
         for (int i = 0; i < 2; i++) {
             mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, 52);
             mWifiMetrics.incrementConnectionDuration(TEST_IFACE_NAME, 5000, false, true, -50, 10000,
-                    10000);
+                    10000, 10, 10);
             mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, 40);
             mWifiMetrics.incrementConnectionDuration(TEST_IFACE_NAME, 5000, false, true, -50, 10000,
-                    10000);
+                    10000, 10, 10);
             mWifiMetrics.incrementConnectionDuration(TEST_IFACE_NAME, 3000, true, true, -50, 10000,
-                    10000);
+                    10000, 10, 10);
             mWifiMetrics.incrementConnectionDuration(TEST_IFACE_NAME, 1000, false, false, -50,
-                    10000, 10000);
+                    10000, 10000, 10, 10);
             mWifiMetrics.incrementConnectionDuration(TEST_IFACE_NAME, 500, true, false, -50, 10000,
-                    10000);
+                    10000, 10, 10);
         }
         dumpProtoAndDeserialize();
 
@@ -7084,13 +7084,14 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.incrementWifiScoreCount("",  60);
         mWifiMetrics.handlePollResult(TEST_IFACE_NAME, wifiInfo);
         mWifiMetrics.incrementConnectionDuration(TEST_IFACE_NAME, 3000, true, true, -50, 10002,
-                10001);
+                10001, 10, 10);
         ExtendedMockito.verify(() -> WifiStatsLog.write(
                 WifiStatsLog.WIFI_HEALTH_STAT_REPORTED, 3000, true, true,
                 WifiStatsLog.WIFI_HEALTH_STAT_REPORTED__BAND__BAND_5G_HIGH, -50, 10002, 10001,
                 Process.WIFI_UID,
                 false,
-                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_UNKNOWN));
+                WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_UNKNOWN,
+                10, 10));
 
         when(wifiInfo.getFrequency()).thenReturn(2412);
         mWifiMetrics.setIsExternalWifiScorerOn(true, TEST_UID);
@@ -7099,12 +7100,13 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.incrementWifiScoreCount("",  30);
         mWifiMetrics.handlePollResult(TEST_IFACE_NAME, wifiInfo);
         mWifiMetrics.incrementConnectionDuration(TEST_IFACE_NAME, 2000, false, true, -55, 20002,
-                20001);
+                20001, 10, 10);
         ExtendedMockito.verify(
                 () -> WifiStatsLog.write(WifiStatsLog.WIFI_HEALTH_STAT_REPORTED, 2000, true, true,
                         WifiStatsLog.WIFI_HEALTH_STAT_REPORTED__BAND__BAND_2G, -55, 20002, 20001,
                         TEST_UID, true,
-                        WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE));
+                        WIFI_IS_UNUSABLE_REPORTED__WIFI_PREDICTED_USABILITY_STATE__WIFI_USABILITY_PREDICTED_USABLE,
+                        10,  10));
     }
 
     /**

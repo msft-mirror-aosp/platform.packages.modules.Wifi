@@ -658,13 +658,13 @@ public class WifiDataStallTest extends WifiBaseTest {
         mWifiDataStall.checkDataStallAndThroughputSufficiency(TEST_IFACE_NAME,
                 mCapabilities, mOldLlStats, mNewLlStats, mWifiInfo, mTxBytes, mRxBytes);
         verify(mWifiMetrics, times(1)).incrementConnectionDuration(TEST_IFACE_NAME,
-                1000, true, true, TEST_RSSI, 960, 9609);
+                1000, true, true, TEST_RSSI, 960, 9609, 10, 10);
 
         // Expect 2nd throughput sufficiency check to return false
         mWifiDataStall.checkDataStallAndThroughputSufficiency(TEST_IFACE_NAME,
                 mCapabilities, mOldLlStats, mNewLlStats, mWifiInfo, mTxBytes, mRxBytes);
         verify(mWifiMetrics, times(1)).incrementConnectionDuration(TEST_IFACE_NAME,
-                1000, false, true, TEST_RSSI, 960, 9609);
+                1000, false, true, TEST_RSSI, 960, 9609, 10, 10);
 
         mNewLlStats.timeStampInMs = mOldLlStats.timeStampInMs + 2000;
         phoneStateListener.onDataConnectionStateChanged(
@@ -673,7 +673,7 @@ public class WifiDataStallTest extends WifiBaseTest {
         mWifiDataStall.checkDataStallAndThroughputSufficiency(TEST_IFACE_NAME,
                 mCapabilities, mOldLlStats, mNewLlStats, mWifiInfo, mTxBytes, mRxBytes);
         verify(mWifiMetrics, times(1)).incrementConnectionDuration(TEST_IFACE_NAME,
-                2000, false, false, TEST_RSSI, 960, 9609);
+                2000, false, false, TEST_RSSI, 960, 9609, 10, 10);
 
         // Expect this update to be ignored by connection duration counters due to its
         // too large poll interval
@@ -681,7 +681,7 @@ public class WifiDataStallTest extends WifiBaseTest {
         mWifiDataStall.checkDataStallAndThroughputSufficiency(TEST_IFACE_NAME,
                 mCapabilities, mOldLlStats, mNewLlStats, mWifiInfo, mTxBytes, mRxBytes);
         verify(mWifiMetrics, never()).incrementConnectionDuration(TEST_IFACE_NAME,
-                10000, false, false, TEST_RSSI, 960, 9609);
+                10000, false, false, TEST_RSSI, 960, 9609, 10, 10);
         setWifiEnabled(false);
     }
 }
