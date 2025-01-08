@@ -2217,15 +2217,12 @@ public class WifiManager {
      *
      * @param context the application context
      * @param service the Binder interface
-     * @param looper the Looper used to deliver callbacks
      * @hide - hide this because it takes in a parameter of type IWifiManager, which
      * is a system private class.
      */
-    public WifiManager(@NonNull Context context, @NonNull IWifiManager service,
-        @NonNull Looper looper) {
+    public WifiManager(@NonNull Context context, @NonNull IWifiManager service) {
         mContext = context;
         mService = service;
-        mLooper = looper;
         mTargetSdkVersion = context.getApplicationInfo().targetSdkVersion;
         updateVerboseLoggingEnabledFromService();
     }
@@ -7560,7 +7557,7 @@ public class WifiManager {
             @Nullable ActionListener listener) {
         ActionListenerProxy listenerProxy = null;
         if (listener != null) {
-            listenerProxy = new ActionListenerProxy("connect", mLooper, listener);
+            listenerProxy = new ActionListenerProxy("connect", mContext.getMainLooper(), listener);
         }
         try {
             Bundle extras = new Bundle();
@@ -7709,7 +7706,7 @@ public class WifiManager {
         if (config == null) throw new IllegalArgumentException("config cannot be null");
         ActionListenerProxy listenerProxy = null;
         if (listener != null) {
-            listenerProxy = new ActionListenerProxy("save", mLooper, listener);
+            listenerProxy = new ActionListenerProxy("save", mContext.getMainLooper(), listener);
         }
         try {
             mService.save(config, listenerProxy, mContext.getOpPackageName());
@@ -7747,7 +7744,7 @@ public class WifiManager {
         if (netId < 0) throw new IllegalArgumentException("Network id cannot be negative");
         ActionListenerProxy listenerProxy = null;
         if (listener != null) {
-            listenerProxy = new ActionListenerProxy("forget", mLooper, listener);
+            listenerProxy = new ActionListenerProxy("forget", mContext.getMainLooper(), listener);
         }
         try {
             mService.forget(netId, listenerProxy);
