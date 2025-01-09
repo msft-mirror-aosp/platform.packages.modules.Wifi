@@ -34,7 +34,6 @@ import android.content.Context;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Looper;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.Process;
@@ -2022,12 +2021,9 @@ public class WifiScanner {
      *
      * @param context the application context
      * @param service the Binder interface for {@link Context#WIFI_SCANNING_SERVICE}
-     * @param looper the Looper used to deliver callbacks
-     *
      * @hide
      */
-    public WifiScanner(@NonNull Context context, @NonNull IWifiScanner service,
-            @NonNull Looper looper) {
+    public WifiScanner(@NonNull Context context, @NonNull IWifiScanner service) {
         mContext = context;
         mService = service;
     }
