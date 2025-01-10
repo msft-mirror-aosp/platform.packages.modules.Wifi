@@ -20,26 +20,38 @@ import datetime
 import logging
 
 from mobly import asserts
+from mobly.snippet import errors
 from mobly.controllers.android_device_lib import callback_handler_v2
 from mobly.controllers import android_device
 
 from direct import constants
 
-_DEFAULT_TIMEOUT = datetime.timedelta(seconds=30)
+_DEFAULT_TIMEOUT = datetime.timedelta(seconds=60)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class DeviceState:
     """All objects related to operating p2p snippet RPCs.
 
     Attributes:
         ad: The Android device controller object.
         p2p_device: The object that represents a Wi-Fi p2p device.
+        broadcast_receiver: The object for getting events that represent
+            Wi-Fi p2p broadcast intents on device.
+        upnp_response_listener: The listener that corresponds to
+            UpnpServiceResponseListener on device.
+        dns_sd_response_listener: The listener that listens for callback
+            invocation of DnsSdServiceResponseListener and
+            DnsSdTxtRecordListener.
     """
 
     ad: android_device.AndroidDevice
     p2p_device: constants.WifiP2pDevice
     broadcast_receiver: callback_handler_v2.CallbackHandlerV2
+    upnp_response_listener: callback_handler_v2.CallbackHandlerV2 | None = None
+    dns_sd_response_listener: callback_handler_v2.CallbackHandlerV2 | None = (
+        None
+    )
 
 
 def setup_wifi_p2p(ad: android_device.AndroidDevice) -> DeviceState:
@@ -146,50 +158,144 @@ def _get_p2p_device(
     )
 
 
-def find_p2p_device(
+def discover_p2p_peer(
     requester: DeviceState,
     responder: DeviceState,
 ) -> constants.WifiP2pDevice:
-    """Initiates Wi-Fi p2p discovery for the requester to find the responder.
+    """Initiates p2p peer discovery for the requester to find the responder.
 
-    This initiates Wi-Fi p2p discovery on both devices and checks that the
-    requester can discover responder and return peer p2p device.
+    This initiates p2p discovery on both devices and checks that the
+    requester can discover responder.
+
+    Returns:
+        The peer p2p device discovered on the client.
     """
-    requester.ad.log.debug('Discovering Wi-Fi P2P peers.')
-    responder.ad.wifi.wifiP2pDiscoverPeers()
-
+    requester.ad.log.debug('Discovering Wi-Fi p2p peer %s.', responder.ad)
+    # Clear events in broadcast receiver before initiating peer discovery.
     _clear_events(requester, constants.WIFI_P2P_PEERS_CHANGED_ACTION)
+
+    # Initiate peer discovery.
+    responder.ad.wifi.wifiP2pDiscoverPeers()
     requester.ad.wifi.wifiP2pDiscoverPeers()
 
-    event = requester.broadcast_receiver.waitAndGet(
-        event_name=constants.WIFI_P2P_PEERS_CHANGED_ACTION,
-        timeout=_DEFAULT_TIMEOUT.total_seconds(),
-    )
-    requester_peers = constants.WifiP2pDevice.from_dict_list(
-        event.data[constants.EVENT_KEY_PEER_LIST]
-    )
+    # Wait until found the p2p peer device with expected MAC address.
+    expected_address = responder.p2p_device.device_address
 
-    responder_mac = responder.p2p_device.device_address
-    filtered_peers = [
-        peer for peer in requester_peers if peer.device_address == responder_mac
-    ]
-    if len(filtered_peers) == 0:
-        asserts.fail(
-            f'{requester.ad} did not find the responder device. Responder MAC '
-            f'address: {responder_mac}, found peers: {requester_peers}.'
+    def _filter_target_p2p_device(event) -> Sequence[constants.WifiP2pDevice]:
+        peers = constants.WifiP2pDevice.from_dict_list(
+            event.data[constants.EVENT_KEY_PEER_LIST]
         )
-    if len(filtered_peers) > 1:
-        asserts.fail(
-            f'{requester.ad} found more than one responder device. Responder '
-            f'MAC address: {responder_mac}, found peers: {requester_peers}.'
+        filtered_peers = [
+            peer for peer in peers if peer.device_address == expected_address
+        ]
+        return filtered_peers
+
+    try:
+        event = requester.broadcast_receiver.waitForEvent(
+            event_name=constants.WIFI_P2P_PEERS_CHANGED_ACTION,
+            predicate=lambda event: len(_filter_target_p2p_device(event)) > 0,
+            timeout=_DEFAULT_TIMEOUT.total_seconds(),
         )
-    return filtered_peers[0]
+    except errors.CallbackHandlerTimeoutError as e:
+        asserts.fail(
+            f'{requester.ad} did not find the responder device. Expected '
+            f'responder MAC: {expected_address}.'
+        )
+
+    # There should be only one expected p2p peer.
+    peers = _filter_target_p2p_device(event)
+    if len(peers) == 0:
+        asserts.fail(
+            f'{requester.ad} did not find the responder device. Expected '
+            f'responder MAC: {expected_address}, found event: {event}.'
+        )
+    if len(peers) > 1:
+        asserts.fail(
+            f'{requester.ad} found more than one responder device. Expected '
+            f'responder MAC: {expected_address}, found event: {event}.'
+        )
+    return peers[0]
+
+
+def discover_group_owner(
+    client: DeviceState,
+    group_owner_address: str,
+) -> constants.WifiP2pDevice:
+    """Initiates p2p peer discovery for the client to find expected group owner.
+
+    This requires that p2p group has already been established on the group
+    owner.
+
+    Args:
+        client: The device acts as p2p client.
+        group_owner_address: The expected MAC address of the group owner.
+
+    Returns:
+        The peer p2p device discovered on the client.
+    """
+    client.ad.log.debug(
+        'Discovering Wi-Fi p2p group owner %s.', group_owner_address
+    )
+    client.ad.wifi.wifiP2pDiscoverPeers()
+
+    # Wait until found the p2p peer device with expected MAC address. It must
+    # be a group owner.
+    def _filter_target_group_owner(event) -> Sequence[constants.WifiP2pDevice]:
+        peers = constants.WifiP2pDevice.from_dict_list(
+            event.data[constants.EVENT_KEY_PEER_LIST]
+        )
+        filtered_peers = [
+            peer
+            for peer in peers
+            if peer.device_address == group_owner_address
+            and peer.is_group_owner
+        ]
+        return filtered_peers
+
+    try:
+        event = client.broadcast_receiver.waitForEvent(
+            event_name=constants.WIFI_P2P_PEERS_CHANGED_ACTION,
+            predicate=lambda event: len(_filter_target_group_owner(event)) > 0,
+            timeout=_DEFAULT_TIMEOUT.total_seconds(),
+        )
+    except errors.CallbackHandlerTimeoutError as e:
+        asserts.fail(
+            f'{client.ad} did not find the group owner device. Expected group '
+            f'owner MAC: {group_owner_address}.'
+        )
+
+    # There should be only one expected p2p peer.
+    peers = _filter_target_group_owner(event)
+    if len(peers) == 0:
+        asserts.fail(
+            f'{client.ad} did not find the group owner device. Expected group '
+            f'owner MAC: {group_owner_address}, got event: {event}.'
+        )
+    if len(peers) > 1:
+        asserts.fail(
+            f'{client.ad} found more than one group owner devices. Expected '
+            f'group owner MAC: {group_owner_address}, got event: {event}.'
+        )
+    return peers[0]
+
+
+def create_group(
+    device: DeviceState, config: constants.WifiP2pConfig | None = None
+):
+    """Creates a Wi-Fi p2p group on the given device."""
+    _clear_events(device, constants.WIFI_P2P_CONNECTION_CHANGED_ACTION)
+
+    config = config.to_dict() if config else None
+    device.ad.wifi.wifiP2pCreateGroup(config)
+
+    # Wait until groupFormed=True
+    _wait_connection_notice(device.broadcast_receiver)
 
 
 def p2p_connect(
     requester: DeviceState,
     responder: DeviceState,
-    wps_config: constants.WpsInfo
+    wps_config: constants.WpsInfo,
 ) -> None:
     """Establishes Wi-Fi p2p connection with WPS configuration.
 
@@ -217,11 +323,15 @@ def p2p_connect(
     requester.ad.wifi.wifiP2pConnect(config.to_dict())
     requester.ad.log.info('Sent P2P connect invitation to responder.')
     if wps_config == constants.WpsInfo.PBC:
-        responder.ad.wifi.wifiP2pAcceptInvitation(requester.p2p_device.device_name)
+        responder.ad.wifi.wifiP2pAcceptInvitation(
+            requester.p2p_device.device_name
+        )
     elif wps_config == constants.WpsInfo.DISPLAY:
-        pin = requester.ad.wifi.wifiP2pGetPinCode(responder.p2p_device.device_name)
+        pin = requester.ad.wifi.wifiP2pGetPinCode(
+            responder.p2p_device.device_name
+        )
         requester.ad.log.info('p2p connection PIN code: %s', pin)
-        responder.ad.wifi.wifiP2pEnterPin(pin,requester.p2p_device.device_name)
+        responder.ad.wifi.wifiP2pEnterPin(pin, requester.p2p_device.device_name)
     else:
         asserts.fail(f'Unsupported WPS configuration: {wps_config}')
     responder.ad.log.info('Accepted connect invitation.')
@@ -297,6 +407,7 @@ def _wait_connection_notice(
 def remove_group_and_verify_disconnected(
     requester: DeviceState,
     responder: DeviceState,
+    is_group_negotiation: bool,
 ):
     """Stops p2p connection and verifies disconnection status on devices."""
     logging.info('Stopping wifi p2p connection.')
@@ -321,7 +432,8 @@ def remove_group_and_verify_disconnected(
     )
 
     # Check p2p status on responder.
-    _wait_disconnection_notice(responder.broadcast_receiver)
+    if is_group_negotiation:
+        _wait_disconnection_notice(responder.broadcast_receiver)
     _wait_peer_disconnected(
         responder.broadcast_receiver, requester.p2p_device.device_address
     )
@@ -387,3 +499,227 @@ def teardown_wifi_p2p(ad: android_device.AndroidDevice):
         # Make sure to call `p2pClose`, otherwise `_setup_wifi_p2p` won't be
         # able to run again.
         ad.wifi.p2pClose()
+
+
+def add_upnp_local_service(device: DeviceState, config: dict):
+    """Adds p2p local Upnp service."""
+    device.ad.wifi.wifiP2pAddUpnpLocalService(
+        config['udid'], config['device'], config['services']
+    )
+
+
+def add_bonjour_local_service(device: DeviceState, config: dict):
+    """Adds p2p local Bonjour service."""
+    device.ad.wifi.wifiP2pAddBonjourLocalService(
+        config['instance_name'], config['service_type'], config['txt_map']
+    )
+
+
+def set_upnp_response_listener(device: DeviceState):
+    """Set response listener for Upnp service."""
+    upnp_response_listener = device.ad.wifi.wifiP2pSetUpnpResponseListener()
+    device.upnp_response_listener = upnp_response_listener
+
+
+def unset_upnp_response_listener(device: DeviceState):
+    """Unset response listener for Upnp service."""
+    device.ad.wifi.wifiP2pUnsetUpnpResponseListener()
+    device.upnp_response_listener = None
+
+
+def set_dns_sd_response_listeners(device: DeviceState):
+    """Set response listener for Bonjour service."""
+    listener = device.ad.wifi.wifiP2pSetDnsSdResponseListeners()
+    device.dns_sd_response_listener = listener
+
+
+def unset_dns_sd_response_listender(device: DeviceState):
+    """Unset response listener for Bonjour service."""
+    device.ad.wifi.wifiP2pUnsetDnsSdResponseListeners()
+    device.dns_sd_response_listener = None
+
+
+def reset_p2p_service_state(ad: android_device.AndroidDevice):
+    """Clears all p2p service related states on device."""
+    ad.wifi.wifiP2pClearServiceRequests()
+    ad.wifi.wifiP2pUnsetDnsSdResponseListeners()
+    ad.wifi.wifiP2pUnsetUpnpResponseListener()
+    ad.wifi.wifiP2pClearLocalServices()
+
+
+def check_discovered_upnp_services(
+    device: DeviceState,
+    expected_services: Sequence[str],
+    expected_src_device_address: str,
+):
+    """Check discovered Upnp services.
+
+    If no services are expected, check all discovered services now and return
+    immediately. Otherwise, wait until all expected services are discovered.
+
+    This assumes that Upnp service listener is set by
+    `set_upnp_response_listener`.
+
+    Args:
+        device: The device that is discovering Upnp services.
+        expected_services: The expected Upnp services.
+        expected_src_device_address: This only checks services that are from the
+            expected source device.
+    """
+    if len(expected_services) == 0:
+        _check_no_discovered_service(
+            ad=device.ad,
+            callback_handler=device.upnp_response_listener,
+            event_name=constants.ON_UPNP_SERVICE_AVAILABLE,
+            expected_src_device_address=expected_src_device_address,
+        )
+        return
+
+    expected_services = set(expected_services.copy())
+
+    def _all_service_received(event):
+        nonlocal expected_services
+        src_device = constants.WifiP2pDevice.from_dict(
+            event.data['sourceDevice']
+        )
+        if src_device.device_address != expected_src_device_address:
+            return False
+        for service in event.data['serviceList']:
+            if service in expected_services:
+                expected_services.remove(service)
+        return len(expected_services) == 0
+
+    try:
+        device.upnp_response_listener.waitForEvent(
+            event_name=constants.ON_UPNP_SERVICE_AVAILABLE,
+            predicate=_all_service_received,
+            timeout=_DEFAULT_TIMEOUT.total_seconds(),
+        )
+    except errors.CallbackHandlerTimeoutError as e:
+        asserts.fail(
+            f'{device.ad} Timed out waiting for services: {expected_services}'
+        )
+
+
+def check_discovered_dns_sd_response(
+    device: DeviceState,
+    expected_responses: Sequence[(str, str)],
+    expected_src_device_address: str,
+):
+    """Check discovered DNS SD responses.
+
+    If no responses are expected, check all discovered responses now and return
+    immediately. Otherwise, wait until all expected responses are discovered.
+
+    This assumes that Bonjour service listener is set by
+    `set_dns_sd_response_listeners`.
+
+    Args:
+        device: The device that is discovering DNS SD responses.
+        expected_responses: The expected DNS SD responses.
+        expected_src_device_address: This only checks services that are from the
+            expected source device.
+    """
+    if not expected_responses:
+        _check_no_discovered_service(
+            device.ad,
+            callback_handler=device.dns_sd_response_listener,
+            event_name=constants.ON_DNS_SD_SERVICE_AVAILABLE,
+            expected_src_device_address=expected_src_device_address,
+        )
+        return
+
+    def _all_service_received(event):
+        nonlocal expected_responses
+        src_device = constants.WifiP2pDevice.from_dict(
+            event.data['sourceDevice']
+        )
+        if src_device.device_address != expected_src_device_address:
+            return False
+        registration_type = event.data['registrationType']
+        instance_name = event.data['instanceName']
+        expected_responses.remove((registration_type, instance_name))
+        return len(expected_responses) == 0
+
+    try:
+        device.dns_sd_response_listener.waitForEvent(
+            event_name=constants.ON_DNS_SD_SERVICE_AVAILABLE,
+            predicate=_all_service_received,
+            timeout=_DEFAULT_TIMEOUT.total_seconds(),
+        )
+    except errors.CallbackHandlerTimeoutError as e:
+        asserts.fail(
+            f'{device.ad} Timed out waiting for services: {expected_responses}'
+        )
+
+
+def check_discovered_dns_sd_txt_record(
+    device: DeviceState,
+    expected_records: Sequence[(str, dict)],
+    expected_src_device_address: str,
+):
+    """Check discovered DNS SD TXT records.
+
+    If no records are expected, check all discovered records now and return
+    immediately. Otherwise, wait until all expected records are discovered.
+
+    This assumes that Bonjour service listener is set by
+    `set_dns_sd_response_listeners`.
+
+    Args:
+        device: The device that is discovering DNS SD TXT records.
+        expected_records: The expected DNS SD TXT records.
+        expected_src_device_address: This only checks services that are from the
+            expected source device.
+    """
+    if not expected_records:
+        _check_no_discovered_service(
+            device.ad,
+            callback_handler=device.dns_sd_response_listener,
+            event_name=constants.ON_DNS_SD_TXT_RECORD_AVAILABLE,
+            expected_src_device_address=expected_src_device_address,
+        )
+        return
+
+    def _all_service_received(event):
+        nonlocal expected_records
+        src_device = constants.WifiP2pDevice.from_dict(
+            event.data['sourceDevice']
+        )
+        if src_device.device_address != expected_src_device_address:
+            return False
+        full_domain_name = event.data['fullDomainName']
+        txt_record_map = tuple(event.data['txtRecordMap'].items())
+        expected_records.remove((full_domain_name, txt_record_map))
+        return len(expected_records) == 0
+
+    try:
+        device.dns_sd_response_listener.waitForEvent(
+            event_name=constants.ON_DNS_SD_TXT_RECORD_AVAILABLE,
+            predicate=_all_service_received,
+            timeout=_DEFAULT_TIMEOUT.total_seconds(),
+        )
+    except errors.CallbackHandlerTimeoutError as e:
+        asserts.fail(
+            f'{device.ad} Timed out waiting for services: {expected_records}'
+        )
+
+
+def _check_no_discovered_service(
+    ad: android_device.AndroidDevice,
+    callback_handler: callback_handler_v2.CallbackHandlerV2,
+    event_name: str,
+    expected_src_device_address: str,
+):
+    """Checks that no service is received from the specified source device."""
+    all_events = callback_handler.getAll(event_name)
+    filtered_events = []
+    for event in all_events:
+        src_device = WifiP2pDevice.from_dict(event.data['sourceDevice'])
+        if src_device.device_address == expected_src_device_address:
+            filtered_events.append(event)
+    asserts.assert_equal(
+        len(filtered_events),
+        0,
+        f'{ad} should not discover p2p service. Discovered: {filtered_events}',
+    )
