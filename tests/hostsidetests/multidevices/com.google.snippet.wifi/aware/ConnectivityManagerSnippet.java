@@ -19,6 +19,7 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.LinkProperties;
 import android.net.NetworkRequest;
 import android.net.TransportInfo;
 import android.net.wifi.aware.WifiAwareChannelInfo;
@@ -51,6 +52,7 @@ public class ConnectivityManagerSnippet implements Snippet {
     private static final String EVENT_KEY_CB_NAME = "callbackName";
     private static final String EVENT_KEY_NETWORK = "network";
     private static final String EVENT_KEY_NETWORK_CAP = "networkCapabilities";
+    private static final String EVENT_KEY_NETWORK_INTERFACE ="interfaceName";
     private static final String EVENT_KEY_TRANSPORT_INFO_CLASS = "transportInfoClassName";
     private static final String EVENT_KEY_TRANSPORT_INFO_CHANNEL_IN_MHZ = "channelInMhz";
     private static final int CLOSE_SOCKET_TIMEOUT = 15 * 1000;
@@ -138,8 +140,41 @@ public class ConnectivityManagerSnippet implements Snippet {
                 event.getData().putIntegerArrayList(
                     EVENT_KEY_TRANSPORT_INFO_CHANNEL_IN_MHZ, channelFrequencies
                 );
-
+                String ipv6 = newWorkInfo.getPeerIpv6Addr().toString();
+                if (ipv6.charAt(0) == '/') {
+                    ipv6 = ipv6.substring(1);
+                }
+                event.getData().putString("aware_ipv6", ipv6);
+                int port = newWorkInfo.getPort();
+                if (port != 0) {
+                    event.getData().putInt("port", port);
+                }
+                if (newWorkInfo.getTransportProtocol() != -1) {
+                    event.getData().putInt("aware_transport_protocol",
+                    newWorkInfo.getTransportProtocol());
+                }
             }
+            EventCache.getInstance().postEvent(event);
+        }
+
+        @Override
+        public void onLinkPropertiesChanged(Network network,
+               LinkProperties linkProperties) {
+            Log.v("NetworkCallback onLinkPropertiesChanged");
+            SnippetEvent event = new SnippetEvent(mCallBackId, "NetworkCallback");
+            event.getData().putString(EVENT_KEY_CB_NAME, "onLinkPropertiesChanged");
+            event.getData().putParcelable(EVENT_KEY_NETWORK, network);
+            event.getData().putString(EVENT_KEY_NETWORK_INTERFACE,
+                   linkProperties.getInterfaceName());
+            EventCache.getInstance().postEvent(event);
+        }
+
+        @Override
+        public void onLost(@NonNull Network network) {
+            Log.v("Network onLost");
+            SnippetEvent event = new SnippetEvent(mCallBackId, "CallbackLost");
+            event.getData().putString(EVENT_KEY_CB_NAME, "Lost");
+            event.getData().putParcelable(EVENT_KEY_NETWORK, network);
             EventCache.getInstance().postEvent(event);
         }
     }
