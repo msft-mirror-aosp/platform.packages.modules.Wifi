@@ -441,8 +441,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
 
     // client(application) P2P group info list, key = package name
     private final Map<String, WifiP2pGroupInfo> mOwnershipMap = new HashMap<>();
-    private WifiP2pGroup mGroup;
-    private final WifiP2pInfo mWifiP2pInfo = new WifiP2pInfo();
 
     // Max number of P2P groups supported
     private static final int MAX_NUM_GROUP = 1;
@@ -610,11 +608,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
     private static class WifiP2pGroupInfo {
         public WifiP2pGroup p2pGroup;
         public WifiP2pInfo p2pInfo;
-        public IIpClient ipClient;
-        WifiP2pGroupInfo(WifiP2pGroup group, WifiP2pInfo info, IIpClient client) {
+        WifiP2pGroupInfo(WifiP2pGroup group, WifiP2pInfo info) {
             p2pGroup = group;
             p2pInfo = info;
-            ipClient = client;
         }
     }
 
@@ -878,7 +874,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
     }
 
     private void stopIpClient() {
-        // TODO: Modify logic for Dual P2P in next CL
         // Invalidate all previous start requests
         mIpClientStartIndex++;
         if (mIpClient != null) {
@@ -950,8 +945,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     return;
                 }
                 mIpClient = ipClient;
-                mOwnershipMap.put(
-                        mConnectionPkgName, new WifiP2pGroupInfo(mGroup, mWifiP2pInfo, mIpClient));
 
                 ProvisioningConfiguration config = null;
                 switch (mGroupClientIpProvisioningMode) {
@@ -1180,16 +1173,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         return !mFeatureFlags.p2pOwnership()
                 || mOwnershipMap.containsKey(packageName)
                 || mOwnershipMap.containsKey(SHARED_PKG_NAME);
-    }
-
-    private String getGroupOwnerPackageName(WifiP2pGroup group) {
-        for (Map.Entry<String, WifiP2pGroupInfo> entry : mOwnershipMap.entrySet()) {
-            if (entry.getValue().p2pGroup.getInterface().equals(group.getInterface())) {
-                return entry.getKey();
-            }
-        }
-        Log.wtf(TAG, "group missing from ownership map " + group.getInterface());
-        return SHARED_PKG_NAME;
     }
 
     /** This is used to provide information to drivers to optimize performance depending
@@ -1475,16 +1458,13 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         pw.println("mClientInfoList " + mClientInfoList.size());
         pw.println("mActiveClients " + mActiveClients);
         pw.println("mPeerAuthorizingTimestamp" + mPeerAuthorizingTimestamp);
-        pw.println("isOwnershipSupported " + mFeatureFlags.p2pOwnership());
-        pw.println("isDualP2pSupported " + isDualP2pSupported());
+        pw.println("isDualP2pSupported" + isDualP2pSupported());
         pw.println();
 
-        for (WifiP2pGroupInfo info : mOwnershipMap.values()) {
-            IIpClient ipClient = info.ipClient;
-            if (ipClient != null) {
-                pw.println("mIpClient:");
-                IpClientUtil.dumpIpClient(ipClient, fd, pw, args);
-            }
+        final IIpClient ipClient = mIpClient;
+        if (ipClient != null) {
+            pw.println("mIpClient:");
+            IpClientUtil.dumpIpClient(ipClient, fd, pw, args);
         }
     }
 
@@ -1524,8 +1504,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         private final InactiveState mInactiveState = new InactiveState(mThreshold, mThreadLocalLog);
         // Idle is when p2p is enabled and there's no ongoing connection attempt
         private final IdleState mIdleState = new IdleState(mThreshold, mThreadLocalLog);
-        private final L3ConnectingState mL3ConnectingState =
-                new L3ConnectingState(mThreshold, mThreadLocalLog);
         private final GroupCreatingState mGroupCreatingState =
                 new GroupCreatingState(mThreshold, mThreadLocalLog);
         private final UserAuthorizingInviteRequestState mUserAuthorizingInviteRequestState =
@@ -1595,6 +1573,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         sendP2pPersistentGroupsChangedBroadcast();
                     }
                 });
+        private final WifiP2pInfo mWifiP2pInfo = new WifiP2pInfo();
+        private WifiP2pGroup mGroup;
         // Is wifi on or off.
         private boolean mIsWifiEnabled = false;
 
@@ -1625,7 +1605,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         addState(mGroupNegotiationState, mGroupCreatingState);
                         addState(mFrequencyConflictState, mGroupCreatingState);
                         addState(mP2pRejectWaitState, mGroupCreatingState);
-                        addState(mL3ConnectingState, mGroupCreatingState);
                     addState(mGroupCreatedState, mP2pEnabledState);
                         addState(mUserAuthorizingJoinState, mGroupCreatedState);
                         addState(mOngoingGroupRemovalState, mGroupCreatedState);
@@ -1746,19 +1725,22 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         }
 
         private RemoteCallbackList<IWifiP2pListener> generateCallbackList(WifiP2pGroup group) {
-            // TODO: Modify logic for Dual P2P in next CL
             if (!mFeatureFlags.p2pOwnership() || mOwnershipMap.containsKey(SHARED_PKG_NAME)) {
                 return mWifiP2pListeners;
             }
 
-            String pkgName = getGroupOwnerPackageName(group);
-            IWifiP2pListener p2pListener = mP2pListenerMap.get(pkgName);
-            RemoteCallbackList<IWifiP2pListener> listener = new RemoteCallbackList<>();
-            if (p2pListener != null) {
-                listener.register(p2pListener);
-                logd("WifiP2pListener callback generated for " + pkgName);
+            for (Map.Entry<String, WifiP2pGroupInfo> entry : mOwnershipMap.entrySet()) {
+                if (entry.getValue().p2pGroup.getInterface().equals(group.getInterface())) {
+                    IWifiP2pListener p2pListener = mP2pListenerMap.get(entry.getKey());
+                    RemoteCallbackList<IWifiP2pListener> listener = new RemoteCallbackList<>();
+                    if (p2pListener != null) {
+                        listener.register(p2pListener);
+                        logd("WifiP2pListener callback generated for " + entry.getKey());
+                    }
+                    return listener;
+                }
             }
-            return listener;
+            return mWifiP2pListeners;
         }
 
         @Override
@@ -5723,9 +5705,14 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             Log.wtf(TAG, "group size= " + mOwnershipMap.size()
                                     + " exceeds max number of p2p group supported");
                         }
-                        mOwnershipMap.put(mConnectionPkgName,
-                                new WifiP2pGroupInfo(mGroup, mWifiP2pInfo, mIpClient));
+                        mOwnershipMap.put(
+                                mConnectionPkgName, new WifiP2pGroupInfo(mGroup, null));
                         mWifiNative.setP2pGroupIdle(mGroup.getInterface(), GROUP_IDLE_TIME_S);
+                        Log.d(TAG, "start Ip client with provisioning mode: "
+                                + mSavedPeerConfig.getGroupClientIpProvisioningMode());
+                        startIpClient(mGroup.getInterface(), getHandler(),
+                                mSavedPeerConfig.getGroupClientIpProvisioningMode(),
+                                mGroup.p2pClientEapolIpInfo);
                         WifiP2pDevice groupOwner = mGroup.getOwner();
                         if (!EMPTY_DEVICE_ADDRESS.equals(groupOwner.deviceAddress)) {
                             WifiP2pDevice peer = mPeers.get(groupOwner.deviceAddress);
@@ -5746,16 +5733,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             // essential.
                             logw("Unknown group owner " + groupOwner);
                         }
-                        // TODO: enable state transition when GroupCreatedState merged to IdleState
-                        /* if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mL3ConnectingState);
-                            break;
-                        }*/
-                        Log.d(TAG, "start Ip client with provisioning mode: "
-                                + mSavedPeerConfig.getGroupClientIpProvisioningMode());
-                        startIpClient(mGroup.getInterface(), getHandler(),
-                                mSavedPeerConfig.getGroupClientIpProvisioningMode(),
-                                mGroup.p2pClientEapolIpInfo);
                         smTransition(this, mGroupCreatedState);
                         break;
                     case TETHER_INTERFACE_STATE_CHANGED:
@@ -5772,8 +5749,11 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             Log.wtf(TAG, "group size= " + mOwnershipMap.size()
                                     + " exceeds max number of p2p group supported");
                         }
-                        mOwnershipMap.put(mConnectionPkgName,
-                                new WifiP2pGroupInfo(mGroup, mWifiP2pInfo, mIpClient));
+                        WifiP2pGroupInfo groupInfo = mOwnershipMap.putIfAbsent(mConnectionPkgName,
+                                new WifiP2pGroupInfo(mGroup, null));
+                        if (groupInfo != null) {
+                            groupInfo.p2pGroup = mGroup;
+                        }
                         smTransition(this, mGroupCreatedState);
                         break;
                     case WifiP2pMonitor.P2P_GO_NEGOTIATION_FAILURE_EVENT:
@@ -5917,149 +5897,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         return NOT_HANDLED;
                 }
                 return HANDLED;
-            }
-
-            @Override
-            public String getMessageLogRec(int what) {
-                return P2pStateMachine.class.getSimpleName() + "."
-                        + this.getClass().getSimpleName()
-                        + "." + getWhatToString(what);
-            }
-        }
-
-        class L3ConnectingState extends RunnerState {
-
-            /**
-             * The Runner state Constructor
-             *
-             * @param threshold the running time threshold in milliseconds
-             */
-            L3ConnectingState(int threshold, @NonNull LocalLog localLog) {
-                super(threshold, localLog);
-            }
-
-            @Override
-            public void enterImpl() {
-                logSmStateName(this.getName(),
-                        getCurrentState() != null ? getCurrentState().getName() : "");
-                Log.d(TAG, "start Ip client with provisioning mode: "
-                        + mSavedPeerConfig.getGroupClientIpProvisioningMode());
-                startIpClient(mGroup.getInterface(), getHandler(),
-                        mSavedPeerConfig.getGroupClientIpProvisioningMode(),
-                        mGroup.p2pClientEapolIpInfo);
-            }
-
-            @Override
-            public boolean processMessageImpl(Message message) {
-                logSmMessage(getName(), message);
-                switch (message.what) {
-                    case IPC_PRE_DHCP_ACTION:
-                        mWifiNative.setP2pPowerSave(mGroup.getInterface(), false);
-                        try {
-                            mIpClient.completedPreDhcpAction();
-                        } catch (RemoteException e) {
-                            e.rethrowFromSystemServer();
-                        }
-                        break;
-                    case IPC_POST_DHCP_ACTION:
-                        mWifiNative.setP2pPowerSave(mGroup.getInterface(), true);
-                        break;
-                    case IPC_DHCP_RESULTS:
-                        mDhcpResultsParcelable = (DhcpResultsParcelable) message.obj;
-                        if (mDhcpResultsParcelable == null) {
-                            break;
-                        }
-
-                        if (mVerboseLoggingEnabled) {
-                            logd("mDhcpResultsParcelable: " + mDhcpResultsParcelable);
-                        }
-                        if (mDhcpResultsParcelable.serverAddress != null) {
-                            setWifiP2pInfoOnGroupFormation(mDhcpResultsParcelable.serverAddress);
-                        } else {
-                            // In case of static IP (IP address received via EAPOL-Key exchange),
-                            // the DHCP server address is null. So look for the gateway address.
-                            InetAddress addr =
-                                    mDhcpResultsParcelable.baseConfiguration.getGateway();
-                            if (addr != null) {
-                                setWifiP2pInfoOnGroupFormation(addr.getHostAddress());
-                            }
-                        }
-                        try {
-                            final String ifname = mGroup.getInterface();
-                            if (mDhcpResultsParcelable != null) {
-                                mNetdWrapper.addInterfaceToLocalNetwork(
-                                        ifname,
-                                        mDhcpResultsParcelable.baseConfiguration.getRoutes(ifname));
-                            }
-                        } catch (Exception e) {
-                            loge("Failed to add iface to local network " + e);
-                        }
-                        onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
-                                eraseOwnDeviceAddress(mGroup),
-                                generateCallbackList(mGroup));
-                        sendP2pConnectionChangedBroadcast();
-                        break;
-                    case IPC_PROVISIONING_SUCCESS:
-                        if (mSavedPeerConfig.getGroupClientIpProvisioningMode()
-                                != GROUP_CLIENT_IP_PROVISIONING_MODE_IPV6_LINK_LOCAL) {
-                            smTransition(this, mIdleState);
-                            break;
-                        }
-
-                        LinkProperties linkProperties = (LinkProperties) message.obj;
-                        if (mVerboseLoggingEnabled) {
-                            logd("IP provisioning result " + linkProperties);
-                        }
-                        try {
-                            mNetdWrapper.addInterfaceToLocalNetwork(
-                                    mGroup.getInterface(),
-                                    linkProperties.getRoutes());
-                        } catch (Exception e) {
-                            loge("Failed to add iface to local network " + e);
-                            mWifiNative.p2pGroupRemove(mGroup.getInterface());
-                        }
-
-                        byte[] goInterfaceMacAddress = mGroup.interfaceAddress;
-                        if (goInterfaceMacAddress == null) {
-                            setWifiP2pInfoOnGroupFormationWithInetAddress(null);
-                            onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
-                                    eraseOwnDeviceAddress(mGroup),
-                                    generateCallbackList(mGroup));
-                            sendP2pConnectionChangedBroadcast();
-                            smTransition(this, mIdleState);
-                            break;
-                        }
-
-                        byte[] goIpv6Address = MacAddress.fromBytes(goInterfaceMacAddress)
-                                .getLinkLocalIpv6FromEui48Mac().getAddress();
-                        try {
-                            InetAddress goIp = Inet6Address.getByAddress(null, goIpv6Address,
-                                    NetworkInterface.getByName(mGroup.getInterface()));
-                            setWifiP2pInfoOnGroupFormationWithInetAddress(goIp);
-                            onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
-                                    eraseOwnDeviceAddress(mGroup),
-                                    generateCallbackList(mGroup));
-                            sendP2pConnectionChangedBroadcast();
-                        } catch (UnknownHostException | SocketException e) {
-                            loge("Unable to retrieve link-local IPv6 address of group owner "
-                                    + e);
-                            mWifiNative.p2pGroupRemove(mGroup.getInterface());
-                        }
-                        smTransition(this, mIdleState);
-                        break;
-                    case IPC_PROVISIONING_FAILURE:
-                        loge("IP provisioning failed");
-                        mWifiNative.p2pGroupRemove(mGroup.getInterface());
-                        smTransition(this, mIdleState);
-                        break;
-                    default:
-                        return NOT_HANDLED;
-                }
-                return HANDLED;
-            }
-
-            public void exitImpl() {
-
             }
 
             @Override
@@ -6531,8 +6368,15 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             Log.e(TAG, "Illegal arguments");
                             break;
                         }
+                        String pkgName = SHARED_PKG_NAME;
                         WifiP2pGroup group = (WifiP2pGroup) message.obj;
-                        String pkgName = getGroupOwnerPackageName(group);
+                        for (Map.Entry<String, WifiP2pGroupInfo> entry : mOwnershipMap.entrySet()) {
+                            if (entry.getValue().p2pGroup.getInterface().equals(
+                                    group.getInterface())) {
+                                pkgName = entry.getKey();
+                                break;
+                            }
+                        }
                         handleGroupRemoved(pkgName);
                         if (mFeatureFlags.p2pOwnership()) {
                             smTransition(this, mIdleState);
@@ -8522,8 +8366,11 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             mWifiP2pInfo.groupFormed = true;
             mWifiP2pInfo.isGroupOwner = mGroup.isGroupOwner();
             mWifiP2pInfo.groupOwnerAddress = serverAddress;
-            mOwnershipMap.put(
-                    mConnectionPkgName, new WifiP2pGroupInfo(mGroup, mWifiP2pInfo, mIpClient));
+            WifiP2pGroupInfo groupInfo = mOwnershipMap.putIfAbsent(
+                    mConnectionPkgName, new WifiP2pGroupInfo(null, mWifiP2pInfo));
+            if (groupInfo != null) {
+                groupInfo.p2pInfo = mWifiP2pInfo;
+            }
         }
 
         private void resetWifiP2pInfo() {
@@ -8819,7 +8666,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         }
 
         private void handleGroupRemoved(String packageName) {
-            // TODO: Modify logic for Dual P2P in next CL
             if (mGroup.isGroupOwner()) {
                 // {@link com.android.server.connectivity.Tethering} listens to
                 // {@link WifiP2pManager#WIFI_P2P_CONNECTION_CHANGED_ACTION}
