@@ -334,7 +334,8 @@ public final class SubscribeConfig extends Config implements Parcelable {
             Objects.requireNonNull(recommendedFrequencies,
                     "recommendedFrequencies must not be null");
             if ((recommendedFrequencies.length > MAX_NUM_OF_OPERATING_FREQUENCIES)
-                    || WifiNetworkSpecifier.validateChannelFrequencyInMhz(recommendedFrequencies)) {
+                    || !WifiNetworkSpecifier.validateChannelFrequencyInMhz(
+                    recommendedFrequencies)) {
                 throw new IllegalArgumentException("Invalid recommendedFrequencies");
             }
             this.mRecommendedFrequencies = recommendedFrequencies.clone();
