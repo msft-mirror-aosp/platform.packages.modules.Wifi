@@ -803,8 +803,10 @@ public class WifiAwareManagerSnippet implements Snippet {
                 RangingResult result = results.get(i);
                 resultBundles[i] = new Bundle();
                 resultBundles[i].putInt("status", result.getStatus());
-                resultBundles[i].putInt("distanceMm", result.getDistanceMm());
-                resultBundles[i].putInt("rssi", result.getRssi());
+                if (result.getStatus() == RangingResult.STATUS_SUCCESS) {
+                    resultBundles[i].putInt("distanceMm", result.getDistanceMm());
+                    resultBundles[i].putInt("rssi", result.getRssi());
+                }
                 PeerHandle peer = result.getPeerHandle();
                 if (peer != null) {
                     resultBundles[i].putInt("peerId", peer.hashCode());
