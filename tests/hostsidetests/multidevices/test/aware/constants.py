@@ -42,6 +42,9 @@ AWARE_NETWORK_INFO_CLASS_NAME = 'android.net.wifi.aware.WifiAwareNetworkInfo'
 TTL_SEC = 'TtlSec'
 INSTANTMODE_ENABLE = 'InstantModeEnabled'
 FEATURE_WIFI_AWARE = 'feature:android.hardware.wifi.aware'
+DISCOVERY_KEY_RANGING_ENABLED = 'ranging_enabled'
+DISCOVERY_KEY_MIN_DISTANCE_MM = 'MinDistanceMm'
+DISCOVERY_KEY_MAX_DISTANCE_MM = 'MaxDistanceMm'
 
 
 # onServiceLost reason code
@@ -293,6 +296,7 @@ class SubscribeConfig:
     match_filter: list[bytes] | None = (
         WifiAwareTestConstants.MATCH_FILTER_BYTES,
     )
+    min_distance_mm: int | None = None
     max_distance_mm: int | None = None
     pairing_config: AwarePairingConfig | None = None
     terminate_notification_enabled: bool = True
@@ -321,6 +325,9 @@ class SubscribeConfig:
 
         if self.max_distance_mm is None:
             del result['max_distance_mm']
+
+        if self.min_distance_mm is None:
+            del result["min_distance_mm"]
 
         return result
 
