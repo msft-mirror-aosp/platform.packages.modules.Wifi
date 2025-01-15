@@ -53,7 +53,7 @@ _TRANSPORT_TYPE_WIFI_AWARE = (
 )
 
 _NETWORK_CB_KEY_NETWORK_SPECIFIER = "network_specifier"
-_NETWORK_CB_LINK_PROPERTIES_CHANGED = "onLinkPropertiesChanged"
+_NETWORK_CB_LINK_PROPERTIES_CHANGED = constants.NetworkCbName.ON_PROPERTIES_CHANGED
 
 # Publish & Subscribe Config keys.
 _PAYLOAD_SIZE_MIN = 0
