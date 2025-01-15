@@ -177,7 +177,6 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -355,8 +354,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
     // Messages for interaction with IpClient.
     private static final int IPC_PRE_DHCP_ACTION            =   BASE + 30;
     private static final int IPC_POST_DHCP_ACTION           =   BASE + 31;
-    @VisibleForTesting
-    static final int IPC_DHCP_RESULTS                       =   BASE + 32;
+    private static final int IPC_DHCP_RESULTS               =   BASE + 32;
     private static final int IPC_PROVISIONING_SUCCESS       =   BASE + 33;
     private static final int IPC_PROVISIONING_FAILURE       =   BASE + 34;
     @VisibleForTesting
@@ -439,18 +437,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
     private final Map<String, HashSet<ScanResult.InformationElement>> mVendorElements =
             new HashMap<>();
 
-    // client(application) P2P group info list, key = package name
-    private final Map<String, WifiP2pGroupInfo> mOwnershipMap = new HashMap<>();
-    private WifiP2pGroup mGroup;
-    private final WifiP2pInfo mWifiP2pInfo = new WifiP2pInfo();
-
-    // Max number of P2P groups supported
-    private static final int MAX_NUM_GROUP = 1;
-    // Package name used to represent all shared connections
-    private static final String SHARED_PKG_NAME = "__SHARED_PACKAGE_NAME";
-    // Ongoing connection request package name with the default value set for shared connection
-    private String mConnectionPkgName = SHARED_PKG_NAME;
-
     // peer authorizing timestamp which is indexed by the peer MAC address.
     private final Map<String, Long> mPeerAuthorizingTimestamp = new HashMap<>();
 
@@ -485,8 +471,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
 
     private final RemoteCallbackList<IWifiP2pListener> mWifiP2pListeners =
             new RemoteCallbackList<>();
-    // clients(application) P2P listener map, key = package name
-    private final Map<String, IWifiP2pListener> mP2pListenerMap = new HashMap<>();
 
     /**
      * Error code definition.
@@ -602,20 +586,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         // If p2p is already on, send ENABLE_P2P to merge the new worksource.
         if (mP2pStateMachine.isP2pDisabled()) return;
         mP2pStateMachine.sendMessage(ENABLE_P2P);
-    }
-
-    /**
-     * Stores P2P group information
-     */
-    private static class WifiP2pGroupInfo {
-        public WifiP2pGroup p2pGroup;
-        public WifiP2pInfo p2pInfo;
-        public IIpClient ipClient;
-        WifiP2pGroupInfo(WifiP2pGroup group, WifiP2pInfo info, IIpClient client) {
-            p2pGroup = group;
-            p2pInfo = info;
-            ipClient = client;
-        }
     }
 
     // Tracks the ongoing Service discovery request to wpa_supplicant.
@@ -878,7 +848,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
     }
 
     private void stopIpClient() {
-        // TODO: Modify logic for Dual P2P in next CL
         // Invalidate all previous start requests
         mIpClientStartIndex++;
         if (mIpClient != null) {
@@ -950,8 +919,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     return;
                 }
                 mIpClient = ipClient;
-                mOwnershipMap.put(
-                        mConnectionPkgName, new WifiP2pGroupInfo(mGroup, mWifiP2pInfo, mIpClient));
 
                 ProvisioningConfiguration config = null;
                 switch (mGroupClientIpProvisioningMode) {
@@ -1144,8 +1111,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 AttributionSource source = mClientAttributionSource.remove(binder);
                 if (null != source) {
                     mVendorElements.remove(source.getPackageName());
-                    mOwnershipMap.remove(source.getPackageName());
-                    mP2pListenerMap.remove(source.getPackageName());
                 }
             }
 
@@ -1162,34 +1127,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 mP2pStateMachine.sendMessage(DISABLE_P2P);
             }
         }
-    }
-
-    /**
-     * Get WifiP2pGroupInfo owned by the provided package name
-     */
-    private WifiP2pGroupInfo getP2pGroupInfo(String packageName) {
-        if (mOwnershipMap.containsKey(packageName)) {
-            return mOwnershipMap.get(packageName);
-        } else if (mOwnershipMap.containsKey(SHARED_PKG_NAME)) {
-            return mOwnershipMap.get(SHARED_PKG_NAME);
-        }
-        return null;
-    }
-
-    private boolean checkIfPackageIsGroupOwner(String packageName) {
-        return !mFeatureFlags.p2pOwnership()
-                || mOwnershipMap.containsKey(packageName)
-                || mOwnershipMap.containsKey(SHARED_PKG_NAME);
-    }
-
-    private String getGroupOwnerPackageName(WifiP2pGroup group) {
-        for (Map.Entry<String, WifiP2pGroupInfo> entry : mOwnershipMap.entrySet()) {
-            if (entry.getValue().p2pGroup.getInterface().equals(group.getInterface())) {
-                return entry.getKey();
-            }
-        }
-        Log.wtf(TAG, "group missing from ownership map " + group.getInterface());
-        return SHARED_PKG_NAME;
     }
 
     /** This is used to provide information to drivers to optimize performance depending
@@ -1242,7 +1179,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 TAG + " registerWifiP2pListener");
         Log.i(TAG, "registerWifiP2pListener uid=" + Binder.getCallingUid());
         mWifiP2pListeners.register(listener);
-        mP2pListenerMap.put(packageName, listener);
     }
 
     /**
@@ -1256,15 +1192,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         }
         Log.i(TAG, "unregisterWifiP2pListener uid=" + Binder.getCallingUid());
         mWifiP2pListeners.unregister(listener);
-        Iterator<Map.Entry<String, IWifiP2pListener>> iterator =
-                mP2pListenerMap.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<String, IWifiP2pListener> entry = iterator.next();
-            if (entry.getValue() == listener) {
-                iterator.remove();
-                break;
-            }
-        }
     }
 
     private void onP2pStateChanged(@WifiP2pManager.WifiP2pState int state) {
@@ -1375,57 +1302,53 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         mWifiP2pListeners.finishBroadcast();
     }
 
-    private void onGroupCreated(WifiP2pInfo p2pInfo, WifiP2pGroup p2pGroup,
-            RemoteCallbackList<IWifiP2pListener> callbackList) {
-        int numCallbacks = callbackList.beginBroadcast();
+    private void onGroupCreated(WifiP2pInfo p2pInfo, WifiP2pGroup p2pGroup) {
+        int numCallbacks = mWifiP2pListeners.beginBroadcast();
         for (int i = 0; i < numCallbacks; i++) {
             try {
-                callbackList.getBroadcastItem(i).onGroupCreated(p2pInfo, p2pGroup);
+                mWifiP2pListeners.getBroadcastItem(i).onGroupCreated(p2pInfo, p2pGroup);
             } catch (RemoteException e) {
                 Log.e(TAG, "Failure calling onGroupCreated" + e);
             }
         }
-        callbackList.finishBroadcast();
+        mWifiP2pListeners.finishBroadcast();
     }
 
-    private void onPeerClientJoined(WifiP2pInfo p2pInfo, WifiP2pGroup p2pGroup,
-            RemoteCallbackList<IWifiP2pListener> callbackList) {
-        int numCallbacks = callbackList.beginBroadcast();
+    private void onPeerClientJoined(WifiP2pInfo p2pInfo, WifiP2pGroup p2pGroup) {
+        int numCallbacks = mWifiP2pListeners.beginBroadcast();
         for (int i = 0; i < numCallbacks; i++) {
             try {
-                callbackList.getBroadcastItem(i).onPeerClientJoined(p2pInfo, p2pGroup);
+                mWifiP2pListeners.getBroadcastItem(i).onPeerClientJoined(p2pInfo, p2pGroup);
             } catch (RemoteException e) {
                 Log.e(TAG, "Failure calling onPeerClientJoined" + e);
             }
         }
-        callbackList.finishBroadcast();
+        mWifiP2pListeners.finishBroadcast();
     }
 
-    private void onPeerClientDisconnected(WifiP2pInfo p2pInfo, WifiP2pGroup p2pGroup,
-            RemoteCallbackList<IWifiP2pListener> callbackList) {
-        int numCallbacks = callbackList.beginBroadcast();
+    private void onPeerClientDisconnected(WifiP2pInfo p2pInfo, WifiP2pGroup p2pGroup) {
+        int numCallbacks = mWifiP2pListeners.beginBroadcast();
         for (int i = 0; i < numCallbacks; i++) {
             try {
-                callbackList.getBroadcastItem(i).onPeerClientDisconnected(p2pInfo,
+                mWifiP2pListeners.getBroadcastItem(i).onPeerClientDisconnected(p2pInfo,
                         p2pGroup);
             } catch (RemoteException e) {
                 Log.e(TAG, "Failure calling onPeerClientDisconnected" + e);
             }
         }
-        callbackList.finishBroadcast();
+        mWifiP2pListeners.finishBroadcast();
     }
 
-    private void onFrequencyChanged(WifiP2pInfo p2pInfo, WifiP2pGroup p2pGroup,
-            RemoteCallbackList<IWifiP2pListener> callbackList) {
-        int numCallbacks = callbackList.beginBroadcast();
+    private void onFrequencyChanged(WifiP2pInfo p2pInfo, WifiP2pGroup p2pGroup) {
+        int numCallbacks = mWifiP2pListeners.beginBroadcast();
         for (int i = 0; i < numCallbacks; i++) {
             try {
-                callbackList.getBroadcastItem(i).onFrequencyChanged(p2pInfo, p2pGroup);
+                mWifiP2pListeners.getBroadcastItem(i).onFrequencyChanged(p2pInfo, p2pGroup);
             } catch (RemoteException e) {
                 Log.e(TAG, "Failure calling onFrequencyChanged" + e);
             }
         }
-        callbackList.finishBroadcast();
+        mWifiP2pListeners.finishBroadcast();
     }
 
     private void onGroupRemoved() {
@@ -1445,12 +1368,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         return wifiPermissionsWrapper.getUidPermission(
                 android.Manifest.permission.CONFIGURE_WIFI_DISPLAY, uid)
                 != PackageManager.PERMISSION_DENIED;
-    }
-
-    private boolean isDualP2pSupported() {
-        return mFeatureFlags.p2pDual()
-                && mFeatureFlags.p2pOwnership()
-                && mWifiNative.isP2pP2pConcurrencySupported();
     }
 
     @Override
@@ -1475,16 +1392,12 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
         pw.println("mClientInfoList " + mClientInfoList.size());
         pw.println("mActiveClients " + mActiveClients);
         pw.println("mPeerAuthorizingTimestamp" + mPeerAuthorizingTimestamp);
-        pw.println("isOwnershipSupported " + mFeatureFlags.p2pOwnership());
-        pw.println("isDualP2pSupported " + isDualP2pSupported());
         pw.println();
 
-        for (WifiP2pGroupInfo info : mOwnershipMap.values()) {
-            IIpClient ipClient = info.ipClient;
-            if (ipClient != null) {
-                pw.println("mIpClient:");
-                IpClientUtil.dumpIpClient(ipClient, fd, pw, args);
-            }
+        final IIpClient ipClient = mIpClient;
+        if (ipClient != null) {
+            pw.println("mIpClient:");
+            IpClientUtil.dumpIpClient(ipClient, fd, pw, args);
         }
     }
 
@@ -1522,10 +1435,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 new P2pEnabledState(mThreshold, mThreadLocalLog);
         // Inactive is when p2p is enabled with no connectivity
         private final InactiveState mInactiveState = new InactiveState(mThreshold, mThreadLocalLog);
-        // Idle is when p2p is enabled and there's no ongoing connection attempt
-        private final IdleState mIdleState = new IdleState(mThreshold, mThreadLocalLog);
-        private final L3ConnectingState mL3ConnectingState =
-                new L3ConnectingState(mThreshold, mThreadLocalLog);
         private final GroupCreatingState mGroupCreatingState =
                 new GroupCreatingState(mThreshold, mThreadLocalLog);
         private final UserAuthorizingInviteRequestState mUserAuthorizingInviteRequestState =
@@ -1595,6 +1504,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         sendP2pPersistentGroupsChangedBroadcast();
                     }
                 });
+        private final WifiP2pInfo mWifiP2pInfo = new WifiP2pInfo();
+        private WifiP2pGroup mGroup;
         // Is wifi on or off.
         private boolean mIsWifiEnabled = false;
 
@@ -1617,7 +1528,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     addState(mWaitingState, mP2pDisabledContainerState);
                 addState(mP2pEnabledState, mDefaultState);
                     addState(mInactiveState, mP2pEnabledState);
-                    addState(mIdleState, mP2pEnabledState);
                     addState(mGroupCreatingState, mP2pEnabledState);
                         addState(mUserAuthorizingInviteRequestState, mGroupCreatingState);
                         addState(mUserAuthorizingNegotiationRequestState, mGroupCreatingState);
@@ -1625,7 +1535,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         addState(mGroupNegotiationState, mGroupCreatingState);
                         addState(mFrequencyConflictState, mGroupCreatingState);
                         addState(mP2pRejectWaitState, mGroupCreatingState);
-                        addState(mL3ConnectingState, mGroupCreatingState);
                     addState(mGroupCreatedState, mP2pEnabledState);
                         addState(mUserAuthorizingJoinState, mGroupCreatedState);
                         addState(mOngoingGroupRemovalState, mGroupCreatedState);
@@ -1743,22 +1652,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 mIsP2pDisallowedByAdmin = newIsP2pDisallowedByAdmin;
                 checkAndSendP2pStateChangedBroadcast();
             }
-        }
-
-        private RemoteCallbackList<IWifiP2pListener> generateCallbackList(WifiP2pGroup group) {
-            // TODO: Modify logic for Dual P2P in next CL
-            if (!mFeatureFlags.p2pOwnership() || mOwnershipMap.containsKey(SHARED_PKG_NAME)) {
-                return mWifiP2pListeners;
-            }
-
-            String pkgName = getGroupOwnerPackageName(group);
-            IWifiP2pListener p2pListener = mP2pListenerMap.get(pkgName);
-            RemoteCallbackList<IWifiP2pListener> listener = new RemoteCallbackList<>();
-            if (p2pListener != null) {
-                listener.register(p2pListener);
-                logd("WifiP2pListener callback generated for " + pkgName);
-            }
-            return listener;
         }
 
         @Override
@@ -2428,22 +2321,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                         message.obj));
                         break;
                     case WifiP2pManager.REQUEST_CONNECTION_INFO:
-                        if (mFeatureFlags.p2pOwnership()) {
-                            String packageName = getCallingPkgName(
-                                    message.sendingUid, message.replyTo);
-                            WifiP2pGroupInfo groupInfo = getP2pGroupInfo(packageName);
-                            if (groupInfo != null) {
-                                replyToMessage(message, WifiP2pManager.RESPONSE_CONNECTION_INFO,
-                                        new WifiP2pInfo(groupInfo.p2pInfo));
-                            } else {
-                                logd("No group owned by caller - returning empty info");
-                                replyToMessage(message, WifiP2pManager.RESPONSE_CONNECTION_INFO,
-                                        new WifiP2pInfo());
-                            }
-                        } else {
-                            replyToMessage(message, WifiP2pManager.RESPONSE_CONNECTION_INFO,
-                                    new WifiP2pInfo(mWifiP2pInfo));
-                        }
+                        replyToMessage(message, WifiP2pManager.RESPONSE_CONNECTION_INFO,
+                                new WifiP2pInfo(mWifiP2pInfo));
                         break;
                     case WifiP2pManager.REQUEST_GROUP_INFO: {
                         String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
@@ -2469,19 +2348,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             // remain at this state.
                             break;
                         }
-                        if (mFeatureFlags.p2pOwnership()) {
-                            WifiP2pGroupInfo groupInfo = getP2pGroupInfo(packageName);
-                            if (groupInfo != null) {
-                                replyToMessage(message, WifiP2pManager.RESPONSE_GROUP_INFO,
-                                        maybeEraseOwnDeviceAddress(groupInfo.p2pGroup, uid));
-                            } else  {
-                                logd("No group owned by caller - returning null group");
-                                replyToMessage(message, WifiP2pManager.RESPONSE_GROUP_INFO, null);
-                            }
-                        } else {
-                            replyToMessage(message, WifiP2pManager.RESPONSE_GROUP_INFO,
-                                    maybeEraseOwnDeviceAddress(mGroup, message.sendingUid));
-                        }
+                        replyToMessage(message, WifiP2pManager.RESPONSE_GROUP_INFO,
+                                maybeEraseOwnDeviceAddress(mGroup, message.sendingUid));
                         break;
                     }
                     case WifiP2pManager.REQUEST_PERSISTENT_GROUP_INFO: {
@@ -3074,7 +2942,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 }
                 resetWifiP2pInfo();
                 mGroup = null;
-                mOwnershipMap.clear();
             }
 
             @Override
@@ -3199,11 +3066,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         } else if (proceedWithOperation
                                 == InterfaceConflictManager.ICM_EXECUTE_COMMAND) {
                             if (setupInterface()) {
-                                if (mFeatureFlags.p2pOwnership()) {
-                                    smTransition(this, mIdleState);
-                                } else {
-                                    smTransition(this, mInactiveState);
-                                }
+                                smTransition(this, mInactiveState);
                             }
                         } // else InterfaceConflictManager.ICM_SKIP_COMMAND_WAIT_FOR_USER: nop
                         break;
@@ -3281,11 +3144,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                 == InterfaceConflictManager.ICM_EXECUTE_COMMAND) {
                             if (!setupInterface()) return NOT_HANDLED;
                             deferMessage(message);
-                            if (mFeatureFlags.p2pOwnership()) {
-                                smTransition(this, mIdleState);
-                            } else {
-                                smTransition(this, mInactiveState);
-                            }
+                            smTransition(this, mInactiveState);
                         }  // else InterfaceConflictManager.ICM_SKIP_COMMAND_WAIT_FOR_USER: nop
                         break;
                     }
@@ -4427,551 +4286,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             }
         }
 
-        class IdleState extends RunnerState {
-
-            /**
-             * The Runner state Constructor
-             *
-             * @param threshold the running time threshold in milliseconds
-             */
-            IdleState(int threshold, @NonNull LocalLog localLog) {
-                super(threshold, localLog);
-            }
-
-            @Override
-            public void enterImpl() {
-                logSmStateName(this.getName(),
-                        getCurrentState() != null ? getCurrentState().getName() : "");
-                mPeerAuthorizingTimestamp.clear();
-                mSavedPeerConfig.invalidate();
-                mDetailedState = NetworkInfo.DetailedState.IDLE;
-                mConnectionPkgName = SHARED_PKG_NAME;
-                scheduleIdleShutdown();
-            }
-
-            @Override
-            public void exitImpl() {
-                cancelIdleShutdown();
-            }
-
-            @Override
-            public boolean processMessageImpl(Message message) {
-                logSmMessage(getName(), message);
-                // Re-schedule the shutdown timer since we got the new operation.
-                // only handle commands from clients.
-                if (message.what > Protocol.BASE_WIFI_P2P_MANAGER
-                        && message.what < Protocol.BASE_WIFI_P2P_SERVICE) {
-                    scheduleIdleShutdown();
-                }
-                switch (message.what) {
-                    case WifiP2pManager.CONNECT: {
-                        String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
-                        if (packageName == null) {
-                            replyToMessage(message, WifiP2pManager.CONNECT_FAILED);
-                            break;
-                        }
-                        int uid = message.sendingUid;
-                        String attributionTag = getCallingFeatureId(uid, message.replyTo);
-                        Bundle extras = message.getData()
-                                .getBundle(WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE);
-                        boolean hasPermission = false;
-                        if (isPlatformOrTargetSdkLessThanT(packageName, uid)) {
-                            hasPermission = mWifiPermissionsUtil.checkCanAccessWifiDirect(
-                                    packageName,
-                                    attributionTag,
-                                    uid, false);
-                        } else {
-                            hasPermission = checkNearbyDevicesPermission(uid, packageName,
-                                    extras, "CONNECT", message.obj);
-                        }
-                        if (!hasPermission) {
-                            replyToMessage(message, WifiP2pManager.CONNECT_FAILED);
-                            // remain at this state.
-                            break;
-                        }
-                        mLastCallerInfoManager.put(WifiManager.API_P2P_CONNECT,
-                                Process.myTid(), uid, 0, packageName, true);
-                        if (mVerboseLoggingEnabled) logd(getName() + " sending connect");
-                        WifiP2pConfig config = (WifiP2pConfig)
-                                extras.getParcelable(WifiP2pManager.EXTRA_PARAM_KEY_CONFIG);
-
-                        boolean isConnectFailed = false;
-                        if (isConfigValidAsGroup(config)) {
-                            mAutonomousGroup = false;
-                            mWifiNative.p2pStopFind();
-                            if (mVerboseLoggingEnabled) {
-                                logd("FAST_CONNECTION GC band freq: " + getGroupOwnerBandToString(
-                                        config.groupOwnerBand));
-                            }
-                            if (mWifiNative.p2pGroupAdd(config, true)) {
-                                reportConnectionEventTakeBugReportIfOverlapped(
-                                        P2pConnectionEvent.CONNECTION_FAST,
-                                        config, WifiMetricsProto.GroupEvent.GROUP_CLIENT, uid,
-                                        attributionTag);
-                                mConnectionPkgName = packageName;
-                                smTransition(this, mGroupNegotiationState);
-                            } else {
-                                loge("Cannot join a group with config.");
-                                isConnectFailed = true;
-                                replyToMessage(message, WifiP2pManager.CONNECT_FAILED);
-                            }
-                        } else if (isConfigForV2Connection(config)) {
-                            // TODO add support for re-invoking V2 persistent connection
-                            if (isWifiDirect2Enabled()) {
-                                mAutonomousGroup = false;
-                                mWifiNative.p2pStopFind();
-                                if (isConfigForBootstrappingMethodOutOfBand(config)) {
-                                    if (mWifiNative.p2pConnect(config, FORM_GROUP) != null) {
-                                        smTransition(this, mGroupNegotiationState);
-                                    } else {
-                                        isConnectFailed = true;
-                                    }
-                                } else {
-                                    smTransition(this, mProvisionDiscoveryState);
-                                }
-                            } else {
-                                isConnectFailed = true;
-                                replyToMessage(message, WifiP2pManager.CONNECT_FAILED);
-                            }
-                        } else {
-                            if (isConfigInvalid(config)) {
-                                loge("Dropping connect request " + config);
-                                isConnectFailed = true;
-                                replyToMessage(message, WifiP2pManager.CONNECT_FAILED);
-                            } else {
-                                mAutonomousGroup = false;
-                                mWifiNative.p2pStopFind();
-                                if (reinvokePersistentGroup(config, false)) {
-                                    mWifiP2pMetrics.startConnectionEvent(
-                                            P2pConnectionEvent.CONNECTION_REINVOKE,
-                                            config, GroupEvent.GROUP_UNKNOWN, uid, attributionTag);
-                                    smTransition(this, mGroupNegotiationState);
-                                } else {
-                                    mWifiP2pMetrics.startConnectionEvent(
-                                            P2pConnectionEvent.CONNECTION_FRESH,
-                                            config, GroupEvent.GROUP_UNKNOWN, uid, attributionTag);
-                                    smTransition(this, mProvisionDiscoveryState);
-                                }
-                            }
-                        }
-
-                        if (!isConnectFailed) {
-                            mSavedPeerConfig = config;
-                            mPeers.updateStatus(mSavedPeerConfig.deviceAddress,
-                                    WifiP2pDevice.INVITED);
-                            sendPeersChangedBroadcast();
-                            replyToMessage(message, WifiP2pManager.CONNECT_SUCCEEDED);
-                        }
-                        break;
-                    }
-                    case WifiP2pManager.STOP_DISCOVERY:
-                        mLastCallerInfoManager.put(WifiManager.API_P2P_STOP_PEER_DISCOVERY,
-                                Process.myTid(), message.sendingUid, 0,
-                                getCallingPkgName(message.sendingUid, message.replyTo), true);
-                        if (mWifiNative.p2pStopFind()) {
-                            // When discovery stops in inactive state, flush to clear
-                            // state peer data
-                            mWifiNative.p2pFlush();
-                            mServiceDiscoveryInfo.invalidate();
-                            replyToMessage(message, WifiP2pManager.STOP_DISCOVERY_SUCCEEDED);
-                        } else {
-                            replyToMessage(message, WifiP2pManager.STOP_DISCOVERY_FAILED,
-                                    WifiP2pManager.ERROR);
-                        }
-                        break;
-                    case CMD_P2P_IDLE_SHUTDOWN:
-                        Log.d(TAG, "IdleShutDown message received");
-                        sendMessage(DISABLE_P2P);
-                        break;
-                    case WifiP2pMonitor.P2P_GO_NEGOTIATION_REQUEST_EVENT:
-                        WifiP2pConfig config = (WifiP2pConfig) message.obj;
-                        if (isConfigInvalid(config)) {
-                            loge("Dropping GO neg request " + config);
-                            break;
-                        }
-                        mSavedPeerConfig = config;
-                        mAutonomousGroup = false;
-                        mJoinExistingGroup = false;
-                        mWifiP2pMetrics.startConnectionEvent(
-                                P2pConnectionEvent.CONNECTION_FRESH,
-                                config, GroupEvent.GROUP_UNKNOWN, Process.SYSTEM_UID, null);
-                        smTransition(this, mUserAuthorizingNegotiationRequestState);
-                        break;
-                    case WifiP2pMonitor.P2P_INVITATION_RECEIVED_EVENT:
-                        if (message.obj == null) {
-                            Log.e(TAG, "Invalid argument(s)");
-                            break;
-                        }
-                        WifiP2pGroup group = (WifiP2pGroup) message.obj;
-                        WifiP2pDevice owner = group.getOwner();
-                        if (owner == null) {
-                            int id = group.getNetworkId();
-                            if (id < 0) {
-                                loge("Ignored invitation from null owner");
-                                break;
-                            }
-
-                            String addr = mGroups.getOwnerAddr(id);
-                            if (addr != null) {
-                                group.setOwner(new WifiP2pDevice(addr));
-                                owner = group.getOwner();
-                            } else {
-                                loge("Ignored invitation from null owner");
-                                break;
-                            }
-                        }
-                        config = new WifiP2pConfig();
-                        config.deviceAddress = group.getOwner().deviceAddress;
-                        if (isConfigInvalid(config)) {
-                            loge("Dropping invitation request " + config);
-                            break;
-                        }
-                        mSavedPeerConfig = config;
-
-                        // Check if we have the owner in peer list and use appropriate
-                        // wps method. Default is to use PBC.
-                        if (owner != null && ((owner = mPeers.get(owner.deviceAddress)) != null)) {
-                            if (owner.wpsPbcSupported()) {
-                                mSavedPeerConfig.wps.setup = WpsInfo.PBC;
-                            } else if (owner.wpsKeypadSupported()) {
-                                mSavedPeerConfig.wps.setup = WpsInfo.KEYPAD;
-                            } else if (owner.wpsDisplaySupported()) {
-                                mSavedPeerConfig.wps.setup = WpsInfo.DISPLAY;
-                            }
-                        }
-
-                        mAutonomousGroup = false;
-                        mJoinExistingGroup = true;
-                        mWifiP2pMetrics.startConnectionEvent(
-                                P2pConnectionEvent.CONNECTION_FRESH,
-                                config, GroupEvent.GROUP_UNKNOWN, Process.SYSTEM_UID, null);
-                        smTransition(this, mUserAuthorizingInviteRequestState);
-                        break;
-                    case WifiP2pMonitor.P2P_PROV_DISC_PBC_REQ_EVENT:
-                    case WifiP2pMonitor.P2P_PROV_DISC_ENTER_PIN_EVENT:
-                        // We let the supplicant handle the provision discovery response
-                        // and wait instead for the GO_NEGOTIATION_REQUEST_EVENT.
-                        // Handling provision discovery and issuing a p2p_connect before
-                        // group negotiation comes through causes issues
-                        break;
-                    case WifiP2pMonitor.P2P_PROV_DISC_SHOW_PIN_EVENT: {
-                        if (message.obj == null) {
-                            Log.e(TAG, "Illegal argument(s)");
-                            break;
-                        }
-                        WifiP2pProvDiscEvent provDisc = (WifiP2pProvDiscEvent) message.obj;
-                        WifiP2pDevice device = provDisc.device;
-                        if (device == null) {
-                            loge("Device entry is null");
-                            break;
-                        }
-                        mSavedPeerConfig = new WifiP2pConfig();
-                        mSavedPeerConfig.wps.setup = WpsInfo.DISPLAY;
-                        mSavedPeerConfig.deviceAddress = device.deviceAddress;
-                        mSavedPeerConfig.wps.pin = provDisc.wpsPin;
-                        if (SdkLevel.isAtLeastV() && provDisc.getVendorData() != null) {
-                            mSavedPeerConfig.setVendorData(provDisc.getVendorData());
-                        }
-
-                        notifyP2pProvDiscShowPinRequest(provDisc.wpsPin, device.deviceAddress);
-                        mPeers.updateStatus(device.deviceAddress, WifiP2pDevice.INVITED);
-                        sendPeersChangedBroadcast();
-                        smTransition(this, mUserAuthorizingNegotiationRequestState);
-                        break;
-                    }
-                    case WifiP2pMonitor
-                            .P2P_PROV_DISC_PAIRING_BOOTSTRAPPING_OPPORTUNISTIC_REQ_EVENT: {
-                        if (processProvDiscPairingBootstrappingOpportunisticRequestEvent(
-                                (WifiP2pProvDiscEvent) message.obj)) {
-                            mAutonomousGroup = false;
-                            mJoinExistingGroup = false;
-                            smTransition(this, mUserAuthorizingNegotiationRequestState);
-                        }
-                        break;
-                    }
-                    case WifiP2pMonitor
-                            .P2P_PROV_DISC_ENTER_PAIRING_BOOTSTRAPPING_PIN_OR_PASSPHRASE_EVENT: {
-                        if (processProvDiscEnterPairingBootstrappingPinOrPassphraseEvent(
-                                (WifiP2pProvDiscEvent) message.obj)) {
-                            mAutonomousGroup = false;
-                            mJoinExistingGroup = false;
-                            smTransition(this, mUserAuthorizingNegotiationRequestState);
-                        }
-                        break;
-                    }
-                    case WifiP2pMonitor
-                            .P2P_PROV_DISC_SHOW_PAIRING_BOOTSTRAPPING_PIN_OR_PASSPHRASE_EVENT: {
-                        if (message.obj == null) {
-                            Log.e(TAG, "Illegal argument(s)");
-                            break;
-                        }
-                        WifiP2pProvDiscEvent provDisc = (WifiP2pProvDiscEvent) message.obj;
-                        WifiP2pDevice device = provDisc.device;
-                        if (device == null) {
-                            loge("Device entry is null");
-                            break;
-                        }
-                        if (processProvDiscShowPairingBootstrappingPinOrPassphraseEvent(provDisc)) {
-                            mAutonomousGroup = false;
-                            mJoinExistingGroup = false;
-                            notifyP2pProvDiscShowPinRequest(provDisc.pairingPinOrPassphrase,
-                                    device.deviceAddress);
-                            smTransition(this, mUserAuthorizingNegotiationRequestState);
-                        }
-                        break;
-                    }
-                    case WifiP2pManager.CREATE_GROUP: {
-                        String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
-                        if (packageName == null) {
-                            replyToMessage(message, WifiP2pManager.CREATE_GROUP_FAILED,
-                                    WifiP2pManager.ERROR);
-                            break;
-                        }
-                        int uid = message.sendingUid;
-                        String attributionTag = getCallingFeatureId(uid, message.replyTo);
-                        Bundle extras = message.getData()
-                                .getBundle(WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE);
-                        boolean hasPermission;
-                        if (isPlatformOrTargetSdkLessThanT(packageName, uid)) {
-                            hasPermission = mWifiPermissionsUtil.checkCanAccessWifiDirect(
-                                    packageName,
-                                    attributionTag,
-                                    uid, false);
-                        } else {
-                            hasPermission = checkNearbyDevicesPermission(uid, packageName,
-                                    extras, "CREATE_GROUP", message.obj);
-                        }
-                        if (!hasPermission) {
-                            replyToMessage(message, WifiP2pManager.CREATE_GROUP_FAILED,
-                                    WifiP2pManager.ERROR);
-                            // remain at this state.
-                            break;
-                        }
-                        mAutonomousGroup = true;
-                        int netId = message.arg1;
-                        config = extras.getParcelable(WifiP2pManager.EXTRA_PARAM_KEY_CONFIG);
-                        mLastCallerInfoManager.put(config == null
-                                        ? WifiManager.API_P2P_CREATE_GROUP
-                                        : WifiManager.API_P2P_CREATE_GROUP_P2P_CONFIG,
-                                Process.myTid(), uid, 0, packageName, true);
-                        boolean ret = false;
-                        if (isConfigValidAsGroup(config)) {
-                                mConnectionPkgName = packageName;
-                                if (mVerboseLoggingEnabled) {
-                                    logd("FAST_CONNECTION GO band freq: "
-                                            + getGroupOwnerBandToString(config.groupOwnerBand));
-                                }
-                                reportConnectionEventTakeBugReportIfOverlapped(
-                                        P2pConnectionEvent.CONNECTION_FAST,
-                                        config, GroupEvent.GROUP_OWNER, uid, attributionTag);
-                                ret = mWifiNative.p2pGroupAdd(config, false);
-                        } else if (isConfigForGroupOwnerV2(config)) {
-                            logd("Requested to create Group Owner - V2");
-                            // TODO check if the configuration is to start persistent connection.
-                            // TODO check if the persistent group is present
-                            if (isWifiDirect2Enabled()) {
-                                ret = mWifiNative.p2pGroupAdd(false, true);
-                            }
-                        } else if (netId == WifiP2pGroup.NETWORK_ID_PERSISTENT) {
-                            // check if the go persistent group is present.
-                            netId = mGroups.getNetworkId(mThisDevice.deviceAddress);
-                            if (netId != -1) {
-                                mWifiP2pMetrics.startConnectionEvent(
-                                        P2pConnectionEvent.CONNECTION_REINVOKE,
-                                        null, GroupEvent.GROUP_OWNER, uid, attributionTag);
-                                ret = mWifiNative.p2pGroupAdd(netId, false);
-                            } else {
-                                mWifiP2pMetrics.startConnectionEvent(
-                                        P2pConnectionEvent.CONNECTION_LOCAL,
-                                        null, GroupEvent.GROUP_OWNER, uid, attributionTag);
-                                ret = mWifiNative.p2pGroupAdd(true, false);
-                            }
-                        } else {
-                            mWifiP2pMetrics.startConnectionEvent(
-                                    P2pConnectionEvent.CONNECTION_LOCAL,
-                                    null, GroupEvent.GROUP_OWNER, uid, attributionTag);
-                            ret = mWifiNative.p2pGroupAdd(false, false);
-                        }
-
-                        if (ret) {
-                            replyToMessage(message, WifiP2pManager.CREATE_GROUP_SUCCEEDED);
-                            smTransition(this, mGroupNegotiationState);
-                        } else {
-                            mConnectionPkgName = SHARED_PKG_NAME;
-                            replyToMessage(message, WifiP2pManager.CREATE_GROUP_FAILED,
-                                    WifiP2pManager.ERROR);
-                            // remain at this state.
-                            String errorMsg = "P2P group creating failed";
-                            if (mVerboseLoggingEnabled) logd(getName() + errorMsg);
-                            if (mWifiP2pMetrics.isP2pFastConnectionType()) {
-                                takeBugReportP2pFailureIfNeeded("Wi-Fi BugReport (P2P "
-                                        + mWifiP2pMetrics.getP2pGroupRoleString()
-                                        + " creation failure)", errorMsg);
-                            }
-                            mWifiP2pMetrics.endConnectionEvent(
-                                    P2pConnectionEvent.CLF_CREATE_GROUP_FAILED);
-                        }
-                        break;
-                    }
-                    case WifiP2pMonitor.P2P_GROUP_STARTED_EVENT:
-                        if (message.obj == null) {
-                            Log.e(TAG, "Invalid argument(s)");
-                            break;
-                        }
-                        mGroup = (WifiP2pGroup) message.obj;
-                        if (mVerboseLoggingEnabled) logd(getName() + " group started");
-                        if (mGroup.isGroupOwner()
-                                && EMPTY_DEVICE_ADDRESS.equals(mGroup.getOwner().deviceAddress)) {
-                            // wpa_supplicant doesn't set own device address to go_dev_addr.
-                            mGroup.getOwner().deviceAddress = mThisDevice.deviceAddress;
-                        }
-                        // We hit this scenario when a persistent group is reinvoked
-                        if (mGroup.getNetworkId() == WifiP2pGroup.NETWORK_ID_PERSISTENT) {
-                            mAutonomousGroup = false;
-                            deferMessage(message);
-                            smTransition(this, mGroupNegotiationState);
-                        } else {
-                            loge("Unexpected group creation, remove " + mGroup);
-                            mWifiNative.p2pGroupRemove(mGroup.getInterface());
-                            mGroup = null;
-                        }
-                        break;
-                    case WifiP2pManager.START_LISTEN:
-                        String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
-                        if (packageName == null) {
-                            replyToMessage(message, WifiP2pManager.START_LISTEN_FAILED);
-                            break;
-                        }
-                        int uid = message.sendingUid;
-                        int listenType = message.arg1;
-                        if (listenType == WifiP2pManager.WIFI_P2P_EXT_LISTEN_WITH_PARAMS
-                                && !SdkLevel.isAtLeastV()) {
-                            replyToMessage(message, WifiP2pManager.START_LISTEN_FAILED);
-                            break;
-                        }
-                        Bundle extras = message.getData()
-                                .getBundle(WifiP2pManager.EXTRA_PARAM_KEY_BUNDLE);
-                        WifiP2pExtListenParams extListenParams = SdkLevel.isAtLeastV()
-                                && (listenType == WifiP2pManager.WIFI_P2P_EXT_LISTEN_WITH_PARAMS)
-                                ? extras.getParcelable(
-                                WifiP2pManager.EXTRA_PARAM_KEY_EXT_LISTEN_PARAMS,
-                                WifiP2pExtListenParams.class)
-                                : null;
-                        boolean hasPermission;
-                        if (isPlatformOrTargetSdkLessThanT(packageName, uid)) {
-                            hasPermission = mWifiPermissionsUtil.checkCanAccessWifiDirect(
-                                    packageName,
-                                    getCallingFeatureId(message.sendingUid, message.replyTo),
-                                    uid, true);
-                        } else {
-                            hasPermission = checkNearbyDevicesPermission(uid, packageName,
-                                    extras, "START_LISTEN", message.obj);
-                        }
-                        if (!hasPermission) {
-                            replyToMessage(message, WifiP2pManager.START_LISTEN_FAILED);
-                            break;
-                        }
-                        mLastCallerInfoManager.put(WifiManager.API_P2P_START_LISTENING,
-                                Process.myTid(), uid, 0, packageName, true);
-                        if (mVerboseLoggingEnabled) logd(getName() + " start listen mode");
-                        mWifiNative.p2pStopFind();
-                        if (mWifiNative.p2pExtListen(true,
-                                mContext.getResources().getInteger(
-                                        R.integer.config_wifiP2pExtListenPeriodMs),
-                                mContext.getResources().getInteger(
-                                        R.integer.config_wifiP2pExtListenIntervalMs),
-                                extListenParams)) {
-                            replyToMessage(message, WifiP2pManager.START_LISTEN_SUCCEEDED);
-                            sendP2pListenChangedBroadcast(true);
-                        } else {
-                            replyToMessage(message, WifiP2pManager.START_LISTEN_FAILED);
-                        }
-                        break;
-                    case WifiP2pManager.STOP_LISTEN:
-                        mLastCallerInfoManager.put(WifiManager.API_P2P_STOP_LISTENING,
-                                Process.myTid(), message.sendingUid, 0,
-                                getCallingPkgName(message.sendingUid, message.replyTo), true);
-                        if (mVerboseLoggingEnabled) logd(getName() + " stop listen mode");
-                        if (mWifiNative.p2pExtListen(false, 0, 0, null)) {
-                            replyToMessage(message, WifiP2pManager.STOP_LISTEN_SUCCEEDED);
-                            sendP2pListenChangedBroadcast(false);
-                        } else {
-                            replyToMessage(message, WifiP2pManager.STOP_LISTEN_FAILED);
-                        }
-                        mWifiNative.p2pStopFind();
-                        break;
-                    case WifiP2pManager.SET_CHANNEL:
-                        if (!checkNetworkSettingsOrNetworkStackOrOverrideWifiConfigPermission(
-                                message.sendingUid)) {
-                            loge("Permission violation - none of NETWORK_SETTING, NETWORK_STACK,"
-                                    + " or OVERRIDE_WIFI_CONFIG permission, uid = "
-                                    + message.sendingUid);
-                            replyToMessage(message, WifiP2pManager.SET_CHANNEL_FAILED,
-                                    WifiP2pManager.ERROR);
-                            break;
-                        }
-                        if (message.obj == null) {
-                            Log.e(TAG, "Illegal arguments(s)");
-                            break;
-                        }
-                        mLastCallerInfoManager.put(WifiManager.API_P2P_SET_CHANNELS,
-                                Process.myTid(), message.sendingUid, 0,
-                                getCallingPkgName(message.sendingUid, message.replyTo), true);
-                        Bundle p2pChannels = (Bundle) message.obj;
-                        mUserListenChannel = p2pChannels.getInt("lc", 0);
-                        mUserOperatingChannel = p2pChannels.getInt("oc", 0);
-                        if (updateP2pChannels()) {
-                            replyToMessage(message, WifiP2pManager.SET_CHANNEL_SUCCEEDED);
-                        } else {
-                            replyToMessage(message, WifiP2pManager.SET_CHANNEL_FAILED);
-                        }
-                        break;
-                    case WifiP2pManager.INITIATOR_REPORT_NFC_HANDOVER:
-                        String handoverSelect = null;
-
-                        if (message.obj != null) {
-                            handoverSelect = ((Bundle) message.obj)
-                                    .getString(WifiP2pManager.EXTRA_HANDOVER_MESSAGE);
-                        }
-
-                        if (handoverSelect != null
-                                && mWifiNative.initiatorReportNfcHandover(handoverSelect)) {
-                            replyToMessage(message, WifiP2pManager.REPORT_NFC_HANDOVER_SUCCEEDED);
-                            smTransition(this, mGroupCreatingState);
-                        } else {
-                            replyToMessage(message, WifiP2pManager.REPORT_NFC_HANDOVER_FAILED);
-                        }
-                        break;
-                    case WifiP2pManager.RESPONDER_REPORT_NFC_HANDOVER:
-                        String handoverRequest = null;
-
-                        if (message.obj != null) {
-                            handoverRequest = ((Bundle) message.obj)
-                                    .getString(WifiP2pManager.EXTRA_HANDOVER_MESSAGE);
-                        }
-
-                        if (handoverRequest != null
-                                && mWifiNative.responderReportNfcHandover(handoverRequest)) {
-                            replyToMessage(message, WifiP2pManager.REPORT_NFC_HANDOVER_SUCCEEDED);
-                            smTransition(this, mGroupCreatingState);
-                        } else {
-                            replyToMessage(message, WifiP2pManager.REPORT_NFC_HANDOVER_FAILED);
-                        }
-                        break;
-                    default:
-                        return NOT_HANDLED;
-                }
-                return HANDLED;
-            }
-
-            @Override
-            public String getMessageLogRec(int what) {
-                return P2pStateMachine.class.getSimpleName() + "."
-                        + this.getClass().getSimpleName()
-                        + "." + getWhatToString(what);
-            }
-        }
-
         class P2pRejectWaitState extends RunnerState {
 
             /**
@@ -5011,11 +4325,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                             WifiP2pManager.CANCEL_CONNECT_SUCCEEDED);
                                 }
                             }
-                            if (mFeatureFlags.p2pOwnership()) {
-                                smTransition(this, mIdleState);
-                            } else {
-                                smTransition(this, mInactiveState);
-                            }
+                            transitionTo(mInactiveState);
                         } else {
                             loge(
                                     "Stale P2p rejection resume after delay - cached index: "
@@ -5085,11 +4395,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                     P2pConnectionEvent.CLF_TIMEOUT);
                             handleGroupCreationFailure(
                                     WifiP2pManager.GROUP_CREATION_FAILURE_REASON_TIMED_OUT);
-                            if (mFeatureFlags.p2pOwnership()) {
-                                smTransition(this, mIdleState);
-                            } else {
-                                smTransition(this, mInactiveState);
-                            }
+                            smTransition(this, mInactiveState);
                         }
                         break;
                     case WifiP2pMonitor.P2P_DEVICE_LOST_EVENT:
@@ -5141,16 +4447,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         // discovery or for a pending user action, but at the framework
                         // level, we always treat cancel as succeeded and enter
                         // an inactive state
-                        String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
-                        if (mFeatureFlags.p2pOwnership()
-                                && mConnectionPkgName != packageName
-                                && mConnectionPkgName != SHARED_PKG_NAME) {
-                            replyToMessage(message, WifiP2pManager.CANCEL_CONNECT_FAILED,
-                                    WifiP2pManager.BUSY);
-                            logd("Cancel connect requested by " + packageName
-                                    + " when connection is initiated by " + mConnectionPkgName);
-                            break;
-                        }
                         mLastCallerInfoManager.put(WifiManager.API_P2P_CANCEL_CONNECT,
                                 Process.myTid(), message.sendingUid, 0,
                                 getCallingPkgName(message.sendingUid, message.replyTo), true);
@@ -5263,11 +4559,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             mWifiNative.p2pCancelConnect();
                             handleGroupCreationFailure(
                                     WifiP2pManager.GROUP_CREATION_FAILURE_REASON_USER_REJECTED);
-                            if (mFeatureFlags.p2pOwnership()) {
-                                smTransition(this, mIdleState);
-                            } else {
-                                smTransition(this, mInactiveState);
-                            }
+                            smTransition(this, mInactiveState);
                         }
                         break;
                     case PEER_CONNECTION_USER_CONFIRM:
@@ -5283,11 +4575,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         loge("provision discovery failed status: " + message.arg1);
                         handleGroupCreationFailure(WifiP2pManager
                                 .GROUP_CREATION_FAILURE_REASON_PROVISION_DISCOVERY_FAILED);
-                        if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mIdleState);
-                        } else {
-                            smTransition(this, mInactiveState);
-                        }
+                        smTransition(this, mInactiveState);
                         break;
                     case WifiP2pManager.SET_CONNECTION_REQUEST_RESULT: {
                         if (!handleSetConnectionResult(message,
@@ -5367,21 +4655,13 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         if (mVerboseLoggingEnabled) {
                             logd("User rejected invitation " + mSavedPeerConfig);
                         }
-                        if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mIdleState);
-                        } else {
-                            smTransition(this, mInactiveState);
-                        }
+                        smTransition(this, mInactiveState);
                         break;
                     case WifiP2pMonitor.P2P_PROV_DISC_FAILURE_EVENT:
                         loge("provision discovery failed status: " + message.arg1);
                         handleGroupCreationFailure(WifiP2pManager
                                 .GROUP_CREATION_FAILURE_REASON_PROVISION_DISCOVERY_FAILED);
-                        if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mIdleState);
-                        } else {
-                            smTransition(this, mInactiveState);
-                        }
+                        smTransition(this, mInactiveState);
                         break;
                     case WifiP2pManager.SET_CONNECTION_REQUEST_RESULT:
                         if (!handleSetConnectionResult(message,
@@ -5615,11 +4895,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                 P2pConnectionEvent.CLF_PROV_DISC_FAIL);
                         handleGroupCreationFailure(WifiP2pManager
                                 .GROUP_CREATION_FAILURE_REASON_PROVISION_DISCOVERY_FAILED);
-                        if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mIdleState);
-                        } else {
-                            smTransition(this, mInactiveState);
-                        }
+                        smTransition(this, mInactiveState);
                         break;
                     default:
                         return NOT_HANDLED;
@@ -5690,6 +4966,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             mGroup.setNetworkId(mGroups.getNetworkId(devAddr,
                                     mGroup.getNetworkName()));
                         }
+
                         if (mGroup.isGroupOwner()) {
                             // Setting an idle time out on GO causes issues with certain scenarios
                             // on clients where it can be off-channel for longer and with the power
@@ -5719,13 +4996,13 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             }
                             break;
                         }
-                        if (mOwnershipMap.size() >= MAX_NUM_GROUP) {
-                            Log.wtf(TAG, "group size= " + mOwnershipMap.size()
-                                    + " exceeds max number of p2p group supported");
-                        }
-                        mOwnershipMap.put(mConnectionPkgName,
-                                new WifiP2pGroupInfo(mGroup, mWifiP2pInfo, mIpClient));
+
                         mWifiNative.setP2pGroupIdle(mGroup.getInterface(), GROUP_IDLE_TIME_S);
+                        Log.d(TAG, "start Ip client with provisioning mode: "
+                                + mSavedPeerConfig.getGroupClientIpProvisioningMode());
+                        startIpClient(mGroup.getInterface(), getHandler(),
+                                mSavedPeerConfig.getGroupClientIpProvisioningMode(),
+                                mGroup.p2pClientEapolIpInfo);
                         WifiP2pDevice groupOwner = mGroup.getOwner();
                         if (!EMPTY_DEVICE_ADDRESS.equals(groupOwner.deviceAddress)) {
                             WifiP2pDevice peer = mPeers.get(groupOwner.deviceAddress);
@@ -5746,16 +5023,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             // essential.
                             logw("Unknown group owner " + groupOwner);
                         }
-                        // TODO: enable state transition when GroupCreatedState merged to IdleState
-                        /* if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mL3ConnectingState);
-                            break;
-                        }*/
-                        Log.d(TAG, "start Ip client with provisioning mode: "
-                                + mSavedPeerConfig.getGroupClientIpProvisioningMode());
-                        startIpClient(mGroup.getInterface(), getHandler(),
-                                mSavedPeerConfig.getGroupClientIpProvisioningMode(),
-                                mGroup.p2pClientEapolIpInfo);
                         smTransition(this, mGroupCreatedState);
                         break;
                     case TETHER_INTERFACE_STATE_CHANGED:
@@ -5768,12 +5035,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         if (!interfaces.contains(mGroup.getInterface())) break;
 
                         Log.d(TAG, "tether " + mGroup.getInterface() + " ready");
-                        if (mOwnershipMap.size() > MAX_NUM_GROUP) {
-                            Log.wtf(TAG, "group size= " + mOwnershipMap.size()
-                                    + " exceeds max number of p2p group supported");
-                        }
-                        mOwnershipMap.put(mConnectionPkgName,
-                                new WifiP2pGroupInfo(mGroup, mWifiP2pInfo, mIpClient));
                         smTransition(this, mGroupCreatedState);
                         break;
                     case WifiP2pMonitor.P2P_GO_NEGOTIATION_FAILURE_EVENT:
@@ -5795,11 +5056,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                 P2pConnectionEvent.CLF_GROUP_REMOVED);
                         handleGroupCreationFailure(
                                 WifiP2pManager.GROUP_CREATION_FAILURE_REASON_GROUP_REMOVED);
-                        if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mIdleState);
-                        } else {
-                            smTransition(this, mInactiveState);
-                        }
+                        smTransition(this, mInactiveState);
                         break;
                     case WifiP2pMonitor.P2P_GROUP_FORMATION_FAILURE_EVENT:
                         // A group formation failure is always followed by
@@ -5871,11 +5128,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                     P2pConnectionEvent.CLF_INVITATION_FAIL);
                             handleGroupCreationFailure(
                                     WifiP2pManager.GROUP_CREATION_FAILURE_REASON_INVITATION_FAILED);
-                            if (mFeatureFlags.p2pOwnership()) {
-                                smTransition(this, mIdleState);
-                            } else {
-                                smTransition(this, mInactiveState);
-                            }
+                            smTransition(this, mInactiveState);
                         }
                         break;
                     case WifiP2pMonitor.P2P_PROV_DISC_FAILURE_EVENT:
@@ -5884,11 +5137,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                 P2pConnectionEvent.CLF_GROUP_REMOVED);
                         handleGroupCreationFailure(WifiP2pManager
                                 .GROUP_CREATION_FAILURE_REASON_PROVISION_DISCOVERY_FAILED);
-                        if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mIdleState);
-                        } else {
-                            smTransition(this, mInactiveState);
-                        }
+                        smTransition(this, mInactiveState);
                         break;
                     case WifiP2pMonitor.AP_STA_CONNECTED_EVENT:
                     case WifiP2pMonitor.AP_STA_DISCONNECTED_EVENT:
@@ -5917,149 +5166,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         return NOT_HANDLED;
                 }
                 return HANDLED;
-            }
-
-            @Override
-            public String getMessageLogRec(int what) {
-                return P2pStateMachine.class.getSimpleName() + "."
-                        + this.getClass().getSimpleName()
-                        + "." + getWhatToString(what);
-            }
-        }
-
-        class L3ConnectingState extends RunnerState {
-
-            /**
-             * The Runner state Constructor
-             *
-             * @param threshold the running time threshold in milliseconds
-             */
-            L3ConnectingState(int threshold, @NonNull LocalLog localLog) {
-                super(threshold, localLog);
-            }
-
-            @Override
-            public void enterImpl() {
-                logSmStateName(this.getName(),
-                        getCurrentState() != null ? getCurrentState().getName() : "");
-                Log.d(TAG, "start Ip client with provisioning mode: "
-                        + mSavedPeerConfig.getGroupClientIpProvisioningMode());
-                startIpClient(mGroup.getInterface(), getHandler(),
-                        mSavedPeerConfig.getGroupClientIpProvisioningMode(),
-                        mGroup.p2pClientEapolIpInfo);
-            }
-
-            @Override
-            public boolean processMessageImpl(Message message) {
-                logSmMessage(getName(), message);
-                switch (message.what) {
-                    case IPC_PRE_DHCP_ACTION:
-                        mWifiNative.setP2pPowerSave(mGroup.getInterface(), false);
-                        try {
-                            mIpClient.completedPreDhcpAction();
-                        } catch (RemoteException e) {
-                            e.rethrowFromSystemServer();
-                        }
-                        break;
-                    case IPC_POST_DHCP_ACTION:
-                        mWifiNative.setP2pPowerSave(mGroup.getInterface(), true);
-                        break;
-                    case IPC_DHCP_RESULTS:
-                        mDhcpResultsParcelable = (DhcpResultsParcelable) message.obj;
-                        if (mDhcpResultsParcelable == null) {
-                            break;
-                        }
-
-                        if (mVerboseLoggingEnabled) {
-                            logd("mDhcpResultsParcelable: " + mDhcpResultsParcelable);
-                        }
-                        if (mDhcpResultsParcelable.serverAddress != null) {
-                            setWifiP2pInfoOnGroupFormation(mDhcpResultsParcelable.serverAddress);
-                        } else {
-                            // In case of static IP (IP address received via EAPOL-Key exchange),
-                            // the DHCP server address is null. So look for the gateway address.
-                            InetAddress addr =
-                                    mDhcpResultsParcelable.baseConfiguration.getGateway();
-                            if (addr != null) {
-                                setWifiP2pInfoOnGroupFormation(addr.getHostAddress());
-                            }
-                        }
-                        try {
-                            final String ifname = mGroup.getInterface();
-                            if (mDhcpResultsParcelable != null) {
-                                mNetdWrapper.addInterfaceToLocalNetwork(
-                                        ifname,
-                                        mDhcpResultsParcelable.baseConfiguration.getRoutes(ifname));
-                            }
-                        } catch (Exception e) {
-                            loge("Failed to add iface to local network " + e);
-                        }
-                        onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
-                                eraseOwnDeviceAddress(mGroup),
-                                generateCallbackList(mGroup));
-                        sendP2pConnectionChangedBroadcast();
-                        break;
-                    case IPC_PROVISIONING_SUCCESS:
-                        if (mSavedPeerConfig.getGroupClientIpProvisioningMode()
-                                != GROUP_CLIENT_IP_PROVISIONING_MODE_IPV6_LINK_LOCAL) {
-                            smTransition(this, mIdleState);
-                            break;
-                        }
-
-                        LinkProperties linkProperties = (LinkProperties) message.obj;
-                        if (mVerboseLoggingEnabled) {
-                            logd("IP provisioning result " + linkProperties);
-                        }
-                        try {
-                            mNetdWrapper.addInterfaceToLocalNetwork(
-                                    mGroup.getInterface(),
-                                    linkProperties.getRoutes());
-                        } catch (Exception e) {
-                            loge("Failed to add iface to local network " + e);
-                            mWifiNative.p2pGroupRemove(mGroup.getInterface());
-                        }
-
-                        byte[] goInterfaceMacAddress = mGroup.interfaceAddress;
-                        if (goInterfaceMacAddress == null) {
-                            setWifiP2pInfoOnGroupFormationWithInetAddress(null);
-                            onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
-                                    eraseOwnDeviceAddress(mGroup),
-                                    generateCallbackList(mGroup));
-                            sendP2pConnectionChangedBroadcast();
-                            smTransition(this, mIdleState);
-                            break;
-                        }
-
-                        byte[] goIpv6Address = MacAddress.fromBytes(goInterfaceMacAddress)
-                                .getLinkLocalIpv6FromEui48Mac().getAddress();
-                        try {
-                            InetAddress goIp = Inet6Address.getByAddress(null, goIpv6Address,
-                                    NetworkInterface.getByName(mGroup.getInterface()));
-                            setWifiP2pInfoOnGroupFormationWithInetAddress(goIp);
-                            onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
-                                    eraseOwnDeviceAddress(mGroup),
-                                    generateCallbackList(mGroup));
-                            sendP2pConnectionChangedBroadcast();
-                        } catch (UnknownHostException | SocketException e) {
-                            loge("Unable to retrieve link-local IPv6 address of group owner "
-                                    + e);
-                            mWifiNative.p2pGroupRemove(mGroup.getInterface());
-                        }
-                        smTransition(this, mIdleState);
-                        break;
-                    case IPC_PROVISIONING_FAILURE:
-                        loge("IP provisioning failed");
-                        mWifiNative.p2pGroupRemove(mGroup.getInterface());
-                        smTransition(this, mIdleState);
-                        break;
-                    default:
-                        return NOT_HANDLED;
-                }
-                return HANDLED;
-            }
-
-            public void exitImpl() {
-
             }
 
             @Override
@@ -6182,11 +5288,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                 P2pConnectionEvent.CLF_USER_REJECT);
                         handleGroupCreationFailure(
                                 WifiP2pManager.GROUP_CREATION_FAILURE_REASON_USER_REJECTED);
-                        if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mIdleState);
-                        } else {
-                            smTransition(this, mInactiveState);
-                        }
+                        smTransition(this, mInactiveState);
                         break;
                     case DROP_WIFI_USER_ACCEPT:
                         mFrequencyConflictDialog = null;
@@ -6199,11 +5301,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         if (mVerboseLoggingEnabled) {
                             logd(getName() + "Wifi disconnected, retry p2p");
                         }
-                        if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mIdleState);
-                        } else {
-                            smTransition(this, mInactiveState);
-                        }
+                        smTransition(this, mInactiveState);
                         p2pReconnect();
                         break;
                     default:
@@ -6265,8 +5363,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 // In case of a negotiation group, connection changed is sent
                 // after a client joins. For autonomous, send now
                 if (mAutonomousGroup) {
-                    onGroupCreated(new WifiP2pInfo(mWifiP2pInfo), eraseOwnDeviceAddress(mGroup),
-                            generateCallbackList(mGroup));
+                    onGroupCreated(new WifiP2pInfo(mWifiP2pInfo), eraseOwnDeviceAddress(mGroup));
                     sendP2pConnectionChangedBroadcast();
                 }
 
@@ -6313,12 +5410,10 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         }
                         if (!mAutonomousGroup && mGroup.getClientList().size() == 1) {
                             onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
-                                    eraseOwnDeviceAddress(mGroup),
-                                    generateCallbackList(mGroup));
+                                    eraseOwnDeviceAddress(mGroup));
                         }
                         onPeerClientJoined(new WifiP2pInfo(mWifiP2pInfo),
-                                eraseOwnDeviceAddress(mGroup),
-                                generateCallbackList(mGroup));
+                                eraseOwnDeviceAddress(mGroup));
                         sendP2pConnectionChangedBroadcast();
                         break;
                     }
@@ -6342,8 +5437,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                     // when this happens at exit()
                                 } else {
                                     onPeerClientDisconnected(new WifiP2pInfo(mWifiP2pInfo),
-                                            eraseOwnDeviceAddress(mGroup),
-                                            generateCallbackList(mGroup));
+                                            eraseOwnDeviceAddress(mGroup));
                                     // Notify when a client disconnects from group
                                     sendP2pConnectionChangedBroadcast();
                                 }
@@ -6434,8 +5528,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             loge("Failed to add iface to local network " + e);
                         }
                         onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
-                                eraseOwnDeviceAddress(mGroup),
-                                generateCallbackList(mGroup));
+                                eraseOwnDeviceAddress(mGroup));
                         sendP2pConnectionChangedBroadcast();
                         break;
                     case IPC_PROVISIONING_SUCCESS:
@@ -6461,8 +5554,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         if (goInterfaceMacAddress == null) {
                             setWifiP2pInfoOnGroupFormationWithInetAddress(null);
                             onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
-                                    eraseOwnDeviceAddress(mGroup),
-                                    generateCallbackList(mGroup));
+                                    eraseOwnDeviceAddress(mGroup));
                             sendP2pConnectionChangedBroadcast();
                             break;
                         }
@@ -6474,8 +5566,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                                     NetworkInterface.getByName(mGroup.getInterface()));
                             setWifiP2pInfoOnGroupFormationWithInetAddress(goIp);
                             onGroupCreated(new WifiP2pInfo(mWifiP2pInfo),
-                                    eraseOwnDeviceAddress(mGroup),
-                                    generateCallbackList(mGroup));
+                                    eraseOwnDeviceAddress(mGroup));
                             sendP2pConnectionChangedBroadcast();
                         } catch (UnknownHostException | SocketException e) {
                             loge("Unable to retrieve link-local IPv6 address of group owner "
@@ -6487,33 +5578,21 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         loge("IP provisioning failed");
                         mWifiNative.p2pGroupRemove(mGroup.getInterface());
                         break;
-                    case WifiP2pManager.REMOVE_GROUP: {
-                        String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
-                        if (!checkIfPackageIsGroupOwner(packageName)
-                                && message.sendingUid != Process.SYSTEM_UID) {
-                            replyToMessage(message, WifiP2pManager.REMOVE_GROUP_FAILED,
-                                    WifiP2pManager.BUSY);
-                            logd("Remove group requested by non-group owner " + packageName);
-                            break;
-                        }
+                    case WifiP2pManager.REMOVE_GROUP:
                         mLastCallerInfoManager.put(WifiManager.API_P2P_REMOVE_GROUP,
-                                Process.myTid(), message.sendingUid, 0, packageName, true);
+                                Process.myTid(), message.sendingUid, 0,
+                                getCallingPkgName(message.sendingUid, message.replyTo), true);
                         if (mVerboseLoggingEnabled) logd(getName() + " remove group");
                         if (mWifiNative.p2pGroupRemove(mGroup.getInterface())) {
                             smTransition(this, mOngoingGroupRemovalState);
                             replyToMessage(message, WifiP2pManager.REMOVE_GROUP_SUCCEEDED);
                         } else {
-                            handleGroupRemoved(packageName);
-                            if (mFeatureFlags.p2pOwnership()) {
-                                smTransition(this, mIdleState);
-                            } else {
-                                smTransition(this, mInactiveState);
-                            }
+                            handleGroupRemoved();
+                            smTransition(this, mInactiveState);
                             replyToMessage(message, WifiP2pManager.REMOVE_GROUP_FAILED,
                                     WifiP2pManager.ERROR);
                         }
                         break;
-                    }
                     case WifiP2pMonitor.P2P_GROUP_REMOVED_EVENT:
                         // We do not listen to NETWORK_DISCONNECTION_EVENT for group removal
                         // handling since supplicant actually tries to reconnect after a temporary
@@ -6526,19 +5605,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         // Treating network disconnection as group removal causes race conditions
                         // since supplicant would still maintain the group at that stage.
                         if (mVerboseLoggingEnabled) logd(getName() + " group removed");
-
-                        if (message.obj == null) {
-                            Log.e(TAG, "Illegal arguments");
-                            break;
-                        }
-                        WifiP2pGroup group = (WifiP2pGroup) message.obj;
-                        String pkgName = getGroupOwnerPackageName(group);
-                        handleGroupRemoved(pkgName);
-                        if (mFeatureFlags.p2pOwnership()) {
-                            smTransition(this, mIdleState);
-                        } else {
-                            smTransition(this, mInactiveState);
-                        }
+                        handleGroupRemoved();
+                        smTransition(this, mInactiveState);
                         break;
                     case WifiP2pMonitor.P2P_DEVICE_LOST_EVENT:
                         if (message.obj == null) {
@@ -6612,12 +5680,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             // remain at this state.
                             break;
                         }
-                        if (!checkIfPackageIsGroupOwner(packageName)) {
-                            replyToMessage(message, WifiP2pManager.CONNECT_FAILED,
-                                    WifiP2pManager.BUSY);
-                            logd("Cannot perform invitation connection due to lack of ownership");
-                            break;
-                        }
                         mLastCallerInfoManager.put(WifiManager.API_P2P_CONNECT,
                                 Process.myTid(), uid, 0, packageName, true);
                         WifiP2pConfig config = (WifiP2pConfig)
@@ -6633,9 +5695,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                             mPeers.updateStatus(config.deviceAddress, WifiP2pDevice.INVITED);
                             sendPeersChangedBroadcast();
                             replyToMessage(message, WifiP2pManager.CONNECT_SUCCEEDED);
-                            if (mOwnershipMap.containsKey(packageName)) {
-                                mConnectionPkgName = packageName;
-                            }
                         } else {
                             replyToMessage(message, WifiP2pManager.CONNECT_FAILED,
                                     WifiP2pManager.ERROR);
@@ -6732,17 +5791,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                     case WifiP2pMonitor.P2P_GROUP_STARTED_EVENT:
                         loge("Duplicate group creation event notice, ignore");
                         break;
-                    case WifiP2pManager.CANCEL_CONNECT: {
-                        String packageName = getCallingPkgName(message.sendingUid, message.replyTo);
-                        if (mFeatureFlags.p2pOwnership()
-                                && mConnectionPkgName != packageName
-                                && mConnectionPkgName != SHARED_PKG_NAME) {
-                            replyToMessage(message, WifiP2pManager.CANCEL_CONNECT_FAILED,
-                                    WifiP2pManager.BUSY);
-                            logd("Cancel invitation connect requested by " + packageName
-                                    + " when connection is initiated by " + mConnectionPkgName);
-                            break;
-                        }
+                    case WifiP2pManager.CANCEL_CONNECT:
                         mLastCallerInfoManager.put(WifiManager.API_P2P_CANCEL_CONNECT,
                                 Process.myTid(), message.sendingUid, 0,
                                 getCallingPkgName(message.sendingUid, message.replyTo), true);
@@ -6762,13 +5811,11 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
 
                         replyToMessage(message, WifiP2pManager.CANCEL_CONNECT_SUCCEEDED);
                         break;
-                    }
                     case WifiP2pMonitor.P2P_FREQUENCY_CHANGED_EVENT:
                         if (mGroup != null) {
                             mGroup.setFrequency(message.arg1);
                             onFrequencyChanged(new WifiP2pInfo(mWifiP2pInfo),
-                                    eraseOwnDeviceAddress(mGroup),
-                                    generateCallbackList(mGroup));
+                                    eraseOwnDeviceAddress(mGroup));
                             sendP2pConnectionChangedBroadcast();
                         }
                         break;
@@ -6895,6 +5942,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                         break;
                     case PEER_CONNECTION_USER_REJECT:
                         if (mVerboseLoggingEnabled) logd("User rejected incoming request");
+                        mSavedPeerConfig.invalidate();
                         smTransition(this, mGroupCreatedState);
                         break;
                     case WifiP2pManager.SET_CONNECTION_REQUEST_RESULT:
@@ -7103,61 +6151,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             }
         }
 
-        private void sendMultipleP2pConnectionChangedBroadcast(Intent intent,
-                @Nullable String[] excludedPermissions, Set<String> pkgNames) {
-            Context context = mContext.createContextAsUser(UserHandle.ALL, 0);
-            boolean isLocationModeEnabled = mWifiPermissionsUtil.isLocationModeEnabled();
-            String[] permissions = isLocationModeEnabled ? RECEIVER_PERMISSIONS_FOR_BROADCAST
-                    : RECEIVER_PERMISSIONS_FOR_BROADCAST_LOCATION_OFF;
-            if (SdkLevel.isAtLeastU()) {
-                BroadcastOptions broadcastOptions = mWifiInjector.makeBroadcastOptions();
-                broadcastOptions.setRequireAllOfPermissions(permissions);
-                broadcastOptions.setRequireNoneOfPermissions(excludedPermissions);
-                if (pkgNames.size() > 0) {
-                    for (String pkg : pkgNames) {
-                        intent.setPackage(pkg);
-                        context.sendBroadcast(intent, null, broadcastOptions.toBundle());
-                    }
-                } else {
-                    context.sendBroadcast(intent, null, broadcastOptions.toBundle());
-                }
-            } else {
-                if (pkgNames.size() > 0) {
-                    for (String pkg : pkgNames) {
-                        intent.setPackage(pkg);
-                        context.sendBroadcastWithMultiplePermissions(intent, permissions);
-                    }
-                } else {
-                    context.sendBroadcastWithMultiplePermissions(intent, permissions);
-                }
-            }
-            if (SdkLevel.isAtLeastT()) {
-                // on Android T or later, also send broadcasts to apps that have NEARBY_WIFI_DEVICES
-                String[] requiredPermissions = new String[]{
-                        android.Manifest.permission.NEARBY_WIFI_DEVICES,
-                        android.Manifest.permission.ACCESS_WIFI_STATE
-                };
-                BroadcastOptions broadcastOptions = mWifiInjector.makeBroadcastOptions();
-                broadcastOptions.setRequireAllOfPermissions(requiredPermissions);
-                ArrayList<String> excludedPermissionsList = new ArrayList<>();
-                if (isLocationModeEnabled) {
-                    excludedPermissionsList.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
-                }
-                if (excludedPermissions != null) {
-                    Collections.addAll(excludedPermissionsList, excludedPermissions);
-                }
-                if (excludedPermissionsList.size() > 0) {
-                    broadcastOptions.setRequireNoneOfPermissions(excludedPermissionsList.toArray(
-                            new String[0]));
-                }
-                // remove package name from intent for ownership
-                if (mFeatureFlags.p2pOwnership()) {
-                    intent = getP2pConnectionChangedIntent();
-                }
-                context.sendBroadcast(intent, null, broadcastOptions.toBundle());
-            }
-        }
-
         private void sendThisDeviceChangedBroadcast() {
             WifiP2pDevice p2pDevice = eraseOwnDeviceAddress(mThisDevice);
             onDeviceConfigurationChanged(p2pDevice);
@@ -7187,71 +6180,19 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             return intent;
         }
 
-        private Set<String> getGroupOwnershipPackageList() {
-            Set<String> pkgNames = new HashSet<>();
-
-            if (mOwnershipMap.isEmpty()) {
-                logd("No ownership mapping available");
-                return pkgNames;
-            }
-
-            boolean hasSharedPkg = mOwnershipMap.containsKey(SHARED_PKG_NAME);
-
-            if (mOwnershipMap.size() == 1) {
-                if (hasSharedPkg) {
-                    logd("Sending P2P connection changed broadcast to everyone");
-                    return pkgNames;
-                }
-                String pkg = mOwnershipMap.keySet().iterator().next();
-                pkgNames.add(pkg);
-                logd("Sending P2P connection changed broadcast to only " + pkg);
-                return pkgNames;
-            }
-
-            if (hasSharedPkg) {
-                for (ClientInfo client : mClientInfoList.values()) {
-                    if (!mOwnershipMap.containsKey(client.mPackageName)) {
-                        pkgNames.add(client.mPackageName);
-                    }
-                }
-            } else {
-                if (mGroup == null) {
-                    loge("P2P current group information is not available");
-                    return pkgNames;
-                }
-                for (Map.Entry<String, WifiP2pGroupInfo> entry : mOwnershipMap.entrySet()) {
-                    if (entry.getValue().p2pGroup.getInterface().equals(mGroup.getInterface())) {
-                        pkgNames.add(entry.getKey());
-                    }
-                }
-            }
-
-            return pkgNames;
-        }
-
         private void sendP2pConnectionChangedBroadcast() {
             if (mVerboseLoggingEnabled) logd("sending p2p connection changed broadcast");
             Intent intent = getP2pConnectionChangedIntent();
-            Set<String> pkgNames = getGroupOwnershipPackageList();
             if (SdkLevel.isAtLeastU()) {
                 // First send direct foreground broadcast to Tethering package and system service
                 // with same android.permission.MAINLINE_NETWORK_STACK
                 sendBroadcastWithMainlineNetworkStackPermissionPostU();
                 // Then send the same broadcast to remaining apps without
                 // android.permission.MAINLINE_NETWORK_STACK
-                if (mFeatureFlags.p2pOwnership()) {
-                    sendMultipleP2pConnectionChangedBroadcast(intent,
-                            RECEIVER_PERMISSIONS_MAINLINE_NETWORK_STACK, pkgNames);
-                } else {
-                    sendBroadcastWithExcludedPermissions(intent,
-                            RECEIVER_PERMISSIONS_MAINLINE_NETWORK_STACK);
-                }
+                sendBroadcastWithExcludedPermissions(intent,
+                        RECEIVER_PERMISSIONS_MAINLINE_NETWORK_STACK);
             } else {
-                if (mFeatureFlags.p2pOwnership()) {
-                    sendMultipleP2pConnectionChangedBroadcast(intent, null, pkgNames);
-                } else {
-                    sendBroadcastWithExcludedPermissions(intent, null);
-                }
+                sendBroadcastWithExcludedPermissions(intent, null);
             }
             if (mWifiChannel != null) {
                 mWifiChannel.sendMessage(WifiP2pServiceImpl.P2P_CONNECTION_CHANGED,
@@ -8522,8 +7463,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             mWifiP2pInfo.groupFormed = true;
             mWifiP2pInfo.isGroupOwner = mGroup.isGroupOwner();
             mWifiP2pInfo.groupOwnerAddress = serverAddress;
-            mOwnershipMap.put(
-                    mConnectionPkgName, new WifiP2pGroupInfo(mGroup, mWifiP2pInfo, mIpClient));
         }
 
         private void resetWifiP2pInfo() {
@@ -8818,8 +7757,7 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             sendDisconnectWifiRequest(false);
         }
 
-        private void handleGroupRemoved(String packageName) {
-            // TODO: Modify logic for Dual P2P in next CL
+        private void handleGroupRemoved() {
             if (mGroup.isGroupOwner()) {
                 // {@link com.android.server.connectivity.Tethering} listens to
                 // {@link WifiP2pManager#WIFI_P2P_CONNECTION_CHANGED_ACTION}
@@ -8855,12 +7793,6 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             if (mPeers.remove(mPeersLostDuringConnection)) peersChanged = true;
             if (peersChanged) {
                 sendPeersChangedBroadcast();
-            }
-
-            if (mOwnershipMap.containsKey(packageName)) {
-                mOwnershipMap.remove(packageName);
-            } else {
-                mOwnershipMap.remove(SHARED_PKG_NAME);
             }
 
             mGroup = null;
