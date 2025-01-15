@@ -16,6 +16,7 @@
 
 package com.google.snippet.wifi.aware;
 
+import android.app.UiAutomation;
 import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -41,12 +42,16 @@ import android.net.wifi.rtt.RangingRequest;
 import android.net.wifi.rtt.RangingResult;
 import android.net.wifi.rtt.RangingResultCallback;
 import android.net.wifi.rtt.WifiRttManager;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.RemoteException;
 
 import androidx.annotation.NonNull;
 import androidx.test.core.app.ApplicationProvider;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.google.android.mobly.snippet.Snippet;
 import com.google.android.mobly.snippet.event.EventCache;
@@ -70,6 +75,7 @@ public class WifiAwareManagerSnippet implements Snippet {
     private final Context mContext;
     private final WifiAwareManager mWifiAwareManager;
     private final WifiRttManager mWifiRttManager;
+    private final WifiManager mWifiManager;
     private final Handler mHandler;
     // WifiAwareSession will be initialized after attach.
     private final ConcurrentHashMap<String, WifiAwareSession> mAttachSessions =
@@ -100,9 +106,37 @@ public class WifiAwareManagerSnippet implements Snippet {
         mWifiAwareManager = mContext.getSystemService(WifiAwareManager.class);
         checkWifiAwareManager();
         mWifiRttManager = mContext.getSystemService(WifiRttManager.class);
+        mWifiManager = mContext.getSystemService(WifiManager.class);
         HandlerThread handlerThread = new HandlerThread("Snippet-Aware");
         handlerThread.start();
         mHandler = new Handler(handlerThread.getLooper());
+    }
+    private void adoptShellPermission() throws RemoteException {
+        UiAutomation uia = InstrumentationRegistry.getInstrumentation().getUiAutomation();
+        uia.adoptShellPermissionIdentity();
+    }
+
+    private void dropShellPermission() throws RemoteException {
+        UiAutomation uia = InstrumentationRegistry.getInstrumentation().getUiAutomation();
+        uia.dropShellPermissionIdentity();
+    }
+
+    /**
+     * Returns the MAC address of the currently active access point.
+     */
+    @Rpc(description = "Returns information about the currently active access point.")
+    public String wifiGetActiveNetworkMacAddress() throws Exception {
+        WifiInfo info = null;
+        try {
+            adoptShellPermission();
+            info = mWifiManager.getConnectionInfo();
+        } catch (RemoteException e) {
+            Log.e("RemoteException message: " + e);
+        } finally {
+            // cleanup
+            dropShellPermission();
+        }
+        return info.getMacAddress();
     }
 
     /**
