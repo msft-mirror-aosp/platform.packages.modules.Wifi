@@ -361,7 +361,15 @@ def get_aware_capabilities(ad: android_device.AndroidDevice):
     ad: the Android device
   Returns: the capability dictionary.
   """
-    return json.loads(ad.adb.shell('cmd wifiaware state_mgr get_capabilities'))
+    try:
+      result = ad.adb.shell('cmd wifiaware state_mgr get_capabilities')
+      return json.loads(result)
+    except adb.AdbError:
+      ad.log.info('Another way to get capabilities- dumpsys and parse string.')
+      result = ad.adb.shell('dumpsys wifiaware |grep mCapabilities').decode()
+      pairs = aware_cap_str_to_dict(result)
+      ad.log.info(pairs)
+    return pairs
 
 def create_discovery_config(service_name,
                             p_type=None,
