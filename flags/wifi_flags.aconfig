@@ -263,3 +263,13 @@ flag {
     bug: "349253691"
     is_fixed_read_only: true
 }
+
+
+flag {
+    name: "multiple_mld_on_sap_supported"
+    is_exported: false
+    namespace: "wifi"
+    description: "Check driver capability when determining the number of supported MLD"
+    bug: "382023801"
+    is_fixed_read_only: true
+}

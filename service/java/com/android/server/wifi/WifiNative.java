@@ -1688,6 +1688,17 @@ public class WifiNative {
     }
 
     /**
+     * Return true when the device supports multiple Wi-Fi 7 multi-link devices (MLD) on SoftAp.
+     */
+    public boolean isMultipleMLDSupportedOnSap() {
+        if (!Flags.multipleMldOnSapSupported()) {
+            return false;
+        }
+        BitSet cachedFeatureSet = getCompleteFeatureSetFromConfigStore();
+        return cachedFeatureSet.get(WifiManager.WIFI_FEATURE_MULTIPLE_MLD_ON_SAP);
+    }
+
+    /**
      * Setup an interface for Soft AP mode operations.
      *
      * This method configures an interface in AP mode in all the native daemons
