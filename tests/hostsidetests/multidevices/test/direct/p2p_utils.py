@@ -27,6 +27,7 @@ from mobly.controllers import android_device
 from direct import constants
 
 _DEFAULT_TIMEOUT = datetime.timedelta(seconds=60)
+DEFAULT_CHANNEL_ID = 0
 
 
 @dataclasses.dataclass
@@ -504,7 +505,7 @@ def teardown_wifi_p2p(ad: android_device.AndroidDevice):
 def add_upnp_local_service(device: DeviceState, config: dict):
     """Adds p2p local Upnp service."""
     device.ad.wifi.wifiP2pAddUpnpLocalService(
-        config['udid'], config['device'], config['services']
+        config['uuid'], config['device'], config['services']
     )
 
 
@@ -515,21 +516,29 @@ def add_bonjour_local_service(device: DeviceState, config: dict):
     )
 
 
-def set_upnp_response_listener(device: DeviceState):
+def set_upnp_response_listener(
+    device: DeviceState, channel_id: int = DEFAULT_CHANNEL_ID
+):
     """Set response listener for Upnp service."""
-    upnp_response_listener = device.ad.wifi.wifiP2pSetUpnpResponseListener()
+    upnp_response_listener = device.ad.wifi.wifiP2pSetUpnpResponseListener(
+        channel_id
+    )
     device.upnp_response_listener = upnp_response_listener
 
 
-def unset_upnp_response_listener(device: DeviceState):
+def unset_upnp_response_listener(
+    device: DeviceState, channel_id: int = DEFAULT_CHANNEL_ID
+):
     """Unset response listener for Upnp service."""
-    device.ad.wifi.wifiP2pUnsetUpnpResponseListener()
+    device.ad.wifi.wifiP2pUnsetUpnpResponseListener(channel_id)
     device.upnp_response_listener = None
 
 
-def set_dns_sd_response_listeners(device: DeviceState):
+def set_dns_sd_response_listeners(
+    device: DeviceState, channel_id: int = DEFAULT_CHANNEL_ID
+):
     """Set response listener for Bonjour service."""
-    listener = device.ad.wifi.wifiP2pSetDnsSdResponseListeners()
+    listener = device.ad.wifi.wifiP2pSetDnsSdResponseListeners(channel_id)
     device.dns_sd_response_listener = listener
 
 
@@ -539,12 +548,14 @@ def unset_dns_sd_response_listender(device: DeviceState):
     device.dns_sd_response_listener = None
 
 
-def reset_p2p_service_state(ad: android_device.AndroidDevice):
+def reset_p2p_service_state(
+    ad: android_device.AndroidDevice, channel_id: int = DEFAULT_CHANNEL_ID
+):
     """Clears all p2p service related states on device."""
-    ad.wifi.wifiP2pClearServiceRequests()
-    ad.wifi.wifiP2pUnsetDnsSdResponseListeners()
-    ad.wifi.wifiP2pUnsetUpnpResponseListener()
-    ad.wifi.wifiP2pClearLocalServices()
+    ad.wifi.wifiP2pClearServiceRequests(channel_id)
+    ad.wifi.wifiP2pUnsetDnsSdResponseListeners(channel_id)
+    ad.wifi.wifiP2pUnsetUpnpResponseListener(channel_id)
+    ad.wifi.wifiP2pClearLocalServices(channel_id)
 
 
 def check_discovered_upnp_services(
@@ -586,6 +597,7 @@ def check_discovered_upnp_services(
             return False
         for service in event.data['serviceList']:
             if service in expected_services:
+                device.ad.log.debug('Received upnp services: %s', service)
                 expected_services.remove(service)
         return len(expected_services) == 0
 
@@ -603,7 +615,7 @@ def check_discovered_upnp_services(
 
 def check_discovered_dns_sd_response(
     device: DeviceState,
-    expected_responses: Sequence[(str, str)],
+    expected_responses: list[tuple[str, str]],
     expected_src_device_address: str,
 ):
     """Check discovered DNS SD responses.
@@ -638,7 +650,10 @@ def check_discovered_dns_sd_response(
             return False
         registration_type = event.data['registrationType']
         instance_name = event.data['instanceName']
-        expected_responses.remove((registration_type, instance_name))
+        service_tuple = (instance_name, registration_type)
+        device.ad.log.debug('Received DNS SD response: %s', service_tuple)
+        if service_tuple in expected_responses:
+            expected_responses.remove(service_tuple)
         return len(expected_responses) == 0
 
     try:
@@ -655,7 +670,7 @@ def check_discovered_dns_sd_response(
 
 def check_discovered_dns_sd_txt_record(
     device: DeviceState,
-    expected_records: Sequence[(str, dict)],
+    expected_records: list[tuple[str, dict[str, str]]],
     expected_src_device_address: str,
 ):
     """Check discovered DNS SD TXT records.
@@ -689,8 +704,11 @@ def check_discovered_dns_sd_txt_record(
         if src_device.device_address != expected_src_device_address:
             return False
         full_domain_name = event.data['fullDomainName']
-        txt_record_map = tuple(event.data['txtRecordMap'].items())
-        expected_records.remove((full_domain_name, txt_record_map))
+        txt_record_map = event.data['txtRecordMap']
+        record_to_remove = (full_domain_name, txt_record_map)
+        device.ad.log.debug('Received DNS SD TXT record: %s', record_to_remove)
+        if record_to_remove in expected_records:
+            expected_records.remove(record_to_remove)
         return len(expected_records) == 0
 
     try:
@@ -715,7 +733,9 @@ def _check_no_discovered_service(
     all_events = callback_handler.getAll(event_name)
     filtered_events = []
     for event in all_events:
-        src_device = WifiP2pDevice.from_dict(event.data['sourceDevice'])
+        src_device = constants.WifiP2pDevice.from_dict(
+            event.data['sourceDevice']
+        )
         if src_device.device_address == expected_src_device_address:
             filtered_events.append(event)
     asserts.assert_equal(
