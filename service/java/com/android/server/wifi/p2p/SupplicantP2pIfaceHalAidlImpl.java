@@ -1167,7 +1167,8 @@ public class SupplicantP2pIfaceHalAidlImpl implements ISupplicantP2pIfaceHal {
         return false;
     }
 
-    private static int convertPairingBootstrappingMethodToAidl(int pairingBootstrappingMethod) {
+    @VisibleForTesting
+    protected static int convertPairingBootstrappingMethodToAidl(int pairingBootstrappingMethod) {
         switch (pairingBootstrappingMethod) {
             case WifiP2pPairingBootstrappingConfig.PAIRING_BOOTSTRAPPING_METHOD_OPPORTUNISTIC:
                 return P2pPairingBootstrappingMethodMask.BOOTSTRAPPING_OPPORTUNISTIC;
