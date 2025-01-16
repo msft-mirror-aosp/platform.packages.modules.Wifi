@@ -135,6 +135,7 @@ python_test_host {
     srcs: [
         "direct/group_owner_negotiation_test.py",
         "direct/group_owner_test.py",
+        "direct/group_owner_with_config_test.py",
         "direct/cts_wifi_direct_test_suite.py",
     ],
     libs: [

@@ -285,6 +285,7 @@ public class WifiP2pManagerSnippet implements Snippet {
         if (wifiP2pConfig != null) {
             config = JsonDeserializer.jsonToWifiP2pConfig(wifiP2pConfig);
         }
+        Log.d("Creating wifi p2p group with config: " + String.valueOf(config));
         mP2pManager.createGroup(channel, config, actionListener);
         verifyActionListenerSucceed(callbackId);
     }
@@ -302,8 +303,9 @@ public class WifiP2pManagerSnippet implements Snippet {
             @RpcDefault(value = "0") Integer channelId) throws Throwable {
         WifiP2pManager.Channel channel = getChannel(channelId);
         String callbackId = UUID.randomUUID().toString();
-        mP2pManager.connect(channel, JsonDeserializer.jsonToWifiP2pConfig(wifiP2pConfig),
-                new ActionListener(callbackId));
+        WifiP2pConfig config = JsonDeserializer.jsonToWifiP2pConfig(wifiP2pConfig);
+        Log.d("Connecting p2p group with config: " + String.valueOf(config));
+        mP2pManager.connect(channel, config, new ActionListener(callbackId));
         verifyActionListenerSucceed(callbackId);
     }
 

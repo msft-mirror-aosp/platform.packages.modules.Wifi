@@ -296,7 +296,7 @@ def create_group(
 def p2p_connect(
     requester: DeviceState,
     responder: DeviceState,
-    wps_config: constants.WpsInfo,
+    config: constants.WifiP2pConfig,
 ) -> None:
     """Establishes Wi-Fi p2p connection with WPS configuration.
 
@@ -307,9 +307,11 @@ def p2p_connect(
     Args:
         requester: The requester device.
         responder: The responder device.
-        wps_config: The WPS method to establish the connection.
+        config: The Wi-Fi p2p configuration.
     """
-    logging.info('Establishing a p2p connection through WPS %s.', wps_config)
+    logging.info(
+        'Establishing a p2p connection through p2p configuration %s.', config
+    )
 
     # Clear events in broadcast receiver.
     _clear_events(requester, constants.WIFI_P2P_PEERS_CHANGED_ACTION)
@@ -317,25 +319,23 @@ def p2p_connect(
     _clear_events(responder, constants.WIFI_P2P_PEERS_CHANGED_ACTION)
     _clear_events(responder, constants.WIFI_P2P_CONNECTION_CHANGED_ACTION)
 
-    config = constants.WifiP2pConfig(
-        device_address=responder.p2p_device.device_address,
-        wps_setup=wps_config,
-    )
     requester.ad.wifi.wifiP2pConnect(config.to_dict())
     requester.ad.log.info('Sent P2P connect invitation to responder.')
-    if wps_config == constants.WpsInfo.PBC:
+    # Connect with WPS config requires user inetraction through UI.
+    if config.wps_setup == constants.WpsInfo.PBC:
         responder.ad.wifi.wifiP2pAcceptInvitation(
             requester.p2p_device.device_name
         )
-    elif wps_config == constants.WpsInfo.DISPLAY:
+        responder.ad.log.info('Accepted connect invitation.')
+    elif config.wps_setup == constants.WpsInfo.DISPLAY:
         pin = requester.ad.wifi.wifiP2pGetPinCode(
             responder.p2p_device.device_name
         )
         requester.ad.log.info('p2p connection PIN code: %s', pin)
         responder.ad.wifi.wifiP2pEnterPin(pin, requester.p2p_device.device_name)
-    else:
-        asserts.fail(f'Unsupported WPS configuration: {wps_config}')
-    responder.ad.log.info('Accepted connect invitation.')
+        responder.ad.log.info('Enetered PIN code.')
+    elif config.wps_setup is not None:
+        asserts.fail(f'Unsupported WPS configuration: {config.wps_setup}')
 
     # Check p2p status on requester.
     _wait_connection_notice(requester.broadcast_receiver)
@@ -358,7 +358,6 @@ def p2p_connect(
         'Connected with device %s through wifi p2p.',
         requester.p2p_device.device_address,
     )
-
     logging.info('Established wifi p2p connection.')
 
 
