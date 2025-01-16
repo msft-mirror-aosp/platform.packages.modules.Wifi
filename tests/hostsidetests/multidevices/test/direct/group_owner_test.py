@@ -230,11 +230,12 @@ class GroupOwnerTest(base_test.BaseTestClass):
         )
 
         # Step 6. The client connects the group owner.
-        client.ad.log.info(
-            'Trying to connect the group owner with wps config %s.',
-            wps_config,
+        p2p_config = constants.WifiP2pConfig(
+            device_address=group_owner.p2p_device.device_address,
+            wps_setup=wps_config,
         )
-        p2p_utils.p2p_connect(client, group_owner, wps_config)
+        client.ad.log.info('Trying to connect the group owner with p2p config: %s', p2p_config)
+        p2p_utils.p2p_connect(client, group_owner, p2p_config)
 
         # Step 7. Remove the p2p group on the requester.
         client.ad.log.info('Disconnecting with the group owner.')
