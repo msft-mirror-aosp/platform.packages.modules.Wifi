@@ -267,31 +267,64 @@ class WifiP2pGroup:
     return [cls.from_dict(group) for group in groups]
 
 
-DEFAULT_UPNP_SERVICE_CONF = {
-    'udid': '6859dede-8574-59ab-9332-123456789011',
-    'device': 'urn:schemas-upnp-org:device:MediaRenderer:1',
-    'services': [
-        'urn:schemas-upnp-org:service:AVTransport:1',
-        'urn:schemas-upnp-org:service:ConnectionManager:1',
-    ],
-}
-DEFAULT_EXPECTED_ALL_UPNP_SERVICES = [
-    'uuid:6859dede-8574-59ab-9332-123456789011',
-    'uuid:6859dede-8574-59ab-9332-123456789011::upnp:rootdevice',
-    'uuid:6859dede-8574-59ab-9332-123456789011::urn:schemas-upnp-org:device:MediaRenderer:1',
-    'uuid:6859dede-8574-59ab-9332-123456789011::urn:schemas-upnp-org:service:AVTransport:1',
-    'uuid:6859dede-8574-59ab-9332-123456789011::urn:schemas-upnp-org:service:ConnectionManager:1',
-]
-DEFAULT_IPP_SERVICE_CONF = {
-    'instance_name': 'MyPrinter',
-    'service_type': '_ipp._tcp',
-    'txt_map': {
-        'txtvers': '1',
-        'pdl': 'application/postscript',
-    },
-}
-DEFAULT_AFP_SERVICE_CONF = {
-    'instance_name': 'Example',
-    'service_type': '_afpovertcp._tcp',
-    'txt_map': None,
-}
+class ServiceData:
+    """Constants for Wi-Fi p2p services."""
+
+    # Service configurations.
+    # Configuration for Bonjour IPP local service.
+    DEFAULT_IPP_SERVICE_CONF = {
+        'instance_name': 'MyPrinter',
+        'service_type': '_ipp._tcp',
+        'txt_map': {
+            'txtvers': '1',
+            'pdl': 'application/postscript'
+        },
+    }
+    # Configuration for AFP local service.
+    DEFAULT_AFP_SERVICE_CONF = {
+        'instance_name': 'Example',
+        'service_type': '_afpovertcp._tcp',
+        'txt_map': {},
+    }
+    # Configuration for UPnP MediaRenderer local service.
+    DEFAULT_UPNP_SERVICE_CONF = {
+        'uuid': '6859dede-8574-59ab-9332-123456789011',
+        'device': 'urn:schemas-upnp-org:device:MediaRenderer:1',
+        'services': [
+            'urn:schemas-upnp-org:service:AVTransport:1',
+            'urn:schemas-upnp-org:service:ConnectionManager:1',
+        ],
+    }
+
+    # Expected services to be discovered.
+    ALL_UPNP_SERVICES = [
+        'uuid:6859dede-8574-59ab-9332-123456789011',
+        'uuid:6859dede-8574-59ab-9332-123456789011::upnp:rootdevice',
+        (
+            'uuid:6859dede-8574-59ab-9332-123456789011::urn:schemas-upnp-org:'
+            'device:MediaRenderer:1'
+        ),
+        (
+            'uuid:6859dede-8574-59ab-9332-123456789011::urn:schemas-upnp-org:'
+            'service:AVTransport:1'
+        ),
+        (
+            'uuid:6859dede-8574-59ab-9332-123456789011::urn:schemas-upnp-org:'
+            'service:ConnectionManager:1'
+        ),
+    ]
+    ALL_DNS_SD = [
+        ('MyPrinter', '_ipp._tcp.local.'),
+        ('Example', '_afpovertcp._tcp.local.'),
+    ]
+    ALL_DNS_TXT = [
+        (
+            'myprinter._ipp._tcp.local.',
+            {
+                'txtvers': '1',
+                'pdl': 'application/postscript',
+            },
+        ),
+        ('example._afpovertcp._tcp.local.', {}),
+    ]
+
