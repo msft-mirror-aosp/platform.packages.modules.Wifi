@@ -37,6 +37,25 @@ python_test_host {
 }
 
 python_test_host {
+    name: "WifiAwareCapabilitiesTestCases",
+    main: "wifi_aware_capabilities_test.py",
+    srcs: ["wifi_aware_capabilities_test.py"],
+    device_common_data: [":wifi_aware_snippet_new"],
+    libs: [
+        "aware_lib_utils",
+        "mobly",
+        "wifi_aware_constants",
+    ],
+    test_suites: [
+        "general-tests",
+    ],
+    test_options: {
+        unit_test: false,
+        tags: ["mobly"],
+    },
+}
+
+python_test_host {
     name: "WifiAwareDiscoveryCases",
     main: "wifi_aware_discovery_test.py",
     srcs: ["wifi_aware_discovery_test.py"],
@@ -78,6 +97,25 @@ python_test_host {
     name: "WifiAwareMessageCases",
     main: "wifi_aware_message_test.py",
     srcs: ["wifi_aware_message_test.py"],
+    device_common_data: [":wifi_aware_snippet_new"],
+    libs: [
+        "aware_lib_utils",
+        "mobly",
+        "wifi_aware_constants",
+    ],
+    test_suites: [
+        "general-tests",
+    ],
+    test_options: {
+        unit_test: false,
+        tags: ["mobly"],
+    },
+}
+
+python_test_host {
+    name: "WifiAwareMacRandomTestCases",
+    main: "wifi_aware_mac_random_test.py",
+    srcs: ["wifi_aware_mac_random_test.py"],
     device_common_data: [":wifi_aware_snippet_new"],
     libs: [
         "aware_lib_utils",
