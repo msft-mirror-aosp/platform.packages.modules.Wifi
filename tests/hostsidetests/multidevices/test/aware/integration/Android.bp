@@ -151,6 +151,25 @@ python_test_host {
 }
 
 python_test_host {
+    name: "WifiAwareMultiCountryProtocolsTestCases",
+    main: "wifi_aware_protocols_multi_country_test.py",
+    srcs: ["wifi_aware_protocols_multi_country_test.py"],
+    device_common_data: [":wifi_aware_snippet_new"],
+    libs: [
+        "aware_lib_utils",
+        "mobly",
+        "wifi_aware_constants",
+    ],
+    test_suites: [
+        "general-tests",
+    ],
+    test_options: {
+        unit_test: false,
+        tags: ["mobly"],
+    },
+}
+
+python_test_host {
     name: "WifiAwareDatapathTestCases",
     main: "wifi_aware_datapath_test.py",
     srcs: ["wifi_aware_datapath_test.py"],
