@@ -344,6 +344,22 @@ def reset_device_parameters(ad: android_device.AndroidDevice):
   """
   ad.adb.shell("cmd wifiaware reset")
 
+def aware_cap_str_to_dict(cap_string:str) -> dict:
+    idx = cap_string.find('[maxConcurrentAwareClusters')
+    # Remove the braces from the string.
+    new_string = cap_string[idx:-1].strip('[]')
+    # split the string into key-value pairs
+    pairs = new_string.split(', ')
+    # Converting the values to integer or bool into dictionary
+    capabilities = {}
+    for pair in pairs:
+      key, value = pair.split('=')
+      try:
+          capabilities[key] = int(value)
+      except ValueError:
+          capabilities[key] = bool(value)
+    return capabilities
+
 
 def reset_device_statistics(ad: android_device.AndroidDevice,):
   """Reset device statistics.
@@ -370,6 +386,7 @@ def get_aware_capabilities(ad: android_device.AndroidDevice):
       pairs = aware_cap_str_to_dict(result)
       ad.log.info(pairs)
     return pairs
+
 
 def create_discovery_config(service_name,
                             p_type=None,
@@ -664,6 +681,88 @@ def wait_for_link(
   ad.log.info('type = %s', type(network_callback_event))
   return network_callback_event
 
+
+def _wait_accept_success(
+    pub_accept_handler: callback_handler_v2.CallbackHandlerV2
+) -> None:
+    pub_accept_event = pub_accept_handler.waitAndGet(
+        event_name=constants.SnippetEventNames.SERVER_SOCKET_ACCEPT,
+        timeout=_DEFAULT_TIMEOUT
+    )
+    is_accept = pub_accept_event.data.get(constants.SnippetEventParams.IS_ACCEPT, False)
+    if not is_accept:
+        error = pub_accept_event.data[constants.SnippetEventParams.ERROR]
+        asserts.fail(
+            f'Publisher failed to accept the connection. Error: {error}'
+        )
+
+
+def _send_socket_msg(
+    sender_ad: android_device.AndroidDevice,
+    receiver_ad: android_device.AndroidDevice,
+    msg: str,
+    send_callback_id: str,
+    receiver_callback_id: str,
+):
+    """Sends a message from one device to another and verifies receipt."""
+    is_write_socket = sender_ad.wifi_aware_snippet.connectivityWriteSocket(
+        send_callback_id, msg
+    )
+    asserts.assert_true(
+        is_write_socket,
+        f'{sender_ad} Failed to write data to the socket.'
+    )
+    sender_ad.log.info('Wrote data to the socket.')
+    # Verify received message
+    received_message = receiver_ad.wifi_aware_snippet.connectivityReadSocket(
+        receiver_callback_id, len(msg)
+    )
+    asserts.assert_equal(
+        received_message,
+        msg,
+        f'{receiver_ad} received message mismatched.Failure:Expected {msg} but got '
+        f'{received_message}.'
+    )
+    receiver_ad.log.info('Read data from the socket.')
+
+
+def establish_socket_and_send_msg(
+    publisher: android_device.AndroidDevice,
+    subscriber: android_device.AndroidDevice,
+    pub_accept_handler: callback_handler_v2.CallbackHandlerV2,
+    network_id: str,
+    pub_local_port: int
+):
+    """Handles socket-based communication between publisher and subscriber."""
+    # Init socket
+    # Create a ServerSocket and makes it listen for client connections.
+    subscriber.wifi_aware_snippet.connectivityCreateSocketOverWiFiAware(
+        network_id, pub_local_port
+    )
+    _wait_accept_success(pub_accept_handler)
+    # Subscriber Send socket data
+    subscriber.log.info('Subscriber create a socket.')
+    _send_socket_msg(
+        sender_ad=subscriber,
+        receiver_ad=publisher,
+        msg=constants.WifiAwareTestConstants.MSG_CLIENT_TO_SERVER,
+        send_callback_id=network_id,
+        receiver_callback_id=network_id
+    )
+    _send_socket_msg(
+        sender_ad=publisher,
+        receiver_ad=subscriber,
+        msg=constants.WifiAwareTestConstants.MSG_SERVER_TO_CLIENT,
+        send_callback_id=network_id,
+        receiver_callback_id=network_id
+    )
+    publisher.wifi_aware_snippet.connectivityCloseWrite(network_id)
+    subscriber.wifi_aware_snippet.connectivityCloseWrite(network_id)
+    publisher.wifi_aware_snippet.connectivityCloseRead(network_id)
+    subscriber.wifi_aware_snippet.connectivityCloseRead(network_id)
+    logging.info('Communicated through socket connection of Wi-Fi Aware network successfully.')
+
+
 def run_ping6(dut: android_device.AndroidDevice, peer_ipv6: str):
   """Run a ping6 over the specified device/link.
 
@@ -671,7 +770,7 @@ def run_ping6(dut: android_device.AndroidDevice, peer_ipv6: str):
     dut: Device on which to execute ping6.
     peer_ipv6: Scoped IPv6 address of the peer to ping.
   """
-  cmd = "ping6 -c 3 -W 5 %s" % peer_ipv6
+  cmd = 'ping6 -c 3 -W 5 %s' % peer_ipv6
   try:
     dut.log.info(cmd)
     results = dut.adb.shell(cmd)
