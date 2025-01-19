@@ -24,12 +24,18 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.NetworkInfo;
+import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
 import android.net.wifi.p2p.WifiP2pDeviceList;
 import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pGroupList;
 import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
+import android.net.wifi.p2p.nsd.WifiP2pDnsSdServiceInfo;
+import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
+import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
+import android.net.wifi.p2p.nsd.WifiP2pUpnpServiceInfo;
+import android.net.wifi.p2p.nsd.WifiP2pUpnpServiceRequest;
 import android.os.Bundle;
 import android.widget.Button;
 
@@ -49,9 +55,15 @@ import com.google.android.mobly.snippet.rpc.Rpc;
 import com.google.android.mobly.snippet.rpc.RpcOptional;
 import com.google.android.mobly.snippet.util.Log;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
@@ -61,6 +73,7 @@ import java.util.regex.Pattern;
 
 /** Snippet class for WifiP2pManager. */
 public class WifiP2pManagerSnippet implements Snippet {
+    private static final String TAG = "WifiP2pManagerSnippet";
     private static final int TIMEOUT_SHORT_MS = 10000;
     private static final int UI_ACTION_SHORT_TIMEOUT_MS = 5000;
     private static final int UI_ACTION_LONG_TIMEOUT_MS = 30000;
@@ -70,6 +83,13 @@ public class WifiP2pManagerSnippet implements Snippet {
     private static final String EVENT_KEY_P2P_INFO = "p2pInfo";
     private static final String EVENT_KEY_P2P_GROUP = "p2pGroup";
     private static final String EVENT_KEY_PEER_LIST = "peerList";
+    private static final String EVENT_KEY_SERVICE_LIST = "serviceList";
+    private static final String EVENT_KEY_INSTANCE_NAME = "instanceName";
+    private static final String EVENT_KEY_REGISTRATION_TYPE = "registrationType";
+    private static final String EVENT_KEY_SOURCE_DEVICE = "sourceDevice";
+    private static final String EVENT_KEY_FULL_DOMAIN_NAME = "fullDomainName";
+    private static final String EVENT_KEY_TXT_RECORD_MAP = "txtRecordMap";
+    private static final String EVENT_KEY_TIMESTAMP_MS = "timestampMs";
     private static final String ACTION_LISTENER_ON_SUCCESS = "onSuccess";
     public static final String ACTION_LISTENER_ON_FAILURE = "onFailure";
 
@@ -83,6 +103,9 @@ public class WifiP2pManagerSnippet implements Snippet {
 
     private WifiP2pManager.Channel mChannel = null;
     private WifiP2pStateChangedReceiver mStateChangedReceiver = null;
+
+    private int mServiceRequestCnt = 0;
+    private final Map<Integer, WifiP2pServiceRequest> mServiceRequests;
 
 
     private static class WifiP2pManagerException extends Exception {
@@ -111,6 +134,7 @@ public class WifiP2pManagerSnippet implements Snippet {
         mIntentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
         mIntentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
 
+        mServiceRequests = new HashMap<Integer, WifiP2pServiceRequest>();
     }
 
     /** Register the application with the Wi-Fi framework. */
@@ -152,6 +176,12 @@ public class WifiP2pManagerSnippet implements Snippet {
         verifyActionListenerSucceed(callbackId);
     }
 
+    /** Request peers that are discovered for wifi p2p. */
+    @AsyncRpc(description = "Request peers that are discovered for wifi p2p.")
+    public void wifiP2pRequestPeers(String callbackId) throws Throwable {
+        checkChannel();
+        mP2pManager.requestPeers(mChannel, new PeerListListener(callbackId));
+    }
     /**
      * Cancel any ongoing p2p group negotiation.
      *
@@ -183,17 +213,17 @@ public class WifiP2pManagerSnippet implements Snippet {
      *
      * @throws Throwable If this failed to initiate discovery, or the action timed out.
      */
-    @AsyncRpc(description = "Create a p2p group with the current device as the group owner.")
-    public void wifiP2pCreateGroup(String callbackId, @RpcOptional JSONObject wifiP2pConfig)
+    @Rpc(description = "Create a p2p group with the current device as the group owner.")
+    public void wifiP2pCreateGroup(@RpcOptional JSONObject wifiP2pConfig)
             throws Throwable {
         checkChannel();
+        String callbackId = UUID.randomUUID().toString();
         ActionListener actionListener = new ActionListener(callbackId);
-        if (wifiP2pConfig == null) {
-            mP2pManager.createGroup(mChannel, actionListener);
-        } else {
-            mP2pManager.createGroup(
-                    mChannel, JsonDeserializer.jsonToWifiP2pConfig(wifiP2pConfig), actionListener);
+        WifiP2pConfig config = null;
+        if (wifiP2pConfig != null) {
+            config = JsonDeserializer.jsonToWifiP2pConfig(wifiP2pConfig);
         }
+        mP2pManager.createGroup(mChannel, config, actionListener);
         verifyActionListenerSucceed(callbackId);
     }
 
@@ -352,6 +382,154 @@ public class WifiP2pManagerSnippet implements Snippet {
         return waitActionListenerResult(callbackId);
     }
 
+    /** Register Upnp service as a local Wi-Fi p2p service for service discovery. */
+    @Rpc(description = "Register Upnp service as a local Wi-Fi p2p service for service discovery.")
+    public void wifiP2pAddUpnpLocalService(
+            String uuid,
+            String device,
+            JSONArray services) throws Throwable {
+        checkChannel();
+        List<String> serviceList = new ArrayList<String>();
+        for (int i = 0; i < services.length(); i++) {
+            serviceList.add(services.getString(i));
+            Log.d("wifiP2pAddUpnpLocalService, services: " + services.getString(i));
+        }
+        WifiP2pServiceInfo serviceInfo = WifiP2pUpnpServiceInfo.newInstance(uuid, device,
+                serviceList);
+
+        String callbackId = UUID.randomUUID().toString();
+        mP2pManager.addLocalService(mChannel, serviceInfo,
+                                    new ActionListener(callbackId));
+        verifyActionListenerSucceed(callbackId);
+    }
+
+    /** Register Bonjour service as a local Wi-Fi p2p service for service discovery. */
+    @Rpc(description = "Register Bonjour service as a local Wi-Fi p2p service for service"
+            + " discovery.")
+    public void wifiP2pAddBonjourLocalService(
+            String instanceName,
+            String serviceType,
+            @RpcOptional JSONObject txtMap) throws Throwable {
+        checkChannel();
+        Map<String, String> map = null;
+        if (txtMap != null) {
+            map = new HashMap<String, String>();
+            Iterator<String> keyIterator = txtMap.keys();
+            while (keyIterator.hasNext()) {
+                String key = keyIterator.next();
+                map.put(key, txtMap.getString(key));
+            }
+        }
+        WifiP2pDnsSdServiceInfo serviceInfo = WifiP2pDnsSdServiceInfo.newInstance(instanceName,
+                serviceType, map);
+
+        String callbackId = UUID.randomUUID().toString();
+        mP2pManager.addLocalService(mChannel, serviceInfo, new ActionListener(callbackId));
+        verifyActionListenerSucceed(callbackId);
+    }
+
+    /** Clear all registered local services of service discovery. */
+    @Rpc(description = "Clear all registered local services of service discovery.")
+    public void wifiP2pClearLocalServices() throws Throwable {
+        checkChannel();
+        String callbackId = UUID.randomUUID().toString();
+        mP2pManager.clearLocalServices(mChannel, new ActionListener(callbackId));
+        waitActionListenerResult(callbackId);
+    }
+
+    /** Add a service discovery request. */
+    @Rpc(description = "Add a service discovery request.")
+    public Integer wifiP2pAddServiceRequest(int protocolType) throws Throwable {
+        checkChannel();
+
+        WifiP2pServiceRequest request = WifiP2pServiceRequest.newInstance(protocolType);
+        mServiceRequestCnt += 1;
+        mServiceRequests.put(mServiceRequestCnt, request);
+
+        String callbackId = UUID.randomUUID().toString();
+        mP2pManager.addServiceRequest(mChannel, request, new ActionListener(callbackId));
+        verifyActionListenerSucceed(callbackId);
+        return mServiceRequestCnt;
+    }
+
+    /** "Add a service Upnp discovery request. */
+    @Rpc(description = "Add a service Upnp discovery request.")
+    public Integer wifiP2pAddUpnpServiceRequest() throws Throwable {
+        checkChannel();
+
+        WifiP2pUpnpServiceRequest request = WifiP2pUpnpServiceRequest.newInstance();
+        mServiceRequestCnt += 1;
+        mServiceRequests.put(mServiceRequestCnt, request);
+
+        String callbackId = UUID.randomUUID().toString();
+        mP2pManager.addServiceRequest(mChannel, request, new ActionListener(callbackId));
+        verifyActionListenerSucceed(callbackId);
+        return mServiceRequestCnt;
+    }
+
+    /** Remove a service discovery request. */
+    @Rpc(description = "Remove a service discovery request.")
+    public void wifiP2pRemoveServiceRequest(int index) throws Throwable {
+        checkChannel();
+        String callbackId = UUID.randomUUID().toString();
+        mP2pManager.removeServiceRequest(mChannel, mServiceRequests.remove(index),
+                new ActionListener(callbackId));
+        verifyActionListenerSucceed(callbackId);
+    }
+
+    /** "Clear all registered service discovery requests. */
+    @Rpc(description = "Clear all registered service discovery requests.")
+    public void wifiP2pClearServiceRequests() throws Throwable {
+        checkChannel();
+        String callbackId = UUID.randomUUID().toString();
+        mP2pManager.clearServiceRequests(mChannel, new ActionListener(callbackId));
+        waitActionListenerResult(callbackId);
+    }
+
+    /** Set a callback to be invoked on receiving Upnp service discovery response. */
+    @AsyncRpc(description = "Set a callback to be invoked on receiving Upnp service discovery "
+                + " response.")
+    public void wifiP2pSetUpnpResponseListener(String callbackId) throws WifiP2pManagerException {
+        checkChannel();
+        mP2pManager.setUpnpServiceResponseListener(mChannel,
+                new UpnpServiceResponseListener(callbackId));
+    }
+
+    /** Unset the Upnp service response callback set by `wifiP2pSetUpnpResponseListener`. */
+    @Rpc(description = "Unset the Upnp service response callback set by "
+            + "`wifiP2pSetUpnpResponseListener`.")
+    public void wifiP2pUnsetUpnpResponseListener() throws WifiP2pManagerException {
+        checkChannel();
+        mP2pManager.setUpnpServiceResponseListener(mChannel, null);
+    }
+
+    /** Set a callback to be invoked on receiving Bonjour service discovery response. */
+    @AsyncRpc(description = "Set a callback to be invoked on receiving Bonjour service discovery"
+            + " response.")
+    public void wifiP2pSetDnsSdResponseListeners(String callbackId) throws WifiP2pManagerException {
+        checkChannel();
+        mP2pManager.setDnsSdResponseListeners(mChannel,
+                new DnsSdServiceResponseListener(callbackId),
+                new DnsSdTxtRecordListener(callbackId));
+    }
+
+    /** Unset the Bonjour service response callback set by `wifiP2pSetDnsSdResponseListeners`. */
+    @Rpc(description = "Unset the Bonjour service response callback set by "
+            + "`wifiP2pSetDnsSdResponseListeners`.")
+    public void wifiP2pUnsetDnsSdResponseListeners() throws WifiP2pManagerException {
+        checkChannel();
+        mP2pManager.setDnsSdResponseListeners(mChannel, null, null);
+    }
+
+    /** Initiate service discovery. */
+    @Rpc(description = "Initiate service discovery.")
+    public void wifiP2pDiscoverServices() throws Throwable {
+        checkChannel();
+        String callbackId = UUID.randomUUID().toString();
+        mP2pManager.discoverServices(mChannel, new ActionListener(callbackId));
+        verifyActionListenerSucceed(callbackId);
+    }
+
     /**
      * Close the current P2P connection and indicate to the P2P service that connections created by
      * the app can be removed.
@@ -389,7 +567,8 @@ public class WifiP2pManagerSnippet implements Snippet {
         public void onReceive(Context mContext, Intent intent) {
             String action = intent.getAction();
             SnippetEvent event = new SnippetEvent(mCallbackId, action);
-            String logPrefix = "Got intent: action=" + action + ", ";
+            String logPrefix = TAG + ": WifiP2pStateChangedReceiver: onReceive: Got intent: action="
+                    + action + ", ";
             switch (action) {
                 case WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION:
                     int wifiP2pState = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, 0);
@@ -399,7 +578,7 @@ public class WifiP2pManagerSnippet implements Snippet {
                 case WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION:
                     WifiP2pDeviceList peerList = (WifiP2pDeviceList) intent.getParcelableExtra(
                             WifiP2pManager.EXTRA_P2P_DEVICE_LIST);
-                    Log.d(logPrefix + "p2pPeerList=" + peerList.toString());
+                    Log.d(logPrefix + "p2pPeerList=" + BundleUtils.fromWifiP2pDeviceList(peerList));
                     event.getData().putParcelableArrayList(
                             EVENT_KEY_PEER_LIST, BundleUtils.fromWifiP2pDeviceList(peerList));
                     break;
@@ -468,27 +647,27 @@ public class WifiP2pManagerSnippet implements Snippet {
             if (device == null) {
                 return;
             }
-            Log.d("onDeviceInfoAvailable: " + device.toString());
+            Log.d(TAG + ": onDeviceInfoAvailable: " + device.toString());
             SnippetEvent event = new SnippetEvent(mCallbackId, EVENT_NAME_ON_DEVICE_INFO);
             event.getData().putBundle(EVENT_KEY_P2P_DEVICE, BundleUtils.fromWifiP2pDevice(device));
             EventCache.getInstance().postEvent(event);
         }
     }
 
-    private static class WifiP2pPeerListListener implements WifiP2pManager.PeerListListener {
+    private static class PeerListListener implements WifiP2pManager.PeerListListener {
         private final String mCallbackId;
 
-        WifiP2pPeerListListener(String callbackId) {
+        PeerListListener(String callbackId) {
             this.mCallbackId = callbackId;
         }
 
         @Override
         public void onPeersAvailable(WifiP2pDeviceList newPeers) {
-            Log.d("onPeersAvailable: " + newPeers.getDeviceList());
+            Log.d(TAG + ": onPeersAvailable: " + newPeers.getDeviceList());
             ArrayList<Bundle> devices = BundleUtils.fromWifiP2pDeviceList(newPeers);
             SnippetEvent event = new SnippetEvent(mCallbackId, "WifiP2pOnPeersAvailable");
             event.getData().putParcelableArrayList(EVENT_KEY_PEER_LIST, devices);
-            event.getData().putLong("timestampMs", System.currentTimeMillis());
+            event.getData().putLong(EVENT_KEY_TIMESTAMP_MS, System.currentTimeMillis());
             EventCache.getInstance().postEvent(event);
         }
     }
@@ -503,10 +682,74 @@ public class WifiP2pManagerSnippet implements Snippet {
 
         @Override
         public void onPersistentGroupInfoAvailable(@NonNull WifiP2pGroupList groups) {
-            Log.d("onPersistentGroupInfoAvailable: " + groups.toString());
+            Log.d(TAG + ": onPersistentGroupInfoAvailable: " + groups.toString());
             SnippetEvent event = new SnippetEvent(mCallbackId, "onPersistentGroupInfoAvailable");
             event.getData().putParcelableArrayList(
                     "groupList", BundleUtils.fromWifiP2pGroupList(groups));
+            EventCache.getInstance().postEvent(event);
+        }
+    }
+
+    private static class UpnpServiceResponseListener implements
+            WifiP2pManager.UpnpServiceResponseListener {
+        private final String mCallbackId;
+
+        UpnpServiceResponseListener(String callbackId) {
+            this.mCallbackId = callbackId;
+        }
+
+        @Override
+        public void onUpnpServiceAvailable(List<String> uniqueServiceNames,
+                WifiP2pDevice srcDevice) {
+            Log.d(TAG + ": onUpnpServiceAvailable: service names: " + uniqueServiceNames);
+            SnippetEvent event = new SnippetEvent(mCallbackId, "onUpnpServiceAvailable");
+            event.getData().putBundle(EVENT_KEY_SOURCE_DEVICE,
+                    BundleUtils.fromWifiP2pDevice(srcDevice));
+            event.getData().putStringArrayList(EVENT_KEY_SERVICE_LIST,
+                    new ArrayList(uniqueServiceNames));
+            EventCache.getInstance().postEvent(event);
+        }
+    }
+
+    private static class DnsSdServiceResponseListener implements
+            WifiP2pManager.DnsSdServiceResponseListener {
+        private final String mCallbackId;
+
+        DnsSdServiceResponseListener(String callbackId) {
+            this.mCallbackId = callbackId;
+        }
+
+        @Override
+        public void onDnsSdServiceAvailable(String instanceName, String registrationType,
+                WifiP2pDevice srcDevice) {
+            SnippetEvent event = new SnippetEvent(mCallbackId, "onDnsSdServiceAvailable");
+            event.getData().putString(EVENT_KEY_INSTANCE_NAME, instanceName);
+            event.getData().putString(EVENT_KEY_REGISTRATION_TYPE, registrationType);
+            event.getData().putBundle(EVENT_KEY_SOURCE_DEVICE,
+                    BundleUtils.fromWifiP2pDevice(srcDevice));
+            EventCache.getInstance().postEvent(event);
+        }
+    }
+
+    private static class DnsSdTxtRecordListener implements WifiP2pManager.DnsSdTxtRecordListener {
+        private final String mCallbackId;
+
+        DnsSdTxtRecordListener(String callbackId) {
+            this.mCallbackId = callbackId;
+        }
+
+        @Override
+        public void onDnsSdTxtRecordAvailable(String fullDomainName,
+                Map<String, String> txtRecordMap, WifiP2pDevice srcDevice) {
+            SnippetEvent event = new SnippetEvent(mCallbackId, "onDnsSdTxtRecordAvailable");
+            event.getData().putString(EVENT_KEY_FULL_DOMAIN_NAME, fullDomainName);
+            Bundle txtMap = new Bundle();
+            for (String key : txtRecordMap.keySet()) {
+                txtMap.putString(key, txtRecordMap.get(key));
+            }
+            event.getData().putBundle(EVENT_KEY_TXT_RECORD_MAP, txtMap);
+            event.getData().putBundle(EVENT_KEY_SOURCE_DEVICE,
+                    BundleUtils.fromWifiP2pDevice(srcDevice));
             EventCache.getInstance().postEvent(event);
         }
     }
@@ -545,10 +788,10 @@ public class WifiP2pManagerSnippet implements Snippet {
     private void verifyActionListenerSucceed(String callbackId) throws Throwable {
         Bundle eventData = waitActionListenerResult(callbackId);
         String result = eventData.getString(EVENT_KEY_CALLBACK_NAME);
-        if (result == ACTION_LISTENER_ON_SUCCESS) {
+        if (Objects.equals(ACTION_LISTENER_ON_SUCCESS, result)) {
             return;
         }
-        if (result == ACTION_LISTENER_ON_FAILURE) {
+        if (Objects.equals(ACTION_LISTENER_ON_FAILURE, result)) {
             throw new WifiP2pManagerException(
                     "Action failed with reason code: " + eventData.getInt(EVENT_KEY_REASON)
             );
