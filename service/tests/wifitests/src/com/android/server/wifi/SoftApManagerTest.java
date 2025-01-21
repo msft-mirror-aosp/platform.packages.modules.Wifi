@@ -1698,11 +1698,25 @@ public class SoftApManagerTest extends WifiBaseTest {
         verify(mWifiMetrics).addSoftApNumAssociatedStationsChangedEvent(1, 1,
                 apConfig.getTargetMode(), mTestSoftApInfo);
 
+        mockClientConnectedEvent(TEST_CLIENT_MAC_ADDRESS_2, true, TEST_INTERFACE_NAME, true);
+        mLooper.dispatchAll();
+        order.verify(mCallback).onConnectedClientsOrInfoChanged(mTestSoftApInfoMap,
+                  mTestWifiClientsMap, false);
+        verify(mWifiMetrics).addSoftApNumAssociatedStationsChangedEvent(2, 2,
+                apConfig.getTargetMode(), mTestSoftApInfo);
+
         mSoftApManager.stop();
         mLooper.dispatchAll();
 
         verify(mWifiNative).forceClientDisconnect(TEST_INTERFACE_NAME, TEST_CLIENT_MAC_ADDRESS,
                 SAP_CLIENT_DISCONNECT_REASON_CODE_UNSPECIFIED);
+        verify(mWifiNative).forceClientDisconnect(TEST_INTERFACE_NAME, TEST_CLIENT_MAC_ADDRESS_2,
+                SAP_CLIENT_DISCONNECT_REASON_CODE_UNSPECIFIED);
+
+        verify(mWifiMetrics).writeSoftApStoppedEvent(eq(SoftApManager.STOP_EVENT_STOPPED),
+                any(), anyInt(), anyBoolean(), anyBoolean(), anyBoolean(), anyInt(), anyBoolean(),
+                anyInt(), anyInt(), anyInt(), eq(2), anyBoolean(),
+                anyInt(), anyInt(), any());
     }
 
     @Test
