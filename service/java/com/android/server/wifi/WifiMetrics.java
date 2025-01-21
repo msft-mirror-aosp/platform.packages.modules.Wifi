@@ -7190,8 +7190,14 @@ public class WifiMetrics {
      */
     public int storeCapturedData(int triggerType, boolean isFullCapture,
             long triggerStartTimeMillis, long triggerStopTimeMillis) {
+        Instant bootTime = Instant.now()
+                .minus(Duration.ofMillis(mClock.getElapsedSinceBootMillis()));
         Log.d(TAG, "storeCapturedData: triggerType=" + triggerType
-                + ", isFullCapture=" + isFullCapture);
+                + ", isFullCapture=" + isFullCapture
+                + ", triggerStartTimeMillis=" + triggerStartTimeMillis
+                + ", triggerStartTime=" + bootTime.plus(Duration.ofMillis(triggerStartTimeMillis))
+                + ", triggerStopTimeMillis=" + triggerStopTimeMillis
+                + ", triggerStopTime=" + bootTime.plus(Duration.ofMillis(triggerStopTimeMillis)));
 
         // Validate triggerStartTimeMillis and triggerStopTimeMillis in non full-capture case
         if (!isFullCapture && ((triggerStartTimeMillis < 0 || triggerStopTimeMillis < 0
