@@ -23,6 +23,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.net.NetworkSpecifier;
 import android.net.MacAddress;
 import android.net.wifi.aware.AttachCallback;
 import android.net.wifi.aware.Characteristics;
@@ -47,6 +48,9 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.text.TextUtils;
+import android.util.Base64;
+
 import android.os.RemoteException;
 
 import androidx.annotation.NonNull;
@@ -712,6 +716,48 @@ public class WifiAwareManagerSnippet implements Snippet {
         WifiAwareNetworkSpecifier specifier =
                 WifiAwareJsonDeserializer.jsonToNetworkSpecifier(jsonObject, builder);
         return SerializationUtil.parcelableToString(specifier);
+    }
+
+    /**
+     * Creates a oob NetworkSpecifier for requesting a Wi-Fi Aware network via ConnectivityManager.
+     *
+     * @param sessionId The Id of the AwareSession session,
+     * @param role             The role of this device: AwareDatapath Role.
+     * @param macAddress    The MAC address of the peer's Aware discovery interface.
+     * @return A {@link NetworkSpecifier}  to be used to construct
+     * @throws WifiAwareManagerSnippetException if there is an error creating the network
+     *                                          specifier.
+     */
+    @Rpc(
+            description = "Create a oob network specifier to be used when specifying a Aware "
+                    + "network request"
+    )
+    public NetworkSpecifier createNetworkSpecifierOob(String sessionId, int role, String macAddress,
+        String passphrase, String pmk)
+            throws WifiAwareManagerSnippetException {
+            WifiAwareSession session = getWifiAwareSession(sessionId);
+             NetworkSpecifier specifier = null;
+            byte[] peermac = null;
+            byte[] pmkDecoded = null;
+            if (!TextUtils.isEmpty(pmk)){
+                pmkDecoded = Base64.decode(pmk, Base64.DEFAULT);
+            }
+            if (macAddress != null) {
+                peermac = MacAddress.fromString(macAddress).toByteArray();
+            }
+            if (passphrase != null && !passphrase.isEmpty()) {
+                specifier = session.createNetworkSpecifierPassphrase(role, peermac, passphrase);
+            }
+            else if (pmk != null) {
+                specifier = session.createNetworkSpecifierPmk(role, peermac, pmkDecoded);
+            }
+            else if (peermac != null){
+                specifier = session.createNetworkSpecifierOpen(role, peermac);
+            } else {
+            throw new WifiAwareManagerSnippetException(
+                "At least one of passphrase, or macAddress must be provided.");
+            }
+            return specifier;
     }
 
     @Override
