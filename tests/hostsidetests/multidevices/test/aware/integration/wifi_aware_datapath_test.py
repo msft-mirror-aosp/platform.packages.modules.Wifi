@@ -54,6 +54,11 @@ _TRANSPORT_TYPE_WIFI_AWARE = (
 
 _NETWORK_CB_KEY_NETWORK_SPECIFIER = "network_specifier"
 _NETWORK_CB_LINK_PROPERTIES_CHANGED = constants.NetworkCbName.ON_PROPERTIES_CHANGED
+_NETWORK_CB_KEY_INTERFACE_NAME = "interfaceName"
+
+# Aware Data-Path Constants
+_DATA_PATH_INITIATOR = 0
+_DATA_PATH_RESPONDER = 1
 
 # Publish & Subscribe Config keys.
 _PAYLOAD_SIZE_MIN = 0
@@ -73,7 +78,11 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
     # message ID counter to make sure all uses are unique
     msg_id = 0
 
-    # message ID counter to make sure all uses are unique
+    # number of second to 'reasonably' wait to make sure that devices synchronize
+    # with each other - useful for OOB test cases, where the OOB discovery would
+    # take some time
+    WAIT_FOR_CLUSTER = 5
+
     # configuration parameters used by tests
     ENCR_TYPE_OPEN = 0
     ENCR_TYPE_PASSPHRASE = 1
@@ -582,7 +591,7 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
             _NETWORK_CB_KEY_NETWORK_SPECIFIER in p_net_event_nc,
              "Network specifier leak!")
         asserts.assert_false(
-            _NETWORK_CB_KEY_NETWORK_SPECIFIER in p_net_event_nc,
+            _NETWORK_CB_KEY_NETWORK_SPECIFIER in s_net_event_nc,
              "Network specifier leak!")
 
         #To get ipv6 ip address
@@ -619,8 +628,10 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
                 ' got callback'
                 f' {s_network_callback_LINK.data[_CALLBACK_NAME]}.'
                 )
-        p_aware_if = p_network_callback_LINK.data["interfaceName"]
-        s_aware_if = s_network_callback_LINK.data["interfaceName"]
+        p_aware_if = p_network_callback_LINK.data[
+                                _NETWORK_CB_KEY_INTERFACE_NAME]
+        s_aware_if = s_network_callback_LINK.data[
+                                _NETWORK_CB_KEY_INTERFACE_NAME]
 
         logging.info("Interface names: p=%s, s=%s", p_aware_if,
                       s_aware_if)
@@ -646,6 +657,265 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
             )
         p_dut.wifi_aware_snippet.connectivityUnregisterNetwork(network_id)
         s_dut.wifi_aware_snippet.connectivityUnregisterNetwork(network_id)
+
+
+    def attach_with_identity(self, dut):
+        """Start an Aware session (attach) and wait for confirmation and
+        identity information (mac address).
+
+        Args:
+            dut: Device under test
+        Returns:
+            id: Aware session ID.
+        mac: Discovery MAC address of this device.
+        """
+        handler = dut.wifi_aware_snippet.wifiAwareAttached(True)
+        id = handler.waitAndGet(constants.AttachCallBackMethodType.ATTACHED)
+        even = handler.waitAndGet(constants.AttachCallBackMethodType.ID_CHANGED)
+        mac = even.data["mac"]
+        return id.callback_id, mac
+
+    def request_oob_network(
+        self,
+        ad: android_device.AndroidDevice,
+        aware_session : str,
+        role: int,
+        mac: str,
+        passphrase:str,
+        pmk:str,
+        net_work_request_id: str,
+    ) -> callback_handler_v2.CallbackHandlerV2:
+        """Requests a Wi-Fi Aware network."""
+        network_specifier_parcel = (
+            ad.wifi_aware_snippet.createNetworkSpecifierOob(
+              aware_session, role, mac, passphrase, pmk)
+        )
+        logging.info("network_specifier_parcel: %s", network_specifier_parcel)
+        network_request_dict = constants.NetworkRequest(
+            transport_type=constants.NetworkCapabilities.Transport.TRANSPORT_WIFI_AWARE,
+            network_specifier_parcel=network_specifier_parcel["result"],
+        ).to_dict()
+        logging.info("network_request_dict: %s", network_request_dict)
+        return ad.wifi_aware_snippet.connectivityRequestNetwork(
+            net_work_request_id, network_request_dict, _REQUEST_NETWORK_TIMEOUT_MS
+        )
+
+
+    def run_oob_data_path_test(self,
+                               encr_type,
+                               use_peer_id,
+                               setup_discovery_sessions=False,
+                               expect_failure=False):
+        """Runs the out-of-band data-path tests.
+
+        Args:
+        encr_type: Encryption type, one of ENCR_TYPE_*
+        setup_discovery_sessions: If True also set up a (spurious) discovery
+            session (pub on both sides, sub on Responder side). Validates a corner
+            case.
+        expect_failure: If True then don't expect NDP formation, otherwise expect
+                        NDP setup to succeed.
+        """
+        init_dut = self.ads[0]
+        init_dut.pretty_name = "Initiator"
+        resp_dut = self.ads[1]
+        resp_dut.pretty_name = "Responder"
+        init_id, init_mac = self.attach_with_identity(init_dut)
+        resp_id, resp_mac = self.attach_with_identity(resp_dut)
+        time.sleep(self.WAIT_FOR_CLUSTER)
+        if setup_discovery_sessions:
+            pconfig = autils.create_discovery_config(
+                self.SERVICE_NAME, p_type =_PUBLISH_TYPE_UNSOLICITED,
+                s_type = None)
+            init_disc_id = init_dut.wifi_aware_snippet.wifiAwarePublish(
+                init_id, pconfig
+                    )
+            logging.info('Created the DUT publish session %s', init_disc_id)
+            init_discovery = init_disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+            init_name = init_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+                init_name,
+                f'{init_dut} DUT publish failed, got callback: {init_name}.',
+                )
+
+            resp_disc_id = resp_dut.wifi_aware_snippet.wifiAwarePublish(
+                resp_id, pconfig
+                    )
+            logging.info('Created the DUT publish session %s', resp_disc_id)
+            resp_discovery = resp_disc_id.waitAndGet(
+                constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT)
+            resp_name = resp_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.PUBLISH_STARTED,
+                resp_name,
+                f'{resp_dut} DUT publish failed, got callback: {resp_name}.',
+                )
+            sconfig = autils.create_discovery_config(
+                self.SERVICE_NAME, p_type =None, s_type =_SUBSCRIBE_TYPE_PASSIVE)
+            resp_disc_id = resp_dut.wifi_aware_snippet.wifiAwareSubscribe(
+                resp_id, sconfig
+                    )
+            resp_dut.log.info('Created the DUT subscribe session.: %s',
+            resp_disc_id)
+            resp_discovery = resp_disc_id.waitAndGet(
+                    constants.DiscoverySessionCallbackMethodType.DISCOVER_RESULT,
+                    timeout=_DEFAULT_TIMEOUT)
+            resp_name = resp_discovery.data[_CALLBACK_NAME]
+            asserts.assert_equal(
+                constants.DiscoverySessionCallbackMethodType.SUBSCRIBE_STARTED,
+                resp_name,
+                f'{resp_dut} DUT subscribe failed, got callback: {resp_name}.',
+                )
+            discovered_event = resp_disc_id.waitAndGet(
+            constants.DiscoverySessionCallbackMethodType.SERVICE_DISCOVERED)
+        passphrase = None
+        pmk = None
+        if encr_type == self.ENCR_TYPE_PASSPHRASE:
+            passphrase = self.PASSPHRASE
+        elif encr_type == self.ENCR_TYPE_PMK:
+            pmk = self.PMK
+
+        # Responder: request network
+        init_dut_accept_handler =(
+            init_dut.wifi_aware_snippet.connectivityServerSocketAccept())
+        network_id = init_dut_accept_handler.callback_id
+        init_local_port = init_dut_accept_handler.ret_value
+        resp_req_key = self.request_oob_network(
+            resp_dut,
+            resp_id,
+            _DATA_PATH_RESPONDER,
+            init_mac if use_peer_id else None,
+            passphrase,
+            pmk,
+            network_id
+            )
+
+        # Initiator: request network
+        init_req_key = self.request_oob_network(
+            init_dut,
+            init_id,
+            _DATA_PATH_INITIATOR,
+            resp_mac,
+            passphrase,
+            pmk,
+            network_id
+            )
+        init_callback_event = init_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+        init_name = init_callback_event.data[_CALLBACK_NAME]
+        resp_callback_event = resp_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+        resp_name = resp_callback_event.data[_CALLBACK_NAME]
+
+        if expect_failure:
+            asserts.assert_equal(
+                init_name, constants.NetworkCbName.ON_UNAVAILABLE,
+                f'{init_dut} failed to request the network, got callback'
+                f' {init_name}.'
+                )
+            asserts.assert_equal(
+                resp_name, constants.NetworkCbName.ON_UNAVAILABLE,
+                f'{resp_dut} failed to request the network, got callback'
+                f' {resp_name}.'
+                )
+        else:
+            # # Publisher & Subscriber: wait for network formation
+            asserts.assert_equal(
+                init_name, constants.NetworkCbName.ON_CAPABILITIES_CHANGED,
+                f'{init_dut} succeeded to request the network, got callback'
+                f' {init_name}.'
+                )
+            network = init_callback_event.data[
+                constants.NetworkCbEventKey.NETWORK]
+            network_capabilities = init_callback_event.data[
+                constants.NetworkCbEventKey.NETWORK_CAPABILITIES]
+            asserts.assert_true(
+                network and network_capabilities,
+                f'{init_dut} received a null Network or NetworkCapabilities!?.'
+            )
+            asserts.assert_equal(
+                resp_name, constants.NetworkCbName.ON_CAPABILITIES_CHANGED,
+                f'{resp_dut} succeeded to request the network, got callback'
+                f' {resp_name}.'
+                )
+            network = resp_callback_event.data[
+                constants.NetworkCbEventKey.NETWORK]
+            network_capabilities = resp_callback_event.data[
+                constants.NetworkCbEventKey.NETWORK_CAPABILITIES]
+            asserts.assert_true(
+                network and network_capabilities,
+                f'{resp_dut} received a null Network or NetworkCapabilities!?.'
+            )
+            init_net_event_nc = init_callback_event.data
+            resp_net_event_nc = resp_callback_event.data
+            # validate no leak of information
+            asserts.assert_false(
+                _NETWORK_CB_KEY_NETWORK_SPECIFIER in init_net_event_nc,
+                "Network specifier leak!")
+            asserts.assert_false(
+                _NETWORK_CB_KEY_NETWORK_SPECIFIER in resp_net_event_nc,
+                "Network specifier leak!")
+
+            #To get ipv6 ip address
+            resp_ipv6= init_net_event_nc[constants.NetworkCbName.NET_CAP_IPV6]
+            init_ipv6 = resp_net_event_nc[constants.NetworkCbName.NET_CAP_IPV6]
+            # note that Pub <-> Sub since IPv6 are of peer's!
+            init_callback_LINK = init_req_key.waitAndGet(
+                    event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                    timeout=_DEFAULT_TIMEOUT,
+                )
+            asserts.assert_equal(
+                    init_callback_LINK.data[_CALLBACK_NAME],
+                    _NETWORK_CB_LINK_PROPERTIES_CHANGED,
+                    f'{init_dut} succeeded to request the'+
+                    ' LinkPropertiesChanged, got callback'
+                    f' {init_callback_LINK.data[_CALLBACK_NAME]}.'
+                    )
+
+            resp_callback_LINK = resp_req_key.waitAndGet(
+                    event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                    timeout=_DEFAULT_TIMEOUT,
+                )
+            asserts.assert_equal(
+                    resp_callback_LINK.data[_CALLBACK_NAME],
+                    _NETWORK_CB_LINK_PROPERTIES_CHANGED,
+                    f'{resp_dut} succeeded to request the'+
+                    'LinkPropertiesChanged, got callback'
+                    f' {resp_callback_LINK.data[_CALLBACK_NAME]}.'
+                    )
+            init_aware_if = init_callback_LINK.data["interfaceName"]
+            resp_aware_if = resp_callback_LINK.data["interfaceName"]
+
+            logging.info("Interface names: p=%s, s=%s", init_aware_if,
+                        resp_aware_if)
+            logging.info("Interface addresses (IPv6): p=%s, s=%s", init_ipv6,
+                        resp_ipv6)
+            self._establish_socket_and_send_msg(
+                pub_accept_handler=init_dut_accept_handler,
+                network_id=network_id,
+                pub_local_port=init_local_port
+                )
+
+            # terminate sessions and wait for ON_LOST callbacks
+            init_dut.wifi_aware_snippet.wifiAwareDetach(init_id)
+            resp_dut.wifi_aware_snippet.wifiAwareDetach(resp_id)
+            time.sleep(self.WAIT_FOR_CLUSTER)
+            init_callback_lost = init_req_key.waitAndGet(
+                    event_name=constants.NetworkCbEventName.NETWORK_CB_LOST,
+                    timeout=_DEFAULT_TIMEOUT,
+                )
+            resp_callback_lost = resp_req_key.waitAndGet(
+                    event_name=constants.NetworkCbEventName.NETWORK_CB_LOST,
+                    timeout=_DEFAULT_TIMEOUT,
+                )
+        init_dut.wifi_aware_snippet.connectivityUnregisterNetwork(init_callback_event.callback_id)
+        resp_dut.wifi_aware_snippet.connectivityUnregisterNetwork(resp_callback_event.callback_id)
 
 
     #######################################
@@ -908,6 +1178,58 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
             encr_type=self.ENCR_TYPE_PASSPHRASE,
             use_peer_id=False,
             passphrase_to_use=self.PASSPHRASE_MAX)
+
+
+    #######################################
+    # Positive Out-of-Band (OOB) tests key:
+    #
+    # names is: test_oob_<encr_type>_<peer_spec>
+    # where:
+    #
+    # encr_type: Encryption type: open, passphrase
+    # peer_spec: Peer specification method: any or specific
+    #
+    # Optionally set up an extra discovery session to test coexistence. If so
+    # add "ib_coex" to test name.
+    #
+    # Note: Out-of-Band means using a non-Wi-Fi Aware mechanism for discovery
+    # and exchange of MAC addresses and then Wi-Fi Aware for data-path.
+    #######################################
+
+    def test_oob_open_specific(self):
+        """Data-path: out-of-band, open encryption, specific peer
+
+    Verifies end-to-end discovery + data-path creation.
+    """
+        self.run_oob_data_path_test(
+            encr_type=self.ENCR_TYPE_OPEN, use_peer_id=True)
+
+    def test_oob_passphrase_specific(self):
+        """Data-path: out-of-band, passphrase, specific peer
+
+    Verifies end-to-end discovery + data-path creation.
+    """
+        self.run_oob_data_path_test(
+            encr_type=self.ENCR_TYPE_PASSPHRASE, use_peer_id=True)
+
+    def test_oob_pmk_specific(self):
+        """Data-path: out-of-band, PMK, specific peer
+
+    Verifies end-to-end discovery + data-path creation.
+    """
+        self.run_oob_data_path_test(
+            encr_type=self.ENCR_TYPE_PMK, use_peer_id=True)
+
+    def test_oob_ib_coex_open_specific(self):
+        """Data-path: out-of-band, open encryption, specific peer - in-band coex:
+    set up a concurrent discovery session to verify no impact. The session
+    consists of Publisher on both ends, and a Subscriber on the Responder.
+
+    Verifies end-to-end discovery + data-path creation.
+    """
+        self.run_oob_data_path_test(
+            encr_type=self.ENCR_TYPE_OPEN,
+            setup_discovery_sessions=True , use_peer_id=True)
 
 
 if __name__ == '__main__':
