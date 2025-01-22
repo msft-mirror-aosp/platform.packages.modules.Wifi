@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 # Lint as: python3
-"""Test cases that p2p client connects to the group owner with WPS."""
+"""Test cases for p2p service discovery and group connection."""
 
 from collections.abc import Sequence
 import dataclasses
@@ -34,7 +34,7 @@ import wifi_test_utils
 
 
 class GroupOwnerTest(base_test.BaseTestClass):
-    """Test cases that p2p client connects to the group owner with WPS."""
+    """Test cases for p2p service discovery and group connection."""
 
     ads: Sequence[android_device.AndroidDevice]
     group_owner_ad: android_device.AndroidDevice
@@ -73,8 +73,8 @@ class GroupOwnerTest(base_test.BaseTestClass):
           1. Initialize Wi-Fi p2p on both group owner and client.
           2. Add p2p local services on the group owner.
           3. Create a p2p group on the group owner.
-          4. Initiate p2p service discovery on the client. Verify that the
-             client discovers expected p2p services.
+          4. Add UPnP service request and initiate p2p service discovery on
+             the client. Verify that the client only discovers UPnP services.
           5. Initiate p2p device discovery on the client. Verify that the client
              discovers the group owner.
           6. The client connects the group owner with WPS PBC (push button
@@ -83,28 +83,20 @@ class GroupOwnerTest(base_test.BaseTestClass):
           7. Remove the p2p group on the requester. Verify both devices show
              connection stopped status.
         """
-        # Initialize wifi p2p.
+        # Step 1. Initialize Wi-Fi p2p on both group owner and client.
         logging.info('Initializing Wi-Fi p2p.')
         group_owner = p2p_utils.setup_wifi_p2p(self.group_owner_ad)
         client = p2p_utils.setup_wifi_p2p(self.client_ad)
 
-        # Create local service on group owner.
-        group_owner.ad.log.debug('Setting up p2p local services.')
-        p2p_utils.add_upnp_local_service(
-            group_owner, constants.DEFAULT_UPNP_SERVICE_CONF
-        )
-        p2p_utils.add_bonjour_local_service(
-            group_owner, constants.DEFAULT_IPP_SERVICE_CONF
-        )
-        p2p_utils.add_bonjour_local_service(
-            group_owner, constants.DEFAULT_AFP_SERVICE_CONF
-        )
+        # Step 2. Add p2p local services on the group owner.
+        self._add_local_services(group_owner)
 
-        # Create p2p group.
+        # Step 3. Create a p2p group on the group owner.
         group_owner.ad.log.debug('Creating a p2p group.')
         p2p_utils.create_group(group_owner, config=None)
 
-        # Initiate service discovery.
+        # Step 4. Add UPnP service request and initiate p2p service discovery on
+        # the client.
         client.ad.log.info('Searching for target p2p services.')
         # Only add UPnP service request.
         client.ad.wifi.wifiP2pAddUpnpServiceRequest()
@@ -112,11 +104,11 @@ class GroupOwnerTest(base_test.BaseTestClass):
         p2p_utils.set_dns_sd_response_listeners(client)
         client.ad.wifi.wifiP2pDiscoverServices()
 
-        # Client should discover Upnp service, but not Bonjour service.
+        # Client should only discover Upnp services, but not Bonjour services.
         group_owner_address = group_owner.p2p_device.device_address
         p2p_utils.check_discovered_upnp_services(
             client,
-            expected_services=constants.DEFAULT_EXPECTED_ALL_UPNP_SERVICES,
+            expected_services=constants.ServiceData.ALL_UPNP_SERVICES,
             expected_src_device_address=group_owner_address,
         )
         p2p_utils.check_discovered_dns_sd_response(
@@ -130,26 +122,128 @@ class GroupOwnerTest(base_test.BaseTestClass):
             expected_src_device_address=group_owner_address,
         )
 
+        # Step 5 - 7. Verify that the client can join the group with WPS PBC.
+        self._test_join_group(
+            client,
+            group_owner,
+            constants.WpsInfo.PBC,
+        )
+
+    @ApiTest([
+        'android.net.wifi.p2p.WifiP2pManager#createGroup(android.net.wifi.p2p.WifiP2pManager.Channel, android.net.wifi.p2p.WifiP2pConfig, android.net.wifi.p2p.WifiP2pManager.ActionListener)',
+        'android.net.wifi.p2p.WifiP2pManager#removeGroup(android.net.wifi.p2p.WifiP2pManager.Channel, android.net.wifi.p2p.WifiP2pManager.ActionListener)',
+    ])
+    def test_connect_with_pin_code(self) -> None:
+        """Test p2p client connects to the group owner with WPS DISPLAY.
+
+        Steps:
+        1. Initialize Wi-Fi p2p on both group owner and client.
+        2. Add p2p local services on the group owner.
+        3. Create a p2p group on the group owner.
+        4. Perform p2p service discovery on the client. Add Bonjour service
+           request to one p2p channel and initiate p2p service discovery on
+           another p2p channel. Verify that the client only discovers Bounjour
+           p2p services.
+        5. Initiate p2p device discovery on the client. Verify that the client
+           discovers the group owner.
+        6. The client connects the group owner with WPS PIN code. Verify both
+           devices show connection established status.
+        7. Remove the p2p group on the requester. Verify both devices show
+           connection stopped status.
+        """
+        # Step 1. Initialize Wi-Fi p2p on both group owner and client.
+        logging.info('Initializing Wi-Fi p2p.')
+        group_owner = p2p_utils.setup_wifi_p2p(self.group_owner_ad)
+        client = p2p_utils.setup_wifi_p2p(self.client_ad)
+
+        # Step 2. Add p2p local services on the group owner.
+        self._add_local_services(group_owner)
+
+        # Step 3. Create a p2p group on the group owner.
+        group_owner.ad.log.debug('Creating a p2p group.')
+        p2p_utils.create_group(group_owner, config=None)
+
+        # Step 4. Perform p2p service discovery on the client.
+        client.ad.log.info('Searching for target p2p services.')
+        # Initialize an extra p2p channel.
+        sub_channel_id = client.ad.wifi.wifiP2pInitExtraChannel()
+        client.ad.wifi.wifiP2pAddBonjourServiceRequest(sub_channel_id)
+        p2p_utils.set_upnp_response_listener(client, sub_channel_id)
+        p2p_utils.set_dns_sd_response_listeners(client, sub_channel_id)
+        # Discover services on the default p2p channel.
+        client.ad.wifi.wifiP2pDiscoverServices()
+
+        # Client should only discover Bonjour services, but not UPnP services.
+        group_owner_address = group_owner.p2p_device.device_address
+        p2p_utils.check_discovered_dns_sd_response(
+            client,
+            expected_responses=constants.ServiceData.ALL_DNS_SD,
+            expected_src_device_address=group_owner_address,
+        )
+        p2p_utils.check_discovered_dns_sd_txt_record(
+            client,
+            expected_records=constants.ServiceData.ALL_DNS_TXT,
+            expected_src_device_address=group_owner_address,
+        )
+        p2p_utils.check_discovered_upnp_services(
+            client,
+            expected_services=[],
+            expected_src_device_address=group_owner_address,
+        )
+
+        # Step 5 - 7. Verify that the client can join the group with WPS PIN.
+        self._test_join_group(
+            client,
+            group_owner,
+            constants.WpsInfo.DISPLAY,
+        )
+
+    def _add_local_services(self, device: p2p_utils.DeviceState) -> None:
+        """Adds local services on the given device."""
+        device.ad.log.debug('Setting up p2p local services.')
+        # Add local services on group owner.
+        p2p_utils.add_upnp_local_service(
+            device, constants.ServiceData.DEFAULT_UPNP_SERVICE_CONF
+        )
+        p2p_utils.add_bonjour_local_service(
+            device, constants.ServiceData.DEFAULT_IPP_SERVICE_CONF
+        )
+        p2p_utils.add_bonjour_local_service(
+            device, constants.ServiceData.DEFAULT_AFP_SERVICE_CONF
+        )
+
+    def _test_join_group(
+        self,
+        client: p2p_utils.DeviceState,
+        group_owner: p2p_utils.DeviceState,
+        wps_config: constants.WpsInfo,
+    ):
+        # Step 5. Initiate p2p device discovery on the client.
         client.ad.log.info('Searching for the target group owner.')
         peer_p2p_device = p2p_utils.discover_group_owner(
-            client=client, group_owner_address=group_owner_address
+            client=client,
+            group_owner_address=group_owner.p2p_device.device_address,
         )
         asserts.assert_true(
             peer_p2p_device.is_group_owner,
             f'P2p device {peer_p2p_device} should be group owner.',
         )
 
-        # Connect to group.
-        client.ad.log.info('Trying to connect the group owner with WPS PBC.')
-        p2p_utils.p2p_connect(client, group_owner, constants.WpsInfo.PBC)
+        # Step 6. The client connects the group owner.
+        p2p_config = constants.WifiP2pConfig(
+            device_address=group_owner.p2p_device.device_address,
+            wps_setup=wps_config,
+        )
+        client.ad.log.info('Trying to connect the group owner with p2p config: %s', p2p_config)
+        p2p_utils.p2p_connect(client, group_owner, p2p_config)
 
-        # Disconnect to group.
+        # Step 7. Remove the p2p group on the requester.
         client.ad.log.info('Disconnecting with the group owner.')
         p2p_utils.remove_group_and_verify_disconnected(
             client, group_owner, is_group_negotiation=False
         )
 
-    def _teardown_wifi_p2p(self, ad: android_device.AndroidDevice):
+    def _teardown_wifi_p2p(self, ad: android_device.AndroidDevice) -> None:
         p2p_utils.reset_p2p_service_state(ad)
         p2p_utils.teardown_wifi_p2p(ad)
 
@@ -157,7 +251,7 @@ class GroupOwnerTest(base_test.BaseTestClass):
         utils.concurrent_exec(
             self._teardown_wifi_p2p,
             param_list=[[ad] for ad in self.ads],
-            raise_on_exception=False,
+            raise_on_exception=True,
         )
         self.client_ad.services.create_output_excerpts_all(
             self.current_test_info
