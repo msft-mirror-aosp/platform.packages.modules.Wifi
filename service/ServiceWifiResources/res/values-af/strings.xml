@@ -48,8 +48,8 @@
     <string name="wifi_watchdog_network_disabled" msgid="5769226742956006362">"Kon nie aan Wi-Fikoppel nie"</string>
     <string name="wifi_watchdog_network_disabled_detailed" msgid="1725243835135539125">" het \'n swak internetverbinding."</string>
     <string name="wifi_connect_alert_title" msgid="2368200646665663612">"Laat verbinding toe?"</string>
-    <string name="wifi_connect_alert_message" msgid="7226456300982080746">"Program %1$s wil aan Wi-Fi-netwerk %2$s koppel"</string>
-    <string name="wifi_connect_default_application" msgid="8917703737222707062">"\'n Program"</string>
+    <string name="wifi_connect_alert_message" msgid="7226456300982080746">"App %1$s wil aan wi-fi-netwerk %2$s koppel"</string>
+    <string name="wifi_connect_default_application" msgid="8917703737222707062">"\'n App"</string>
     <string name="accept" msgid="8346431649376483879">"Aanvaar"</string>
     <string name="decline" msgid="4172251727603762084">"Weier"</string>
     <string name="ok" msgid="847575529546290102">"OK"</string>
