@@ -189,6 +189,22 @@ class RangingResultCb(enum.StrEnum):
     DATA_KEY_RESULT_RSSI = 'rssi'
     DATA_KEY_PEER_ID = 'peerId'
     DATA_KEY_MAC = 'mac'
+    DATA_KEY_DISTANCE_STD_DEV_MM = 'distanceStdDevMm'
+    DATA_KEY_NUM_ATTEMPTED_MEASUREMENTS = 'numAttemptedMeasurements'
+    DATA_KEY_NUM_SUCCESSFUL_MEASUREMENTS = 'numSuccessfulMeasurements'
+    DATA_KEY_LCI = 'lci'
+    DATA_KEY_LCR = 'lcr'
+    DATA_KEY_TIMESTAMP = 'timestamp'
+    DATA_KEY_MAC_AS_STRING = 'macAsString'
+
+
+@enum.unique
+class RangingStatusCb(enum.IntEnum):
+    """Constant for handling RTT status."""
+
+    EVENT_CB_RANGING_STATUS_SUCCESS = 0
+    EVENT_CB_RANGING_STATUS_FAIL = 1
+    EVENT_CB_RANGING_STATUS_RESPONDER_DOES_NOT_SUPPORT_IEEE80211MC = 2
 
 
 @enum.unique
