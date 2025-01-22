@@ -64,10 +64,10 @@ python_test_host {
     defaults: ["CtsWifiMultiDevicePythonDefaults"],
 }
 
-// TODO: Rename this to CtsWifiAwareTestCases when adding the CTS tag.
 python_test_host {
-    name: "WifiAwareManagerTestCases",
+    name: "CtsWifiAwareTests",
     main: "aware/cts_wifi_aware_test_suite.py",
+    test_config: "aware/AndroidTestNew.xml",
     srcs: [
         "aware/cts_wifi_aware_test_suite.py",
         "aware/wifi_aware_network_test.py",
@@ -84,9 +84,12 @@ python_test_host {
     device_common_data: [":wifi_mobly_snippet"],
     test_options: {
         unit_test: false,
-        tags: ["mobly"],
+        runner: "mobly",
     },
-    test_suites: ["general-tests"],
+    test_suites: [
+        "general-tests",
+        "cts-v-host",
+    ],
     version: {
         py3: {
             embedded_launcher: true,
@@ -130,7 +133,7 @@ python_test_host {
 }
 
 python_test_host {
-    name: "CtsWifiDirectTestCases",
+    name: "CtsWifiDirectTests",
     main: "direct/cts_wifi_direct_test_suite.py",
     srcs: [
         "direct/group_owner_negotiation_test.py",
@@ -138,6 +141,7 @@ python_test_host {
         "direct/group_owner_with_config_test.py",
         "direct/cts_wifi_direct_test_suite.py",
     ],
+    test_config: "direct/AndroidTest.xml",
     libs: [
         "mobly",
         "wifi_direct_constants",
@@ -148,9 +152,12 @@ python_test_host {
     device_common_data: [":wifi_mobly_snippet"],
     test_options: {
         unit_test: false,
-        tags: ["mobly"],
+        runner: "mobly",
     },
-    test_suites: ["general-tests"],
+    test_suites: [
+        "general-tests",
+        "cts-v-host",
+    ],
     version: {
         py3: {
             embedded_launcher: true,
