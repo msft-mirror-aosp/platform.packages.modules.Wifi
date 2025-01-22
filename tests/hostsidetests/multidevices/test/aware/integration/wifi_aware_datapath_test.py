@@ -53,8 +53,11 @@ _TRANSPORT_TYPE_WIFI_AWARE = (
 )
 
 _NETWORK_CB_KEY_NETWORK_SPECIFIER = "network_specifier"
+
 _NETWORK_CB_LINK_PROPERTIES_CHANGED = constants.NetworkCbName.ON_PROPERTIES_CHANGED
 _NETWORK_CB_KEY_INTERFACE_NAME = "interfaceName"
+_CAP_MAX_NDI_INTERFACES = "maxNdiInterfaces"
+
 
 # Aware Data-Path Constants
 _DATA_PATH_INITIATOR = 0
@@ -889,8 +892,10 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
                     'LinkPropertiesChanged, got callback'
                     f' {resp_callback_LINK.data[_CALLBACK_NAME]}.'
                     )
-            init_aware_if = init_callback_LINK.data["interfaceName"]
-            resp_aware_if = resp_callback_LINK.data["interfaceName"]
+            init_aware_if = init_callback_LINK.data[
+                _NETWORK_CB_KEY_INTERFACE_NAME]
+            resp_aware_if = resp_callback_LINK.data[
+                _NETWORK_CB_KEY_INTERFACE_NAME]
 
             logging.info("Interface names: p=%s, s=%s", init_aware_if,
                         resp_aware_if)
@@ -917,6 +922,20 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
         init_dut.wifi_aware_snippet.connectivityUnregisterNetwork(init_callback_event.callback_id)
         resp_dut.wifi_aware_snippet.connectivityUnregisterNetwork(resp_callback_event.callback_id)
 
+    def get_ipv6_addr(self, device, interface):
+        """Get the IPv6 address of the specified interface. Uses ifconfig and parses
+        its output. Returns a None if the interface does not have an IPv6 address
+        (indicating it is not UP).
+
+        Args:
+            device: Device on which to query the interface IPv6 address.
+            interface: Name of the interface for which to obtain the IPv6 address.
+        """
+        out = device.adb.shell("ifconfig %s" % interface)
+        res = re.search(r"inet6 addr: (.*?)/64", str(out))
+        if not res:
+            return None
+        return res.group(1)
 
     #######################################
     # Positive In-Band (IB) tests key:
@@ -1231,6 +1250,378 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
             encr_type=self.ENCR_TYPE_OPEN,
             setup_discovery_sessions=True , use_peer_id=True)
 
+    def test_multiple_identical_networks(self):
+        """Validate that creating multiple networks between 2 devices, each network
+        with identical configuration is supported over a single NDP.
+
+        Verify that the interface and IPv6 address is the same for all networks.
+        """
+        init_dut = self.ads[0]
+        init_dut.pretty_name = "Initiator"
+        resp_dut = self.ads[1]
+        resp_dut.pretty_name = "Responder"
+        N = 2  # first iteration (must be 2 to give us a chance to cancel the first)
+        M = 5  # second iteration
+
+        init_ids = []
+        resp_ids = []
+
+        # Initiator+Responder: attach and wait for confirmation & identity
+        # create N+M sessions to be used in the different (but identical) NDPs
+        for i in range(N + M):
+            id, init_mac = self.attach_with_identity(init_dut)
+            init_ids.append(id)
+            id, resp_mac = self.attach_with_identity(resp_dut)
+            resp_ids.append(id)
+
+        # wait for devices to synchronize with each other - there are no other
+        # mechanisms to make sure this happens for OOB discovery (except retrying
+        # to execute the data-path request)
+        time.sleep(self.WAIT_FOR_CLUSTER)
+
+        resp_req_keys = []
+        init_req_keys = []
+        resp_aware_ifs = []
+        init_aware_ifs = []
+        resp_aware_ipv6 = []
+        init_aware_ipv6 = []
+        init_dut_accept_handler = (
+            init_dut.wifi_aware_snippet.connectivityServerSocketAccept())
+        network_id = init_dut_accept_handler.callback_id
+        for i in range(N):
+            init_req_key = self.request_oob_network(
+                init_dut,
+                init_ids[i],
+                _DATA_PATH_INITIATOR,
+                resp_mac,
+                None,
+                None,
+                network_id
+                )
+            init_req_keys.append(init_req_key)
+            resp_ini_key = self.request_oob_network(
+                resp_dut,
+                resp_ids[i],
+                _DATA_PATH_RESPONDER,
+                init_mac,
+                None,
+                None,
+                network_id
+                )
+            resp_req_keys.append(resp_ini_key)
+            self.wait_for_request_responses(init_dut, init_req_keys[i],
+             init_aware_ifs, resp_aware_ipv6)
+            self.wait_for_request_responses(resp_dut,
+             resp_req_keys[i], resp_aware_ifs, init_aware_ipv6)
+        for i in range(M):
+            init_req_key = self.request_oob_network(
+                init_dut,
+                init_ids[N + i],
+                _DATA_PATH_INITIATOR,
+                resp_mac,
+                None,
+                None,
+                network_id
+                )
+            init_req_keys.append(init_req_key)
+            resp_ini_key = self.request_oob_network(
+                resp_dut,
+                resp_ids[N + i],
+                _DATA_PATH_RESPONDER,
+                init_mac,
+                None,
+                None,
+                network_id
+                )
+            resp_req_keys.append(resp_ini_key)
+            self.wait_for_request_responses(init_dut, init_req_keys[i],
+             init_aware_ifs, resp_aware_ipv6)
+            self.wait_for_request_responses(resp_dut, resp_req_keys[i],
+             resp_aware_ifs, init_aware_ipv6)
+        # determine whether all interfaces and ipv6 addresses are identical
+        # (single NDP)
+        init_aware_ifs = list(set(init_aware_ifs))
+        resp_aware_ifs = list(set(resp_aware_ifs))
+        init_aware_ipv6 = list(set(init_aware_ipv6))
+        resp_aware_ipv6 = list(set(resp_aware_ipv6))
+        logging.info("Interface names: I=%s, R=%s", init_aware_ifs, resp_aware_ifs)
+        logging.info("Interface IPv6: I=%s, R=%s", init_aware_ipv6, resp_aware_ipv6)
+        logging.info("Initiator requests: %s", init_req_keys)
+        logging.info("Responder requests: %s", resp_req_keys)
+        asserts.assert_equal(
+            len(init_aware_ifs), 1, "Multiple initiator interfaces")
+        asserts.assert_equal(
+            len(resp_aware_ifs), 1, "Multiple responder interfaces")
+        asserts.assert_equal(
+            len(init_aware_ipv6), 1, "Multiple initiator IPv6 addresses")
+        asserts.assert_equal(
+            len(resp_aware_ipv6), 1, "Multiple responder IPv6 addresses")
+
+        if init_dut.is_adb_root:
+            for i in range(
+                autils.get_aware_capabilities(init_dut)[_CAP_MAX_NDI_INTERFACES]):
+                if_name = "%s%d" %("aware_data",i)
+                init_ipv6 = self.get_ipv6_addr(init_dut, if_name)
+                resp_ipv6 = self.get_ipv6_addr(resp_dut, if_name)
+                asserts.assert_equal(
+                    init_ipv6 is None, if_name not in init_aware_ifs,
+                    "Initiator interface %s in unexpected state" % if_name)
+                asserts.assert_equal(
+                    resp_ipv6 is None, if_name not in resp_aware_ifs,
+                    "Responder interface %s in unexpected state" % if_name)
+        for resp_req_key in resp_req_keys:
+            resp_req_callback_event = resp_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            resp_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
+                resp_req_callback_event.callback_id)
+        for init_req_key in init_req_keys:
+            init_req_callback_event = init_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+            init_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
+                init_req_callback_event.callback_id)
+
+    def test_identical_network_from_both_sides(self):
+        """Validate that requesting two identical NDPs (Open) each being initiated
+        from a different side, results in the same/single NDP.
+
+        Verify that the interface and IPv6 address is the same for all networks.
+        """
+        init_dut = self.ads[0]
+        resp_dut = self.ads[1]
+        init_id, init_mac = self.attach_with_identity(init_dut)
+        resp_id, resp_mac = self.attach_with_identity(resp_dut)
+        time.sleep(self.WAIT_FOR_CLUSTER)
+        # first NDP: DUT1 (Init) -> DUT2 (Resp)
+        init_dut_accept_handler = (
+            init_dut.wifi_aware_snippet.connectivityServerSocketAccept())
+        network_id = init_dut_accept_handler.callback_id
+        resp_req_key_a = self.request_oob_network(
+            resp_dut,
+            resp_id,
+            _DATA_PATH_RESPONDER, # DATA_PATH_RESPONDER = 1
+            init_mac,
+            None,
+            None,
+            network_id
+            )
+
+        # Initiator: request network
+        init_req_key_a = self.request_oob_network(
+            init_dut,
+            init_id,
+            _DATA_PATH_INITIATOR, #DATA_PATH_INITIATOR = 0
+            resp_mac,
+            None,
+            None,
+            network_id
+            )
+        i_network_callback_event_a = init_req_key_a.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+        i_callback_name_a = i_network_callback_event_a.data[_CALLBACK_NAME]
+        r_network_callback_event_a = resp_req_key_a.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+        r_callback_name_a = r_network_callback_event_a.data[_CALLBACK_NAME]
+
+        asserts.assert_equal(
+                i_callback_name_a,
+                constants.NetworkCbName.ON_CAPABILITIES_CHANGED,
+                f'{init_dut} succeeded to request the network, got callback'
+                f' {i_callback_name_a}.'
+                )
+        network = i_network_callback_event_a.data[
+            constants.NetworkCbEventKey.NETWORK]
+        network_capabilities = i_network_callback_event_a.data[
+            constants.NetworkCbEventKey.NETWORK_CAPABILITIES]
+        asserts.assert_true(
+            network and network_capabilities,
+            f'{init_dut} received a null Network or NetworkCapabilities!?.'
+        )
+        asserts.assert_equal(
+            r_callback_name_a, constants.NetworkCbName.ON_CAPABILITIES_CHANGED,
+            f'{resp_dut} succeeded to request the network, got callback'
+            f' {r_callback_name_a}.'
+            )
+        network = r_network_callback_event_a.data[
+            constants.NetworkCbEventKey.NETWORK]
+        network_capabilities = r_network_callback_event_a.data[
+            constants.NetworkCbEventKey.NETWORK_CAPABILITIES]
+        asserts.assert_true(
+            network and network_capabilities,
+            f'{resp_dut} received a null Network or NetworkCapabilities!?.'
+        )
+        i_net_event_nc_a = i_network_callback_event_a.data
+        r_net_event_nc_a = r_network_callback_event_a.data
+        # validate no leak of information
+        asserts.assert_false(
+            _NETWORK_CB_KEY_NETWORK_SPECIFIER in i_net_event_nc_a,
+            "Network specifier leak!")
+        asserts.assert_false(
+            _NETWORK_CB_KEY_NETWORK_SPECIFIER in r_net_event_nc_a,
+            "Network specifier leak!")
+        #To get ipv6 ip address
+        i_ipv6_1= i_net_event_nc_a[constants.NetworkCbName.NET_CAP_IPV6]
+        r_ipv6_1 = r_net_event_nc_a[constants.NetworkCbName.NET_CAP_IPV6]
+        # note that Pub <-> Sub since IPv6 are of peer's!
+        i_network_callback_LINK_a = init_req_key_a.waitAndGet(
+            event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+            timeout=_DEFAULT_TIMEOUT,
+            )
+        asserts.assert_equal(
+            i_network_callback_LINK_a.data[_CALLBACK_NAME],
+            _NETWORK_CB_LINK_PROPERTIES_CHANGED,
+            f'{init_dut} succeeded to request the LinkPropertiesChanged,'+
+            ' got callback'
+            f' {i_network_callback_LINK_a.data[_CALLBACK_NAME]}.'
+            )
+
+        r_network_callback_LINK_a = resp_req_key_a.waitAndGet(
+            event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+            timeout=_DEFAULT_TIMEOUT,
+            )
+        asserts.assert_equal(
+            r_network_callback_LINK_a.data[_CALLBACK_NAME],
+            _NETWORK_CB_LINK_PROPERTIES_CHANGED,
+            f'{resp_dut} succeeded to request the LinkPropertiesChanged,'+
+            ' got callback'
+            f' {r_network_callback_LINK_a.data[_CALLBACK_NAME]}.'
+            )
+        i_aware_if_1 = i_network_callback_LINK_a.data[
+            _NETWORK_CB_KEY_INTERFACE_NAME]
+        r_aware_if_1 = r_network_callback_LINK_a.data[
+            _NETWORK_CB_KEY_INTERFACE_NAME]
+
+        logging.info("Interface names: p=%s, s=%s", i_aware_if_1,
+                     r_aware_if_1)
+        logging.info("Interface addresses (IPv6): p=%s, s=%s", i_ipv6_1,
+                     r_ipv6_1)
+        # second NDP: DUT2 (Init) -> DUT1 (Resp)
+        init_req_key = self.request_oob_network(
+            init_dut,
+            init_id,
+            _DATA_PATH_RESPONDER,
+            resp_mac,
+            None,
+            None,
+            network_id
+            )
+        resp_ini_key = self.request_oob_network(
+            resp_dut,
+            resp_id,
+            _DATA_PATH_INITIATOR,
+            init_mac,
+            None,
+            None,
+            network_id
+            )
+        i_network_callback_event = init_req_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+        i_callback_name = i_network_callback_event.data[_CALLBACK_NAME]
+        r_network_callback_event = resp_ini_key.waitAndGet(
+                event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+                timeout=_DEFAULT_TIMEOUT,
+            )
+        r_callback_name = r_network_callback_event.data[_CALLBACK_NAME]
+
+        asserts.assert_equal(
+                i_callback_name,
+                constants.NetworkCbName.ON_CAPABILITIES_CHANGED,
+                f'{init_dut} succeeded to request the network, got callback'
+                f' {i_callback_name}.'
+                )
+        network = i_network_callback_event.data[
+            constants.NetworkCbEventKey.NETWORK]
+        network_capabilities = i_network_callback_event.data[
+            constants.NetworkCbEventKey.NETWORK_CAPABILITIES]
+        asserts.assert_true(
+            network and network_capabilities,
+            f'{init_dut} received a null Network or NetworkCapabilities!?.'
+        )
+        asserts.assert_equal(
+            r_callback_name, constants.NetworkCbName.ON_CAPABILITIES_CHANGED,
+            f'{resp_dut} succeeded to request the network, got callback'
+            f' {r_callback_name}.'
+            )
+        network = r_network_callback_event.data[
+            constants.NetworkCbEventKey.NETWORK]
+        network_capabilities = r_network_callback_event.data[
+            constants.NetworkCbEventKey.NETWORK_CAPABILITIES]
+        asserts.assert_true(
+            network and network_capabilities,
+            f'{resp_dut} received a null Network or NetworkCapabilities!?.'
+        )
+        i_net_event_nc = i_network_callback_event.data
+        r_net_event_nc = r_network_callback_event.data
+        # validate no leak of information
+        asserts.assert_false(
+            _NETWORK_CB_KEY_NETWORK_SPECIFIER in i_net_event_nc,
+            "Network specifier leak!")
+        asserts.assert_false(
+            _NETWORK_CB_KEY_NETWORK_SPECIFIER in r_net_event_nc,
+            "Network specifier leak!")
+        #To get ipv6 ip address
+        i_ipv6_2 = i_net_event_nc[constants.NetworkCbName.NET_CAP_IPV6]
+        r_ipv6_2 = r_net_event_nc[constants.NetworkCbName.NET_CAP_IPV6]
+        # note that Pub <-> Sub since IPv6 are of peer's!
+        i_network_callback_LINK = init_req_key.waitAndGet(
+            event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+            timeout=_DEFAULT_TIMEOUT,
+            )
+        asserts.assert_equal(
+            i_network_callback_LINK.data[_CALLBACK_NAME],
+            _NETWORK_CB_LINK_PROPERTIES_CHANGED,
+            f'{init_dut} succeeded to request the LinkPropertiesChanged,'+
+            ' got callback'
+            f' {i_network_callback_LINK.data[_CALLBACK_NAME]}.'
+            )
+
+        r_network_callback_LINK = resp_ini_key.waitAndGet(
+            event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+            timeout=_DEFAULT_TIMEOUT,
+            )
+        asserts.assert_equal(
+            r_network_callback_LINK.data[_CALLBACK_NAME],
+            _NETWORK_CB_LINK_PROPERTIES_CHANGED,
+            f'{resp_dut} succeeded to request the LinkPropertiesChanged,'+
+            ' got callback'
+            f' {r_network_callback_LINK.data[_CALLBACK_NAME]}.'
+            )
+        i_aware_if_2 = i_network_callback_LINK.data[
+            _NETWORK_CB_KEY_INTERFACE_NAME]
+        r_aware_if_2 = r_network_callback_LINK.data[
+            _NETWORK_CB_KEY_INTERFACE_NAME]
+
+        logging.info("Interface names: p=%s, s=%s", i_aware_if_2,
+                     r_aware_if_2)
+        logging.info("Interface addresses (IPv6): p=%s, s=%s", i_ipv6_2,
+                     r_ipv6_2)
+        # validate equality of NDPs (using interface names & ipv6)
+        asserts.assert_equal(i_aware_if_1, i_aware_if_2,
+                             "DUT1 NDPs are on different interfaces")
+        asserts.assert_equal(r_aware_if_1, r_aware_if_2,
+                             "DUT2 NDPs are on different interfaces")
+        asserts.assert_equal(i_ipv6_1, i_ipv6_2,
+                             "DUT1 NDPs are using different IPv6 addresses")
+        asserts.assert_equal(r_ipv6_1, r_ipv6_2,
+                             "DUT2 NDPs are using different IPv6 addresses")
+        # release requests
+        init_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
+            i_network_callback_event_a.callback_id)
+        resp_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
+            r_network_callback_event_a.callback_id)
+        init_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
+            i_network_callback_event.callback_id)
+        resp_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
+            r_network_callback_event.callback_id)
 
 if __name__ == '__main__':
     # Take test args
