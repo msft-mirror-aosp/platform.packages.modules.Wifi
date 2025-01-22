@@ -704,8 +704,8 @@ public class WifiAwareManagerSnippet implements Snippet {
     ) throws JSONException, WifiAwareManagerSnippetException {
         DiscoverySession session = getDiscoverySession(discoverySessionId);
         PeerHandle handle = null;
-        if (peerId != null){
-        handle = getPeerHandler(peerId);
+        if (peerId != null && peerId > 0){
+            handle = getPeerHandler(peerId);
         }
         WifiAwareNetworkSpecifier.Builder builder;
         if (isAcceptAnyPeer) {
@@ -895,6 +895,8 @@ public class WifiAwareManagerSnippet implements Snippet {
                 }
                 MacAddress mac = result.getMacAddress();
                 resultBundles[i].putString("mac", mac != null ? mac.toString() : null);
+                resultBundles[i].putString("macAsString",
+                    mac != null ? result.getMacAddress().toString() : null);
             }
             event.getData().putParcelableArray("results", resultBundles);
             mEventCache.postEvent(event);
