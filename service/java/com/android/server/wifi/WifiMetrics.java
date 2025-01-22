@@ -58,6 +58,7 @@ import android.content.pm.ResolveInfo;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.wifi.DeauthenticationReasonCode;
 import android.net.wifi.EAPConstants;
 import android.net.wifi.IOnWifiUsabilityStatsListener;
 import android.net.wifi.MloLink;
@@ -10567,6 +10568,155 @@ public class WifiMetrics {
                 getSoftApStoppedUpstreamType(upstreamCaps));
         WifiStatsLog.write(WifiStatsLog.SOFT_AP_STATE_CHANGED,
                 WifiStatsLog.SOFT_AP_STATE_CHANGED__HOTSPOT_ON__STATE_OFF);
+    }
+
+    /**
+     * Report that a client has disconnected from a soft ap session.
+     *
+     * @param disconnectReason reason for disconnection.
+     * @param source calling WorkSource that identifies the creator of the SoftAp.
+     */
+    public void reportOnClientsDisconnected(
+            @WifiAnnotations.SoftApDisconnectReason int disconnectReason,
+            WorkSource source) {
+        WifiStatsLog.write(WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED,
+                convertDisconnectReasonToProto(disconnectReason),
+                source.getUid(0)
+        );
+    }
+
+    private static int convertDisconnectReasonToProto(
+            @WifiAnnotations.SoftApDisconnectReason int disconnectReason) {
+        return switch (disconnectReason) {
+            case DeauthenticationReasonCode.REASON_UNKNOWN ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__UNKNOWN;
+            case DeauthenticationReasonCode.REASON_UNSPECIFIED ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__UNSPECIFIED;
+            case DeauthenticationReasonCode.REASON_PREV_AUTH_NOT_VALID ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__PREV_AUTH_NOT_VALID;
+            case DeauthenticationReasonCode.REASON_DEAUTH_LEAVING ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__DEAUTH_LEAVING;
+            case DeauthenticationReasonCode.REASON_DISASSOC_DUE_TO_INACTIVITY ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__DISASSOC_DUE_TO_INACTIVITY;
+            case DeauthenticationReasonCode.REASON_DISASSOC_AP_BUSY ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__DISASSOC_AP_BUSY;
+            case DeauthenticationReasonCode.REASON_CLASS2_FRAME_FROM_NONAUTH_STA ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__CLASS2_FRAME_FROM_NONAUTH_STA;
+            case DeauthenticationReasonCode.REASON_CLASS3_FRAME_FROM_NONASSOC_STA ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__CLASS3_FRAME_FROM_NONASSOC_STA;
+            case DeauthenticationReasonCode.REASON_DISASSOC_STA_HAS_LEFT ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__DISASSOC_STA_HAS_LEFT;
+            case DeauthenticationReasonCode.REASON_STA_REQ_ASSOC_WITHOUT_AUTH ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__STA_REQ_ASSOC_WITHOUT_AUTH;
+            case DeauthenticationReasonCode.REASON_PWR_CAPABILITY_NOT_VALID ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__PWR_CAPABILITY_NOT_VALID;
+            case DeauthenticationReasonCode.REASON_SUPPORTED_CHANNEL_NOT_VALID ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__SUPPORTED_CHANNEL_NOT_VALID;
+            case DeauthenticationReasonCode.REASON_BSS_TRANSITION_DISASSOC ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__BSS_TRANSITION_DISASSOC;
+            case DeauthenticationReasonCode.REASON_INVALID_IE ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__INVALID_IE;
+            case DeauthenticationReasonCode.REASON_MICHAEL_MIC_FAILURE ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MICHAEL_MIC_FAILURE;
+            case DeauthenticationReasonCode.REASON_FOURWAY_HANDSHAKE_TIMEOUT ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__FOURWAY_HANDSHAKE_TIMEOUT;
+            case DeauthenticationReasonCode.REASON_GROUP_KEY_UPDATE_TIMEOUT ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__GROUP_KEY_UPDATE_TIMEOUT;
+            case DeauthenticationReasonCode.REASON_IE_IN_4WAY_DIFFERS ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__IE_IN_4WAY_DIFFERS;
+            case DeauthenticationReasonCode.REASON_GROUP_CIPHER_NOT_VALID ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__GROUP_CIPHER_NOT_VALID;
+            case DeauthenticationReasonCode.REASON_PAIRWISE_CIPHER_NOT_VALID ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__PAIRWISE_CIPHER_NOT_VALID;
+            case DeauthenticationReasonCode.REASON_AKMP_NOT_VALID ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__AKMP_NOT_VALID;
+            case DeauthenticationReasonCode.REASON_UNSUPPORTED_RSN_IE_VERSION ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__UNSUPPORTED_RSN_IE_VERSION;
+            case DeauthenticationReasonCode.REASON_INVALID_RSN_IE_CAPAB ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__INVALID_RSN_IE_CAPAB;
+            case DeauthenticationReasonCode.REASON_IEEE_802_1X_AUTH_FAILED ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__IEEE_802_1X_AUTH_FAILED;
+            case DeauthenticationReasonCode.REASON_CIPHER_SUITE_REJECTED ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__CIPHER_SUITE_REJECTED;
+            case DeauthenticationReasonCode.REASON_TDLS_TEARDOWN_UNREACHABLE ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__TDLS_TEARDOWN_UNREACHABLE;
+            case DeauthenticationReasonCode.REASON_TDLS_TEARDOWN_UNSPECIFIED ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__TDLS_TEARDOWN_UNSPECIFIED;
+            case DeauthenticationReasonCode.REASON_SSP_REQUESTED_DISASSOC ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__SSP_REQUESTED_DISASSOC;
+            case DeauthenticationReasonCode.REASON_NO_SSP_ROAMING_AGREEMENT ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__NO_SSP_ROAMING_AGREEMENT;
+            case DeauthenticationReasonCode.REASON_BAD_CIPHER_OR_AKM ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__BAD_CIPHER_OR_AKM;
+            case DeauthenticationReasonCode.REASON_NOT_AUTHORIZED_THIS_LOCATION ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__NOT_AUTHORIZED_THIS_LOCATION;
+            case DeauthenticationReasonCode.REASON_SERVICE_CHANGE_PRECLUDES_TS ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__SERVICE_CHANGE_PRECLUDES_TS;
+            case DeauthenticationReasonCode.REASON_UNSPECIFIED_QOS_REASON ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__UNSPECIFIED_QOS_REASON;
+            case DeauthenticationReasonCode.REASON_NOT_ENOUGH_BANDWIDTH ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__NOT_ENOUGH_BANDWIDTH;
+            case DeauthenticationReasonCode.REASON_DISASSOC_LOW_ACK ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__DISASSOC_LOW_ACK;
+            case DeauthenticationReasonCode.REASON_EXCEEDED_TXOP ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__EXCEEDED_TXOP;
+            case DeauthenticationReasonCode.REASON_STA_LEAVING ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__STA_LEAVING;
+            case DeauthenticationReasonCode.REASON_END_TS_BA_DLS ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__END_TS_BA_DLS;
+            case DeauthenticationReasonCode.REASON_UNKNOWN_TS_BA ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__UNKNOWN_TS_BA;
+            case DeauthenticationReasonCode.REASON_TIMEOUT ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__TIMEOUT;
+            case DeauthenticationReasonCode.REASON_PEERKEY_MISMATCH ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__PEERKEY_MISMATCH;
+            case DeauthenticationReasonCode.REASON_AUTHORIZED_ACCESS_LIMIT_REACHED ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__AUTHORIZED_ACCESS_LIMIT_REACHED;
+            case DeauthenticationReasonCode.REASON_EXTERNAL_SERVICE_REQUIREMENTS ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__EXTERNAL_SERVICE_REQUIREMENTS;
+            case DeauthenticationReasonCode.REASON_INVALID_FT_ACTION_FRAME_COUNT ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__INVALID_FT_ACTION_FRAME_COUNT;
+            case DeauthenticationReasonCode.REASON_INVALID_PMKID ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__INVALID_PMKID;
+            case DeauthenticationReasonCode.REASON_INVALID_MDE ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__INVALID_MDE;
+            case DeauthenticationReasonCode.REASON_INVALID_FTE ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__INVALID_FTE;
+            case DeauthenticationReasonCode.REASON_MESH_PEERING_CANCELLED ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_PEERING_CANCELLED;
+            case DeauthenticationReasonCode.REASON_MESH_MAX_PEERS ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_MAX_PEERS;
+            case DeauthenticationReasonCode.REASON_MESH_CONFIG_POLICY_VIOLATION ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_CONFIG_POLICY_VIOLATION;
+            case DeauthenticationReasonCode.REASON_MESH_CLOSE_RCVD ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_CLOSE_RCVD;
+            case DeauthenticationReasonCode.REASON_MESH_MAX_RETRIES ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_MAX_RETRIES;
+            case DeauthenticationReasonCode.REASON_MESH_CONFIRM_TIMEOUT ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_CONFIRM_TIMEOUT;
+            case DeauthenticationReasonCode.REASON_MESH_INVALID_GTK ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_INVALID_GTK;
+            case DeauthenticationReasonCode.REASON_MESH_INCONSISTENT_PARAMS ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_INCONSISTENT_PARAMS;
+            case DeauthenticationReasonCode.REASON_MESH_INVALID_SECURITY_CAP ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_INVALID_SECURITY_CAP;
+            case DeauthenticationReasonCode.REASON_MESH_PATH_ERROR_NO_PROXY_INFO ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_PATH_ERROR_NO_PROXY_INFO;
+            case DeauthenticationReasonCode.REASON_MESH_PATH_ERROR_NO_FORWARDING_INFO ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_PATH_ERROR_NO_FORWARDING_INFO;
+            case DeauthenticationReasonCode.REASON_MESH_PATH_ERROR_DEST_UNREACHABLE ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_PATH_ERROR_DEST_UNREACHABLE;
+            case DeauthenticationReasonCode.REASON_MAC_ADDRESS_ALREADY_EXISTS_IN_MBSS ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MAC_ADDRESS_ALREADY_EXISTS_IN_MBSS;
+            case DeauthenticationReasonCode.REASON_MESH_CHANNEL_SWITCH_REGULATORY_REQ ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_CHANNEL_SWITCH_REGULATORY_REQ;
+            case DeauthenticationReasonCode.REASON_MESH_CHANNEL_SWITCH_UNSPECIFIED ->
+                    WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__MESH_CHANNEL_SWITCH_UNSPECIFIED;
+            default -> {
+                Log.e(TAG, "Invalid disconnectReason: " + disconnectReason);
+                yield WifiStatsLog.WIFI_SOFT_AP_CALLBACK_ON_CLIENTS_DISCONNECTED__DISCONNECT_REASON__UNKNOWN;
+            }
+        };
     }
 
     public int getLastUwbState() {
