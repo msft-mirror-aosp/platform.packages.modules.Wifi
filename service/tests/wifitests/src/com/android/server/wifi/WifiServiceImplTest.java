@@ -10228,15 +10228,24 @@ public class WifiServiceImplTest extends WifiBaseTest {
                                 ScanResult.CHANNEL_WIDTH_20MHZ)));
         when(mWifiNative.getUsableChannels(eq(WIFI_BAND_60_GHZ), anyInt(), anyInt()))
                 .thenReturn(null);
-
         mWifiServiceImpl.mCountryCodeTracker.onDriverCountryCodeChanged(TEST_COUNTRY_CODE);
         mLooper.dispatchAll();
-
         verify(mWifiSettingsConfigStore).put(
                 eq(WifiSettingsConfigStore.WIFI_SOFT_AP_COUNTRY_CODE), eq(TEST_COUNTRY_CODE));
         verify(mWifiSettingsConfigStore).put(
                 eq(WifiSettingsConfigStore.WIFI_AVAILABLE_SOFT_AP_FREQS_MHZ),
                 eq("[2452,5180,5955]"));
+
+        // Make sure CC change to world mode won't update WIFI_SOFT_AP_COUNTRY_CODE
+        when(mWifiSettingsConfigStore.get(WifiSettingsConfigStore.WIFI_SOFT_AP_COUNTRY_CODE))
+                .thenReturn(TEST_COUNTRY_CODE);
+        when(mWifiCountryCode.isDriverCountryCodeWorldMode()).thenReturn(true);
+        String testWorldModeCountryCode = "00";
+        mWifiServiceImpl.mCountryCodeTracker.onDriverCountryCodeChanged(testWorldModeCountryCode);
+        mLooper.dispatchAll();
+        verify(mWifiSettingsConfigStore, never()).put(
+                eq(WifiSettingsConfigStore.WIFI_SOFT_AP_COUNTRY_CODE),
+                        eq(testWorldModeCountryCode));
     }
 
     private List<WifiConfiguration> setupMultiTypeConfigs(
