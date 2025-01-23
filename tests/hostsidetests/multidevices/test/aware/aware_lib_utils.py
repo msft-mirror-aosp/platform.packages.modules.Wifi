@@ -37,6 +37,8 @@ _WAIT_WIFI_STATE_TIME_OUT = datetime.timedelta(seconds=10)
 _WAIT_TIME_SEC = 3
 _CONTROL_WIFI_TIMEOUT_SEC = 10
 _REQUEST_NETWORK_TIMEOUT_MS = 15 * 1000
+# arbitrary timeout for events
+_EVENT_TIMEOUT = 10
 
 # Alias variable.
 _CALLBACK_NAME = constants.DiscoverySessionCallbackParamsType.CALLBACK_NAME
@@ -429,7 +431,6 @@ def create_discovery_config(service_name,
     config[constants.TTL_SEC] = ttl
     config[constants.TERMINATE_NOTIFICATION_ENABLED] = term_cb_enable
     return config
-
 
 def start_attach(
     ad: android_device.AndroidDevice,

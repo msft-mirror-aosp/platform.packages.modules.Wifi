@@ -182,6 +182,7 @@ public class ConnectivityManagerSnippet implements Snippet {
             EventCache.getInstance().postEvent(event);
         }
     }
+
     private Enumeration<InetAddress> getInetAddrsForInterface(String ifaceName) {
         NetworkInterface iface = null;
         try {
