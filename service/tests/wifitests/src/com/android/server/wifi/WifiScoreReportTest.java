@@ -17,10 +17,13 @@
 package com.android.server.wifi;
 
 import static com.android.server.wifi.ClientModeImpl.WIFI_WORK_SOURCE;
+import static com.android.server.wifi.WifiScoreReport.SCORER_BINDING_STATE_POLLING_DISABLED;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
@@ -37,6 +40,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
@@ -863,7 +867,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         }
         setupToGenerateAReportWhenPrintlnIsCalled();
         mWifiScoreReport.dump(null, mPrintWriter, null);
-        verify(mPrintWriter, times(13)).println(anyString());
+        verify(mPrintWriter, times(14)).println(anyString());
     }
 
     /** Test data logging with MLO */
@@ -918,7 +922,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
         }
         setupToGenerateAReportWhenPrintlnIsCalled();
         mWifiScoreReport.dump(null, mPrintWriter, null);
-        verify(mPrintWriter, times(13)).println(anyString());
+        verify(mPrintWriter, times(14)).println(anyString());
     }
 
     /**
@@ -939,7 +943,7 @@ public class WifiScoreReportTest extends WifiBaseTest {
             mWifiScoreReport.calculateAndReportScore();
         }
         mWifiScoreReport.dump(null, mPrintWriter, null);
-        verify(mPrintWriter, atMost(3603)).println(anyString());
+        verify(mPrintWriter, atMost(3604)).println(anyString());
     }
 
     /**
@@ -2038,5 +2042,76 @@ public class WifiScoreReportTest extends WifiBaseTest {
         mLooper.dispatchAll();
         verify(mWifiBlocklistMonitor).handleBssidConnectionFailure(any(), any(),
                 eq(WifiBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_CONNECTED_SCORE), anyInt());
+    }
+
+    @Test
+    public void setWifiConnectedNetworkScorer_validPackageNameInScorerHolder_scorerServiceBinded() {
+        when(mContext.bindServiceAsUser(any(), any(), anyInt(), any())).thenReturn(true);
+        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
+                TEST_UID);
+
+        assertNotNull(mWifiScoreReport.mScorerServiceConnection);
+    }
+
+    @Test
+    public void bindScorerService_nullScorerHolder_notBinded() {
+        mWifiScoreReport.bindScorerService();
+
+        assertNull(mWifiScoreReport.mScorerServiceConnection);
+    }
+
+    @Test
+    public void bindScorerService_nullPackageNameInScorerHolder_notBinded() {
+        when(mMockPackageManager.getPackagesForUid(anyInt())).thenReturn(new String[]{});
+        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
+                TEST_UID);
+        // Make sure that the ScorerServiceConnection is null.
+        mWifiScoreReport.unbindScorerService(SCORER_BINDING_STATE_POLLING_DISABLED);
+        assertNull(mWifiScoreReport.mScorerServiceConnection);
+
+        mWifiScoreReport.bindScorerService();
+
+        assertNull(mWifiScoreReport.mScorerServiceConnection);
+    }
+
+    @Test
+    public void bindScorerService_notNullPackageNameInScorerHolder_binded() {
+        when(mMockPackageManager.getPackagesForUid(anyInt()))
+                .thenReturn(new String[]{EXTERNAL_SCORER_PKG_NAME});
+        when(mContext.bindServiceAsUser(any(), any(), anyInt(), any())).thenReturn(true);
+        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
+                TEST_UID);
+        /*
+         * Make sure that the ScorerServiceConnection is null. So it will try bind again to create a
+         * new ScorerServiceConnection.
+         */
+        mWifiScoreReport.unbindScorerService(SCORER_BINDING_STATE_POLLING_DISABLED);
+        assertNull(mWifiScoreReport.mScorerServiceConnection);
+
+        mWifiScoreReport.bindScorerService();
+
+        assertNotNull(mWifiScoreReport.mScorerServiceConnection);
+    }
+
+    @Test
+    public void unbindScorerService_scorerServiceConnectionIsNull_notUnbind() {
+        mWifiScoreReport.mScorerServiceConnection = null;
+
+        mWifiScoreReport.unbindScorerService(SCORER_BINDING_STATE_POLLING_DISABLED);
+
+        verifyZeroInteractions(mContext);
+    }
+
+    @Test
+    public void unbindScorerService_scorerServiceConnectionIsNotNull_unbind() {
+        when(mContext.bindServiceAsUser(any(), any(), anyInt(), any())).thenReturn(true);
+        mWifiScoreReport.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer,
+                TEST_UID);
+        // Make sure that the ScorerServiceConnection is not null.
+        assertNotNull(mWifiScoreReport.mScorerServiceConnection);
+
+        mWifiScoreReport.unbindScorerService(SCORER_BINDING_STATE_POLLING_DISABLED);
+
+        verify(mContext).unbindService(any());
     }
 }
