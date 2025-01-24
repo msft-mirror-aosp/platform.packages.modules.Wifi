@@ -4769,6 +4769,8 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
                 .updateAndGetBssidBlocklistForSsids(anySet());
         mWifiConnectivityManager.forceConnectivityScan(WIFI_WORK_SOURCE);
         mLooper.dispatchAll();
+        inOrder.verify(mWifiBlocklistMonitor).clearBssidBlocklistForReason(
+                eq(WifiBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT));
         inOrder.verify(mWifiBlocklistMonitor).tryEnablingBlockedBssids(any());
         inOrder.verify(mWifiConfigManager).updateNetworkSelectionStatus(disabledConfig.networkId,
                 WifiConfiguration.NetworkSelectionStatus.DISABLED_NONE);
