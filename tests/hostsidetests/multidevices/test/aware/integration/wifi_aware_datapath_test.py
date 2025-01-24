@@ -18,7 +18,7 @@ import base64
 import logging
 import sys
 import time
-
+import re
 
 from aware import aware_lib_utils as autils
 from aware import constants
@@ -924,6 +924,43 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
         init_dut.wifi_aware_snippet.connectivityUnregisterNetwork(init_callback_event.callback_id)
         resp_dut.wifi_aware_snippet.connectivityUnregisterNetwork(resp_callback_event.callback_id)
 
+    def wait_for_request_responses(self, dut, req_keys, aware_ifs, aware_ipv6):
+        """Wait for network request confirmation for all request keys.
+
+        Args:
+            dut: Device under test
+            req_keys: (in) A list of the network requests
+            aware_ifs: (out) A list into which to append the network interface
+            aware_ipv6: (out) A list into which to append the network ipv6
+            address
+        """
+        network_callback_event = req_keys.waitAndGet(
+            event_name=constants.NetworkCbEventName.NETWORK_CALLBACK,
+            timeout=_DEFAULT_TIMEOUT,
+            )
+            # network_callback_event=req_keys[0]
+        if network_callback_event.data[_CALLBACK_NAME] == _NETWORK_CB_LINK_PROPERTIES_CHANGED:
+            if network_callback_event.callback_id:
+                aware_ifs.append(network_callback_event.data["interfaceName"])
+            else:
+                logging.info(
+                    "Received an unexpected connectivity, the revoked "+
+                    "network request probably went through -- %s", network_callback_event)
+        elif network_callback_event.data[_CALLBACK_NAME] == (
+            constants.NetworkCbName.ON_CAPABILITIES_CHANGED) :
+            if network_callback_event.callback_id:
+                aware_ipv6.append(network_callback_event.data[
+                    constants.NetworkCbName.NET_CAP_IPV6])
+            else:
+                logging.info(
+                    "Received an unexpected connectivity, the revoked "+
+                    "network request probably went through -- %s",
+                    network_callback_event)
+                asserts.assert_false(
+                     _NETWORK_CB_KEY_NETWORK_SPECIFIER in
+                    network_callback_event.data,
+                     "Network specifier leak!")
+
     def get_ipv6_addr(self, device, interface):
         """Get the IPv6 address of the specified interface. Uses ifconfig and parses
         its output. Returns a None if the interface does not have an IPv6 address
@@ -1079,6 +1116,261 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
         return dut.wifi_aware_snippet.connectivityRequestNetwork(
             net_work_request_id, network_request_dict, _REQUEST_NETWORK_TIMEOUT_MS
         )
+
+    def run_mix_ib_oob(self, same_request, ib_first, inits_on_same_dut):
+        """Validate that multiple network requests issued using both in-band
+        and out-of-band discovery behave as expected.
+
+        The same_request parameter controls whether identical single NDP is
+        expected, if True, or whether multiple NDPs on different NDIs are
+        expected, if False.
+
+        Args:
+            same_request: Issue canonically identical requests (same NMI peer,
+            same passphrase) if True, if False use different passphrases.
+            ib_first: If True then the in-band network is requested first,
+            otherwise (if False) then the out-of-band network is requested first.
+            inits_on_same_dut: If True then the Initiators are run on the same
+            device, otherwise (if False) then the Initiators are run on
+            different devices. Note that Subscribe == Initiator.
+        """
+        p_dut = self.ads[0]
+        s_dut = self.ads[1]
+        if not same_request:
+            asserts.skip_if(
+                autils.get_aware_capabilities(p_dut)[
+                    _CAP_MAX_NDI_INTERFACES] < 2 or
+                autils.get_aware_capabilities(s_dut)[
+                    _CAP_MAX_NDI_INTERFACES] < 2,
+                "DUTs do not support enough NDIs")
+
+        (p_dut, s_dut, p_id, s_id, p_disc_id, s_disc_id, peer_id_on_sub,
+         peer_id_on_pub) = self.set_up_discovery(_PUBLISH_TYPE_UNSOLICITED,
+                                                 _SUBSCRIBE_TYPE_PASSIVE, True)
+        p_id2, p_mac = self.attach_with_identity(p_dut)
+        s_id2, s_mac = self.attach_with_identity(s_dut)
+        time.sleep(self.WAIT_FOR_CLUSTER)
+
+        if inits_on_same_dut:
+            resp_dut = p_dut
+            resp_id = p_id2
+            resp_mac = p_mac
+            init_dut = s_dut
+            init_id = s_id2
+            init_mac = s_mac
+
+        else:
+            resp_dut = s_dut
+            resp_id = s_id2
+            resp_mac = s_mac
+            init_dut = p_dut
+            init_id = p_id2
+            init_mac = p_mac
+
+        passphrase = None if same_request else self.PASSPHRASE
+        pub_accept_handler = (
+            p_dut.wifi_aware_snippet.connectivityServerSocketAccept())
+        network_id = pub_accept_handler.callback_id
+        self.publish_session = p_disc_id.callback_id
+        self.subscribe_session = s_disc_id.callback_id
+
+        if ib_first:
+            # request in-band network (to completion)
+            p_req_key = self._request_network(
+                ad=p_dut,
+                discovery_session=self.publish_session,
+                peer=peer_id_on_pub,
+                net_work_request_id=network_id
+                )
+            s_req_key = self._request_network(
+                ad=s_dut,
+                discovery_session=self.subscribe_session,
+                peer=peer_id_on_sub,
+                net_work_request_id=network_id
+                )
+            p_net_event_nc = autils.wait_for_network(
+                ad=p_dut,
+                request_network_cb_handler=p_req_key,
+                expected_channel=None,
+                )
+            s_net_event_nc = autils.wait_for_network(
+                ad=s_dut,
+                request_network_cb_handler=s_req_key,
+                expected_channel=None,
+                )
+            p_net_event_lp = autils.wait_for_link(
+                ad=p_dut,
+                request_network_cb_handler=p_req_key,
+                )
+            s_net_event_lp = autils.wait_for_link(
+                ad=s_dut,
+                request_network_cb_handler=s_req_key,
+                )
+            # validate no leak of information
+            asserts.assert_false(
+                _NETWORK_CB_KEY_NETWORK_SPECIFIER in p_net_event_nc.data,
+                "Network specifier leak!")
+            asserts.assert_false(
+                _NETWORK_CB_KEY_NETWORK_SPECIFIER in s_net_event_nc.data,
+                "Network specifier leak!")
+
+        # request out-of-band network
+        init_dut_accept_handler = (
+            init_dut.wifi_aware_snippet.connectivityServerSocketAccept())
+        network_id = init_dut_accept_handler.callback_id
+        resp_req_key = self.request_oob_network(
+            resp_dut,
+            resp_id,
+            _DATA_PATH_RESPONDER,
+            init_mac,
+            passphrase,
+            None,
+            network_id
+            )
+        init_req_key = self.request_oob_network(
+            init_dut,
+            init_id,
+            _DATA_PATH_INITIATOR,
+            resp_mac,
+            passphrase,
+            None,
+            network_id
+            )
+        time.sleep(5)
+        # Publisher & Subscriber: wait for network formation
+        resp_net_event_nc = autils.wait_for_network(
+            ad=resp_dut,
+            request_network_cb_handler=resp_req_key,
+            expected_channel=None,
+            )
+        init_net_event_nc = autils.wait_for_network(
+            ad=init_dut,
+            request_network_cb_handler=init_req_key,
+            expected_channel=None,
+            )
+        resp_net_event_lp = autils.wait_for_link(
+            ad=resp_dut,
+            request_network_cb_handler=resp_req_key,
+            )
+        init_net_event_lp = autils.wait_for_link(
+            ad=init_dut,
+            request_network_cb_handler=init_req_key,
+            )
+        # validate no leak of information
+        asserts.assert_false(
+            _NETWORK_CB_KEY_NETWORK_SPECIFIER in resp_net_event_nc.data,
+            "Network specifier leak!")
+        asserts.assert_false(
+            _NETWORK_CB_KEY_NETWORK_SPECIFIER in init_net_event_nc.data,
+            "Network specifier leak!")
+
+        if not ib_first:
+            # request in-band network (to completion)
+            p_req_key = self._request_network(
+                ad=p_dut,
+                discovery_session=self.publish_session,
+                peer=peer_id_on_pub,
+                net_work_request_id=network_id
+                )
+            s_req_key = self._request_network(
+                ad=s_dut,
+                discovery_session=self.subscribe_session,
+                peer=peer_id_on_sub,
+                net_work_request_id=network_id
+                )
+            # Publisher & Subscriber: wait for network formation
+            p_net_event_nc = autils.wait_for_network(
+                ad=p_dut,
+                request_network_cb_handler=p_req_key,
+                expected_channel=None,
+                )
+            s_net_event_nc = autils.wait_for_network(
+                ad=s_dut,
+                request_network_cb_handler=s_req_key,
+                expected_channel=None,
+                )
+            p_net_event_lp = autils.wait_for_link(
+                ad=p_dut,
+                request_network_cb_handler=p_req_key,
+                )
+            s_net_event_lp = autils.wait_for_link(
+                ad=s_dut,
+                request_network_cb_handler=s_req_key,
+                )
+            # validate no leak of information
+            asserts.assert_false(
+                _NETWORK_CB_KEY_NETWORK_SPECIFIER in p_net_event_nc.data,
+                "Network specifier leak!")
+            asserts.assert_false(
+                _NETWORK_CB_KEY_NETWORK_SPECIFIER in s_net_event_nc.data,
+                "Network specifier leak!")
+
+        # note that Init <-> Resp & Pub <--> Sub since IPv6 are of peer's!
+        init_ipv6 = resp_net_event_nc.data[constants.NetworkCbName.NET_CAP_IPV6]
+        resp_ipv6 = init_net_event_nc.data[constants.NetworkCbName.NET_CAP_IPV6]
+        pub_ipv6 = s_net_event_nc.data[constants.NetworkCbName.NET_CAP_IPV6]
+        sub_ipv6 = p_net_event_nc.data[constants.NetworkCbName.NET_CAP_IPV6]
+
+        # extract net info
+        pub_interface = p_net_event_lp.data[
+            _NETWORK_CB_KEY_INTERFACE_NAME]
+        sub_interface = s_net_event_lp.data[
+            _NETWORK_CB_KEY_INTERFACE_NAME]
+        resp_interface = resp_net_event_lp.data[
+            _NETWORK_CB_KEY_INTERFACE_NAME]
+        init_interface = init_net_event_lp.data[
+            _NETWORK_CB_KEY_INTERFACE_NAME]
+        logging.info(
+            "Interface names: Pub=%s, Sub=%s, Resp=%s, Init=%s",
+            pub_interface, sub_interface, resp_interface,
+            init_interface
+            )
+        logging.info(
+            "Interface addresses (IPv6): Pub=%s, Sub=%s, Resp=%s, Init=%s",
+            pub_ipv6, sub_ipv6, resp_ipv6, init_ipv6)
+
+        # validate NDP/NDI conditions (using interface names & ipv6)
+        if same_request:
+            asserts.assert_equal(
+                pub_interface, resp_interface if inits_on_same_dut else
+                init_interface, "NDP interfaces don't match on Pub/other")
+            asserts.assert_equal(
+                sub_interface, init_interface if inits_on_same_dut else
+                resp_interface, "NDP interfaces don't match on Sub/other")
+
+            asserts.assert_equal(
+                pub_ipv6, resp_ipv6 if inits_on_same_dut else init_ipv6,
+                "NDP IPv6 don't match on Pub/other")
+            asserts.assert_equal(
+                sub_ipv6, init_ipv6 if inits_on_same_dut else resp_ipv6,
+                "NDP IPv6 don't match on Sub/other")
+        else:
+            asserts.assert_false(
+                pub_interface == (
+                    resp_interface if inits_on_same_dut else init_interface),
+                "NDP interfaces match on Pub/other")
+            asserts.assert_false(
+                sub_interface == (
+                    init_interface if inits_on_same_dut else resp_interface),
+                "NDP interfaces match on Sub/other")
+
+            asserts.assert_false(
+                pub_ipv6 == (resp_ipv6 if inits_on_same_dut else init_ipv6),
+                "NDP IPv6 match on Pub/other")
+            asserts.assert_false(
+                sub_ipv6 == (init_ipv6 if inits_on_same_dut else resp_ipv6),
+                "NDP IPv6 match on Sub/other")
+
+        # release requests
+        init_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
+            init_net_event_nc.callback_id)
+        resp_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
+            resp_net_event_nc.callback_id)
+        p_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
+            p_net_event_nc.callback_id)
+        s_dut.wifi_aware_snippet.connectivityUnregisterNetwork(
+            s_net_event_nc.callback_id)
+
 
     #######################################
     # Positive In-Band (IB) tests key:
@@ -2070,6 +2362,113 @@ class WifiAwareDatapathTest(base_test.BaseTestClass):
         """
         self.run_multiple_ndi([self.PMK, self.PMK2], flip_init_resp=True)
 
+    #######################################
+    # The device can create and use multiple NDIs tests key:
+    #
+    # names is:test_<same_request>_ndps_mix_ib_oob_
+    #          <ib_first>_<inits_on_same_dut>_polarity
+    # same_request:
+    #   Issue canonically identical requests (same NMI peer, same passphrase)
+    #   if True, if False use different passphrases.
+    # ib_first:
+    #   If True then the in-band network is requested first, otherwise (if False)
+    #   then the out-of-band network is requested first.
+    # inits_on_same_dut:
+    #   If True then the Initiators are run on the same device, otherwise
+    #   (if False) then the Initiators are run on different devices.
+    #
+    #######################################
+
+    def test_identical_ndps_mix_ib_oob_ib_first_same_polarity(self):
+        """Validate that a single NDP is created for multiple identical
+        requests which are issued through either in-band (ib) or out-of-band
+        (oob) APIs.
+
+        The in-band request is issued first. Both Initiators (Sub == Initiator)
+        are run on the same device.
+        """
+        self.run_mix_ib_oob(
+            same_request=True, ib_first=True, inits_on_same_dut=True)
+
+    def test_identical_ndps_mix_ib_oob_oob_first_same_polarity(self):
+        """Validate that a single NDP is created for multiple identical
+        requests which are issued through either in-band (ib) or out-of-band
+        (oob) APIs.
+
+        The out-of-band request is issued first. Both Initiators (Sub ==
+        Initiator)
+        are run on the same device.
+        """
+        self.run_mix_ib_oob(
+            same_request=True, ib_first=False, inits_on_same_dut=True)
+
+    def test_identical_ndps_mix_ib_oob_ib_first_diff_polarity(self):
+        """Validate that a single NDP is created for multiple identical
+        requests which are issued through either in-band (ib) or out-of-band
+        (oob) APIs.
+
+        The in-band request is issued first. Initiators (Sub == Initiator) are
+        run on different devices.
+        """
+        self.run_mix_ib_oob(
+            same_request=True, ib_first=True, inits_on_same_dut=False)
+
+    def test_identical_ndps_mix_ib_oob_oob_first_diff_polarity(self):
+        """Validate that a single NDP is created for multiple identical
+        requests which are issued through either in-band (ib) or out-of-band
+        (oob) APIs.
+
+        The out-of-band request is issued first. Initiators (Sub == Initiator)
+        are run on different devices.
+        """
+        self.run_mix_ib_oob(
+            same_request=True, ib_first=False, inits_on_same_dut=False)
+
+    def test_multiple_ndis_mix_ib_oob_ib_first_same_polarity(self):
+
+        """Validate that multiple NDIs are created for NDPs which are requested
+        with different security configurations. Use a mix of in-band and
+        out-of-band APIs to request the different NDPs.
+
+        The in-band request is issued first. Initiators (Sub == Initiator) are
+        run on the same device.
+        """
+        self.run_mix_ib_oob(
+            same_request=False, ib_first=True, inits_on_same_dut=True)
+
+    def test_multiple_ndis_mix_ib_oob_oob_first_same_polarity(self):
+        """Validate that multiple NDIs are created for NDPs which are requested
+        with different security configurations. Use a mix of in-band and
+        out-of-band APIs to request the different NDPs.
+
+        The out-of-band request is issued first. Initiators (Sub == Initiator)
+        are run on the same device.
+        """
+        self.run_mix_ib_oob(
+            same_request=False, ib_first=False, inits_on_same_dut=True)
+
+    def test_multiple_ndis_mix_ib_oob_ib_first_diff_polarity(self):
+        """Validate that multiple NDIs are created for NDPs which are requested
+        with different security configurations. Use a mix of in-band and
+        out-of-band APIs to request the different NDPs.
+
+        The in-band request is issued first. Initiators (Sub == Initiator) are
+        run on different devices.
+        """
+        self.run_mix_ib_oob(
+            same_request=False, ib_first=True, inits_on_same_dut=False)
+
+
+    def test_multiple_ndis_mix_ib_oob_oob_first_diff_polarity(self):
+        """Validate that multiple NDIs are created for NDPs which are requested
+        with different security configurations. Use a mix of in-band and
+        out-of-band APIs to request the different NDPs.
+
+        The out-of-band request is issued first. Initiators (Sub == Initiator)
+        are run on different devices.
+        """
+        self.run_mix_ib_oob(
+            same_request=False, ib_first=False, inits_on_same_dut=False)
 
 if __name__ == '__main__':
     # Take test args
