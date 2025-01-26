@@ -91,7 +91,11 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
         )
 
         requester.ad.log.info('Trying to connect the peer device with WPS PBC.')
-        p2p_utils.p2p_connect(requester, responder, constants.WpsInfo.PBC)
+        p2p_config = constants.WifiP2pConfig(
+            device_address=responder.p2p_device.device_address,
+            wps_setup=constants.WpsInfo.PBC,
+        )
+        p2p_utils.p2p_connect(requester, responder, p2p_config)
 
         requester.ad.log.info('Disconnecting the peer device.')
         p2p_utils.remove_group_and_verify_disconnected(
@@ -131,7 +135,11 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
         )
 
         requester.ad.log.info('Trying to connect the peer device with WPS PIN.')
-        p2p_utils.p2p_connect(requester, responder, constants.WpsInfo.DISPLAY)
+        p2p_config = constants.WifiP2pConfig(
+            device_address=responder.p2p_device.device_address,
+            wps_setup=constants.WpsInfo.DISPLAY,
+        )
+        p2p_utils.p2p_connect(requester, responder, p2p_config)
 
         requester.ad.log.info('Disconnecting the peer device.')
         p2p_utils.remove_group_and_verify_disconnected(

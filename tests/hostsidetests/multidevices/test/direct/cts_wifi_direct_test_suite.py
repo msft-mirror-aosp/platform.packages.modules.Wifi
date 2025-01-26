@@ -20,6 +20,7 @@ from mobly import suite_runner
 
 from direct import group_owner_negotiation_test
 from direct import group_owner_test
+from direct import group_owner_with_config_test
 
 
 class CtsWifiDirectTestSuite(base_suite.BaseSuite):
@@ -31,6 +32,7 @@ class CtsWifiDirectTestSuite(base_suite.BaseSuite):
             group_owner_negotiation_test.GroupOwnerNegotiationTest
         )
         self.add_test_class(group_owner_test.GroupOwnerTest)
+        self.add_test_class(group_owner_with_config_test.GroupOwnerWithConfigTest)
 
 
 if __name__ == '__main__':
