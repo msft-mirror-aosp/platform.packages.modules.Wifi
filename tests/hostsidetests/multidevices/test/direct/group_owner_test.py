@@ -105,21 +105,12 @@ class GroupOwnerTest(base_test.BaseTestClass):
         client.ad.wifi.wifiP2pDiscoverServices()
 
         # Client should only discover Upnp services, but not Bonjour services.
-        group_owner_address = group_owner.p2p_device.device_address
-        p2p_utils.check_discovered_upnp_services(
+        p2p_utils.check_discovered_services(
             client,
-            expected_services=constants.ServiceData.ALL_UPNP_SERVICES,
-            expected_src_device_address=group_owner_address,
-        )
-        p2p_utils.check_discovered_dns_sd_response(
-            client,
-            expected_responses=[],
-            expected_src_device_address=group_owner_address,
-        )
-        p2p_utils.check_discovered_dns_sd_txt_record(
-            client,
-            expected_records=[],
-            expected_src_device_address=group_owner_address,
+            expected_src_device_address=group_owner.p2p_device.device_address,
+            expected_dns_sd_sequence=(),
+            expected_dns_txt_sequence=(),
+            expected_upnp_sequence=constants.ServiceData.ALL_UPNP_SERVICES,
         )
 
         # Step 5 - 7. Verify that the client can join the group with WPS PBC.
@@ -155,6 +146,7 @@ class GroupOwnerTest(base_test.BaseTestClass):
         logging.info('Initializing Wi-Fi p2p.')
         group_owner = p2p_utils.setup_wifi_p2p(self.group_owner_ad)
         client = p2p_utils.setup_wifi_p2p(self.client_ad)
+        main_channel_id = client.channel_ids[0]
 
         # Step 2. Add p2p local services on the group owner.
         self._add_local_services(group_owner)
@@ -166,29 +158,25 @@ class GroupOwnerTest(base_test.BaseTestClass):
         # Step 4. Perform p2p service discovery on the client.
         client.ad.log.info('Searching for target p2p services.')
         # Initialize an extra p2p channel.
-        sub_channel_id = client.ad.wifi.wifiP2pInitExtraChannel()
-        client.ad.wifi.wifiP2pAddBonjourServiceRequest(sub_channel_id)
+        sub_channel_id = p2p_utils.init_extra_channel(client)
+        client.ad.wifi.wifiP2pAddBonjourServiceRequest(
+            None,  # serviceType
+            None,  # instanceName
+            sub_channel_id,
+        )
         p2p_utils.set_upnp_response_listener(client, sub_channel_id)
         p2p_utils.set_dns_sd_response_listeners(client, sub_channel_id)
-        # Discover services on the default p2p channel.
-        client.ad.wifi.wifiP2pDiscoverServices()
+        # Discover services on the main channel.
+        client.ad.wifi.wifiP2pDiscoverServices(main_channel_id)
 
         # Client should only discover Bonjour services, but not UPnP services.
-        group_owner_address = group_owner.p2p_device.device_address
-        p2p_utils.check_discovered_dns_sd_response(
+        p2p_utils.check_discovered_services(
             client,
-            expected_responses=constants.ServiceData.ALL_DNS_SD,
-            expected_src_device_address=group_owner_address,
-        )
-        p2p_utils.check_discovered_dns_sd_txt_record(
-            client,
-            expected_records=constants.ServiceData.ALL_DNS_TXT,
-            expected_src_device_address=group_owner_address,
-        )
-        p2p_utils.check_discovered_upnp_services(
-            client,
-            expected_services=[],
-            expected_src_device_address=group_owner_address,
+            expected_src_device_address=group_owner.p2p_device.device_address,
+            expected_dns_sd_sequence=constants.ServiceData.ALL_DNS_SD,
+            expected_dns_txt_sequence=constants.ServiceData.ALL_DNS_TXT,
+            expected_upnp_sequence=(),
+            channel_id=sub_channel_id,
         )
 
         # Step 5 - 7. Verify that the client can join the group with WPS PIN.
@@ -243,21 +231,17 @@ class GroupOwnerTest(base_test.BaseTestClass):
             client, group_owner, is_group_negotiation=False
         )
 
-    def _teardown_wifi_p2p(self, ad: android_device.AndroidDevice) -> None:
-        p2p_utils.reset_p2p_service_state(ad)
-        p2p_utils.teardown_wifi_p2p(ad)
+    def _teardown_wifi_p2p(self, ad: android_device.AndroidDevice):
+        try:
+            p2p_utils.teardown_wifi_p2p(ad)
+        finally:
+            ad.services.create_output_excerpts_all(self.current_test_info)
 
     def teardown_test(self) -> None:
         utils.concurrent_exec(
             self._teardown_wifi_p2p,
             param_list=[[ad] for ad in self.ads],
             raise_on_exception=True,
-        )
-        self.client_ad.services.create_output_excerpts_all(
-            self.current_test_info
-        )
-        self.group_owner_ad.services.create_output_excerpts_all(
-            self.current_test_info
         )
 
     def on_fail(self, record: records.TestResult) -> None:
