@@ -13218,12 +13218,13 @@ public class WifiManager {
     @FlaggedApi(android.security.Flags.FLAG_AAPM_API)
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     @NonNull
+    @SuppressLint("NewApi")
     public List<AdvancedProtectionFeature> getAvailableAdvancedProtectionFeatures() {
         if (!Environment.isSdkAtLeastB()) {
             throw new UnsupportedOperationException();
         }
         List<AdvancedProtectionFeature> features = new ArrayList<>();
-        if (Flags.wepDisabledInApm()) {
+        if (Flags.wepDisabledInApm() && android.security.Flags.aapmApi()) {
             features.add(new AdvancedProtectionFeature(
                     AdvancedProtectionManager.FEATURE_ID_DISALLOW_WEP));
         }
