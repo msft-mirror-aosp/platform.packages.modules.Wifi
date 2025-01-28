@@ -1019,6 +1019,8 @@ public class WifiP2pConfig implements Parcelable {
             config.mJoinExistingGroup = mJoinExistingGroup;
             if (mPairingBootstrappingConfig != null) {
                 config.mPairingBootstrappingConfig = mPairingBootstrappingConfig;
+                config.mGroupClientIpProvisioningMode =
+                        GROUP_CLIENT_IP_PROVISIONING_MODE_IPV6_LINK_LOCAL;
                 config.wps.setup = WpsInfo.INVALID;
             }
             config.mIsAuthorizeConnectionFromPeerEnabled = mIsAuthorizeConnectionFromPeerEnabled;
