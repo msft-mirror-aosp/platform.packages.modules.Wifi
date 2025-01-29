@@ -6117,7 +6117,6 @@ public class WifiMetrics {
             mWifiIsUnusableList.clear();
             mInstalledPasspointProfileTypeForR1.clear();
             mInstalledPasspointProfileTypeForR2.clear();
-            mWifiUsabilityStatsEntriesRingBuffer.clear();
             mMobilityStatePnoStatsMap.clear();
             mWifiP2pMetrics.clear();
             mDppMetrics.clear();
