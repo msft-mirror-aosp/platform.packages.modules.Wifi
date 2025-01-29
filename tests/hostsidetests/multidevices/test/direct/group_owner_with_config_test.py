@@ -86,7 +86,7 @@ class GroupOwnerWithConfigTest(base_test.BaseTestClass):
     @ApiTest([
         'android.net.wifi.p2p.WifiP2pManager#createGroup(android.net.wifi.p2p.WifiP2pManager.Channel, android.net.wifi.p2p.WifiP2pConfig, android.net.wifi.p2p.WifiP2pManager.ActionListener)',
         'android.net.wifi.p2p.WifiP2pManager#removeGroup(android.net.wifi.p2p.WifiP2pManager.Channel, android.net.wifi.p2p.WifiP2pManager.ActionListener)',
-     ])
+    ])
     def test_p2p_group_with_band_auto(self) -> None:
         """Tests p2p group without specifying band or frequency.
 
@@ -172,8 +172,10 @@ class GroupOwnerWithConfigTest(base_test.BaseTestClass):
         )
 
     def _teardown_wifi_p2p(self, ad: android_device.AndroidDevice):
-        p2p_utils.teardown_wifi_p2p(ad)
-        ad.services.create_output_excerpts_all(self.current_test_info)
+        try:
+            p2p_utils.teardown_wifi_p2p(ad)
+        finally:
+            ad.services.create_output_excerpts_all(self.current_test_info)
 
     def teardown_test(self) -> None:
         utils.concurrent_exec(
