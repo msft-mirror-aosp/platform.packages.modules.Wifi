@@ -4232,11 +4232,11 @@ public class WifiMetricsTest extends WifiBaseTest {
     }
 
     private void assertUsabilityStatsAssignment(WifiInfo info, WifiLinkLayerStats stats,
-            WifiUsabilityStatsEntry usabilityStats) {
+            WifiUsabilityStatsEntry usabilityStats, int expectedTimestampMs) {
         assertEquals(info.getRssi(), usabilityStats.rssi);
         assertEquals(info.getLinkSpeed(), usabilityStats.linkSpeedMbps);
         assertEquals(info.getRxLinkSpeedMbps(), usabilityStats.rxLinkSpeedMbps);
-        assertEquals(stats.timeStampInMs, usabilityStats.timeStampMs);
+        assertEquals(expectedTimestampMs, usabilityStats.timeStampMs);
         assertEquals(stats.txmpdu_be + stats.txmpdu_bk + stats.txmpdu_vi + stats.txmpdu_vo,
                 usabilityStats.totalTxSuccess);
         assertEquals(stats.retries_be + stats.retries_bk + stats.retries_vi + stats.retries_vo,
@@ -4542,6 +4542,8 @@ public class WifiMetricsTest extends WifiBaseTest {
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 2, 55, 15);
         mWifiMetrics.logLinkProbeSuccess(
                 TEST_IFACE_NAME, nextRandInt(), nextRandInt(), nextRandInt(), 12);
+        // This is used as the timestamp when the record lands in the ring buffer.
+        when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 618);
         mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats1, false, 0);
         mWifiMetrics.incrementWifiScoreCount(TEST_IFACE_NAME, 58);
         mWifiMetrics.incrementWifiUsabilityScoreCount(TEST_IFACE_NAME, 3, 56, 15);
@@ -4549,6 +4551,8 @@ public class WifiMetricsTest extends WifiBaseTest {
                 nextRandInt(), nextRandInt());
         mWifiMetrics.enterDeviceMobilityState(DEVICE_MOBILITY_STATE_HIGH_MVMT);
 
+        // This is used as the timestamp when the record lands in the ring buffer.
+        when(mClock.getElapsedSinceBootMillis()).thenReturn((long) 1791);
         mWifiMetrics.updateWifiUsabilityStatsEntries(TEST_IFACE_NAME, info, stats2, false, 0);
         assertEquals(stats2.beacon_rx, mWifiMetrics.getTotalBeaconRxCount());
 
@@ -4556,8 +4560,8 @@ public class WifiMetricsTest extends WifiBaseTest {
         WifiUsabilityStatsEntry result1 = mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.get(0);
         WifiUsabilityStatsEntry result2 = mWifiMetrics.mWifiUsabilityStatsEntriesRingBuffer.get(1);
 
-        assertUsabilityStatsAssignment(info, stats1, result1);
-        assertUsabilityStatsAssignment(info, stats2, result2);
+        assertUsabilityStatsAssignment(info, stats1, result1, 618);
+        assertUsabilityStatsAssignment(info, stats2, result2, 1791);
         assertEquals(2, result1.seqNumToFramework);
         assertEquals(3, result2.seqNumToFramework);
         assertEquals(0, result1.seqNumInsideFramework);

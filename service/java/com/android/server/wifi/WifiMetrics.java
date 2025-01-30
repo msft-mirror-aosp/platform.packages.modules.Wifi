@@ -7670,7 +7670,6 @@ public class WifiMetrics {
                     ? WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_ONESHOT_RSSI_POLL
                     : WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_SYNCHRONOUS;
 
-            mWifiUsabilityStatsEntriesRingBuffer.add(wifiUsabilityStatsEntry);
             if (mScoreBreachLowTimeMillis != -1) {
                 long elapsedTime =  mClock.getElapsedSinceBootMillis() - mScoreBreachLowTimeMillis;
                 if (elapsedTime >= MIN_SCORE_BREACH_TO_GOOD_STATS_WAIT_TIME_MS) {
@@ -7686,6 +7685,17 @@ public class WifiMetrics {
                         createNewWifiUsabilityStatsEntryParcelable(wifiUsabilityStatsEntry, stats,
                                 info));
             }
+
+            // We need the records in the ring buffer to all have the same timebase. The records
+            // created here are timestamped by the WiFi driver and the timestamps have been found to
+            // drift relative to the Android clock. Historically, these records have been forwarded
+            // to external WiFi scorers with the drifting clock. In order to maintain historical
+            // behavior while ensuring that records in the ring buffer have the same timebase, we
+            // will send the record created in this function unmodified to any external WiFi Scorer,
+            // but we will modify the timestamp before storing in the ring buffer. Thus, the
+            // following statement, which also modifies the timestamp, must be executed AFTER the
+            // record is deep copied and sent to the external WiFi Scorer.
+            addToRingBuffer(wifiUsabilityStatsEntry);
 
             mSeqNumInsideFramework++;
             mProbeStatusSinceLastUpdate =
@@ -8249,6 +8259,12 @@ public class WifiMetrics {
         return out;
     }
 
+    private void addToRingBuffer(WifiUsabilityStatsEntry wifiUsabilityStatsEntry) {
+        // We override the timestamp here so that all records have the same time base.
+        wifiUsabilityStatsEntry.timeStampMs = mClock.getElapsedSinceBootMillis();
+        mWifiUsabilityStatsEntriesRingBuffer.add(wifiUsabilityStatsEntry);
+    }
+
     /**
      * Used to log an asynchronous event (such as WiFi disconnect) into the ring buffer.
      */
@@ -8262,10 +8278,9 @@ public class WifiMetrics {
                     < MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE
                     ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove()
                     .clear();
-            wifiUsabilityStatsEntry.timeStampMs = mClock.getElapsedSinceBootMillis();
             wifiUsabilityStatsEntry.captureEventType = e;
             wifiUsabilityStatsEntry.captureEventTypeSubcode = c;
-            mWifiUsabilityStatsEntriesRingBuffer.add(wifiUsabilityStatsEntry);
+            addToRingBuffer(wifiUsabilityStatsEntry);
         }
     }
     /**
