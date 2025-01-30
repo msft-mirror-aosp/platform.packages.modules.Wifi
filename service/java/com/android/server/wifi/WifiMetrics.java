@@ -7169,69 +7169,74 @@ public class WifiMetrics {
      */
     public int storeCapturedData(int triggerType, boolean isFullCapture,
             long triggerStartTimeMillis, long triggerStopTimeMillis) {
-        Instant bootTime = Instant.now()
-                .minus(Duration.ofMillis(mClock.getElapsedSinceBootMillis()));
-        Log.d(TAG, "storeCapturedData: triggerType=" + triggerType
-                + ", isFullCapture=" + isFullCapture
-                + ", triggerStartTimeMillis=" + triggerStartTimeMillis
-                + ", triggerStartTime=" + bootTime.plus(Duration.ofMillis(triggerStartTimeMillis))
-                + ", triggerStopTimeMillis=" + triggerStopTimeMillis
-                + ", triggerStopTime=" + bootTime.plus(Duration.ofMillis(triggerStopTimeMillis)));
+        synchronized (mLock) {
+            Instant bootTime = Instant.now()
+                    .minus(Duration.ofMillis(mClock.getElapsedSinceBootMillis()));
+            Log.d(TAG, "storeCapturedData: triggerType=" + triggerType
+                    + ", isFullCapture=" + isFullCapture
+                    + ", triggerStartTimeMillis=" + triggerStartTimeMillis
+                    + ", triggerStartTime="
+                    + bootTime.plus(Duration.ofMillis(triggerStartTimeMillis))
+                    + ", triggerStopTimeMillis=" + triggerStopTimeMillis
+                    + ", triggerStopTime="
+                    + bootTime.plus(Duration.ofMillis(triggerStopTimeMillis)));
 
-        // Validate triggerStartTimeMillis and triggerStopTimeMillis in non full-capture case
-        if (!isFullCapture && ((triggerStartTimeMillis < 0 || triggerStopTimeMillis < 0
-                || triggerStopTimeMillis <= triggerStartTimeMillis))) {
-            return 1;
-        }
-
-        Instant now = mClock.getCurrentInstant();
-        Duration durationSinceBoot = Duration.ofMillis(mClock.getElapsedSinceBootMillis());
-
-        WifiUsabilityStatsTraining wifiUsabilityStatsTraining = new WifiUsabilityStatsTraining();
-        while (mWifiUsabilityStatsTrainingExamples.size()
-                >= MAX_WIFI_USABILITY_STATS_TRAINING_SIZE) {
-            mWifiUsabilityStatsTrainingExamples.remove(0);
-        }
-        wifiUsabilityStatsTraining.dataCaptureType = triggerType;
-
-        long capturePeriodStartTime = triggerStartTimeMillis;
-        long capturePeriodStopTime = triggerStopTimeMillis;
-
-        if (isFullCapture) {
-            capturePeriodStartTime = mWifiUsabilityStatsEntriesRingBuffer.size() > 0
-                ? mWifiUsabilityStatsEntriesRingBuffer.get(0).timeStampMs :
-                0;
-            capturePeriodStopTime = mWifiUsabilityStatsEntriesRingBuffer.size() > 0
-                ? mWifiUsabilityStatsEntriesRingBuffer.get(
-                    mWifiUsabilityStatsEntriesRingBuffer.size() - 1).timeStampMs :
-                durationSinceBoot.toMillis();
-        }
-
-        wifiUsabilityStatsTraining.captureStartTimestampSecs =
-                now.minus(durationSinceBoot)
-                    .plus(Duration.ofMillis(capturePeriodStartTime))
-                    .truncatedTo(ChronoUnit.HOURS)
-                    .getEpochSecond();
-        wifiUsabilityStatsTraining.storeTimeOffsetMs =
-                    durationSinceBoot.toMillis() - capturePeriodStopTime;
-
-        // If isFullCapture is true, store everything in ring buffer
-        // If isFullCapture is false, Store WifiUsabilityStatsEntries within capture period
-        TrainingData trainingData = new TrainingData();
-        List<WifiUsabilityStatsEntry> trainingDataList = new ArrayList<>();
-        for (WifiUsabilityStatsEntry currStats : mWifiUsabilityStatsEntriesRingBuffer) {
-            if (isFullCapture || (currStats.timeStampMs >= triggerStartTimeMillis
-                    && currStats.timeStampMs < triggerStopTimeMillis)) {
-                WifiUsabilityStatsEntry trainingStats =
-                        createNewWifiUsabilityStatsEntry(currStats, capturePeriodStartTime);
-                trainingDataList.add(trainingStats);
+            // Validate triggerStartTimeMillis and triggerStopTimeMillis in non full-capture case
+            if (!isFullCapture && ((triggerStartTimeMillis < 0 || triggerStopTimeMillis < 0
+                    || triggerStopTimeMillis <= triggerStartTimeMillis))) {
+                return 1;
             }
-        }
-        trainingData.stats = trainingDataList.toArray(new WifiUsabilityStatsEntry[0]);
-        wifiUsabilityStatsTraining.trainingData = trainingData;
 
-        mWifiUsabilityStatsTrainingExamples.add(wifiUsabilityStatsTraining);
-        return 0;
+            Instant now = mClock.getCurrentInstant();
+            Duration durationSinceBoot = Duration.ofMillis(mClock.getElapsedSinceBootMillis());
+
+            WifiUsabilityStatsTraining wifiUsabilityStatsTraining =
+                    new WifiUsabilityStatsTraining();
+            while (mWifiUsabilityStatsTrainingExamples.size()
+                    >= MAX_WIFI_USABILITY_STATS_TRAINING_SIZE) {
+                mWifiUsabilityStatsTrainingExamples.remove(0);
+            }
+            wifiUsabilityStatsTraining.dataCaptureType = triggerType;
+
+            long capturePeriodStartTime = triggerStartTimeMillis;
+            long capturePeriodStopTime = triggerStopTimeMillis;
+
+            if (isFullCapture) {
+                capturePeriodStartTime = mWifiUsabilityStatsEntriesRingBuffer.size() > 0
+                    ? mWifiUsabilityStatsEntriesRingBuffer.get(0).timeStampMs :
+                    0;
+                capturePeriodStopTime = mWifiUsabilityStatsEntriesRingBuffer.size() > 0
+                    ? mWifiUsabilityStatsEntriesRingBuffer.get(
+                        mWifiUsabilityStatsEntriesRingBuffer.size() - 1).timeStampMs :
+                    durationSinceBoot.toMillis();
+            }
+
+            wifiUsabilityStatsTraining.captureStartTimestampSecs =
+                    now.minus(durationSinceBoot)
+                        .plus(Duration.ofMillis(capturePeriodStartTime))
+                        .truncatedTo(ChronoUnit.HOURS)
+                        .getEpochSecond();
+            wifiUsabilityStatsTraining.storeTimeOffsetMs =
+                        durationSinceBoot.toMillis() - capturePeriodStopTime;
+
+            // If isFullCapture is true, store everything in ring buffer
+            // If isFullCapture is false, Store WifiUsabilityStatsEntries within capture period
+            TrainingData trainingData = new TrainingData();
+            List<WifiUsabilityStatsEntry> trainingDataList = new ArrayList<>();
+            for (WifiUsabilityStatsEntry currStats : mWifiUsabilityStatsEntriesRingBuffer) {
+                if (isFullCapture || (currStats.timeStampMs >= triggerStartTimeMillis
+                        && currStats.timeStampMs < triggerStopTimeMillis)) {
+                    WifiUsabilityStatsEntry trainingStats =
+                            createNewWifiUsabilityStatsEntry(currStats, capturePeriodStartTime);
+                    trainingDataList.add(trainingStats);
+                }
+            }
+            trainingData.stats = trainingDataList.toArray(new WifiUsabilityStatsEntry[0]);
+            wifiUsabilityStatsTraining.trainingData = trainingData;
+
+            mWifiUsabilityStatsTrainingExamples.add(wifiUsabilityStatsTraining);
+            return 0;
+        }
     }
 
     /**
@@ -7242,9 +7247,9 @@ public class WifiMetrics {
      */
     public void updateWifiUsabilityStatsEntries(String ifaceName, WifiInfo info,
             WifiLinkLayerStats stats, boolean oneshot, int statusDataStall) {
-        // This is only collected for primary STA currently because RSSI polling is disabled for
-        // non-primary STAs.
         synchronized (mLock) {
+            // This is only collected for primary STA currently because RSSI polling is disabled for
+            // non-primary STAs.
             if (info == null) {
                 return;
             }
@@ -8251,15 +8256,17 @@ public class WifiMetrics {
         if (!isPrimary(ifaceName)) {
             return;
         }
-        WifiUsabilityStatsEntry wifiUsabilityStatsEntry =
-                mWifiUsabilityStatsEntriesRingBuffer.size()
-                < MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE
-                ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove()
-                .clear();
-        wifiUsabilityStatsEntry.timeStampMs = mClock.getElapsedSinceBootMillis();
-        wifiUsabilityStatsEntry.captureEventType = e;
-        wifiUsabilityStatsEntry.captureEventTypeSubcode = c;
-        mWifiUsabilityStatsEntriesRingBuffer.add(wifiUsabilityStatsEntry);
+        synchronized (mLock) {
+            WifiUsabilityStatsEntry wifiUsabilityStatsEntry =
+                    mWifiUsabilityStatsEntriesRingBuffer.size()
+                    < MAX_WIFI_USABILITY_STATS_ENTRIES_RING_BUFFER_SIZE
+                    ? new WifiUsabilityStatsEntry() : mWifiUsabilityStatsEntriesRingBuffer.remove()
+                    .clear();
+            wifiUsabilityStatsEntry.timeStampMs = mClock.getElapsedSinceBootMillis();
+            wifiUsabilityStatsEntry.captureEventType = e;
+            wifiUsabilityStatsEntry.captureEventTypeSubcode = c;
+            mWifiUsabilityStatsEntriesRingBuffer.add(wifiUsabilityStatsEntry);
+        }
     }
     /**
      * Used to log an asynchronous event (such as WiFi disconnect) into the ring buffer.
