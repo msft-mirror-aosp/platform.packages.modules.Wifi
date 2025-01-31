@@ -2171,9 +2171,6 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                         Log.e(TAG, "Country code not consistent! expect " + countryCode + " actual "
                                 + mCountryCode.getCurrentDriverCountryCode());
                     }
-                    // Store Soft AP channels for reference after a reboot before the driver is up.
-                    mSettingsConfigStore.put(WifiSettingsConfigStore.WIFI_SOFT_AP_COUNTRY_CODE,
-                            countryCode);
                     List<Integer> freqs = new ArrayList<>();
                     SparseArray<int[]> channelMap = new SparseArray<>(
                             SoftApConfiguration.BAND_TYPES.length);
@@ -2193,9 +2190,17 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                             channelMap.put(band, channel);
                         }
                     }
-                    mSettingsConfigStore.put(
-                            WifiSettingsConfigStore.WIFI_AVAILABLE_SOFT_AP_FREQS_MHZ,
-                            new JSONArray(freqs).toString());
+                    if (!mCountryCode.isDriverCountryCodeWorldMode()
+                            || TextUtils.isEmpty(mSettingsConfigStore.get(
+                                    WifiSettingsConfigStore.WIFI_SOFT_AP_COUNTRY_CODE))) {
+                        // Store Soft AP channels (non-world mode CC or no save before) for
+                        // reference after a reboot before the driver is up.
+                        mSettingsConfigStore.put(WifiSettingsConfigStore.WIFI_SOFT_AP_COUNTRY_CODE,
+                                countryCode);
+                        mSettingsConfigStore.put(
+                                WifiSettingsConfigStore.WIFI_AVAILABLE_SOFT_AP_FREQS_MHZ,
+                                new JSONArray(freqs).toString());
+                    }
                     mTetheredSoftApTracker.updateAvailChannelListInSoftApCapability(countryCode,
                             channelMap);
                     mLohsSoftApTracker.updateAvailChannelListInSoftApCapability(countryCode,
