@@ -175,6 +175,7 @@ python_test_host {
     name: "CtsWifiSoftApTestCases",
     main: "softap/wifi_softap_test.py",
     srcs: ["softap/wifi_softap_test.py"],
+    test_config: "softap/AndroidTest.xml",
     libs: [
         "mobly",
         "wifi_softap_constants",
