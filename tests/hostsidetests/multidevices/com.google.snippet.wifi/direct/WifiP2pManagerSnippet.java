@@ -486,8 +486,8 @@ public class WifiP2pManagerSnippet implements Snippet {
             String uuid,
             String device,
             JSONArray services,
-            @RpcDefault(value = "0") Integer channelId
-    ) throws Throwable {
+            @RpcDefault(value = "0"
+            ) Integer channelId) throws Throwable {
         WifiP2pManager.Channel channel = getChannel(channelId);
         List<String> serviceList = new ArrayList<String>();
         for (int i = 0; i < services.length(); i++) {
@@ -581,17 +581,24 @@ public class WifiP2pManagerSnippet implements Snippet {
     /**
      * Add a service Upnp discovery request.
      *
+     * @param serviceType The service type to be passed to {@link WifiP2pUpnpServiceRequest}.
      * @param channelId The ID of the channel for Wi-Fi P2P to operate on.
      * @return The ID of the service request, which is used when calling
      *     {@link #wifiP2pRemoveServiceRequest(int, Integer)}.
      * @throws Throwable If add service request action timed out or got invalid channel ID.
      */
     @Rpc(description = "Add a service Upnp discovery request.")
-    public Integer wifiP2pAddUpnpServiceRequest(@RpcDefault(value = "0") Integer channelId)
-            throws Throwable {
+    public Integer wifiP2pAddUpnpServiceRequest(
+            @RpcOptional String serviceType,
+            @RpcDefault(value = "0") Integer channelId
+    ) throws Throwable {
         WifiP2pManager.Channel channel = getChannel(channelId);
-
-        WifiP2pUpnpServiceRequest request = WifiP2pUpnpServiceRequest.newInstance();
+        WifiP2pUpnpServiceRequest request;
+        if (serviceType == null) {
+            request = WifiP2pUpnpServiceRequest.newInstance();
+        } else {
+            request = WifiP2pUpnpServiceRequest.newInstance(serviceType);
+        }
         mServiceRequestCnt += 1;
         mServiceRequests.put(mServiceRequestCnt, request);
 
@@ -604,17 +611,30 @@ public class WifiP2pManagerSnippet implements Snippet {
     /**
      * Add a service Bonjour discovery request.
      *
+     * @param instanceName The instance name to be passed to
+     *     {@link WifiP2pDnsSdServiceRequest#newInstance(String, String)}.
+     * @param serviceType The service type to be passed to
+     *     {@link WifiP2pDnsSdServiceRequest#newInstance(String, String)}.
      * @param channelId The ID of the channel for Wi-Fi P2P to operate on.
      * @return The ID of the service request, which is used when calling
      *     {@link #wifiP2pRemoveServiceRequest(int, Integer)}.
      *  @throws Throwable If add service request action timed out or got invalid channel ID.
      */
     @Rpc(description = "Add a service Bonjour discovery request.")
-    public Integer wifiP2pAddBonjourServiceRequest(@RpcDefault(value = "0") Integer channelId)
-            throws Throwable {
+    public Integer wifiP2pAddBonjourServiceRequest(
+            @RpcOptional String instanceName,
+            @RpcOptional String serviceType,
+            @RpcDefault(value = "0") Integer channelId
+    ) throws Throwable {
         WifiP2pManager.Channel channel = getChannel(channelId);
-
-        WifiP2pDnsSdServiceRequest request = WifiP2pDnsSdServiceRequest.newInstance();
+        WifiP2pDnsSdServiceRequest request;
+        if (instanceName != null) {
+            request = WifiP2pDnsSdServiceRequest.newInstance(instanceName, serviceType);
+        } else if (serviceType == null) {
+            request = WifiP2pDnsSdServiceRequest.newInstance();
+        } else {
+            request = WifiP2pDnsSdServiceRequest.newInstance(serviceType);
+        }
         mServiceRequestCnt += 1;
         mServiceRequests.put(mServiceRequestCnt, request);
 
@@ -636,7 +656,12 @@ public class WifiP2pManagerSnippet implements Snippet {
             throws Throwable {
         WifiP2pManager.Channel channel = getChannel(channelId);
         String callbackId = UUID.randomUUID().toString();
-        mP2pManager.removeServiceRequest(channel, mServiceRequests.remove(index),
+        WifiP2pServiceRequest serviceRequest = mServiceRequests.remove(index);
+        if (serviceRequest == null) {
+            throw new WifiP2pManagerException("Service request not found. Please use the request ID"
+                    + " returned by `wifiP2pAddServiceRequest`.");
+        }
+        mP2pManager.removeServiceRequest(channel, serviceRequest,
                 new ActionListener(callbackId));
         verifyActionListenerSucceed(callbackId);
     }
@@ -725,8 +750,9 @@ public class WifiP2pManagerSnippet implements Snippet {
      * @throws Throwable If the P2P operation failed or timed out, or got invalid channel ID.
      */
     @Rpc(description = "Initiate service discovery.")
-    public void wifiP2pDiscoverServices(@RpcDefault(value = "0") Integer channelId)
-            throws Throwable {
+    public void wifiP2pDiscoverServices(
+            @RpcDefault(value = "0") Integer channelId
+    ) throws Throwable {
         WifiP2pManager.Channel channel = getChannel(channelId);
         String callbackId = UUID.randomUUID().toString();
         mP2pManager.discoverServices(channel, new ActionListener(callbackId));
@@ -972,7 +998,7 @@ public class WifiP2pManagerSnippet implements Snippet {
             throws WifiP2pManagerException {
         WifiP2pManager.Channel channel = mChannels.get(channelId);
         if (channel == null) {
-            Log.e(TAG + ": checkAndGetChannel : channel keys" + mChannels.keySet());
+            Log.e(TAG + ": getChannel : channel keys" + mChannels.keySet());
             throw new WifiP2pManagerException(
                     "The channelId " + channelId + " is wrong. Please use the channelId returned "
                             + "by calling `wifiP2pInitialize` or `wifiP2pInitExtraChannel`.");
@@ -1033,8 +1059,10 @@ public class WifiP2pManagerSnippet implements Snippet {
             return;
         }
         if (Objects.equals(ACTION_LISTENER_ON_FAILURE, result)) {
+            // Please keep reason code in error message for client side to check the reason.
             throw new WifiP2pManagerException(
-                    "Action failed with reason code: " + eventData.getInt(EVENT_KEY_REASON));
+                    "Action failed with reason_code=" + eventData.getInt(EVENT_KEY_REASON)
+            );
         }
         throw new WifiP2pManagerException("Action got unknown event: " + eventData.toString());
     }
