@@ -461,6 +461,8 @@ public class WifiP2pConfigTest {
                 c.getPairingBootstrappingConfig();
         assertNotNull(pairingBootstrappingConfig);
         assertEquals(expectedPairingBootstrappingConfig, pairingBootstrappingConfig);
+        assertEquals(c.getGroupClientIpProvisioningMode(),
+                GROUP_CLIENT_IP_PROVISIONING_MODE_IPV6_LINK_LOCAL);
     }
 
     /**
