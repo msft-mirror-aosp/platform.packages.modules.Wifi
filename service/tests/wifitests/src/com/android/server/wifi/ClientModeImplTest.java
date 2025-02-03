@@ -11314,4 +11314,25 @@ public class ClientModeImplTest extends WifiBaseTest {
                 eq(100 * 1000L), eq(REASON_APP_DISALLOW), eq(0));
         verify(mWifiBlocklistMonitor).updateAndGetBssidBlocklistForSsids(any());
     }
+
+    @Test
+    public void enableRssiPolling_bindScorerService() throws Exception {
+        connect();
+
+        mCmi.enableRssiPolling(true);
+        mLooper.dispatchAll();
+
+        verify(mWifiScoreReport).bindScorerService();
+    }
+
+    @Test
+    public void disableRssiPolling_unbindScorerService() throws Exception {
+        connect();
+
+        mCmi.enableRssiPolling(false);
+        mLooper.dispatchAll();
+
+        verify(mWifiScoreReport).unbindScorerService(
+                WifiScoreReport.SCORER_BINDING_STATE_POLLING_DISABLED);
+    }
 }
