@@ -677,6 +677,11 @@ public class WifiServiceImplTest extends WifiBaseTest {
         when(mWifiPermissionsUtil.isTargetSdkLessThan(any(),
                 eq(Build.VERSION_CODES.UPSIDE_DOWN_CAKE),
                 anyInt())).thenReturn(true);
+        if (SdkLevel.isAtLeastS()) {
+            // AttributionSource arg is only available from S.
+            when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                    .thenReturn(true);
+        }
         when(mWifiInjector.getWifiCarrierInfoManager()).thenReturn(mWifiCarrierInfoManager);
         when(mWifiInjector.getWifiPseudonymManager()).thenReturn(mWifiPseudonymManager);
         when(mWifiInjector.getOpenNetworkNotifier()).thenReturn(mOpenNetworkNotifier);
@@ -10899,6 +10904,8 @@ public class WifiServiceImplTest extends WifiBaseTest {
     @Test
     public void unregisterLohsSoftApCallbackRemovesCallback() throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
+        AttributionSource attributionSource = mock(AttributionSource.class);
+        mExtras.putParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE, attributionSource);
         registerLohsSoftApCallbackAndVerify(mClientSoftApCallback, mExtras);
 
         mWifiServiceImpl.unregisterLocalOnlyHotspotSoftApCallback(mClientSoftApCallback, mExtras);
@@ -10919,6 +10926,8 @@ public class WifiServiceImplTest extends WifiBaseTest {
     public void unregisterLohsSoftApCallbackDoesNotRemoveCallbackIfCallbackNotMatching()
             throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
+        AttributionSource attributionSource = mock(AttributionSource.class);
+        mExtras.putParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE, attributionSource);
         registerLohsSoftApCallbackAndVerify(mClientSoftApCallback, mExtras);
 
         mWifiServiceImpl.unregisterLocalOnlyHotspotSoftApCallback(mAnotherSoftApCallback, mExtras);
@@ -10940,6 +10949,8 @@ public class WifiServiceImplTest extends WifiBaseTest {
         assumeTrue(SdkLevel.isAtLeastT());
         WifiClient testWifiClient = new WifiClient(MacAddress.fromString("22:33:44:55:66:77"),
                 WIFI_IFACE_NAME2);
+        AttributionSource attributionSource = mock(AttributionSource.class);
+        mExtras.putParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE, attributionSource);
         registerLohsSoftApCallbackAndVerify(mClientSoftApCallback, mExtras);
         mLooper.dispatchAll();
 
@@ -10985,6 +10996,8 @@ public class WifiServiceImplTest extends WifiBaseTest {
     @Test
     public void registersForBinderDeathOnRegisterLohsSoftApCallback() throws Exception {
         assumeTrue(SdkLevel.isAtLeastT());
+        AttributionSource attributionSource = mock(AttributionSource.class);
+        mExtras.putParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE, attributionSource);
         registerLohsSoftApCallbackAndVerify(mClientSoftApCallback, mExtras);
         verify(mAppBinder).linkToDeath(any(IBinder.DeathRecipient.class), anyInt());
     }
@@ -10997,6 +11010,8 @@ public class WifiServiceImplTest extends WifiBaseTest {
         assumeTrue(SdkLevel.isAtLeastT());
         ArgumentCaptor<IBinder.DeathRecipient> drCaptor =
                 ArgumentCaptor.forClass(IBinder.DeathRecipient.class);
+        AttributionSource attributionSource = mock(AttributionSource.class);
+        mExtras.putParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE, attributionSource);
         registerLohsSoftApCallbackAndVerify(mClientSoftApCallback, mExtras);
         verify(mAppBinder).linkToDeath(drCaptor.capture(), anyInt());
 
@@ -11041,6 +11056,31 @@ public class WifiServiceImplTest extends WifiBaseTest {
                 .when(mWifiPermissionsUtil).enforceNearbyDevicesPermission(
                         any(), anyBoolean(), any());
         mWifiServiceImpl.unregisterLocalOnlyHotspotSoftApCallback(mClientSoftApCallback, mExtras);
+    }
+
+    /**
+     * Verifies that a LOHS SoftApCallback is ignored if its AttributionSource no longer has the
+     * NEARBY_WIFI_DEVICES permission
+     */
+    @Test
+    public void testRegisterLocalOnlyHotspotSoftApCallbackIgnoredWhenPermissionRevoked()
+            throws Exception {
+        assumeTrue(SdkLevel.isAtLeastT());
+        AttributionSource attributionSource = mock(AttributionSource.class);
+        mExtras.putParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE, attributionSource);
+        registerLohsSoftApCallbackAndVerify(mClientSoftApCallback, mExtras);
+
+        // Revoke NEARBY_WIFI_DEVICES permission
+        when(mWifiPermissionsUtil.checkNearbyDevicesPermission(any(), anyBoolean(), any()))
+                .thenReturn(false);
+
+        // Callback should be ignored
+        reset(mClientSoftApCallback);
+        mLohsApCallback.onConnectedClientsOrInfoChanged(
+                mTestSoftApInfos, mTestSoftApClients, false);
+        mLooper.dispatchAll();
+        verify(mClientSoftApCallback, never()).onConnectedClientsOrInfoChanged(
+                any(), any(), anyBoolean(), anyBoolean());
     }
 
     /**

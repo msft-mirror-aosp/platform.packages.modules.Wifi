@@ -461,6 +461,14 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                 @SapClientBlockedReason int blockedReason) {}
 
         /**
+         * Checks the AttributionSource of a callback and returns true if the AttributionSource
+         * has the correct permissions. This should be extended by child classes.
+         */
+        boolean checkCallbackPermission(@Nullable Object broadcastCookie) {
+            return true;
+        }
+
+        /**
          * Notify register the state of soft AP changed.
          */
         public void notifyRegisterOnStateChanged(RemoteCallbackList<ISoftApCallback> callbacks,
@@ -468,6 +476,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             int itemCount = callbacks.beginBroadcast();
             for (int i = 0; i < itemCount; i++) {
                 try {
+                    if (!checkCallbackPermission(callbacks.getBroadcastCookie(i))) {
+                        continue;
+                    }
                     callbacks.getBroadcastItem(i).onStateChanged(state);
                 } catch (RemoteException e) {
                     Log.e(TAG, "onStateChanged: remote exception -- " + e);
@@ -487,6 +498,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             int itemCount = callbacks.beginBroadcast();
             for (int i = 0; i < itemCount; i++) {
                 try {
+                    if (!checkCallbackPermission(callbacks.getBroadcastCookie(i))) {
+                        continue;
+                    }
                     callbacks.getBroadcastItem(i).onConnectedClientsOrInfoChanged(
                             ApConfigUtil.deepCopyForSoftApInfoMap(infos),
                             ApConfigUtil.deepCopyForWifiClientListMap(
@@ -508,6 +522,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             int itemCount = callbacks.beginBroadcast();
             for (int i = 0; i < itemCount; i++) {
                 try {
+                    if (!checkCallbackPermission(callbacks.getBroadcastCookie(i))) {
+                        continue;
+                    }
                     callbacks.getBroadcastItem(i).onCapabilityChanged(capability);
                 } catch (RemoteException e) {
                     Log.e(TAG, "onCapabilityChanged: remote exception -- " + e);
@@ -530,6 +547,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             int itemCount = callbacks.beginBroadcast();
             for (int i = 0; i < itemCount; i++) {
                 try {
+                    if (!checkCallbackPermission(callbacks.getBroadcastCookie(i))) {
+                        continue;
+                    }
                     callbacks.getBroadcastItem(i).onBlockedClientConnecting(client, blockedReason);
                 } catch (RemoteException e) {
                     Log.e(TAG, "onBlockedClientConnecting: remote exception -- " + e);
@@ -551,6 +571,9 @@ public class WifiServiceImpl extends IWifiManager.Stub {
             int itemCount = callbacks.beginBroadcast();
             for (int i = 0; i < itemCount; i++) {
                 try {
+                    if (!checkCallbackPermission(callbacks.getBroadcastCookie(i))) {
+                        continue;
+                    }
                     callbacks.getBroadcastItem(i).onClientsDisconnected(new SoftApInfo(info),
                             clients);
                 } catch (RemoteException e) {
@@ -2404,8 +2427,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     getSoftApCapability(), countryCode, channelMap));
         }
 
-        public boolean registerSoftApCallback(ISoftApCallback callback) {
-            if (!mRegisteredSoftApCallbacks.register(callback)) {
+        public boolean registerSoftApCallback(ISoftApCallback callback, Object cookie) {
+            if (!mRegisteredSoftApCallbacks.register(callback, cookie)) {
                 return false;
             }
 
@@ -2571,7 +2594,20 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
         @GuardedBy("mLocalOnlyHotspotRequests")
         private int mPidRestartingLohsFor = UNSPECIFIED_PID;
-
+        @Override
+        public boolean checkCallbackPermission(@Nullable Object broadcastCookie) {
+            if (!SdkLevel.isAtLeastS()) {
+                // AttributionSource requires at least S.
+                return false;
+            }
+            if (!(broadcastCookie instanceof AttributionSource)) {
+                return false;
+            }
+            return mWifiPermissionsUtil.checkNearbyDevicesPermission(
+                    (AttributionSource) broadcastCookie,
+                    false /* checkForLocation */,
+                    TAG + " " + this.getClass().getSimpleName() + "#checkCallbackPermission");
+        }
         public void updateInterfaceIpState(String ifaceName, int mode) {
             // update interface IP state related to local-only hotspot
             synchronized (mLocalOnlyHotspotRequests) {
@@ -2940,7 +2976,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
         // post operation to handler thread
         mWifiThreadRunner.post(() -> {
-            if (!mTetheredSoftApTracker.registerSoftApCallback(callback)) {
+            if (!mTetheredSoftApTracker.registerSoftApCallback(callback, null)) {
                 Log.e(TAG, "registerSoftApCallback: Failed to add callback");
                 return;
             }
@@ -3122,15 +3158,18 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
     @Override
     public void registerLocalOnlyHotspotSoftApCallback(ISoftApCallback callback, Bundle extras) {
+        if (!SdkLevel.isAtLeastT()) {
+            throw new UnsupportedOperationException();
+        }
+
         // verify arguments
         if (callback == null) {
             throw new IllegalArgumentException("Callback must not be null");
         }
 
-        int uid = Binder.getCallingUid();
-        int pid = Binder.getCallingPid();
-        mWifiPermissionsUtil.enforceNearbyDevicesPermission(
-                extras.getParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE),
+        AttributionSource attributionSource =
+                extras.getParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE);
+        mWifiPermissionsUtil.enforceNearbyDevicesPermission(attributionSource,
                 false, TAG + " registerLocalOnlyHotspotSoftApCallback");
 
         if (mVerboseLoggingEnabled) {
@@ -3140,9 +3179,8 @@ public class WifiServiceImpl extends IWifiManager.Stub {
 
         // post operation to handler thread
         mWifiThreadRunner.post(() -> {
-            if (!mLohsSoftApTracker.registerSoftApCallback(callback)) {
+            if (!mLohsSoftApTracker.registerSoftApCallback(callback, attributionSource)) {
                 Log.e(TAG, "registerLocalOnlyHotspotSoftApCallback: Failed to add callback");
-                return;
             }
         }, TAG + "#registerLocalOnlyHotspotSoftApCallback");
     }
@@ -3153,8 +3191,6 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         if (callback == null) {
             throw new IllegalArgumentException("Callback must not be null");
         }
-        int uid = Binder.getCallingUid();
-        int pid = Binder.getCallingPid();
 
         mWifiPermissionsUtil.enforceNearbyDevicesPermission(
                 extras.getParcelable(WifiManager.EXTRA_PARAM_KEY_ATTRIBUTION_SOURCE),
