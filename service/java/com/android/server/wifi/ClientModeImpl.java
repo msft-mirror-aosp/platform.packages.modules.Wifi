@@ -6739,15 +6739,12 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                                 mWifiGlobals.getPollRssiIntervalMillis());
                         mWifiMetrics.logAsynchronousEvent(mInterfaceName,
                                 WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_ENABLED);
-                        mWifiScoreReport.bindScorerService();
                     }
                     else {
                         mRssiMonitor.setShortPollRssiInterval();
                         removeMessages(CMD_RSSI_POLL);
                         mWifiMetrics.logAsynchronousEvent(mInterfaceName,
                                 WifiUsabilityStatsEntry.CAPTURE_EVENT_TYPE_RSSI_POLLING_DISABLED);
-                        mWifiScoreReport.unbindScorerService(
-                                WifiScoreReport.SCORER_BINDING_STATE_POLLING_DISABLED);
                     }
                     break;
                 }
