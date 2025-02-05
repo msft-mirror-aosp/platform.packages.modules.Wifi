@@ -389,7 +389,7 @@ public class WifiServiceImplTest extends WifiBaseTest {
     private static final String DPP_PRODUCT_INFO = "DPP:some_dpp_uri_info";
     private static final WorkSource SETTINGS_WORKSOURCE =
             new WorkSource(Process.SYSTEM_UID, "system-service");
-
+    private static final String EXTERNAL_SCORER_PKG_NAME = "com.scorer";
     private final ArgumentCaptor<BroadcastReceiver> mBroadcastReceiverCaptor =
             ArgumentCaptor.forClass(BroadcastReceiver.class);
 
@@ -9213,9 +9213,15 @@ public class WifiServiceImplTest extends WifiBaseTest {
      */
     @Test
     public void testSetWifiConnectedNetworkScorerAndVerify() throws Exception {
+        when(mPackageManager.getPackagesForUid(anyInt()))
+                .thenReturn(new String[]{EXTERNAL_SCORER_PKG_NAME});
+        when(mContext.bindServiceAsUser(any(), any(), anyInt(), any())).thenReturn(true);
         mLooper.startAutoDispatch();
+
         mWifiServiceImpl.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer);
         mLooper.stopAutoDispatch();
+
+        assertNotNull(mWifiServiceImpl.mScorerServiceConnection);
         verify(mActiveModeWarden).setWifiConnectedNetworkScorer(
                 mAppBinder, mWifiConnectedNetworkScorer, myUid());
     }
@@ -9224,9 +9230,30 @@ public class WifiServiceImplTest extends WifiBaseTest {
      * Verify that clearWifiConnectedNetworkScorer clears scorer from {@link WifiScoreReport}.
      */
     @Test
-    public void testClearWifiConnectedNetworkScorerAndVerify() throws Exception {
+    public void testClearWifiConnectedNetworkScorerUnbindService() throws Exception {
+        when(mPackageManager.getPackagesForUid(anyInt()))
+                .thenReturn(new String[]{EXTERNAL_SCORER_PKG_NAME});
+        when(mContext.bindServiceAsUser(any(), any(), anyInt(), any())).thenReturn(true);
+        mLooper.startAutoDispatch();
+        mWifiServiceImpl.setWifiConnectedNetworkScorer(mAppBinder, mWifiConnectedNetworkScorer);
+        mLooper.stopAutoDispatch();
+        assertNotNull(mWifiServiceImpl.mScorerServiceConnection);
+
         mWifiServiceImpl.clearWifiConnectedNetworkScorer();
         mLooper.dispatchAll();
+
+        verify(mContext).unbindService(any());
+        verify(mActiveModeWarden).clearWifiConnectedNetworkScorer();
+    }
+
+    @Test
+    public void testClearWifiConnectedNetworkScorerAndVerify() throws Exception {
+        mWifiServiceImpl.mScorerServiceConnection = null;
+
+        mWifiServiceImpl.clearWifiConnectedNetworkScorer();
+        mLooper.dispatchAll();
+
+        verify(mContext, never()).unbindService(any());
         verify(mActiveModeWarden).clearWifiConnectedNetworkScorer();
     }
 

@@ -70,6 +70,7 @@ import static com.android.server.wifi.WifiSettingsConfigStore.WIFI_WEP_ALLOWED;
 import android.Manifest;
 import android.annotation.AnyThread;
 import android.annotation.CheckResult;
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.AppOpsManager;
@@ -83,6 +84,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -243,6 +245,8 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.security.GeneralSecurityException;
@@ -283,6 +287,40 @@ public class WifiServiceImpl extends IWifiManager.Stub {
     @VisibleForTesting
     static final int AUTO_DISABLE_SHOW_KEY_COUNTDOWN_MILLIS = 24 * 60 * 60 * 1000;
     private static final int CHANNEL_USAGE_WEAK_SCAN_RSSI_DBM = -80;
+
+    private static final int SCORER_BINDING_STATE_INVALID = -1;
+    // The system is brining up the scorer service.
+    private static final int SCORER_BINDING_STATE_BRINGING_UP = 0;
+    private static final int SCORER_BINDING_STATE_CONNECTED = 1;
+    private static final int SCORER_BINDING_STATE_DISCONNECTED = 2;
+    private static final int SCORER_BINDING_STATE_BINDING_DIED = 3;
+    // A null binder is received.
+    private static final int SCORER_BINDING_STATE_NULL_BINDING = 4;
+    // The system couldn't find the service to bind to.
+    private static final int SCORER_BINDING_STATE_NO_SERVICE = 5;
+    // The app has cleared the Wi-Fi scorer. So the service is unbound.
+    private static final int SCORER_BINDING_STATE_CLEARED = 6;
+    // The app has set a new Wi-Fi scorer. Rebind to the service.
+    public static final int SCORER_BINDING_STATE_REBINDING = 7;
+
+    @IntDef(prefix = { "SCORER_BINDING_STATE_" }, value = {
+        SCORER_BINDING_STATE_INVALID,
+        SCORER_BINDING_STATE_BRINGING_UP,
+        SCORER_BINDING_STATE_CONNECTED,
+        SCORER_BINDING_STATE_DISCONNECTED,
+        SCORER_BINDING_STATE_BINDING_DIED,
+        SCORER_BINDING_STATE_NULL_BINDING,
+        SCORER_BINDING_STATE_NO_SERVICE,
+        SCORER_BINDING_STATE_CLEARED,
+        SCORER_BINDING_STATE_REBINDING
+
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    private @interface ScorerBindingState {}
+
+    private @ScorerBindingState int mLastScorerBindingState = SCORER_BINDING_STATE_INVALID;
+    @VisibleForTesting
+    ScorerServiceConnection mScorerServiceConnection;
 
     private final ActiveModeWarden mActiveModeWarden;
     private final ScanRequestProxy mScanRequestProxy;
@@ -388,6 +426,112 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                         mTetheredSoftApTracker.getSoftApCapability(),
                         WifiManager.IFACE_IP_MODE_TETHERED);
             }, this.getClass().getSimpleName() + "#onActiveDataSubscriptionIdChanged");
+        }
+    }
+
+    private class ScorerServiceConnection implements ServiceConnection {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder binder) {
+            Log.i(TAG, "ScorerServiceConnection.onServiceConnected(" + name + ", " + binder + ")");
+            if (binder == null) {
+                mWifiThreadRunner.post(() -> unbindScorerService(SCORER_BINDING_STATE_NULL_BINDING),
+                        "ScorerServiceConnection#onServiceConnected");
+            } else {
+                mWifiThreadRunner.post(() -> {
+                    mLastScorerBindingState = SCORER_BINDING_STATE_CONNECTED;
+                }, "ScorerServiceConnection#onServiceConnected");
+            }
+        }
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            Log.w(TAG, "ScorerServiceConnection.onServiceDisconnected(" + name + ")");
+            mWifiThreadRunner.post(() -> unbindScorerService(SCORER_BINDING_STATE_DISCONNECTED),
+                    "ScorerServiceConnection#onServiceDisconnected");
+        }
+
+        @Override
+        public void onBindingDied(ComponentName name) {
+            Log.w(TAG, "ScorerServiceConnection.onBindingDied(" + name + ")");
+            mWifiThreadRunner.post(() -> unbindScorerService(SCORER_BINDING_STATE_BINDING_DIED),
+                    "ScorerServiceConnection#onBindingDied");
+        }
+
+        @Override
+        public void onNullBinding(ComponentName name) {
+            Log.i(TAG, "Wifi scorer service " + name + " - onNullBinding");
+            mWifiThreadRunner.post(() -> unbindScorerService(SCORER_BINDING_STATE_NULL_BINDING),
+                    "ScorerServiceConnection#onNullBinding");
+        }
+    }
+
+    /**
+     * Bind to the scorer service to prevent the process of the external scorer from freezing.
+     */
+    private void bindScorerService(int scorerUid) {
+        if (mScorerServiceConnection != null) {
+            Log.i(TAG, "bindScorerService() service is already bound. Unbind it now.");
+            unbindScorerService(SCORER_BINDING_STATE_REBINDING);
+        }
+
+        mLastScorerBindingState = SCORER_BINDING_STATE_NO_SERVICE;
+        PackageManager pm = mContext.getPackageManager();
+        if (pm == null) {
+            Log.e(TAG, "PackageManager is null!");
+            return;
+        } else {
+            String[] packageNames = pm.getPackagesForUid(scorerUid);
+            for (String packageName : packageNames) {
+                if (!TextUtils.isEmpty(packageName)) {
+                    mScorerServiceConnection = new ScorerServiceConnection();
+                    if (bindScorerServiceAsSystemUser(packageName, mScorerServiceConnection)) {
+                        mLastScorerBindingState = SCORER_BINDING_STATE_BRINGING_UP;
+                        return;
+                    } else {
+                        unbindScorerService(SCORER_BINDING_STATE_NO_SERVICE);
+                    }
+                } else {
+                    Log.d(TAG, "bindScorerService() packageName is empty");
+                }
+            }
+        }
+    }
+
+    private boolean bindScorerServiceAsSystemUser(@NonNull String packageName,
+            @NonNull ServiceConnection serviceConnection) {
+        Intent intent = new Intent("android.wifi.ScorerService");
+        intent.setPackage(packageName);
+        try {
+            if (mContext.bindServiceAsUser(intent, serviceConnection,
+                    Context.BIND_AUTO_CREATE | Context.BIND_FOREGROUND_SERVICE,
+                    UserHandle.SYSTEM)) {
+                Log.i(TAG, "bindScorerServiceAsSystemUser(): Bringing up service: " + packageName);
+                return true;
+            }
+        } catch (SecurityException ex) {
+            Log.e(TAG, "Fail to bindServiceAsSystemUser(): " + ex);
+        } catch (Exception ex) {
+            // Just make sure that it won't crash WiFi process
+            Log.e(TAG, "Fail to bindServiceAsSystemUser(): " + ex);
+        }
+        return false;
+    }
+
+    /**
+     * Unbind scorer service to let the system freeze the process of the external scorer freely.
+     */
+    private void unbindScorerService(@ScorerBindingState int state) {
+        mLastScorerBindingState = state;
+        if (mScorerServiceConnection != null) {
+            Log.i(TAG, "unbindScorerService(" + state + ")");
+            try {
+                mContext.unbindService(mScorerServiceConnection);
+            } catch (Exception e) {
+                Log.e(TAG, "Fail to unbindService! " + e);
+            }
+            mScorerServiceConnection = null;
+        } else {
+            Log.i(TAG, "unbindScorerService(" + state
+                    + ") mScorerServiceConnection is already null.");
         }
     }
 
@@ -5950,6 +6094,12 @@ public class WifiServiceImpl extends IWifiManager.Stub {
                     pw.println();
                     mWepNetworkUsageController.dump(fd, pw, args);
                 }
+                if (mScorerServiceConnection != null) {
+                    pw.println("boundToExternalScorer successfully");
+                } else {
+                    pw.println("boundToExternalScorer=failure, lastScorerBindingState="
+                            + mLastScorerBindingState);
+                }
             }
         }, TAG + "#dump");
     }
@@ -7627,6 +7777,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         if (mVerboseLoggingEnabled) {
             mLog.info("setWifiConnectedNetworkScorer uid=%").c(callingUid).flush();
         }
+        mWifiThreadRunner.post(() -> bindScorerService(callingUid));
         // Post operation to handler thread
         return mWifiThreadRunner.call(
                 () -> mActiveModeWarden.setWifiConnectedNetworkScorer(binder, scorer, callingUid),
@@ -7643,6 +7794,7 @@ public class WifiServiceImpl extends IWifiManager.Stub {
         if (mVerboseLoggingEnabled) {
             mLog.info("clearWifiConnectedNetworkScorer uid=%").c(Binder.getCallingUid()).flush();
         }
+        mWifiThreadRunner.post(() -> unbindScorerService(SCORER_BINDING_STATE_CLEARED));
         // Post operation to handler thread
         mWifiThreadRunner.post(() -> mActiveModeWarden.clearWifiConnectedNetworkScorer(),
                 TAG + "#clearWifiConnectedNetworkScorer");
