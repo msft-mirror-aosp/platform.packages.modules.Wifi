@@ -46,6 +46,7 @@ import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledAfter;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.ConnectivityManager.NetworkCallback;
 import android.net.DhcpInfo;
@@ -4085,14 +4086,18 @@ public class WifiManager {
      * @hide
      */
     public boolean isPasspointSupported() {
-        return isFeatureSupported(WIFI_FEATURE_PASSPOINT);
+        // Both OEM and chip support are required
+        return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_PASSPOINT)
+                && isFeatureSupported(WIFI_FEATURE_PASSPOINT);
     }
 
     /**
      * @return true if this adapter supports WifiP2pManager (Wi-Fi Direct)
      */
     public boolean isP2pSupported() {
-        return isFeatureSupported(WIFI_FEATURE_P2P);
+        // Both OEM and chip support are required
+        return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_DIRECT)
+                && isFeatureSupported(WIFI_FEATURE_P2P);
     }
 
     /**
@@ -4118,7 +4123,9 @@ public class WifiManager {
      * @hide
      */
     public boolean isWifiAwareSupported() {
-        return isFeatureSupported(WIFI_FEATURE_AWARE);
+        // Both OEM and chip support are required
+        return mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_WIFI_AWARE)
+                && isFeatureSupported(WIFI_FEATURE_AWARE);
     }
 
     /**
