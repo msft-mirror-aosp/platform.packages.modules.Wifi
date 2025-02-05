@@ -497,7 +497,7 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
                         config.bw = halRttChannelBandwidthCapabilityLimiter(config.bw, cap,
                                 config.type);
                         config.preamble = halRttPreambleCapabilityLimiter(config.preamble, cap,
-                                config.type);
+                                config.type, responder.frequency);
                     }
 
                     // Update secure ranging configuration
@@ -726,17 +726,33 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
     }
 
     /**
-     * Check whether the selected RTT preamble is supported by the device.
-     * If supported, return the requested preamble.
-     * If not supported, return the next "lower" preamble which is supported.
-     * If none, throw an IllegalArgumentException.
+     * Check whether the selected RTT preamble is supported by the device and the RTT type.
+     * <ul>
+     * <li>If supported, return the requested preamble.
+     * <li>If not supported, return the next "lower" preamble which is supported.
+     * <li>If none, throw an IllegalArgumentException.
+     * </ul>
      *
-     * Note: the halRttPreamble is a single bit flag from the HAL RttPreamble type.
+     * <p>Note: the halRttPreamble is a single bit flag from the HAL RttPreamble type.
+     *
+     * <p>Note: The IEEE 802.11mc is only compatible with HE and EHT when using the 6 GHz band.
+     * However, the IEEE 802.11az supports HE and EHT across all Wi-Fi bands (2.4GHz, 5 GHz, and
+     * 6 GHz).
      */
     private static int halRttPreambleCapabilityLimiter(int halRttPreamble,
-            WifiRttController.Capabilities cap, @RttType int rttType)
+            WifiRttController.Capabilities cap, @RttType int rttType, int frequency)
             throws IllegalArgumentException {
+        // Note: requestedPreamble is only used for the error logging
         int requestedPreamble = halRttPreamble;
+        // Since RTT type is limited based on device capability, check preamble for any adjustment.
+        // The IEEE 802.11mc is only compatible with HE and EHT when using the 6 GHz band. So
+        // adjust the preamble accordingly.
+        if (rttType <= RttType.TWO_SIDED_11MC && !ScanResult.is6GHz(frequency)) {
+            if (halRttPreamble >= RttPreamble.HE) {
+                halRttPreamble = RttPreamble.VHT;
+            }
+        }
+        // Check device capability whether preamble is supported by the device, otherwise adjust it.
         int preambleSupported = (rttType == RttType.TWO_SIDED_11AZ_NTB) ? cap.azPreambleSupported
                 : cap.preambleSupported;
         while ((halRttPreamble != 0) && ((halRttPreamble & preambleSupported) == 0)) {

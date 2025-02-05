@@ -439,6 +439,10 @@ public final class ResponderConfig implements Parcelable {
         int centerFreq1 = scanResult.centerFreq1;
 
         int preamble;
+        // The IEEE 802.11mc is only compatible with HE and EHT when using the 6 GHz band.
+        // However, the IEEE 802.11az supports HE and EHT across all Wi-Fi bands (2.4GHz, 5 GHz,
+        // and 6 GHz).
+        boolean isHeOrEhtAllowed = supports80211azNtbRanging || ScanResult.is6GHz(frequency);
         if (scanResult.informationElements != null && scanResult.informationElements.length != 0) {
             boolean htCapabilitiesPresent = false;
             boolean vhtCapabilitiesPresent = false;
@@ -457,9 +461,9 @@ public final class ResponderConfig implements Parcelable {
                 }
             }
 
-            if (ehtCapabilitiesPresent && ScanResult.is6GHz(frequency)) {
+            if (ehtCapabilitiesPresent && isHeOrEhtAllowed) {
                 preamble = ScanResult.PREAMBLE_EHT;
-            } else if (heCapabilitiesPresent && ScanResult.is6GHz(frequency)) {
+            } else if (heCapabilitiesPresent && isHeOrEhtAllowed) {
                 preamble = ScanResult.PREAMBLE_HE;
             } else if (vhtCapabilitiesPresent) {
                 preamble = ScanResult.PREAMBLE_VHT;
@@ -470,9 +474,10 @@ public final class ResponderConfig implements Parcelable {
             }
         } else {
             Log.e(TAG, "Scan Results do not contain IEs - using backup method to select preamble");
-            if (channelWidth == ScanResult.CHANNEL_WIDTH_320MHZ) {
+            if (channelWidth == ScanResult.CHANNEL_WIDTH_320MHZ && isHeOrEhtAllowed) {
                 preamble = ScanResult.PREAMBLE_EHT;
-            } else if (channelWidth == ScanResult.CHANNEL_WIDTH_80MHZ
+            } else if (channelWidth == ScanResult.CHANNEL_WIDTH_320MHZ
+                    || channelWidth == ScanResult.CHANNEL_WIDTH_80MHZ
                     || channelWidth == ScanResult.CHANNEL_WIDTH_160MHZ) {
                 preamble = ScanResult.PREAMBLE_VHT;
             } else {
