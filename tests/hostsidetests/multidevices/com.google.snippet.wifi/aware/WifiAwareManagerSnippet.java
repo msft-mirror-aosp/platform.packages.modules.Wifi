@@ -16,12 +16,14 @@
 
 package com.google.snippet.wifi.aware;
 
+import android.app.UiAutomation;
 import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.net.NetworkSpecifier;
 import android.net.MacAddress;
 import android.net.wifi.aware.AttachCallback;
 import android.net.wifi.aware.Characteristics;
@@ -41,12 +43,19 @@ import android.net.wifi.rtt.RangingRequest;
 import android.net.wifi.rtt.RangingResult;
 import android.net.wifi.rtt.RangingResultCallback;
 import android.net.wifi.rtt.WifiRttManager;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.text.TextUtils;
+import android.util.Base64;
+
+import android.os.RemoteException;
 
 import androidx.annotation.NonNull;
 import androidx.test.core.app.ApplicationProvider;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.google.android.mobly.snippet.Snippet;
 import com.google.android.mobly.snippet.event.EventCache;
@@ -70,6 +79,7 @@ public class WifiAwareManagerSnippet implements Snippet {
     private final Context mContext;
     private final WifiAwareManager mWifiAwareManager;
     private final WifiRttManager mWifiRttManager;
+    private final WifiManager mWifiManager;
     private final Handler mHandler;
     // WifiAwareSession will be initialized after attach.
     private final ConcurrentHashMap<String, WifiAwareSession> mAttachSessions =
@@ -100,9 +110,37 @@ public class WifiAwareManagerSnippet implements Snippet {
         mWifiAwareManager = mContext.getSystemService(WifiAwareManager.class);
         checkWifiAwareManager();
         mWifiRttManager = mContext.getSystemService(WifiRttManager.class);
+        mWifiManager = mContext.getSystemService(WifiManager.class);
         HandlerThread handlerThread = new HandlerThread("Snippet-Aware");
         handlerThread.start();
         mHandler = new Handler(handlerThread.getLooper());
+    }
+    private void adoptShellPermission() throws RemoteException {
+        UiAutomation uia = InstrumentationRegistry.getInstrumentation().getUiAutomation();
+        uia.adoptShellPermissionIdentity();
+    }
+
+    private void dropShellPermission() throws RemoteException {
+        UiAutomation uia = InstrumentationRegistry.getInstrumentation().getUiAutomation();
+        uia.dropShellPermissionIdentity();
+    }
+
+    /**
+     * Returns the MAC address of the currently active access point.
+     */
+    @Rpc(description = "Returns information about the currently active access point.")
+    public String wifiGetActiveNetworkMacAddress() throws Exception {
+        WifiInfo info = null;
+        try {
+            adoptShellPermission();
+            info = mWifiManager.getConnectionInfo();
+        } catch (RemoteException e) {
+            Log.e("RemoteException message: " + e);
+        } finally {
+            // cleanup
+            dropShellPermission();
+        }
+        return info.getMacAddress();
     }
 
     /**
@@ -666,8 +704,8 @@ public class WifiAwareManagerSnippet implements Snippet {
     ) throws JSONException, WifiAwareManagerSnippetException {
         DiscoverySession session = getDiscoverySession(discoverySessionId);
         PeerHandle handle = null;
-        if (peerId != null){
-        handle = getPeerHandler(peerId);
+        if (peerId != null && peerId > 0){
+            handle = getPeerHandler(peerId);
         }
         WifiAwareNetworkSpecifier.Builder builder;
         if (isAcceptAnyPeer) {
@@ -678,6 +716,48 @@ public class WifiAwareManagerSnippet implements Snippet {
         WifiAwareNetworkSpecifier specifier =
                 WifiAwareJsonDeserializer.jsonToNetworkSpecifier(jsonObject, builder);
         return SerializationUtil.parcelableToString(specifier);
+    }
+
+    /**
+     * Creates a oob NetworkSpecifier for requesting a Wi-Fi Aware network via ConnectivityManager.
+     *
+     * @param sessionId The Id of the AwareSession session,
+     * @param role             The role of this device: AwareDatapath Role.
+     * @param macAddress    The MAC address of the peer's Aware discovery interface.
+     * @return A {@link NetworkSpecifier}  to be used to construct
+     * @throws WifiAwareManagerSnippetException if there is an error creating the network
+     *                                          specifier.
+     */
+    @Rpc(
+            description = "Create a oob network specifier to be used when specifying a Aware "
+                    + "network request"
+    )
+    public NetworkSpecifier createNetworkSpecifierOob(String sessionId, int role, String macAddress,
+        String passphrase, String pmk)
+            throws WifiAwareManagerSnippetException {
+            WifiAwareSession session = getWifiAwareSession(sessionId);
+             NetworkSpecifier specifier = null;
+            byte[] peermac = null;
+            byte[] pmkDecoded = null;
+            if (!TextUtils.isEmpty(pmk)){
+                pmkDecoded = Base64.decode(pmk, Base64.DEFAULT);
+            }
+            if (macAddress != null) {
+                peermac = MacAddress.fromString(macAddress).toByteArray();
+            }
+            if (passphrase != null && !passphrase.isEmpty()) {
+                specifier = session.createNetworkSpecifierPassphrase(role, peermac, passphrase);
+            }
+            else if (pmk != null) {
+                specifier = session.createNetworkSpecifierPmk(role, peermac, pmkDecoded);
+            }
+            else if (peermac != null){
+                specifier = session.createNetworkSpecifierOpen(role, peermac);
+            } else {
+            throw new WifiAwareManagerSnippetException(
+                "At least one of passphrase, or macAddress must be provided.");
+            }
+            return specifier;
     }
 
     @Override
@@ -803,8 +883,10 @@ public class WifiAwareManagerSnippet implements Snippet {
                 RangingResult result = results.get(i);
                 resultBundles[i] = new Bundle();
                 resultBundles[i].putInt("status", result.getStatus());
-                resultBundles[i].putInt("distanceMm", result.getDistanceMm());
-                resultBundles[i].putInt("rssi", result.getRssi());
+                if (result.getStatus() == RangingResult.STATUS_SUCCESS) {
+                    resultBundles[i].putInt("distanceMm", result.getDistanceMm());
+                    resultBundles[i].putInt("rssi", result.getRssi());
+                }
                 PeerHandle peer = result.getPeerHandle();
                 if (peer != null) {
                     resultBundles[i].putInt("peerId", peer.hashCode());
@@ -813,6 +895,8 @@ public class WifiAwareManagerSnippet implements Snippet {
                 }
                 MacAddress mac = result.getMacAddress();
                 resultBundles[i].putString("mac", mac != null ? mac.toString() : null);
+                resultBundles[i].putString("macAsString",
+                    mac != null ? result.getMacAddress().toString() : null);
             }
             event.getData().putParcelableArray("results", resultBundles);
             mEventCache.postEvent(event);

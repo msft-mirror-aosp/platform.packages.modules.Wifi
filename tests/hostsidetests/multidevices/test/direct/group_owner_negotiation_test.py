@@ -74,10 +74,12 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
             4. Stop the connection. Verify both devices show connection stopped
                status.
         """
+        logging.info('Initializing Wi-Fi p2p.')
         responder = p2p_utils.setup_wifi_p2p(self.responder_ad)
         requester = p2p_utils.setup_wifi_p2p(self.requester_ad)
 
-        requester_peer_p2p_device = p2p_utils.find_p2p_device(
+        requester.ad.log.info('Searching for target device.')
+        requester_peer_p2p_device = p2p_utils.discover_p2p_peer(
             requester, responder
         )
         # Make sure that peer is not a group owner (GO) as this is testing
@@ -88,9 +90,17 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
             ' It should not be group owner.',
         )
 
-        p2p_utils.p2p_connect(requester, responder, constants.WpsInfo.PBC)
+        requester.ad.log.info('Trying to connect the peer device with WPS PBC.')
+        p2p_config = constants.WifiP2pConfig(
+            device_address=responder.p2p_device.device_address,
+            wps_setup=constants.WpsInfo.PBC,
+        )
+        p2p_utils.p2p_connect(requester, responder, p2p_config)
 
-        p2p_utils.remove_group_and_verify_disconnected(requester, responder)
+        requester.ad.log.info('Disconnecting the peer device.')
+        p2p_utils.remove_group_and_verify_disconnected(
+            requester, responder, is_group_negotiation=True
+        )
 
     @ApiTest([
         'android.net.wifi.p2p.WifiP2pManager#connect(android.net.wifi.p2p.WifiP2pManager.Channel, android.net.wifi.p2p.WifiP2pConfig, android.net.wifi.p2p.WifiP2pManager.ActionListener)',
@@ -108,10 +118,12 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
             4. Stop the connection. Verify both devices show connection stopped
                status.
         """
+        logging.info('Initializing Wi-Fi p2p.')
         responder = p2p_utils.setup_wifi_p2p(self.responder_ad)
         requester = p2p_utils.setup_wifi_p2p(self.requester_ad)
 
-        requester_peer_p2p_device = p2p_utils.find_p2p_device(
+        requester.ad.log.info('Searching for target device.')
+        requester_peer_p2p_device = p2p_utils.discover_p2p_peer(
             requester, responder
         )
         # Make sure that peer is not a group owner (GO) as this is testing
@@ -122,13 +134,23 @@ class GroupOwnerNegotiationTest(base_test.BaseTestClass):
             ' It should not be group owner.',
         )
 
-        p2p_utils.p2p_connect(requester, responder, constants.WpsInfo.DISPLAY)
+        requester.ad.log.info('Trying to connect the peer device with WPS PIN.')
+        p2p_config = constants.WifiP2pConfig(
+            device_address=responder.p2p_device.device_address,
+            wps_setup=constants.WpsInfo.DISPLAY,
+        )
+        p2p_utils.p2p_connect(requester, responder, p2p_config)
 
-        p2p_utils.remove_group_and_verify_disconnected(requester, responder)
+        requester.ad.log.info('Disconnecting the peer device.')
+        p2p_utils.remove_group_and_verify_disconnected(
+            requester, responder, is_group_negotiation=True
+        )
 
     def _teardown_device(self, ad: android_device.AndroidDevice):
-        p2p_utils.teardown_wifi_p2p(ad)
-        ad.services.create_output_excerpts_all(self.current_test_info)
+        try:
+            p2p_utils.teardown_wifi_p2p(ad)
+        finally:
+            ad.services.create_output_excerpts_all(self.current_test_info)
 
     def teardown_test(self) -> None:
         utils.concurrent_exec(

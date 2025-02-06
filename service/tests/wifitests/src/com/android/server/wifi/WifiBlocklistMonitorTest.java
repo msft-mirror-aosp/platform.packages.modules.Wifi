@@ -1788,4 +1788,34 @@ public class WifiBlocklistMonitorTest extends WifiBaseTest {
 
         assertEquals(maxAllowlistSize, ssidAllowlistCaptor.getValue().size());
     }
+
+    /**
+     * Verifies the bssid block list can be cleared for a specific reason code.
+     */
+    @Test
+    public void testClearBlocklistBssidForReason() {
+        WifiConfiguration config = WifiConfigurationTestUtil.createPskNetwork(TEST_SSID_1);
+        long testDuration = 5500L;
+        // Add bssid's in the block list with different reason codes and validate.
+        // - TEST_BSSID_1 and TEST_BSSID_2 with REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT
+        // - TEST_BSSID_3 with REASON_ASSOCIATION_REJECTION
+        mWifiBlocklistMonitor.blockBssidForDurationMs(TEST_BSSID_1, config, testDuration,
+                WifiBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT, -TEST_GOOD_RSSI);
+        mWifiBlocklistMonitor.blockBssidForDurationMs(TEST_BSSID_2, config, testDuration,
+                WifiBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT, -TEST_GOOD_RSSI);
+        mWifiBlocklistMonitor.blockBssidForDurationMs(TEST_BSSID_3, config, testDuration,
+                WifiBlocklistMonitor.REASON_ASSOCIATION_REJECTION, -TEST_GOOD_RSSI);
+        assertEquals(Set.of(TEST_BSSID_1, TEST_BSSID_2, TEST_BSSID_3),
+                mWifiBlocklistMonitor.updateAndGetBssidBlocklist());
+        assertEquals(Set.of(WifiBlocklistMonitor.REASON_ASSOCIATION_REJECTION,
+                        WifiBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT),
+                mWifiBlocklistMonitor.getFailureReasonsForSsid(TEST_SSID_1));
+        // Remove entries with reason REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT, and
+        // block list should have only TEST_BSSID_3 with reason REASON_ASSOCIATION_REJECTION
+        mWifiBlocklistMonitor.clearBssidBlocklistForReason(
+                WifiBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT);
+        assertEquals(Set.of(TEST_BSSID_3), mWifiBlocklistMonitor.updateAndGetBssidBlocklist());
+        assertEquals(Set.of(WifiBlocklistMonitor.REASON_ASSOCIATION_REJECTION),
+                mWifiBlocklistMonitor.getFailureReasonsForSsid(TEST_SSID_1));
+    }
 }

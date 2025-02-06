@@ -683,7 +683,8 @@ public class UsdRequestManager {
         }
 
         @Override
-        public void onUsdPublishConfigFailed(int cmdId) {
+        public void onUsdPublishConfigFailed(int cmdId,
+                @SessionCallback.FailureCode int errorCode) {
             if (cmdId != DEFAULT_COMMAND_ID) {
                 Log.e(TAG, "onUsdPublishConfigFailed: Invalid command id = " + cmdId);
                 return;
@@ -692,15 +693,15 @@ public class UsdRequestManager {
             if (usdSession.getRole() != Role.PUBLISHER) return;
             usdSession.sessionCleanup();
             try {
-                usdSession.mIPublishSessionCallback.onPublishFailed(
-                        SessionCallback.FAILURE_UNKNOWN);
+                usdSession.mIPublishSessionCallback.onPublishFailed(errorCode);
             } catch (RemoteException e) {
                 Log.e(TAG, "onUsdPublishConfigFailed " + e);
             }
         }
 
         @Override
-        public void onUsdSubscribeConfigFailed(int cmdId) {
+        public void onUsdSubscribeConfigFailed(int cmdId,
+                @SessionCallback.FailureCode int errorCode) {
             if (cmdId != DEFAULT_COMMAND_ID) {
                 Log.e(TAG, "onUsdSubscribeConfigFailed: Invalid command id = " + cmdId);
                 return;
@@ -709,8 +710,7 @@ public class UsdRequestManager {
             if (usdSession.getRole() != Role.SUBSCRIBER) return;
             usdSession.sessionCleanup();
             try {
-                usdSession.mISubscribeSessionCallback.onSubscribeFailed(
-                        SessionCallback.FAILURE_UNKNOWN);
+                usdSession.mISubscribeSessionCallback.onSubscribeFailed(errorCode);
             } catch (RemoteException e) {
                 Log.e(TAG, "onUsdSubscribeConfigFailed " + e);
             }

@@ -206,6 +206,7 @@ public class WifiNetworkFactory extends NetworkFactory {
     private final HashMap<String, RemoteCallbackList<ILocalOnlyConnectionStatusListener>>
             mLocalOnlyStatusListenerPerApp = new HashMap<>();
     private final HashMap<String, String> mFeatureIdPerApp = new HashMap<>();
+    private boolean mShouldTriggerScanImmediately = false;
 
     /**
      * Helper class to store an access point that the user previously approved for a specific app.
@@ -1606,6 +1607,7 @@ public class WifiNetworkFactory extends NetworkFactory {
                 mScanSettings.channels[index++] = new WifiScanner.ChannelSpec(freq);
             }
             mScanSettings.band = WIFI_BAND_UNSPECIFIED;
+            mShouldTriggerScanImmediately = true;
         }
         mIsPeriodicScanEnabled = true;
         startScan();
@@ -1615,6 +1617,7 @@ public class WifiNetworkFactory extends NetworkFactory {
     }
 
     private void cancelPeriodicScans() {
+        mShouldTriggerScanImmediately = false;
         if (mPeriodicScanTimerSet) {
             mAlarmManager.cancel(mPeriodicScanTimerListener);
             mPeriodicScanTimerSet = false;
@@ -1624,6 +1627,8 @@ public class WifiNetworkFactory extends NetworkFactory {
     }
 
     private void scheduleNextPeriodicScan() {
+        boolean triggerScanImmediately = mShouldTriggerScanImmediately;
+        mShouldTriggerScanImmediately = false;
         if (mIsPeriodicScanPaused) {
             Log.e(TAG, "Scan triggered when periodic scanning paused. Ignoring...");
             return;
@@ -1633,6 +1638,10 @@ public class WifiNetworkFactory extends NetworkFactory {
         }
         if (mSkipUserDialogue && mUserApprovedScanRetryCount >= USER_APPROVED_SCAN_RETRY_MAX) {
             cleanupActiveRequest();
+            return;
+        }
+        if (triggerScanImmediately) {
+            startScan();
             return;
         }
         mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,

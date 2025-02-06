@@ -634,6 +634,10 @@ public class WifiRttManagerTest {
         heCap.id = ScanResult.InformationElement.EID_EXTENSION_PRESENT;
         heCap.idExt = ScanResult.InformationElement.EID_EXT_HE_CAPABILITIES;
 
+        ScanResult.InformationElement ehtCap = new ScanResult.InformationElement();
+        ehtCap.id = ScanResult.InformationElement.EID_EXTENSION_PRESENT;
+        ehtCap.idExt = ScanResult.InformationElement.EID_EXT_EHT_CAPABILITIES;
+
         // no IE
         ScanResult scan = new ScanResult();
         scan.BSSID = "00:01:02:03:04:05";
@@ -689,6 +693,57 @@ public class WifiRttManagerTest {
         config = ResponderConfig.fromScanResult(scan);
 
         assertEquals(ResponderConfig.PREAMBLE_HE, config.preamble);
+
+        ScanResult.InformationElement[] ie = new ScanResult.InformationElement[3];
+        ie[0] = vhtCap;
+        ie[1] = heCap;
+        ie[2] = ehtCap;
+
+        ScanResult.Builder builder = new ScanResult.Builder()
+                .setBssid("00:01:02:03:04:05")
+                .setChannelWidth(ResponderConfig.CHANNEL_WIDTH_80MHZ);
+
+        // Validate 11az & 11mc ranging in 5 Ghz and EHT
+        scan =  builder.setFrequency(5200).setIs80211azNtbRTTResponder(true)
+                .setIs80211McRTTResponder(true).build();
+        scan.informationElements = ie;
+        config = ResponderConfig.fromScanResult(scan);
+        assertEquals(ResponderConfig.PREAMBLE_EHT, config.preamble);
+
+        // Validate 11az & 11mc ranging in 6 Ghz and EHT
+        scan =  builder.setFrequency(5935).setIs80211azNtbRTTResponder(true)
+                .setIs80211McRTTResponder(true).build();
+        scan.informationElements = ie;
+        config = ResponderConfig.fromScanResult(scan);
+        assertEquals(ResponderConfig.PREAMBLE_EHT, config.preamble);
+
+        // Validate 11mc ranging in 5 Ghz with EHT
+        scan =  builder.setFrequency(5200).setIs80211azNtbRTTResponder(false)
+                .setIs80211McRTTResponder(true).build();
+        scan.informationElements = ie;
+        config = ResponderConfig.fromScanResult(scan);
+        assertEquals(ResponderConfig.PREAMBLE_VHT, config.preamble);
+
+        // Validate one-sided ranging in 5 Ghz with EHT; Same result as 11mc.
+        scan =  builder.setFrequency(5200).setIs80211azNtbRTTResponder(false)
+                .setIs80211McRTTResponder(false).build();
+        scan.informationElements = ie;
+        config = ResponderConfig.fromScanResult(scan);
+        assertEquals(ResponderConfig.PREAMBLE_VHT, config.preamble);
+
+        // Validate 11mc ranging in 6 Ghz with EHT
+        scan =  builder.setFrequency(5935).setIs80211azNtbRTTResponder(false)
+                .setIs80211McRTTResponder(true).build();
+        scan.informationElements = ie;
+        config = ResponderConfig.fromScanResult(scan);
+        assertEquals(ResponderConfig.PREAMBLE_EHT, config.preamble);
+
+        // Validate one-sided ranging in 6 Ghz with EHT; Same result as 11mc.
+        scan =  builder.setFrequency(5935).setIs80211azNtbRTTResponder(false)
+                .setIs80211McRTTResponder(false).build();
+        scan.informationElements = ie;
+        config = ResponderConfig.fromScanResult(scan);
+        assertEquals(ResponderConfig.PREAMBLE_EHT, config.preamble);
     }
 
     @Test

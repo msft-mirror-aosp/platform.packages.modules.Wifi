@@ -7540,11 +7540,6 @@ public class ClientModeImpl extends StateMachine implements ClientMode {
                 }
                 case WifiMonitor.NETWORK_DISCONNECTION_EVENT: {
                     DisconnectEventInfo eventInfo = (DisconnectEventInfo) message.obj;
-                    reportConnectionAttemptEnd(
-                            WifiMetrics.ConnectionEvent.FAILURE_NETWORK_DISCONNECTION,
-                            WifiMetricsProto.ConnectionEvent.HLF_NONE,
-                            WifiMetricsProto.ConnectionEvent.FAILURE_REASON_UNKNOWN,
-                            eventInfo.reasonCode);
                     if (unexpectedDisconnectedReason(eventInfo.reasonCode)) {
                         mWifiDiagnostics.triggerBugReportDataCapture(
                                 WifiDiagnostics.REPORT_REASON_UNEXPECTED_DISCONNECT);

@@ -85,26 +85,50 @@ public class RttTestUtils {
      */
     public static RangingRequest getDummyRangingRequestWith11az(byte lastMacByte) {
         RangingRequest.Builder builder = new RangingRequest.Builder();
+        ScanResult.InformationElement vhtCap = new ScanResult.InformationElement();
+        vhtCap.id = ScanResult.InformationElement.EID_VHT_CAPABILITIES;
 
-        ScanResult scan1 = new ScanResult();
-        scan1.BSSID = "00:01:02:03:04:" + String.format("%02d", lastMacByte);
-        scan1.setFlag(ScanResult.FLAG_80211mc_RESPONDER);
-        scan1.channelWidth = ScanResult.CHANNEL_WIDTH_40MHZ;
+        ScanResult.InformationElement heCap = new ScanResult.InformationElement();
+        heCap.id = ScanResult.InformationElement.EID_EXTENSION_PRESENT;
+        heCap.idExt = ScanResult.InformationElement.EID_EXT_HE_CAPABILITIES;
+
+        ScanResult.InformationElement ehtCap = new ScanResult.InformationElement();
+        ehtCap.id = ScanResult.InformationElement.EID_EXTENSION_PRESENT;
+        ehtCap.idExt = ScanResult.InformationElement.EID_EXT_EHT_CAPABILITIES;
+
+        ScanResult.InformationElement[] ie = new ScanResult.InformationElement[3];
+        ie[0] = vhtCap;
+        ie[1] = heCap;
+        ie[2] = ehtCap;
+
+        // peer 0: 11mc only
+        ScanResult scan1 = new ScanResult.Builder()
+                .setBssid("00:01:02:03:04:" + String.format("%02d", lastMacByte))
+                .setIs80211McRTTResponder(true)
+                .setChannelWidth(ScanResult.CHANNEL_WIDTH_40MHZ)
+                .setFrequency(5200)
+                .build();
+        scan1.informationElements = ie;
+        builder.addAccessPoint(scan1);
+        // peer 1: one-sided only
         ScanResult scan2 = new ScanResult();
         scan2.BSSID = "0A:0B:0C:0D:0E:" + String.format("%02d", lastMacByte);
         scan2.channelWidth = ScanResult.CHANNEL_WIDTH_20MHZ;
         MacAddress mac1 = MacAddress.fromString("08:09:08:07:06:05");
-
-        builder.addAccessPoint(scan1);
         builder.addNon80211mcCapableAccessPoint(scan2);
-        // Changing default RTT burst size to a valid, but maximum, value
+        // peer 2: Aware
         builder.setRttBurstSize(RangingRequest.getMaxRttBurstSize());
         builder.addWifiAwarePeer(mac1);
-        // Add 11az & 11mc supported AP
-        scan1.BSSID = "00:11:22:33:44:" + String.format("%02d", lastMacByte);
-        scan1.setFlag(ScanResult.FLAG_80211mc_RESPONDER);
-        scan1.setFlag(ScanResult.FLAG_80211az_NTB_RESPONDER);
-        scan1.channelWidth = ScanResult.CHANNEL_WIDTH_40MHZ;
+        // peer 3: 11az & 11mc supported AP. Since the device supports 11mc only, the expectation is
+        // preamble will be adjusted as VHT since ranging request is in 5 Ghz.
+        scan1 = new ScanResult.Builder()
+                .setBssid("00:11:22:33:44:" + String.format("%02d", lastMacByte))
+                .setIs80211McRTTResponder(true)
+                .setIs80211azNtbRTTResponder(true)
+                .setChannelWidth(ScanResult.CHANNEL_WIDTH_40MHZ)
+                .setFrequency(5200)
+                .build();
+        scan1.informationElements = ie;
         builder.addAccessPoint(scan1);
         return builder.build();
     }

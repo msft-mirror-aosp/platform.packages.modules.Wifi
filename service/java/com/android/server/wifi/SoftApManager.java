@@ -226,6 +226,9 @@ public class SoftApManager implements ActiveModeManager {
     // Whether this SoftApManager (i.e. this AP interface) is using multiple link operation.
     private boolean mIsUsingMlo = false;
 
+    private int mMaximumNumberOfMLDSupported;
+    private int mCurrentExistingMLD;
+
     /**
      * The specified configuration passed in during initialization or during a configuration update
      * that doesn't require a restart.
@@ -296,6 +299,8 @@ public class SoftApManager implements ActiveModeManager {
     private int mCurrentApState = WifiManager.WIFI_AP_STATE_DISABLED;
 
     private boolean mIsSoftApStartedEventWritten = false;
+
+    private int mMaxConnectedClients = 0;
 
     /**
      * A map stores shutdown timeouts for each Soft Ap instance.
@@ -533,6 +538,9 @@ public class SoftApManager implements ActiveModeManager {
         mRole = role;
         // chip support it && overlay configuration is set.
         mIsMLDApSupportMLO = mWifiNative.isMLDApSupportMLO();
+        mMaximumNumberOfMLDSupported = ApConfigUtil.getMaximumSupportedMLD(
+                mContext, mWifiNative.isMultipleMLDSupportedOnSap());
+        mCurrentExistingMLD = mActiveModeWarden.getCurrentMLDAp();
         mIsUsingMlo = useMultilinkMloSoftAp();
         enableVerboseLogging(verboseLoggingEnabled);
         mStateMachine.sendMessage(SoftApStateMachine.CMD_START, requestorWs);
@@ -568,12 +576,10 @@ public class SoftApManager implements ActiveModeManager {
                 && mCurrentSoftApConfiguration.isIeee80211beEnabled()
                 && isBridgedMode() && mIsMLDApSupportMLO) {
 
-            int currentExistingMLD =
-                    mActiveModeWarden.getCurrentMLDAp();
             if (ApConfigUtil.is11beAllowedForThisConfiguration(
                     null /* Wiphy capability can be ignored for MLO case*/,
                     mContext, mCurrentSoftApConfiguration, true /* isBridgedMode */,
-                    currentExistingMLD,
+                    mMaximumNumberOfMLDSupported, mCurrentExistingMLD,
                     true /* isMLDApSupportMLO */)) {
                 return true;
             }
@@ -1350,11 +1356,9 @@ public class SoftApManager implements ActiveModeManager {
                             DeviceWiphyCapabilities capabilities =
                                     mWifiNative.getDeviceWiphyCapabilities(
                                             mApInterfaceName, isBridgeRequired());
-                            int currentExistingMLD =
-                                    mActiveModeWarden.getCurrentMLDAp();
                             if (!ApConfigUtil.is11beAllowedForThisConfiguration(capabilities,
                                     mContext, mCurrentSoftApConfiguration, isBridgedMode(),
-                                    currentExistingMLD,
+                                    mMaximumNumberOfMLDSupported, mCurrentExistingMLD,
                                     mIsMLDApSupportMLO)) {
                                 Log.d(getTag(), "11BE is not allowed,"
                                         + " removing from configuration");
@@ -1775,6 +1779,8 @@ public class SoftApManager implements ActiveModeManager {
                     boolean isAllow = checkSoftApClient(mCurrentSoftApConfiguration, client);
                     if (isAllow) {
                         clientList.add(client);
+                        mMaxConnectedClients = clientList.size() > mMaxConnectedClients
+                                ? clientList.size() : mMaxConnectedClients;
                     } else {
                         return;
                     }
@@ -1795,6 +1801,8 @@ public class SoftApManager implements ActiveModeManager {
                 if (mSoftApCallback != null) {
                     if (Flags.softapDisconnectReason() && !isConnected) {
                         // Client successfully disconnected, should also notify callback
+                        mWifiMetrics.reportOnClientsDisconnected(client.getDisconnectReason(),
+                                mRequestorWs);
                         mSoftApCallback.onClientsDisconnected(
                                 currentInfoWithClientsChanged,
                                 ImmutableList.of(client));
@@ -2430,7 +2438,7 @@ public class SoftApManager implements ActiveModeManager {
                 durationSeconds,
                 securityType,
                 standard,
-                -1,
+                mMaxConnectedClients,
                 mDefaultShutdownIdleInstanceInBridgedModeTimeoutMillis > 0,
                 -1,
                 -1,

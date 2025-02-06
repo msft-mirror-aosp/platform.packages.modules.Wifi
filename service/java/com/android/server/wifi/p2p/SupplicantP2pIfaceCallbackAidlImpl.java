@@ -55,6 +55,7 @@ import android.net.wifi.util.Environment;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.HexDump;
 import com.android.modules.utils.build.SdkLevel;
 import com.android.server.wifi.util.HalAidlUtil;
@@ -1162,11 +1163,17 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
             return;
         }
 
-        try {
-            device.primaryDeviceType = NativeUtil.wpsDevTypeStringFromByteArray(primaryDeviceType);
-        } catch (Exception e) {
-            Log.e(TAG, "Could not encode device primary type.", e);
-            return;
+        // Device Type is present only in WFD R1 device discovery. So in case of USD based
+        // discovery where pairing bootstrapping method is advertised, skip checking the
+        // Device type.
+        if (pairingBootstrappingMethods == 0) {
+            try {
+                device.primaryDeviceType = NativeUtil.wpsDevTypeStringFromByteArray(
+                        primaryDeviceType);
+            } catch (Exception e) {
+                Log.e(TAG, "Could not encode device primary type.", e);
+                return;
+            }
         }
 
         device.deviceCapability = deviceCapabilities;
@@ -1278,6 +1285,7 @@ public class SupplicantP2pIfaceCallbackAidlImpl extends ISupplicantP2pIfaceCallb
         return result;
     }
 
+    @VisibleForTesting
     private static int convertAidlPairingBootstrappingMethodsToFramework(
             int aidlPairingBootstrappingMethods) {
         int pairingBootstrappingMethods = 0;

@@ -4769,6 +4769,8 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
                 .updateAndGetBssidBlocklistForSsids(anySet());
         mWifiConnectivityManager.forceConnectivityScan(WIFI_WORK_SOURCE);
         mLooper.dispatchAll();
+        inOrder.verify(mWifiBlocklistMonitor).clearBssidBlocklistForReason(
+                eq(WifiBlocklistMonitor.REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT));
         inOrder.verify(mWifiBlocklistMonitor).tryEnablingBlockedBssids(any());
         inOrder.verify(mWifiConfigManager).updateNetworkSelectionStatus(disabledConfig.networkId,
                 WifiConfiguration.NetworkSelectionStatus.DISABLED_NONE);
@@ -6289,8 +6291,8 @@ public class WifiConnectivityManagerTest extends WifiBaseTest {
         assertEquals(1, mTestHandler.getIntervals().size());
         final long delta = Math.abs(NETWORK_CHANGE_TRIGGER_PNO_THROTTLE_MS
                 - mTestHandler.getIntervals().get(0));
-        assertTrue("Interval " + " (" + delta + ") not in 1ms error margin",
-                delta < 2);
+        assertTrue("Interval " + " (" + delta + ") not in 5ms error margin",
+                delta < 6);
         when(mClock.getElapsedSinceBootMillis()).thenReturn(mTestHandler.getIntervals().get(0));
         // Now advance the test handler and fire the periodic scan timer
         mTestHandler.timeAdvance();

@@ -267,13 +267,13 @@ public class WifiScanningServiceImpl extends IWifiScanner.Stub {
             notifyFailure(listener, WifiScanner.REASON_NOT_AUTHORIZED, "Not authorized");
             return;
         }
-        ExternalClientInfo client = (ExternalClientInfo) mClients.get(listener);
-        if (client == null) {
-            logw("no client registered: " + uid + ", listener=" + listener
-                    + " AttributionTag " + featureId);
-            return;
-        }
         mWifiThreadRunner.post(() -> {
+            ExternalClientInfo client = (ExternalClientInfo) mClients.get(listener);
+            if (client == null) {
+                logw("no client registered: " + uid + ", listener=" + listener
+                        + " AttributionTag " + featureId);
+                return;
+            }
             logScanRequest("deregisterScanListener", client, null, null, null);
             mSingleScanListeners.removeRequest(client);
             client.cleanup();

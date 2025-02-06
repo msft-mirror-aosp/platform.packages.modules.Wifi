@@ -16,6 +16,7 @@
 
 package com.android.server.wifi;
 
+import static android.net.wifi.WifiManager.WIFI_STATE_DISABLING;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLED;
 import static android.net.wifi.WifiManager.WIFI_STATE_ENABLING;
 
@@ -591,6 +592,9 @@ public class ConcreteClientModeManager implements ClientModeManager {
         mTargetRoleChangeInfo = new RoleChangeInfo(role, requestorWs, modeListener);
         if (role == ROLE_CLIENT_SCAN_ONLY) {
             // Switch client mode manager to scan only mode.
+            if (mRole == ROLE_CLIENT_PRIMARY) {
+                mWifiInjector.getActiveModeWarden().setWifiStateForApiCalls(WIFI_STATE_DISABLING);
+            }
             mStateMachine.sendMessage(
                     ClientModeStateMachine.CMD_SWITCH_TO_SCAN_ONLY_MODE);
         } else {

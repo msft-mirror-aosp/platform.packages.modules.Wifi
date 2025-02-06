@@ -737,6 +737,20 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
     }
 
     /**
+     * Verify handling of new network request with network specifier.
+     */
+    @Test
+    public void testScanScheduleWithPreferredChannel() {
+        attachDefaultWifiNetworkSpecifierAndAppInfo(TEST_UID_1, false,
+                new int[]{TEST_PREFERRED_CHANNEL_FREQ}, false);
+        mWifiNetworkFactory.needNetworkFor(mNetworkRequest);
+        verifyPeriodicScans(false, 0, 0,
+                PERIODIC_SCAN_INTERVAL_MS,     // 10s
+                PERIODIC_SCAN_INTERVAL_MS,     // 10s
+                PERIODIC_SCAN_INTERVAL_MS);    // 10s
+    }
+
+    /**
      * Validates handling of new network request with unsupported network specifier.
      */
     @Test
@@ -3917,11 +3931,13 @@ public class WifiNetworkFactoryTest extends WifiBaseTest {
             if (stopAtLastSchedule && i == scanParams.length - 2) {
                 break;
             }
-            mInOrder.verify(mAlarmManager).set(eq(AlarmManager.ELAPSED_REALTIME_WAKEUP),
-                    eq(expectedNextIntervalInMs + nowMs), any(),
-                    mPeriodicScanListenerArgumentCaptor.capture(), any());
-            alarmListener = mPeriodicScanListenerArgumentCaptor.getValue();
-            assertNotNull(alarmListener);
+            if (expectedNextIntervalInMs != 0) {
+                mInOrder.verify(mAlarmManager).set(eq(AlarmManager.ELAPSED_REALTIME_WAKEUP),
+                        eq(expectedNextIntervalInMs + nowMs), any(),
+                        mPeriodicScanListenerArgumentCaptor.capture(), any());
+                alarmListener = mPeriodicScanListenerArgumentCaptor.getValue();
+                assertNotNull(alarmListener);
+            }
         }
 
         mInOrder.verifyNoMoreInteractions();

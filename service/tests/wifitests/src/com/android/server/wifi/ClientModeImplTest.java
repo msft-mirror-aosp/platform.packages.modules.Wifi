@@ -5362,6 +5362,19 @@ public class ClientModeImplTest extends WifiBaseTest {
         // BSSID different, record this connection.
         verify(mWifiMetrics).incrementNumBssidDifferentSelectionBetweenFrameworkAndFirmware();
         verifyConnectionEventTimeoutDoesNotOccur();
+
+        // Disconnect now should not trigger handleConnectionAttemptEnded
+        DisconnectEventInfo disconnectEventInfo =
+                new DisconnectEventInfo(TEST_SSID, TEST_BSSID_STR, 0, false);
+        mCmi.sendMessage(WifiMonitor.NETWORK_DISCONNECTION_EVENT, disconnectEventInfo);
+        mLooper.dispatchAll();
+
+        verify(mWifiMetrics, never()).endConnectionEvent(
+                any(), eq(WifiMetrics.ConnectionEvent.FAILURE_NETWORK_DISCONNECTION),
+                anyInt(), anyInt(), anyInt(), anyInt());
+        verify(mWifiConnectivityManager, never()).handleConnectionAttemptEnded(
+                any(), eq(WifiMetrics.ConnectionEvent.FAILURE_NETWORK_DISCONNECTION),
+                anyInt(), any(), any());
     }
 
     /**

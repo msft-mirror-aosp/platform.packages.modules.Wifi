@@ -412,53 +412,6 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
         }
     }
 
-    /**
-     * Get optimum burst duration corresponding to a burst size.
-     *
-     * IEEE 802.11 spec, Section 11.21.6.3 Fine timing measurement procedure negotiation, burst
-     * duration is defined as
-     *
-     * Burst duration = (N_FTMPB  * (K + 1)) – 1) * T_MDFTM + T_FTM + aSIFSTime + T_Ack, where
-     *  - N_FTMPB is the value of the FTMs Per Burst subfield
-     *  - K is the maximum number of Fine Timing Measurement frame retransmissions the
-     *    responding STA might attempt
-     *  - T_MDFTM is the duration indicated by the Min Delta FTM subfield of the Fine Timing
-     *    Measurement Parameters field of the initial Fine Timing Measurement frame (FTM_1)
-     *  - T_FTM is the duration of the initial Fine Timing Measurement frame if the FTMs Per Burst
-     *    subfield of the Fine Timing Measurement Parameters field of FTM_1 is set to 1,
-     *    and the duration of the non-initial Fine Timing Measurement frame otherwise
-     *    T_Ack is the duration of the Ack frame expected as a response
-     *
-     * Since many of the parameters are dependent on the chip and the vendor software, framework is
-     * doing a simple conversion with experimented values. Vendor Software may override the burst
-     * duration with more optimal values.
-     *
-     * Section '9.4.2.167 Fine Timing Measurement Parameters element' defines Burst Duration
-     * subfield encoding as,
-     * +--------------------+
-     * |Value|   Represents |
-     * +--------------------+
-     * | 0-1 |  Reserved    |
-     * |  2  |    250 us    |
-     * |  3  |    500 us    |
-     * |  4  |      1 ms    |
-     * |  5  |      2 ms    |
-     * |  6  |      4 ms    |
-     * |  7  |      8 ms    |
-     * |  8  |     16 ms    |
-     * |  9  |     32 ms    |
-     * | 10  |     64 ms    |
-     * | 11  |    128 ms    |
-     * |12-14|  Reserved    |
-     * | 15  | No Preference|
-     * +-----+--------------+
-     */
-    private static int getOptimumBurstDuration(int burstSize) {
-        if (burstSize <= 8) return 9; // 32 ms
-        if (burstSize <= 24) return 10; // 64 ms
-        return 11; // 128 ms
-    }
-
     private static RttConfig[] convertRangingRequestToRttConfigs(RangingRequest request,
             WifiRttController.Capabilities cap) {
         ArrayList<RttConfig> rttConfigs = new ArrayList<>();
@@ -525,7 +478,8 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
                     config.numFramesPerBurst = request.mRttBurstSize;
                     config.numRetriesPerRttFrame = 0; // irrelevant for 2-sided RTT
                     config.numRetriesPerFtmr = 3;
-                    config.burstDuration = getOptimumBurstDuration(request.mRttBurstSize);
+                    config.burstDuration = WifiRttController.getOptimumBurstDuration(
+                            request.mRttBurstSize);
                 } else { // AP + all non-NAN requests
                     config.mustRequestLci = true;
                     config.mustRequestLcr = true;
@@ -534,7 +488,8 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
                     config.numFramesPerBurst = request.mRttBurstSize;
                     config.numRetriesPerRttFrame = (config.type == RttType.TWO_SIDED ? 0 : 3);
                     config.numRetriesPerFtmr = 3;
-                    config.burstDuration = getOptimumBurstDuration(request.mRttBurstSize);
+                    config.burstDuration = WifiRttController.getOptimumBurstDuration(
+                            request.mRttBurstSize);
 
                     if (cap != null) { // constrain parameters per device capabilities
                         config.mustRequestLci = config.mustRequestLci && cap.lciSupported;
@@ -542,7 +497,7 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
                         config.bw = halRttChannelBandwidthCapabilityLimiter(config.bw, cap,
                                 config.type);
                         config.preamble = halRttPreambleCapabilityLimiter(config.preamble, cap,
-                                config.type);
+                                config.type, responder.frequency);
                     }
 
                     // Update secure ranging configuration
@@ -771,17 +726,33 @@ public class WifiRttControllerAidlImpl implements IWifiRttController {
     }
 
     /**
-     * Check whether the selected RTT preamble is supported by the device.
-     * If supported, return the requested preamble.
-     * If not supported, return the next "lower" preamble which is supported.
-     * If none, throw an IllegalArgumentException.
+     * Check whether the selected RTT preamble is supported by the device and the RTT type.
+     * <ul>
+     * <li>If supported, return the requested preamble.
+     * <li>If not supported, return the next "lower" preamble which is supported.
+     * <li>If none, throw an IllegalArgumentException.
+     * </ul>
      *
-     * Note: the halRttPreamble is a single bit flag from the HAL RttPreamble type.
+     * <p>Note: the halRttPreamble is a single bit flag from the HAL RttPreamble type.
+     *
+     * <p>Note: The IEEE 802.11mc is only compatible with HE and EHT when using the 6 GHz band.
+     * However, the IEEE 802.11az supports HE and EHT across all Wi-Fi bands (2.4GHz, 5 GHz, and
+     * 6 GHz).
      */
     private static int halRttPreambleCapabilityLimiter(int halRttPreamble,
-            WifiRttController.Capabilities cap, @RttType int rttType)
+            WifiRttController.Capabilities cap, @RttType int rttType, int frequency)
             throws IllegalArgumentException {
+        // Note: requestedPreamble is only used for the error logging
         int requestedPreamble = halRttPreamble;
+        // Since RTT type is limited based on device capability, check preamble for any adjustment.
+        // The IEEE 802.11mc is only compatible with HE and EHT when using the 6 GHz band. So
+        // adjust the preamble accordingly.
+        if (rttType <= RttType.TWO_SIDED_11MC && !ScanResult.is6GHz(frequency)) {
+            if (halRttPreamble >= RttPreamble.HE) {
+                halRttPreamble = RttPreamble.VHT;
+            }
+        }
+        // Check device capability whether preamble is supported by the device, otherwise adjust it.
         int preambleSupported = (rttType == RttType.TWO_SIDED_11AZ_NTB) ? cap.azPreambleSupported
                 : cap.preambleSupported;
         while ((halRttPreamble != 0) && ((halRttPreamble & preambleSupported) == 0)) {

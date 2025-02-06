@@ -1380,6 +1380,9 @@ public class ActiveModeWarden {
     private void stopAllClientModeManagers() {
         Log.d(TAG, "Shutting down all client mode managers");
         for (ConcreteClientModeManager clientModeManager : getClientModeManagersPrimaryLast()) {
+            if (clientModeManager.getRole() == ROLE_CLIENT_PRIMARY) {
+                setWifiStateForApiCalls(WIFI_STATE_DISABLING);
+            }
             clientModeManager.stop();
         }
     }
@@ -1512,6 +1515,9 @@ public class ActiveModeWarden {
     private void shutdownWifi() {
         Log.d(TAG, "Shutting down all mode managers");
         for (ActiveModeManager manager : getActiveModeManagers()) {
+            if (manager.getRole() == ROLE_CLIENT_PRIMARY) {
+                setWifiStateForApiCalls(WIFI_STATE_DISABLING);
+            }
             manager.stop();
         }
     }
@@ -2007,6 +2013,13 @@ public class ActiveModeWarden {
                 setInitialState(mDisabledState);
             }
             mWifiMetrics.noteWifiEnabledDuringBoot(mSettingsStore.isWifiToggleEnabled());
+            if (mSettingsStore.isWifiToggleEnabled()) {
+                boolean isWifiWakeOn = mWifiInjector.getWakeupController().isUsable();
+                mWifiMetrics.reportWifiStateChanged(true, isWifiWakeOn, false);
+                if (mVerboseLoggingEnabled) {
+                    Log.d(TAG, "logging wifi is on after boot. wifi wake state=" + isWifiWakeOn);
+                }
+            }
 
             // Initialize the lower layers before we start.
             mWifiNative.initialize();
