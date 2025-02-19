@@ -886,6 +886,16 @@ public class WifiAwareManagerSnippet implements Snippet {
                 if (result.getStatus() == RangingResult.STATUS_SUCCESS) {
                     resultBundles[i].putInt("distanceMm", result.getDistanceMm());
                     resultBundles[i].putInt("rssi", result.getRssi());
+                    resultBundles[i].putInt("distanceStdDevMm", result.getDistanceStdDevMm());
+                    resultBundles[i].putInt(
+                        "numAttemptedMeasurements",
+                        result.getNumAttemptedMeasurements());
+                    resultBundles[i].putInt(
+                        "numSuccessfulMeasurements",
+                        result.getNumSuccessfulMeasurements());
+                    resultBundles[i].putByteArray("lci", result.getLci());
+                    resultBundles[i].putByteArray("lcr", result.getLcr());
+                    resultBundles[i].putLong("timestamp", result.getRangingTimestampMillis());
                 }
                 PeerHandle peer = result.getPeerHandle();
                 if (peer != null) {
