@@ -205,6 +205,21 @@ public class WifiP2pManagerSnippet implements Snippet {
     }
 
     /**
+     * Request the connection information in the form of WifiP2pDevice.
+     *
+     * @param callbackId The callback ID assigned by Mobly.
+     * @param channelId The ID of the channel for Wi-Fi P2P to operate on.
+     */
+    @AsyncRpc(description = "Request the connection information in the form of WifiP2pDevice.")
+    public void wifiP2pRequestConnectionInfo(String callbackId,
+            @RpcDefault(value = "0") Integer channelId)
+            throws WifiP2pManagerException {
+        WifiP2pManager.Channel channel = getChannel(channelId);
+        mP2pManager.requestConnectionInfo(channel,
+            new WifiP2pConnectionInfoListener(callbackId));
+    }
+
+    /**
      * Initiate peer discovery. A discovery process involves scanning for available Wi-Fi peers for
      * the purpose of establishing a connection.
      *
@@ -862,6 +877,27 @@ public class WifiP2pManagerSnippet implements Snippet {
             SnippetEvent event = new SnippetEvent(mCallbackId, CALLBACK_EVENT_NAME);
             event.getData().putString(EVENT_KEY_CALLBACK_NAME, ACTION_LISTENER_ON_FAILURE);
             event.getData().putInt(EVENT_KEY_REASON, reason);
+            EventCache.getInstance().postEvent(event);
+        }
+    }
+
+    private static class  WifiP2pConnectionInfoListener
+        implements WifiP2pManager.ConnectionInfoListener {
+        public static final String EVENT_NAME_ON_CONNECTION_INFO =
+            "WifiP2pOnConnectionInfoAvailable";
+        private final String mCallbackId;
+
+        public WifiP2pConnectionInfoListener(String callbackId) {
+            this.mCallbackId = callbackId;
+        }
+
+        @Override
+        public void onConnectionInfoAvailable(WifiP2pInfo info) {
+            Log.d(TAG + ": onConnectionInfoAvailable: " + info.toString());
+            SnippetEvent event = new SnippetEvent(mCallbackId, EVENT_NAME_ON_CONNECTION_INFO);
+            event.getData().putBoolean("groupFormed", info.groupFormed);
+            event.getData().putBoolean("isGroupOwner", info.isGroupOwner);
+            event.getData().putString("groupOwnerHostAddress", info.groupOwnerAddress.toString());
             EventCache.getInstance().postEvent(event);
         }
     }
