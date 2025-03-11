@@ -109,6 +109,8 @@ java_defaults {
         "android.hardware.wifi-V1.0-java-constants",
         "wifi-modules-utils",
         "PlatformProperties",
+        "android.net.wifi.flags-aconfig-java",
+        "ranging_aconfig_flags_lib",
     ],
     libs: [
         "androidx.annotation_annotation",
@@ -119,6 +121,7 @@ java_defaults {
         // library for generated flag code read new storage
         "aconfig_storage_stub",
         "framework-configinfrastructure.stubs.module_lib",
+        "android.security.flags-aconfig-java-export",
     ],
     aidl: {
         generate_get_transaction_name: true,
